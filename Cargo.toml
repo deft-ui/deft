@@ -1,0 +1,68 @@
+[package]
+name = "lento"
+readme = "README.md"
+license = "MIT"
+
+version = "0.1.0"
+authors = ["KasonYang <me@kason.site>"]
+edition = "2021"
+
+
+[dependencies]
+
+quick-js = {path = "third_party/quickjs-rs"}
+yoga = { path = "third_party/yoga-rs" }
+winit = { path = "third_party/winit", features = ["android-native-activity"] }
+skia-window = { path = "skia-window" }
+
+bitflags = "2.0"
+lazy_static = "1.4"
+skia-bindings = { version = "0.75.0", default-features = false }
+skia-safe = {version = "0.75.0", features = ["textlayout", "svg", "x11"]}
+
+ureq = { version = "2.8.0", optional = true }
+base64 = { version = "0.22.0" }
+ordered-float = "3.9.2"
+serde_json = "1.0.117"
+serde = { version = "1.0.203", features = ["derive"] }
+anyhow = { version = "1.0.75" }
+reqwest = { version = "0.12.5",default-features = false, features = ["blocking", "native-tls-vendored"] }
+tokio = { version = "1.38.0", features = ["rt-multi-thread", "fs", "macros", "io-std", "io-util", "sync"] }
+tokio-tungstenite = { version = "0.23.1", features = ["native-tls"] }
+futures-util = "0.3.30"
+clipboard = "0.5.0"
+image = "0.25.2"
+libc = "0.2.155"
+sled = "0.34.7"
+ksni = { version = "0.2.2", optional = true }
+rodio = "0.19.0"
+measure_time = "0.8.3"
+memory-stats = "1.2.0"
+backtrace = "0.3.73"
+sha1 = "0.10.6"
+base16ct = { version = "0.2.0", features = ["alloc"] }
+
+[features]
+default=[]
+tray=["ksni"]
+x11=["tray"]
+production=[]
+
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger = "0.11.0"
+
+
+[dev-dependencies]
+serial_test = "3.0"
+static_assertions = "1.1"
+
+raw-window-handle = { version = "0.5.0" }
+
+[lib]
+name = "lento"
+path = "src/lib.rs"
+crate_type=["cdylib"]
+
+[[bin]]
+path="src/lib.rs"
+name="lento_demo"
