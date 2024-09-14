@@ -8,10 +8,11 @@ function main() {
     container.setStyle({
         background: "#2a2a2a",
         color: "#FFF",
+        padding: 5,
     })
-    container.bindMouseMove(e => {
-        console.log("mouse move", e);
-    })
+    // container.bindMouseMove(e => {
+    //     console.log("mouse move", e);
+    // })
 
     const label = new LabelElement();
     label.setAlign("center")
@@ -36,16 +37,26 @@ function main() {
     // img.setSrc("img.png");
     // container.addChild(img);
     //
-    // const button = new ButtonElement();
-    // button.setTitle("Add children");
-    // button.bindClick(() => {
-    //     for (let i = 0; i < 1000; i++) {
-    //         const lb = new LabelElement();
-    //         lb.setText("label" + i);
-    //         container.addChild(lb);
-    //     }
-    //     console.log("done");
-    // })
+    const button = new ButtonElement();
+    button.setTitle("Add children");
+    button.bindClick(() => {
+        for (let i = 0; i < 1000; i++) {
+            const lb = new LabelElement();
+            lb.setStyle({
+                border: '1 #ccc',
+                borderRadius: 10,
+                marginTop: 10,
+            });
+            lb.setHoverStyle({
+                background: '#ccc',
+            })
+            lb.setText("label" + i);
+            container.addChild(lb);
+        }
+        console.log("done");
+    });
+    container.addChild(button);
+
     //
     // const textEdit = new TextEditElement();
     //
@@ -61,7 +72,6 @@ function main() {
     // });
     //
     // container.addChild(textEdit);
-    // container.addChild(button);
     //
     // //container.removeChild(label2);
     //
