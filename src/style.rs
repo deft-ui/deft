@@ -1,13 +1,16 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use ordered_float::OrderedFloat;
 use quick_js::JsValue;
-use skia_safe::{Color, Image};
+use skia_safe::{Color, Image, Path};
 use yoga::{Align, Direction, Display, Edge, FlexDirection, Justify, Node, Overflow, PositionType, StyleUnit, Wrap};
 use crate::base::Rect;
 use crate::color::parse_hex_color;
 use crate::{inherit_color_prop};
+use crate::border::build_border_paths;
+use crate::cache::CacheValue;
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 
@@ -362,6 +365,7 @@ pub struct StyleNodeInner {
 
     parent: Option<MrcWeak<Self>>,
     children: Vec<StyleNode>,
+    border_paths: CacheValue<BorderParams, [Path; 4]>,
 
     // (inherited, computed)
     pub color: ColorPropValue,
@@ -371,6 +375,14 @@ pub struct StyleNodeInner {
     pub background_image: Option<Image>,
     pub computed_style: ComputedStyle,
     pub on_changed: Option<Box<dyn FnMut(&str)>>,
+}
+
+#[derive(PartialEq)]
+struct BorderParams {
+    border_width: [f32; 4],
+    border_radius: [f32; 4],
+    width: f32,
+    height: f32,
 }
 
 impl Deref for StyleNodeInner {
@@ -421,6 +433,9 @@ impl StyleNode {
             background_image: None,
             computed_style: ComputedStyle::default(),
             on_changed: None,
+            border_paths: CacheValue::new(|p: &BorderParams| {
+                build_border_paths(p.border_width, p.border_radius, p.width, p.height)
+            }),
         };
         Self { inner: Mrc::new(inner) }
     }
@@ -613,6 +628,23 @@ impl StyleNode {
     inherit_color_prop!(
         compute_background_color, compute_children_background_color, background_color, "backgroundcolor", Color::from_argb(0, 0, 0, 0)
     );
+
+    pub fn get_border_paths(&self) -> [Path; 4] {
+        let border_width = [
+            self.get_layout_border_top().de_nan(0.0),
+            self.get_layout_border_right().de_nan(0.0),
+            self.get_layout_border_bottom().de_nan(0.0),
+            self.get_layout_border_left().de_nan(0.0),
+        ];
+        let width = self.get_layout_width().de_nan(0.0);
+        let height = self.get_layout_height().de_nan(0.0);
+        self.border_paths.get(BorderParams {
+            border_width,
+            border_radius: self.border_radius,
+            width,
+            height
+        })
+    }
 
     fn get_parent(&self) -> Option<StyleNode> {
         if let Some(p) = &self.parent {

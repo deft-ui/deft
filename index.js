@@ -40,19 +40,27 @@ function main() {
     const button = new ButtonElement();
     button.setTitle("Add children");
     button.bindClick(() => {
-        for (let i = 0; i < 1000; i++) {
+        const wrapper = new ContainerElement();
+        wrapper.setStyle({
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+        })
+        for (let i = 0; i < 200; i++) {
             const lb = new LabelElement();
             lb.setStyle({
                 border: '1 #ccc',
                 borderRadius: 10,
                 marginTop: 10,
+                width: 80,
+                height: 20,
             });
             lb.setHoverStyle({
                 background: '#ccc',
             })
             lb.setText("label" + i);
-            container.addChild(lb);
+            wrapper.addChild(lb);
         }
+        container.addChild(wrapper);
         console.log("done");
     });
     container.addChild(button);

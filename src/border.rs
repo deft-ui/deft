@@ -35,6 +35,38 @@ impl Border {
     }
 }
 
+pub fn build_border_paths(border_width: [f32; 4], border_radius: [f32; 4], width: f32, height: f32) -> [Path; 4] {
+    let [top_left_radius, top_right_radius, bottom_right_radius, bottom_left_radius] = border_radius;
+    let top = (border_width[0], Color::new(0));
+    let right = (border_width[1],  Color::new(0));
+    let bottom = (border_width[2],  Color::new(0));
+    let left = (border_width[3],  Color::new(0));
+    let borders = vec![
+        (top, left, top_left_radius, right, top_right_radius, width, height, 0.0, 0.0, 0.0),
+        (right, top, top_right_radius, bottom, bottom_right_radius, height, width, 90.0, width, 0.0),
+        (bottom, right, bottom_right_radius, left, bottom_left_radius, width, height, 180.0, width, height),
+        (left, bottom, bottom_left_radius, top, top_left_radius, height, width, 270.0, 0.0, height),
+    ];
+    let mut result = Vec::new();
+    for (top, left, left_radius, right, right_radius, width, height, rotate, tx, ty) in borders {
+        if let Some(mut path) = draw_top_border(&top, &left, left_radius, &right, right_radius, width, height) {
+            let mut matrix = Matrix::rotate_deg(rotate);
+            matrix.post_translate((tx, ty));
+            path.transform(&matrix);
+            result.push(path);
+        } else {
+            result.push(Path::new());
+        }
+    }
+    return unsafe { [
+        result.get_unchecked(0).clone(),
+        result.get_unchecked(1).clone(),
+        result.get_unchecked(2).clone(),
+        result.get_unchecked(3).clone()
+    ] }
+}
+
+
 
 pub fn draw_border(canvas: &Canvas, border_width: [f32; 4], border_color: [Color; 4], border_radius: [f32; 4], width: f32, height: f32) {
     let [top_left_radius, top_right_radius, bottom_right_radius, bottom_left_radius] = border_radius;

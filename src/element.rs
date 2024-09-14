@@ -320,16 +320,19 @@ impl ElementRef {
     }
 
     pub fn draw_border(&self, canvas: &Canvas) {
-        let (width, height) = self.get_size();
-        let layout = &self.layout;
-        let border = [
-            layout.get_style_border_top().nan_to_zero(),
-            layout.get_style_border_right().nan_to_zero(),
-            layout.get_style_border_bottom().nan_to_zero(),
-            layout.get_style_border_left().nan_to_zero(),
-        ];
         let style = &self.layout;
-        draw_border(canvas, border, style.border_color, style.border_radius, width, height);
+        let paths = self.layout.get_border_paths();
+        let color = style.border_color;
+        for i in 0..4 {
+            let p = &paths[i];
+            if !p.is_empty() {
+                let mut paint = Paint::default();
+                paint.set_style(SkPaint_Style::Fill);
+                paint.set_anti_alias(true);
+                paint.set_color(color[i]);
+                canvas.draw_path(&p, &paint);
+            }
+        }
     }
 
     pub fn get_size(&self) -> (f32, f32) {

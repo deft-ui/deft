@@ -12,8 +12,11 @@ use quick_js::loader::FsJsModuleLoader;
 use serde::{Deserialize, Serialize};
 use skia_safe::{Font, Paint};
 use skia_safe::textlayout::{paragraph, TextAlign};
+use skia_window::skia_window::SkiaWindow;
 use tokio_tungstenite::connect_async;
-use winit::event_loop::{EventLoop, EventLoopProxy};
+use winit::application::ApplicationHandler;
+use winit::event::WindowEvent;
+use winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopBuilder, EventLoopProxy};
 use yoga::Node;
 use crate::app::{App, AppEvent};
 use crate::element::ScrollByOption;
@@ -28,6 +31,7 @@ use crate::renderer::CpuRenderer;
 use crate::websocket::WebSocketManager;
 #[cfg(target_os = "android")]
 use winit::platform::android::activity::AndroidApp;
+use winit::window::{WindowAttributes, WindowId};
 use crate::data_dir::get_data_path;
 
 mod border;
@@ -60,6 +64,8 @@ mod ext;
 mod js;
 mod performance;
 
+mod cache;
+
 
 fn main_js_deserializer() {
     let mut map = HashMap::new();
@@ -73,9 +79,9 @@ fn main_js_deserializer() {
 }
 
 #[cfg(not(feature = "production"))]
-fn create_module_loader() -> RemoteModuleLoader {
-    RemoteModuleLoader::new("http://localhost:7800/".to_string())
-   //  FsJsModuleLoader::new(".")
+fn create_module_loader() -> FsJsModuleLoader {
+    // RemoteModuleLoader::new("http://localhost:7800/".to_string())
+   FsJsModuleLoader::new(".")
 }
 
 #[cfg(feature = "production")]
@@ -197,4 +203,35 @@ fn test_text_measure() {
         println!("mem use:{}", mem_use / 1024.0 / 1024.0);
     }
 
+}
+
+fn test_border_performance_gl() {
+    let event_loop: EventLoop<()> = EventLoopBuilder::default().build().unwrap();
+    struct TestApp {
+        window: Option<SkiaWindow>,
+    }
+
+    impl ApplicationHandler for TestApp {
+        fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+            let mut skia_window = SkiaWindow::new(event_loop, WindowAttributes::default());
+            skia_window.render(|canvas| {
+                crate::renderer::test_border(canvas);
+            });
+            self.window = Some(skia_window);
+        }
+
+        fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
+            if let WindowEvent::RedrawRequested = &event {
+                let win = self.window.as_mut().unwrap();
+                win.render(|canvas| {
+                    crate::renderer::test_border(canvas);
+                })
+            } else if let WindowEvent::Resized(s) = &event {
+                let win = self.window.as_mut().unwrap();
+                win.resize_surface(s.width, s.height);
+            }
+        }
+    }
+    let mut app = TestApp { window: None };
+    event_loop.run_app(&mut app).unwrap();
 }
