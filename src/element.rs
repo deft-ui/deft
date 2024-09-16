@@ -12,7 +12,7 @@ use skia_bindings::{SkPaint_Style, SkPathOp};
 use skia_safe::{Canvas, Color, Paint, Path, Rect};
 use winit::window::CursorIcon;
 use yoga::{Direction, Edge, Node};
-use crate::{base, inherit_color_prop, js_call, js_call_rust, js_event_bind, js_get_prop};
+use crate::{base, define_resource, inherit_color_prop, js_call, js_call_rust, js_event_bind, js_get_prop};
 use crate::base::{CaretDetail, ElementEvent, ElementEventContext, ElementEventHandler, Event, EventRegistration, MouseDetail, ScrollEventDetail, TextChangeDetail};
 use crate::border::{build_rect_with_radius, draw_border};
 use crate::color::parse_hex_color;
@@ -27,7 +27,7 @@ use crate::event::{DragOverEventDetail, DragStartEventDetail, DropEventDetail, K
 use crate::ext::common::create_event_handler;
 use crate::frame::{FrameRef, FrameWeak, WeakWindowHandle};
 use crate::img_manager::IMG_MANAGER;
-use crate::js::js_value_util::{FromJsValue2, ToJsValue2};
+use crate::js::js_value_util::{FromJsValue, ToJsValue};
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::style::{AllStylePropertyKey, ColorHelper, ColorPropValue, ComputedStyle, expand_mixed_style, parse_align, parse_color, parse_direction, parse_display, parse_flex_direction, parse_float, parse_justify, parse_length, parse_overflow, parse_position_type, parse_style, parse_wrap, Style, StyleNode, StylePropertyKey, StylePropertyValue};
@@ -48,10 +48,12 @@ thread_local! {
     pub static NEXT_ELEMENT_ID: Cell<u32> = Cell::new(1);
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub struct ElementRef {
     inner: Mrc<Element>
 }
+
+define_resource!(ElementRef);
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ScrollByOption {
@@ -748,14 +750,6 @@ impl DerefMut for ElementRef {
     }
 }
 
-impl Clone for ElementRef {
-    fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-        }
-    }
-}
-
 
 pub struct Element {
     id: u32,
@@ -862,22 +856,6 @@ pub trait ElementBackend {
     }
     fn get_children(&self) -> Vec<ElementRef> {
         Vec::new()
-    }
-}
-
-// js api
-impl ToJsValue2 for ElementRef {
-    fn to_js_value(self) -> Result<JsValue, Error> {
-        Ok(JsValue::Resource(ResourceValue { resource: Rc::new(RefCell::new(self)) }))
-    }
-}
-impl FromJsValue2 for ElementRef {
-    fn from_js_value(value: JsValue) -> Result<Self, Error> {
-        if let Some(r) = value.as_resource(|r:&mut ElementRef| r.clone()) {
-            Ok(r.clone())
-        } else {
-            Err(anyhow!("invalid value"))
-        }
     }
 }
 

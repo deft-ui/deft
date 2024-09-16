@@ -12,23 +12,22 @@ use crate::base::{Event, EventRegistration};
 use crate::event_loop::run_on_event_loop;
 use crate::ext::audio_player::{AudioCurrentChangeInfo, AudioMeta, AudioNotify, AudioServer, AudioSources};
 use crate::ext::common::create_event_handler;
-use crate::js::js_value_util::{FromJsValue2, ToJsValue2};
-use crate::js_event_bind;
-use crate::mrc::Mrc;
+use crate::js::js_value_util::{FromJsValue, ToJsValue};
+use crate::{define_ref_and_resource, js_event_bind};
 
 thread_local! {
     pub static NEXT_ID: Cell<u32> = Cell::new(1);
-    pub static PLAYING_MAP: RefCell<HashMap<u32, Audio>> = RefCell::new(HashMap::new());
+    pub static PLAYING_MAP: RefCell<HashMap<u32, AudioResource >> = RefCell::new(HashMap::new());
     pub static PLAYER: AudioServer = AudioServer::new(handle_play_notify);
 }
 
-pub struct AudioInner {
+pub struct Audio {
     id: u32,
     event_registration: EventRegistration<u32>,
     sources: Arc<Mutex<AudioSources>>,
 }
 
-impl AudioInner {
+impl Audio {
     pub fn new(id: u32, sources: Arc<Mutex<AudioSources>>) -> Self {
         Self {
             id,
@@ -38,10 +37,7 @@ impl AudioInner {
     }
 }
 
-#[derive(Clone)]
-pub struct Audio {
-    inner: Mrc<AudioInner>,
-}
+define_ref_and_resource!(AudioResource, Audio);
 
 #[derive(Serialize, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -50,36 +46,6 @@ pub struct AudioOptions {
     index: Option<usize>,
     cache_dir: Option<String>,
     auto_loop: Option<bool>,
-}
-
-impl Deref for Audio {
-    type Target = AudioInner;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl DerefMut for Audio {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
-    }
-}
-
-impl ToJsValue2 for Audio {
-    fn to_js_value(self) -> Result<JsValue, Error> {
-        Ok(JsValue::Resource(ResourceValue { resource: Rc::new(RefCell::new(self)) }))
-    }
-}
-
-impl FromJsValue2 for Audio {
-    fn from_js_value(value: JsValue) -> Result<Self, Error> {
-        if let Some(r) = value.as_resource(|r: &mut Audio| r.clone()) {
-            Ok(r)
-        } else {
-            Err(anyhow!("invalid value"))
-        }
-    }
 }
 
 fn handle_play_notify(id: u32, msg: AudioNotify) {
@@ -121,21 +87,21 @@ fn handle_play_notify(id: u32, msg: AudioNotify) {
     });
 }
 
-fn registry_playing(audio: &Audio) {
+fn registry_playing(audio: &AudioResource) {
     let audio = audio.clone();
     PLAYING_MAP.with_borrow_mut(move |m| {
         m.insert(audio.id, audio);
     })
 }
 
-fn unregistry_playing(audio: &Audio) {
+fn unregistry_playing(audio: &AudioResource) {
     let id = audio.id;
     PLAYING_MAP.with_borrow_mut(move |m| {
         m.remove(&id);
     })
 }
 
-pub fn audio_create(options: AudioOptions) -> Result<Audio, Error> {
+pub fn audio_create(options: AudioOptions) -> Result<AudioResource, Error> {
     let id = NEXT_ID.get();
     NEXT_ID.set(id + 1);
 
@@ -146,13 +112,11 @@ pub fn audio_create(options: AudioOptions) -> Result<Audio, Error> {
         auto_loop: options.auto_loop.unwrap_or(false),
         download_handle: None,
     };
-    let audio = AudioInner::new(id, Arc::new(Mutex::new(sources)));
-    Ok(Audio {
-        inner: Mrc::new(audio)
-    })
+    let audio = Audio::new(id, Arc::new(Mutex::new(sources)));
+    Ok(AudioResource::new(audio))
 }
 
-pub fn audio_play(audio: Audio) -> Result<(), Error> {
+pub fn audio_play(audio: AudioResource) -> Result<(), Error> {
     registry_playing(&audio);
     PLAYER.with(move |p| {
         p.play(audio.id, audio.sources.clone())
@@ -160,14 +124,14 @@ pub fn audio_play(audio: Audio) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn audio_pause(audio: Audio) -> Result<(), Error> {
+pub fn audio_pause(audio: AudioResource) -> Result<(), Error> {
     PLAYER.with(|p| {
         p.pause(audio.id)
     });
     Ok(())
 }
 
-pub fn audio_stop(audio: Audio) -> Result<(), Error> {
+pub fn audio_stop(audio: AudioResource) -> Result<(), Error> {
     unregistry_playing(&audio);
     PLAYER.with(|p| {
         p.stop(audio.id)
@@ -175,7 +139,7 @@ pub fn audio_stop(audio: Audio) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn audio_add_event_listener(mut audio: Audio, event_type: String, callback: JsValue) -> Result<i32, Error> {
+pub fn audio_add_event_listener(mut audio: AudioResource, event_type: String, callback: JsValue) -> Result<i32, Error> {
     let event_name = event_type.as_str();
     let handler = create_event_handler(event_name, callback);
     let er = &mut audio.event_registration;
@@ -189,7 +153,7 @@ pub fn audio_add_event_listener(mut audio: Audio, event_type: String, callback: 
     Ok(0)
 }
 
-pub fn audio_remove_event_listener(mut audio: Audio, event_type: String, id: u32) -> Result<(), Error> {
+pub fn audio_remove_event_listener(mut audio: AudioResource, event_type: String, id: u32) -> Result<(), Error> {
     audio.event_registration.remove_event_listener(&event_type, id);
     Ok(())
 }

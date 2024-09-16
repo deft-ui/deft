@@ -10,7 +10,7 @@ pub fn create_event_handler<T>(event_name: &str, callback: JsValue) -> Box<dyn F
             JsValue::Int(0), JsValue::String(en.clone()), detail, JsValue::Int(target),
         ]);
         if let Ok(cb_result) = callback_result {
-            use crate::js::js_value_util::FromJsValue;
+            use crate::js::js_value_util::DeserializeFromJsValue;
             ;
             if let Ok(res) = EventResult::from_js_value(cb_result) {
                 if res.propagation_cancelled {

@@ -16,24 +16,24 @@ impl TryFrom<JsValue> for JsParam {
     }
 }
 
+pub trait SerializeToJsValue {
+    fn to_js_value(self) -> Result<JsValue, Error>;
+}
+
 pub trait ToJsValue {
     fn to_js_value(self) -> Result<JsValue, Error>;
 }
 
-pub trait ToJsValue2 {
+pub trait SerializeResultToJsValue {
     fn to_js_value(self) -> Result<JsValue, Error>;
 }
 
-pub trait ToJsValue3 {
-    fn to_js_value(self) -> Result<JsValue, Error>;
-}
-
-pub trait ToJsValue4 {
+pub trait ResultToJsValue {
     fn to_js_value(self) -> Result<JsValue, Error>;
 }
 
 
-impl<F> ToJsValue for F where F: Serialize {
+impl<F> SerializeToJsValue for F where F: Serialize {
     fn to_js_value(self) -> Result<JsValue, Error> {
         let serializer = JsValueSerializer {};
         let js_r = self.serialize(serializer)?;
@@ -41,7 +41,7 @@ impl<F> ToJsValue for F where F: Serialize {
     }
 }
 
-impl<F> ToJsValue3 for Result<F, Error> where F: Serialize {
+impl<F> SerializeResultToJsValue for Result<F, Error> where F: Serialize {
     fn to_js_value(self) -> Result<JsValue, Error> {
         match self {
             Ok(r) => {
@@ -55,28 +55,28 @@ impl<F> ToJsValue3 for Result<F, Error> where F: Serialize {
     }
 }
 
-impl ToJsValue4 for Result<JsValue, Error> {
+impl ResultToJsValue for Result<JsValue, Error> {
     fn to_js_value(self) -> Result<JsValue, Error> {
         self
     }
 }
 
-impl ToJsValue2 for JsValue {
+impl ToJsValue for JsValue {
     fn to_js_value(self) -> Result<JsValue, Error> {
         Ok(self)
     }
 
 }
 
+pub trait DeserializeFromJsValue: Sized {
+    fn from_js_value(value: JsValue) -> Result<Self, Error>;
+}
+
 pub trait FromJsValue: Sized {
     fn from_js_value(value: JsValue) -> Result<Self, Error>;
 }
 
-pub trait FromJsValue2: Sized {
-    fn from_js_value(value: JsValue) -> Result<Self, Error>;
-}
-
-impl<F> FromJsValue for F
+impl<F> DeserializeFromJsValue for F
 where
     F: for <'a> Deserialize<'a>,
 {
@@ -85,7 +85,7 @@ where
     }
 }
 
-impl FromJsValue2 for JsValue {
+impl FromJsValue for JsValue {
     fn from_js_value(value: JsValue) -> Result<Self, Error> {
         Ok(value)
     }

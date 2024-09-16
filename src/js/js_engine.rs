@@ -13,7 +13,7 @@ use crate::app::exit_app;
 use crate::console::Console;
 use crate::element::{element_create, ElementRef};
 use crate::ext::ext_appfs::{appfs_create_dir, appfs_create_dir_all, appfs_data_path, appfs_delete_file, appfs_exists, appfs_read, appfs_readdir, appfs_remove_dir, appfs_remove_dir_all, appfs_write, appfs_write_new};
-use crate::ext::ext_audio::{audio_add_event_listener, audio_create, audio_stop, audio_remove_event_listener, Audio, audio_play, audio_pause, AudioOptions};
+use crate::ext::ext_audio::{audio_add_event_listener, audio_create, audio_stop, audio_remove_event_listener, AudioResource, audio_play, audio_pause, AudioOptions};
 use crate::ext::ext_base64::base64_encode_str;
 use crate::ext::ext_env::{env_exe_dir, env_exe_path};
 use crate::ext::ext_fetch::{fetch_create, fetch_response_headers, fetch_response_save, fetch_response_status, FetchResponse};
@@ -24,12 +24,12 @@ use crate::ext::ext_localstorage::{localstorage_get, localstorage_set};
 use crate::ext::ext_path::{path_filename, path_join};
 use crate::ext::ext_timer::{timer_clear_interval, timer_clear_timeout, timer_set_interval, timer_set_timeout};
 #[cfg(feature = "tray")]
-use crate::ext::ext_tray::{SystemTrayRef, tray_create, TrayMenu};
-use crate::ext::ext_websocket::{Websocket, ws_connect, ws_read};
+use crate::ext::ext_tray::{SystemTrayResource, tray_create, TrayMenu};
+use crate::ext::ext_websocket::{WsConnectionResource, ws_connect, ws_read};
 use crate::frame::FrameWeak;
 use crate::js::js_runtime::JsContext;
 use crate::js::js_serde::JsValueSerializer;
-use crate::js::js_value_util::FromJsValue;
+use crate::js::js_value_util::DeserializeFromJsValue;
 use crate::mrc::Mrc;
 
 pub struct JsEngine {
@@ -103,17 +103,17 @@ impl JsEngine {
 
         // websocket
         export_js_async_api!(js_context, "ws_connect", ws_connect, String);
-        export_js_async_api!(js_context, "ws_read", ws_read, Websocket);
+        export_js_async_api!(js_context, "ws_read", ws_read, WsConnectionResource);
 
         // tray
         #[cfg(feature = "tray")]
         {
             export_js_api!(js_context, "tray_create",     tray_create, String);
-            export_js_object_api!(js_context, "tray_set_menus",  SystemTrayRef, set_menus, Vec::<TrayMenu>);
-            export_js_object_api!(js_context, "tray_set_icon",   SystemTrayRef, set_icon, String);
-            export_js_object_api!(js_context, "tray_set_title",  SystemTrayRef, set_title, String);
-            export_js_object_api!(js_context, "tray_remove_event_listener", SystemTrayRef, remove_event_listener, String, i32);
-            export_js_object_api!(js_context, "tray_bind_event", SystemTrayRef, bind_event, String, JsValue);
+            export_js_object_api!(js_context, "tray_set_menus",  SystemTrayResource, set_menus, Vec::<TrayMenu>);
+            export_js_object_api!(js_context, "tray_set_icon",   SystemTrayResource, set_icon, String);
+            export_js_object_api!(js_context, "tray_set_title",  SystemTrayResource, set_title, String);
+            export_js_object_api!(js_context, "tray_remove_event_listener", SystemTrayResource, remove_event_listener, String, i32);
+            export_js_object_api!(js_context, "tray_bind_event", SystemTrayResource, bind_event, String, JsValue);
         }
 
         // env
@@ -143,11 +143,11 @@ impl JsEngine {
 
         //audio
         export_js_api!(js_context, "audio_create", audio_create, AudioOptions);
-        export_js_api!(js_context, "audio_play", audio_play, Audio);
-        export_js_api!(js_context, "audio_pause", audio_pause, Audio);
-        export_js_api!(js_context, "audio_stop", audio_stop, Audio);
-        export_js_api!(js_context, "audio_add_event_listener", audio_add_event_listener, Audio, String, JsValue);
-        export_js_api!(js_context, "audio_remove_event_listener", audio_remove_event_listener, Audio, String, u32);
+        export_js_api!(js_context, "audio_play", audio_play, AudioResource);
+        export_js_api!(js_context, "audio_pause", audio_pause, AudioResource);
+        export_js_api!(js_context, "audio_stop", audio_stop, AudioResource);
+        export_js_api!(js_context, "audio_add_event_listener", audio_add_event_listener, AudioResource, String, JsValue);
+        export_js_api!(js_context, "audio_remove_event_listener", audio_remove_event_listener, AudioResource, String, u32);
 
         // base64
         export_js_api!(js_context, "base64_encode_str", base64_encode_str, String);

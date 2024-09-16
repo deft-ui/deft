@@ -5,7 +5,6 @@ use std::rc::Rc;
 use anyhow::{anyhow, Error};
 use quick_js::{JsValue, ResourceValue};
 use serde::{Deserialize, Serialize};
-use skia_window::skia_window::SkiaWindow;
 use winit::dpi::{LogicalPosition, LogicalSize, Size};
 use winit::dpi::Position::Logical;
 use winit::event::WindowEvent;
@@ -15,12 +14,9 @@ use winit::window::{Window, WindowId};
 
 use crate::app::{exit_app};
 use crate::element::{ElementBackend, ElementRef};
-use crate::event_loop::{run_with_event_loop, send_event};
-use crate::export_js_object_api;
+use crate::{define_resource};
 use crate::frame::{FrameRef, FrameWeak};
-use crate::js::js_runtime::JsContext;
-use crate::js::js_value_util::{FromJsValue2, ToJsValue2};
-use crate::mrc::Mrc;
+use crate::js::js_value_util::{FromJsValue, ToJsValue};
 
 
 thread_local! {
@@ -185,21 +181,4 @@ impl FrameWeak {
 
 // Js Api
 
-impl ToJsValue2 for FrameWeak {
-    fn to_js_value(self) -> Result<JsValue, Error> {
-        Ok(JsValue::Resource(ResourceValue {
-            resource: Rc::new(RefCell::new(self)),
-        }))
-    }
-}
-
-impl FromJsValue2 for FrameWeak {
-    fn from_js_value(value: JsValue) -> Result<Self, Error> {
-        if let Some(r) = value.as_resource(|r: &mut FrameWeak| r.clone()) {
-            //TODO fix
-            Ok(r)
-        } else {
-            Err(anyhow!("invalid value"))
-        }
-    }
-}
+define_resource!(FrameWeak);

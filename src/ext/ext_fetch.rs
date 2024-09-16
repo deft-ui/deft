@@ -9,13 +9,16 @@ use serde::{Deserialize, Serialize};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
+use crate::define_resource;
 
-use crate::js::js_value_util::{FromJsValue2, ToJsValue2};
+use crate::js::js_value_util::{FromJsValue, ToJsValue};
 
 #[derive(Clone)]
 pub struct FetchResponse {
     response: Arc<Mutex<Response>>,
 }
+
+define_resource!(FetchResponse);
 
 #[derive(Serialize, Deserialize)]
 pub struct Header {
@@ -23,23 +26,6 @@ pub struct Header {
     pub value: String,
 }
 
-impl ToJsValue2 for FetchResponse {
-    fn to_js_value(self) -> Result<JsValue, Error> {
-        Ok(JsValue::Resource(ResourceValue {
-            resource: Rc::new(RefCell::new(self)),
-        }))
-    }
-}
-
-impl FromJsValue2 for FetchResponse {
-    fn from_js_value(value: JsValue) -> Result<Self, Error> {
-        if let Some(r) = value.as_resource(|r: &mut FetchResponse| r.clone()) {
-            Ok(r)
-        } else {
-            Err(anyhow!("invalid response"))
-        }
-    }
-}
 
 pub async fn fetch_create(url: String) -> Result<FetchResponse, Error> {
     let rsp = reqwest::get(url).await?;

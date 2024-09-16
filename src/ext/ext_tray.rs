@@ -10,8 +10,8 @@ use crate::app::AppEvent;
 use crate::base::{Event, EventHandler, EventRegistration};
 use crate::event_loop::get_event_proxy;
 use crate::ext::common::create_event_handler;
-use crate::js::js_value_util::{FromJsValue2, ToJsValue2};
-use crate::{js_event_bind, js_event_bind2};
+use crate::js::js_value_util::{FromJsValue, ToJsValue};
+use crate::{define_ref_and_resource, js_event_bind, js_event_bind2};
 use crate::mrc::Mrc;
 
 
@@ -58,15 +58,12 @@ impl Tray for MyTray {
 
 pub struct SystemTray {
     event_loop_proxy: EventLoopProxy<AppEvent>,
-    event_registration: EventRegistration<SystemTrayRef>,
+    event_registration: EventRegistration<SystemTrayResource>,
     id: u32,
     handle: Handle<MyTray>,
 }
 
-#[derive(Clone)]
-pub struct SystemTrayRef {
-    inner: Mrc<SystemTray>,
-}
+define_ref_and_resource!(SystemTrayResource, SystemTray);
 
 unsafe impl Send for MyTray {}
 
@@ -78,7 +75,7 @@ pub struct TrayMenu {
     pub label: String,
 }
 
-impl SystemTrayRef {
+impl SystemTrayResource {
     pub fn new(tray_id: &str, event_loop_proxy: EventLoopProxy<AppEvent>) -> Self {
         let inner_id = NEXT_TRAY_ID.get();
         NEXT_TRAY_ID.set(inner_id + 1);
@@ -109,7 +106,7 @@ impl SystemTrayRef {
         inst.inner.handle.update(move |t| {
             t.activate_callback = Box::new(move || {
                 if let Some(st) = inst_weak.upgrade() {
-                    let mut str = SystemTrayRef {
+                    let mut str = SystemTrayResource {
                         inner: st,
                     };
                     str.activate_ts();
@@ -120,7 +117,7 @@ impl SystemTrayRef {
                 let id = id.to_string();
                 Box::new(move |_| {
                     if let Some(st) = inst_weak2.upgrade() {
-                        let mut str = SystemTrayRef {
+                        let mut str = SystemTrayResource {
                             inner: st,
                         };
                         str.emit_menu_click(id.to_string());
@@ -131,7 +128,7 @@ impl SystemTrayRef {
         inst
     }
 
-    pub fn add_event_listener(&mut self, event_type: &str, handler: Box<EventHandler<SystemTrayRef>>) -> u32 {
+    pub fn add_event_listener(&mut self, event_type: &str, handler: Box<EventHandler<SystemTrayResource>>) -> u32 {
         self.inner.event_registration.add_event_listener(event_type, handler)
     }
 
@@ -186,58 +183,36 @@ impl SystemTrayRef {
     }
 }
 
-// Type conversion
-
-impl ToJsValue2 for SystemTrayRef {
-    fn to_js_value(self) -> Result<JsValue, Error> {
-        Ok(JsValue::Resource(ResourceValue {
-            resource: Rc::new(RefCell::new(self)),
-        }))
-    }
-}
-
-impl FromJsValue2 for SystemTrayRef {
-    fn from_js_value(value: JsValue) -> Result<Self, Error> {
-        if let Some(r) = value.as_resource(|r:&mut SystemTrayRef| r.clone()) {
-            Ok(r)
-        } else {
-            Err(anyhow!("Invalid value"))
-        }
-    }
-}
-
-
 // Js Api
 
-
-pub fn tray_create(id: String) -> Result<SystemTrayRef, Error> {
-    let tray = SystemTrayRef::new(&id, get_event_proxy());
+pub fn tray_create(id: String) -> Result<SystemTrayResource, Error> {
+    let tray = SystemTrayResource::new(&id, get_event_proxy());
     Ok(tray)
 }
 
-pub fn tray_bind_event(mut n: SystemTrayRef, event_name: String, callback: JsValue) -> Result<i32, Error> {
+pub fn tray_bind_event(mut n: SystemTrayResource, event_name: String, callback: JsValue) -> Result<i32, Error> {
     let handler = create_event_handler(&event_name, callback);
     js_event_bind!(n, "activate", (), &event_name, handler);
     js_event_bind!(n, "menuclick", String, &event_name, handler);
     Ok(0)
 }
 
-pub fn tray_set_menus(mut n: SystemTrayRef, menus: Vec<TrayMenu>) -> Result<i32, Error> {
+pub fn tray_set_menus(mut n: SystemTrayResource, menus: Vec<TrayMenu>) -> Result<i32, Error> {
     n.set_menus(menus);
     Ok(0)
 }
 
-pub fn tray_set_icon(mut n: SystemTrayRef,  icon: String) -> Result<(), Error> {
+pub fn tray_set_icon(mut n: SystemTrayResource, icon: String) -> Result<(), Error> {
     n.set_icon(icon);
     Ok(())
 }
 
-pub fn tray_set_title(mut n: SystemTrayRef,  title: String) -> Result<(), Error> {
+pub fn tray_set_title(mut n: SystemTrayResource, title: String) -> Result<(), Error> {
     n.set_title(title);
     Ok(())
 }
 
-pub fn tray_remove_event_listener(mut n: SystemTrayRef,  event_name: String, id: i32) -> Result<(), Error> {
+pub fn tray_remove_event_listener(mut n: SystemTrayResource, event_name: String, id: i32) -> Result<(), Error> {
     n.remove_event_listener(event_name, id);
     Ok(())
 }

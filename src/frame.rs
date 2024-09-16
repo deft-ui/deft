@@ -25,7 +25,7 @@ use crate::element::ElementRef;
 use crate::event::{build_modifier, CaretEventBind, ClickEventBind, DragOverEventDetail, DragStartEventDetail, DropEventDetail, FocusEventBind, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT, KeyEventDetail, MouseDownEventBind, MouseEnterEventBind, MouseLeaveEventBind, MouseMoveEventBind, MouseUpEventBind, MouseWheelDetail, named_key_to_str, TouchCancelEventBind, TouchEndEventBind, TouchMoveEventBind, TouchStartEventBind};
 use crate::event_loop::{run_with_event_loop, send_event};
 use crate::ext::common::create_event_handler;
-use crate::js::js_value_util::{FromJsValue2, ToJsValue2};
+use crate::js::js_value_util::{FromJsValue, ToJsValue};
 use crate::js_event_bind;
 use crate::mrc::{Mrc, MrcWeak};
 use crate::renderer::CpuRenderer;
@@ -798,28 +798,5 @@ fn emit_mouse_event(node: &mut ElementRef, event_type: &str, event_type_enum: Mo
         MouseEventType::MouseMove => node.emit_mouse_move(detail),
         MouseEventType::MouseEnter => node.emit_mouse_enter(detail),
         MouseEventType::MouseLeave => node.emit_mouse_leave(detail),
-    }
-}
-
-// Js Api
-
-impl ToJsValue2 for FrameRef {
-    fn to_js_value(self) -> Result<JsValue, Error> {
-        Ok(JsValue::Resource(ResourceValue {
-            resource: Rc::new(RefCell::new(self)),
-        }))
-    }
-}
-
-impl FromJsValue2 for FrameRef {
-    fn from_js_value(value: JsValue) -> Result<Self, Error> {
-        if let Some(r) = value.as_resource(|r: &mut FrameRef| r.clone()) {
-            //TODO fix
-            Ok(FrameRef {
-                inner: r,
-            })
-        } else {
-            Err(anyhow!("invalid value"))
-        }
     }
 }

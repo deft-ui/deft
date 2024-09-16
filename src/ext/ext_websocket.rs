@@ -7,56 +7,42 @@ use anyhow::{anyhow, Error};
 use futures_util::stream::{SplitSink, SplitStream};
 use futures_util::StreamExt;
 use quick_js::{JsValue, ResourceValue};
-use quick_js::JsValue::Resource;
 use tokio::net::TcpStream;
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 use tokio_tungstenite::tungstenite::Message;
 use tokio::sync::Mutex;
-use crate::js::js_value_util::{FromJsValue2, ToJsValue2};
+use crate::define_ref_and_resource;
+use crate::js::js_value_util::{FromJsValue, ToJsValue};
 
 type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
-pub struct WebsocketInner {
+struct WsConnectionInner {
     writer: SplitSink<WsStream, Message>,
     reader: SplitStream<WsStream>,
 }
 
-#[derive(Clone)]
-pub struct Websocket {
-    inner: Arc<Mutex<WebsocketInner>>,
+pub struct WsConnection {
+    inner: Arc<Mutex<WsConnectionInner>>,
 }
 
-impl FromJsValue2 for Websocket {
-    fn from_js_value(client: JsValue) -> Result<Self, Error> {
-        if let Some(ws) = client.as_resource(|w: &mut Websocket| w.clone()) {
-            Ok(ws)
-        } else {
-            Err(anyhow!("invalid client"))
-        }
-    }
-}
+define_ref_and_resource!(WsConnectionResource, WsConnection);
+unsafe impl Send for WsConnectionResource {}
+unsafe impl Sync for WsConnectionResource {}
 
-impl ToJsValue2 for Websocket {
-    fn to_js_value(self) -> Result<JsValue, Error> {
-        Ok(Resource(ResourceValue {
-            resource: Rc::new(RefCell::new(self)),
-        }))
-    }
-}
-
-pub async fn ws_connect(url: String) -> Result<Websocket, Error> {
+pub async fn ws_connect(url: String) -> Result<WsConnectionResource, Error> {
     let (mut socket, _) = connect_async(url).await
         .map_err(|e| io::Error::new(ErrorKind::Other, e))?;
     let (writer, reader) = socket.split();
-    let inner = WebsocketInner {
+    let inner = WsConnectionInner {
         reader,
         writer,
     };
-    Ok(Websocket { inner: Arc::new(Mutex::new(inner)) })
+    let ws_conn = WsConnection { inner: Arc::new(Mutex::new(inner)) };
+    Ok(WsConnectionResource::new(ws_conn))
 }
 
-pub async fn ws_read(ws: Websocket) -> Result<JsValue, Error> {
-    let mut inner = ws.inner.lock().await;
+pub async fn ws_read(ws: WsConnectionResource) -> Result<JsValue, Error> {
+    let mut inner = ws.inner.inner.lock().await;
     if let Some(result) = inner.reader.next().await {
         let msg = result?;
         let value = match msg {
