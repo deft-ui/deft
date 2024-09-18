@@ -218,7 +218,9 @@ impl Entry {
                 match nk {
                     NamedKey::Backspace => {
                         if self.base.get_selection().is_none() {
-                            self.base.select(self.caret - 1, self.caret);
+                            if self.caret > 0 {
+                                self.base.select(self.caret - 1, self.caret);
+                            }
                         }
                         self.handle_input("");
                     },
