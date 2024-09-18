@@ -1,6 +1,7 @@
 use std::any::Any;
 use std::collections::HashMap;
 use std::str::FromStr;
+use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
 use skia_safe::Path;
 use yoga::Layout;
@@ -79,19 +80,24 @@ pub struct TouchDetail {
     pub touches: Vec<Touch>,
 }
 
-pub type MouseEventHandler = dyn FnMut(MouseDetail);
+pub trait EventDetail {
+    fn raw(&self) -> Box<&dyn Any>;
+    fn raw_mut(&mut self) -> Box<&mut dyn Any>;
+    fn create_js_value(&self) -> JsValue;
+}
 
-pub type PreventableMouseEventHandler = dyn FnMut(MouseDetail) -> bool;
+impl<T> EventDetail for T where T: Serialize + Clone + 'static {
+    fn raw(&self) -> Box<&dyn Any> {
+        Box::new(self)
+    }
 
-pub struct MouseEventRegistration {
-    //TODO make private
-    pub next_event_id: u32,
-    pub click_listeners: Vec<(u32, Box<PreventableMouseEventHandler>)>,
-    pub down_listeners: Vec<(u32, Box<PreventableMouseEventHandler>)>,
-    pub up_listeners: Vec<(u32, Box<PreventableMouseEventHandler>)>,
-    pub move_listeners: Vec<(u32, Box<MouseEventHandler>)>,
-    pub enter_listeners: Vec<(u32, Box<MouseEventHandler>)>,
-    pub leave_listeners: Vec<(u32, Box<MouseEventHandler>)>,
+    fn raw_mut(&mut self) -> Box<&mut dyn Any> {
+        Box::new(self)
+    }
+
+    fn create_js_value(&self) -> JsValue {
+        todo!()
+    }
 }
 
 pub struct EventContext<T> {
@@ -206,8 +212,8 @@ impl<E> EventRegistration<E> {
         }
     }
 
-    pub fn emit_event(&mut self, event_type: &str, event: &mut Event<E>) {
-        if let Some(listeners) = self.listeners.get_mut(event_type) {
+    pub fn emit_event(&mut self, event: &mut Event<E>) {
+        if let Some(listeners) = self.listeners.get_mut(&event.event_type) {
             for it in listeners {
                 (it.1)(event);
             }
@@ -215,20 +221,6 @@ impl<E> EventRegistration<E> {
 
     }
 
-}
-
-impl MouseEventRegistration {
-    pub fn new() -> Self {
-        Self {
-            next_event_id: 0,
-            click_listeners: vec![],
-            down_listeners: vec![],
-            up_listeners: vec![],
-            move_listeners: vec![],
-            enter_listeners: vec![],
-            leave_listeners: vec![],
-        }
-    }
 }
 
 

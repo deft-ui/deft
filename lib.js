@@ -122,15 +122,14 @@ export class EventRegistry {
 
         /**
          *
-         * @param frameId {number}
          * @param type {string}
          * @param detail {object}
-         * @param _targetId {number}
+         * @param target {unknown}
          * @returns {{propagationCancelled: boolean, preventDefault: boolean}}
          * @private
          */
-        function eventCallback(frameId, type, detail, _targetId) {
-            const event = new EventObject(type, detail, this);
+        function eventCallback(type, detail, target) {
+            const event = new EventObject(type, detail, target);
             callback && callback(event);
             return event.result();
         }

@@ -170,7 +170,7 @@ impl SystemTrayResource {
         let mut sr = self.clone();
         self.inner.event_loop_proxy.send_event(AppEvent::CallbackWithEventLoop(Box::new(move |_| {
             let mut event = Event::new("menuclick", menu_id, sr.clone());
-            sr.inner.event_registration.emit_event("menuclick", &mut event);
+            sr.inner.event_registration.emit_event(&mut event);
         }))).unwrap();
     }
 
@@ -178,7 +178,7 @@ impl SystemTrayResource {
         let mut sr = self.clone();
         self.inner.event_loop_proxy.send_event(AppEvent::CallbackWithEventLoop(Box::new(move |_| {
             let mut event = Event::new("activate", (), sr.clone());
-            sr.inner.event_registration.emit_event("activate", &mut event);
+            sr.inner.event_registration.emit_event(&mut event);
         }))).unwrap();
     }
 }
