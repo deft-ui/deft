@@ -41,6 +41,7 @@ memory-stats = "1.2.0"
 backtrace = "0.3.73"
 sha1 = "0.10.6"
 base16ct = { version = "0.2.0", features = ["alloc"] }
+jni = "0.21.1"
 
 [features]
 default=[]

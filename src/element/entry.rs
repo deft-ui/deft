@@ -13,9 +13,11 @@ use crate::element::{ElementBackend, ElementRef};
 use crate::element::text::{AtomOffset, Text as Label};
 use crate::number::DeNan;
 use crate::{js_call, match_event, match_event_type, timer};
+use crate::app::AppEvent;
 use crate::element::edit_history::{EditHistory, EditOpType};
 use crate::element::text::text_paragraph::Line;
 use crate::event::{CaretEventBind, KEY_MOD_CTRL, KEY_MOD_SHIFT, KeyDownEvent, KeyEventDetail};
+use crate::event_loop::send_event;
 use crate::string::StringUtils;
 use crate::timer::TimerHandle;
 
@@ -183,6 +185,7 @@ impl Entry {
         self.caret_timer_handle = None;
         self.caret_visible.set(false);
         self.element.mark_dirty(false);
+        send_event(AppEvent::HideSoftInput).unwrap();
     }
 
     fn begin_select(&mut self) {
@@ -315,6 +318,7 @@ impl Entry {
                 Self::caret_tick(caret_visible.clone(), context.clone());
             }, 500)
         });
+        send_event(AppEvent::ShowSoftInput).unwrap();
     }
 
     fn insert_text(&mut self, input: &str, caret: usize, record_history: bool) {

@@ -255,14 +255,14 @@ impl ElementRef {
         }
     }
 
-    // pub fn get_window(&self) -> Option<FrameRef> {
-    //     if let Some(p) = self.get_parent() {
-    //         return p.get_window()
-    //     } else if let Some(ww) = &self.window {
-    //         return ww.upgrade();
-    //     }
-    //     None
-    // }
+    pub fn get_frame(&self) -> Option<FrameWeak> {
+        if let Some(p) = self.get_parent() {
+            return p.get_frame()
+        } else if let Some(ww) = &self.window {
+            return Some(ww.clone())
+        }
+        None
+    }
 
     pub fn get_parent(&self) -> Option<ElementRef> {
         let p = match &self.parent {
