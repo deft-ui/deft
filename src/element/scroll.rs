@@ -376,7 +376,7 @@ impl ElementBackend for Scroll {
             self.update_scroll_y(d.screen_y, true);
         }) || event.accept_caret_change(|d| {
             self.handle_caret_change(d);
-        }) || if let Some(e) = event.detail.downcast_ref::<MouseWheelDetail>() {
+        }) || if let Some(e) = event.detail.raw().downcast_ref::<MouseWheelDetail>() {
             self.handle_default_mouse_wheel(e)
         } else {
             false

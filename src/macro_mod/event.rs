@@ -13,7 +13,7 @@ macro_rules! define_event {
 
             pub fn try_match<F: FnMut(&$ty)>(key: &str, event: &crate::base::ElementEvent, mut callback: F) -> bool {
                 if key == Self::key() {
-                   if let Some(detail) = event.detail.downcast_ref::<$ty>() {
+                   if let Some(detail) = event.detail.raw().downcast_ref::<$ty>() {
                        callback(detail);
                        return true;
                    }
@@ -23,7 +23,7 @@ macro_rules! define_event {
 
             pub fn try_match_mut<F: FnMut(&mut crate::base::EventContext<crate::element::ElementRef>, &mut $ty)>(key: &str, event: &mut crate::base::ElementEvent, mut callback: F) -> bool {
                 if key == Self::key() {
-                   if let Some(detail) = event.detail.downcast_mut::<$ty>() {
+                   if let Some(detail) = event.detail.raw_mut().downcast_mut::<$ty>() {
                        callback(&mut event.context, detail);
                        return true;
                    }
@@ -44,7 +44,7 @@ macro_rules! define_event {
         impl $bind_trait for crate::element::ElementRef {
             fn $bind_func<F: FnMut(&mut crate::base::ElementEventContext, &mut $ty) + 'static>(&mut self, mut handler: F) -> u32 {
                 self.add_event_listener($key, Box::new(move |e| {
-                    if let Some(me) = e.detail.downcast_mut::<$ty>() {
+                    if let Some(me) = e.detail.raw_mut().downcast_mut::<$ty>() {
                         handler(&mut e.context, me);
                     }
                 }))
@@ -59,65 +59,13 @@ macro_rules! define_event {
         impl $event_trait for crate::base::Event<crate::element::ElementRef> {
             fn $as_func<F: FnMut(&$ty)>(&mut self, mut callback: F) -> bool {
                 if self.event_type == $key {
-                    if let Some(detail) = self.detail.downcast_ref::<$ty>() {
+                    if let Some(detail) = self.detail.raw().downcast_ref::<$ty>() {
                         callback(detail);
                         return true;
                     }
                 }
                 return false;
             }
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! js_event_bind {
-    ($target: expr, $event_name: expr, $event_type: ty, $param_event_name: expr, $param_handler: expr) => {
-        if $param_event_name == $event_name {
-            use crate::js::js_serde::JsValueSerializer;
-            use serde::{Deserialize, Serialize};
-            let ret = $target.add_event_listener($param_event_name, Box::new(move |e| {
-                if let Some(me) = e.detail.downcast_mut::<$event_type>() {
-                    //TODO no unwrap
-                    let detail = me.serialize(JsValueSerializer {}).unwrap();
-                    $param_handler(&mut e.context,  detail);
-                }
-            }));
-            return Ok(ret as i32)
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! js_bind_event {
-    ($target: expr, $param_event_name: expr, $param_handler: expr; $($event_type: ty,)*) => {
-        $(
-            if $param_event_name == <$event_type>::key() {
-                let ret = $target.add_event_listener($param_event_name, Box::new(move |e| {
-                    <$event_type>::try_match_mut(<$event_type>::key(), e, |ctx, d| {
-                        // TODO no unwrap
-                        let detail = d.serialize(JsValueSerializer {}).unwrap();
-                        $param_handler(ctx, detail);
-                    });
-                }));
-                return Ok(ret as i32);
-            }
-        )*
-    };
-}
-
-#[macro_export]
-macro_rules! js_event_bind2 {
-    ($target: expr, $event_name: expr, $event_type: ty, $param_event_name: expr, $param_handler: expr) => {
-        if $param_event_name == $event_name {
-            use crate::js::js_serde::JsValueSerializer;
-            let ret = $target.add_event_listener($param_event_name, Box::new(move |e| {
-                if let Some(me) = e.detail.downcast_mut::<$event_type>() {
-                    let target_id = e.context.target.get_id();
-                    $param_handler(&mut e.context, target_id as i32,  me.serialize(JsValueSerializer {}).unwrap());
-                }
-            }));
-            return ret
         }
     };
 }

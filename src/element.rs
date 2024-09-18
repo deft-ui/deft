@@ -14,7 +14,7 @@ use skia_safe::{Canvas, Color, Paint, Path, Rect};
 use winit::window::CursorIcon;
 use yoga::{Direction, Edge};
 
-use crate::{base, define_resource, js_bind_event, js_call, js_call_rust, js_event_bind, js_get_prop};
+use crate::{base, define_resource, js_call, js_call_rust, js_get_prop};
 use crate::base::{ElementEvent, ElementEventContext, ElementEventHandler, EventRegistration, ScrollEventDetail, TextChangeDetail};
 use crate::border::build_rect_with_radius;
 use crate::element::button::Button;
@@ -131,33 +131,7 @@ impl ElementRef {
     }
 
     pub fn bind_event(&mut self, e: String, callback: JsValue) -> Result<i32, Error> {
-        let event_name = e.as_str();
-        let handler = create_event_handler(event_name, callback);
-        js_bind_event!(self, event_name, handler;
-            CaretEvent,
-            MouseDownEvent,
-            MouseUpEvent,
-            MouseClickEvent,
-            MouseMoveEvent,
-            MouseEnterEvent,
-            MouseLeaveEvent,
-            KeyDownEvent,
-            KeyUpEvent,
-            MouseWheelEvent,
-            TextUpdateEvent,
-            TouchStartEvent,
-            TouchMoveEvent,
-            TouchEndEvent,
-            TouchCancelEvent,
-            FocusEvent,
-            BlurEvent,
-            TextChangeEvent,
-            ScrollEvent,
-            DragStartEvent,
-            DragOverEvent,
-            DropEvent,
-        );
-        Ok(0)
+        Ok(self.event_registration.add_js_event_listener(&e, callback))
     }
 
     pub fn set_cursor(&mut self, cursor: CursorIcon) {

@@ -13,7 +13,7 @@ use crate::event_loop::run_on_event_loop;
 use crate::ext::audio_player::{AudioCurrentChangeInfo, AudioMeta, AudioNotify, AudioServer, AudioSources};
 use crate::ext::common::create_event_handler;
 use crate::js::js_value_util::{FromJsValue, ToJsValue};
-use crate::{define_ref_and_resource, js_event_bind};
+use crate::{define_ref_and_resource};
 
 thread_local! {
     pub static NEXT_ID: Cell<u32> = Cell::new(1);
@@ -141,17 +141,8 @@ pub fn audio_stop(audio: AudioResource) -> Result<(), Error> {
 }
 
 pub fn audio_add_event_listener(mut audio: AudioResource, event_type: String, callback: JsValue) -> Result<i32, Error> {
-    let event_name = event_type.as_str();
-    let handler = create_event_handler(event_name, callback);
     let er = &mut audio.event_registration;
-    js_event_bind!(er, "load", AudioMeta, event_name, handler);
-    js_event_bind!(er, "end", (), event_name, handler);
-    js_event_bind!(er, "timeupdate", f32, event_name, handler);
-    js_event_bind!(er, "stop", (), event_name, handler);
-    js_event_bind!(er, "pause", (), event_name, handler);
-    js_event_bind!(er, "currentchange", AudioCurrentChangeInfo, event_name, handler);
-    js_event_bind!(er, "finish", (), event_name, handler);
-    Ok(0)
+    Ok(er.add_js_event_listener(&event_type, callback))
 }
 
 pub fn audio_remove_event_listener(mut audio: AudioResource, event_type: String, id: u32) -> Result<(), Error> {

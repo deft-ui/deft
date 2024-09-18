@@ -26,7 +26,6 @@ use crate::event::{build_modifier, CaretEventBind, ClickEventBind, DragOverEvent
 use crate::event_loop::{run_with_event_loop, send_event};
 use crate::ext::common::create_event_handler;
 use crate::js::js_value_util::{FromJsValue, ToJsValue};
-use crate::js_event_bind;
 use crate::mrc::{Mrc, MrcWeak};
 use crate::renderer::CpuRenderer;
 use crate::timer::{set_timeout, TimerHandle};
@@ -186,9 +185,7 @@ impl FrameRef {
     }
 
     pub fn bind_event(&mut self, event_name: String, callback: JsValue) -> Result<i32, Error> {
-        let handler = create_event_handler(&event_name, callback);
-        js_event_bind!(self, "close", (), &event_name, handler);
-        Ok(0)
+        Ok(self.event_registration.add_js_event_listener(&event_name, callback))
     }
 
     pub fn set_visible(&mut self, visible: bool) -> Result<(), Error> {
