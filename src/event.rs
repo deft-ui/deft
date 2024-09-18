@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use winit::keyboard::{ModifiersState, NamedKey};
-use crate::base::{CaretDetail, MouseDetail, TextUpdateDetail, TouchDetail};
+use crate::base::{CaretDetail, MouseDetail, ScrollEventDetail, TextChangeDetail, TextUpdateDetail, TouchDetail};
 use crate::define_event;
 
 pub const KEY_MOD_CTRL: u32 = 0x1;
@@ -407,5 +407,10 @@ define_event!(TouchMoveEvent,   TouchMoveEventBind,   "touchmove",   bind_touch_
 define_event!(TouchEndEvent,    TouchEndEventBind,    "touchend",    bind_touch_end,    emit_touch_end,    AcceptTouchEndEvent,    accept_touch_end,    TouchDetail);
 define_event!(TouchCancelEvent, TouchCancelEventBind, "touchcancel", bind_touch_cancel, emit_touch_cancel, AcceptTouchCancelEvent, accept_touch_cancel, TouchDetail);
 define_event!(FocusEvent,       FocusEventBind,       "focus",       bind_focus,        emit_focus,        AcceptFocusEvent,       accept_focus,        ());
-// event_api!(Scroll, "scroll", bind_scroll, ScrollEventDetail);
+define_event!(BlurEvent,        BlurEventBind,        "blur",        bind_blur,         emit_blur,         AcceptBlurEvent,        accept_blur,         ());
+define_event!(TextChangeEvent,  TextChangeBind,       "textchange",  bind_text_change,  emit_text_change,  AcceptTextChange,       accept_text_change,  TextChangeDetail);
+define_event!(ScrollEvent,      ScrollBind,           "scroll",      bind_scroll,       emit_scroll,       AcceptScroll,           accept_scroll,       ScrollEventDetail);
+define_event!(DragStartEvent,   DragStartBind,        "dragstart",   bind_drag_start,   emit_drag_start,   AccpetDragStart,        accept_drag_start,   DragStartEventDetail);
+define_event!(DragOverEvent,    DragOverBind,         "dragover",    bind_drag_over,    emit_drag_over,    AccpetDragOver,         accept_drag_over,    DragOverEventDetail);
+define_event!(DropEvent,        DropBind,             "drop",        bind_drop,         emit_drop,         AccpetDrop,             accept_drop,         DropEventDetail);
 

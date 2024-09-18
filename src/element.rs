@@ -4,18 +4,19 @@ use std::default::Default;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use std::str::FromStr;
+
 use anyhow::{anyhow, Error};
-use ordered_float::{Float};
+use ordered_float::Float;
 use quick_js::{JsValue, ResourceValue};
 use serde::{Deserialize, Serialize};
 use skia_bindings::{SkPaint_Style, SkPathOp};
 use skia_safe::{Canvas, Color, Paint, Path, Rect};
 use winit::window::CursorIcon;
-use yoga::{Direction, Edge, Node};
-use crate::{base, define_resource, inherit_color_prop, js_call, js_call_rust, js_event_bind, js_get_prop};
-use crate::base::{CaretDetail, ElementEvent, ElementEventContext, ElementEventHandler, Event, EventRegistration, MouseDetail, ScrollEventDetail, TextChangeDetail};
-use crate::border::{build_rect_with_radius, draw_border};
-use crate::color::parse_hex_color;
+use yoga::{Direction, Edge};
+
+use crate::{base, define_resource, js_bind_event, js_call, js_call_rust, js_event_bind, js_get_prop};
+use crate::base::{ElementEvent, ElementEventContext, ElementEventHandler, EventRegistration, ScrollEventDetail, TextChangeDetail};
+use crate::border::build_rect_with_radius;
 use crate::element::button::Button;
 use crate::element::container::Container;
 use crate::element::entry::Entry;
@@ -23,15 +24,16 @@ use crate::element::image::Image;
 use crate::element::label::Label;
 use crate::element::scroll::Scroll;
 use crate::element::textedit::TextEdit;
-use crate::event::{DragOverEventDetail, DragStartEventDetail, DropEventDetail, KeyEventDetail, MouseWheelDetail};
+use crate::event::{BlurEvent, CaretEvent, ClickEventBind, DragOverEvent, DragOverEventDetail, DragStartEvent, DragStartEventDetail, DropEvent, DropEventDetail, FocusEvent, KeyDownEvent, KeyUpEvent, MouseClickEvent, MouseDownEvent, MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, ScrollEvent, TextChangeEvent, TextUpdateEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent};
 use crate::ext::common::create_event_handler;
-use crate::frame::{FrameRef, FrameWeak, WeakWindowHandle};
+use crate::ext::ext_frame::{VIEW_TYPE_BUTTON, VIEW_TYPE_CONTAINER, VIEW_TYPE_ENTRY, VIEW_TYPE_IMAGE, VIEW_TYPE_LABEL, VIEW_TYPE_SCROLL, VIEW_TYPE_TEXT_EDIT};
+use crate::frame::{FrameRef, FrameWeak};
 use crate::img_manager::IMG_MANAGER;
-use crate::js::js_value_util::{FromJsValue, ToJsValue};
+use crate::js::js_serde::JsValueSerializer;
+use crate::js::js_value_util::{FromJsValue, SerializeToJsValue, ToJsValue};
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
-use crate::style::{AllStylePropertyKey, ColorHelper, ColorPropValue, ComputedStyle, expand_mixed_style, parse_align, parse_color, parse_direction, parse_display, parse_flex_direction, parse_float, parse_justify, parse_length, parse_overflow, parse_position_type, parse_style, parse_wrap, Style, StyleNode, StylePropertyKey, StylePropertyValue};
-use crate::ext::ext_frame::{VIEW_TYPE_BUTTON, VIEW_TYPE_CONTAINER, VIEW_TYPE_ENTRY, VIEW_TYPE_IMAGE, VIEW_TYPE_LABEL, VIEW_TYPE_SCROLL, VIEW_TYPE_TEXT_EDIT, ViewId};
+use crate::style::{AllStylePropertyKey, ColorHelper, expand_mixed_style, parse_style, StyleNode, StylePropertyKey, StylePropertyValue};
 
 pub mod container;
 pub mod entry;
@@ -131,25 +133,30 @@ impl ElementRef {
     pub fn bind_event(&mut self, e: String, callback: JsValue) -> Result<i32, Error> {
         let event_name = e.as_str();
         let handler = create_event_handler(event_name, callback);
-        js_event_bind!(self, "blur", (), event_name, handler);
-        js_event_bind!(self, "focus", (), event_name, handler);
-        js_event_bind!(self, "click", MouseDetail, event_name, handler);
-        js_event_bind!(self, "mousedown", MouseDetail, event_name, handler);
-        js_event_bind!(self, "mouseup", MouseDetail, event_name, handler);
-        js_event_bind!(self, "mouseenter", MouseDetail, event_name, handler);
-        js_event_bind!(self, "mouseleave", MouseDetail, event_name, handler);
-        js_event_bind!(self, "mousemove", MouseDetail, event_name, handler);
-
-        js_event_bind!(self, "keydown", KeyEventDetail, event_name, handler);
-        js_event_bind!(self, "keyup", KeyEventDetail, event_name, handler);
-        js_event_bind!(self, "textchange", TextChangeDetail, event_name, handler);
-        js_event_bind!(self, "caretchange", CaretDetail, event_name, handler);
-        js_event_bind!(self, "scroll", ScrollEventDetail, event_name, handler);
-
-        js_event_bind!(self, "dragstart", DragStartEventDetail, event_name, handler);
-        js_event_bind!(self, "dragover", DragOverEventDetail, event_name, handler);
-        js_event_bind!(self, "drop", DropEventDetail, event_name, handler);
-        js_event_bind!(self, "mousewheel", MouseWheelDetail, event_name, handler);
+        js_bind_event!(self, event_name, handler;
+            CaretEvent,
+            MouseDownEvent,
+            MouseUpEvent,
+            MouseClickEvent,
+            MouseMoveEvent,
+            MouseEnterEvent,
+            MouseLeaveEvent,
+            KeyDownEvent,
+            KeyUpEvent,
+            MouseWheelEvent,
+            TextUpdateEvent,
+            TouchStartEvent,
+            TouchMoveEvent,
+            TouchEndEvent,
+            TouchCancelEvent,
+            FocusEvent,
+            BlurEvent,
+            TextChangeEvent,
+            ScrollEvent,
+            DragStartEvent,
+            DragOverEvent,
+            DropEvent,
+        );
         Ok(0)
     }
 
@@ -652,7 +659,7 @@ impl ElementRef {
         }
         let backend = self.get_backend_mut();
         backend.handle_event(event_type, event);
-        self.event_registration.emit_event(event_type, event);
+        self.event_registration.emit_event(event);
         //TODO check bubble-supported
         if !event.context.propagation_cancelled {
             if let Some(mut parent) = self.get_parent() {

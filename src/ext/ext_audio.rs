@@ -23,7 +23,7 @@ thread_local! {
 
 pub struct Audio {
     id: u32,
-    event_registration: EventRegistration<u32>,
+    event_registration: EventRegistration<AudioResource>,
     sources: Arc<Mutex<AudioSources>>,
 }
 
@@ -52,35 +52,36 @@ fn handle_play_notify(id: u32, msg: AudioNotify) {
     run_on_event_loop(move || {
         let mut audio = PLAYING_MAP.with_borrow_mut(|m| m.get(&id).cloned());
         if let Some(a) = &mut audio {
+            let target = a.clone();
             match msg {
                 AudioNotify::Load(meta) => {
-                    let mut event = Event::new("load", meta, id);
-                    a.event_registration.emit_event("load", &mut event);
+                    let mut event = Event::new("load", meta, target);
+                    a.event_registration.emit_event(&mut event);
                 }
                 AudioNotify::TimeUpdate(time) => {
-                    let mut event = Event::new("timeupdate", time, id);
-                    a.event_registration.emit_event("timeupdate", &mut event);
+                    let mut event = Event::new("timeupdate", time, target);
+                    a.event_registration.emit_event(&mut event);
                 }
                 AudioNotify::End => {
-                    let mut event = Event::new("end", (), id);
-                    a.event_registration.emit_event("end", &mut event);
+                    let mut event = Event::new("end", (), target);
+                    a.event_registration.emit_event(&mut event);
                 }
                 AudioNotify::Finish => {
-                    let mut event = Event::new("finish", (), id);
-                    a.event_registration.emit_event("finish", &mut event);
+                    let mut event = Event::new("finish", (), target);
+                    a.event_registration.emit_event(&mut event);
                     unregistry_playing(a);
                 }
                 AudioNotify::Pause => {
-                    let mut event = Event::new("pause", (), id);
-                    a.event_registration.emit_event("pause", &mut event);
+                    let mut event = Event::new("pause", (), target);
+                    a.event_registration.emit_event(&mut event);
                 }
                 AudioNotify::Stop => {
-                    let mut event = Event::new("stop", (), id);
-                    a.event_registration.emit_event("stop", &mut event);
+                    let mut event = Event::new("stop", (), target);
+                    a.event_registration.emit_event(&mut event);
                 }
                 AudioNotify::CurrentChange(info) => {
-                    let mut event = Event::new("currentchange", info, id);
-                    a.event_registration.emit_event("currentchange", &mut event);
+                    let mut event = Event::new("currentchange", info, target);
+                    a.event_registration.emit_event(&mut event);
                 }
             }
         }

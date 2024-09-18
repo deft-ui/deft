@@ -20,6 +20,16 @@ macro_rules! define_event {
                 }
                 false
             }
+
+            pub fn try_match_mut<F: FnMut(&mut crate::base::EventContext<crate::element::ElementRef>, &mut $ty)>(key: &str, event: &mut crate::base::ElementEvent, mut callback: F) -> bool {
+                if key == Self::key() {
+                   if let Some(detail) = event.detail.downcast_mut::<$ty>() {
+                       callback(&mut event.context, detail);
+                       return true;
+                   }
+                }
+                false
+            }
         }
 
         pub trait $bind_trait {
@@ -68,13 +78,31 @@ macro_rules! js_event_bind {
             use serde::{Deserialize, Serialize};
             let ret = $target.add_event_listener($param_event_name, Box::new(move |e| {
                 if let Some(me) = e.detail.downcast_mut::<$event_type>() {
-                    //TODO remove target_id
-                    let target_id = 0;//e.context.target.get_id();
-                    $param_handler(&mut e.context, target_id as i32,  me.serialize(JsValueSerializer {}).unwrap());
+                    //TODO no unwrap
+                    let detail = me.serialize(JsValueSerializer {}).unwrap();
+                    $param_handler(&mut e.context,  detail);
                 }
             }));
             return Ok(ret as i32)
         }
+    };
+}
+
+#[macro_export]
+macro_rules! js_bind_event {
+    ($target: expr, $param_event_name: expr, $param_handler: expr; $($event_type: ty,)*) => {
+        $(
+            if $param_event_name == <$event_type>::key() {
+                let ret = $target.add_event_listener($param_event_name, Box::new(move |e| {
+                    <$event_type>::try_match_mut(<$event_type>::key(), e, |ctx, d| {
+                        // TODO no unwrap
+                        let detail = d.serialize(JsValueSerializer {}).unwrap();
+                        $param_handler(ctx, detail);
+                    });
+                }));
+                return Ok(ret as i32);
+            }
+        )*
     };
 }
 

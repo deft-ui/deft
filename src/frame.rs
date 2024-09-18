@@ -201,7 +201,7 @@ impl FrameRef {
     }
     pub fn allow_close(&mut self) -> bool {
         let mut event = Event::new("close", (), self.as_weak());
-        self.event_registration.emit_event("close", &mut event);
+        self.event_registration.emit_event(&mut event);
         return !event.context.prevent_default;
     }
 
