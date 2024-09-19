@@ -185,7 +185,11 @@ impl Entry {
         self.caret_timer_handle = None;
         self.caret_visible.set(false);
         self.element.mark_dirty(false);
-        send_event(AppEvent::HideSoftInput).unwrap();
+        if let Some(frame) = self.element.get_frame() {
+            frame.upgrade_mut(|f| {
+                send_event(AppEvent::HideSoftInput(f.get_id())).unwrap();
+            });
+        }
     }
 
     fn begin_select(&mut self) {
@@ -318,7 +322,11 @@ impl Entry {
                 Self::caret_tick(caret_visible.clone(), context.clone());
             }, 500)
         });
-        send_event(AppEvent::ShowSoftInput).unwrap();
+        if let Some(frame) = self.element.get_frame() {
+            frame.upgrade_mut(|f| {
+                send_event(AppEvent::ShowSoftInput(f.get_id())).unwrap();
+            });
+        }
     }
 
     fn insert_text(&mut self, input: &str, caret: usize, record_history: bool) {

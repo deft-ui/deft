@@ -25,6 +25,7 @@ use crate::element::ElementRef;
 use crate::event::{build_modifier, CaretEventBind, ClickEventBind, DragOverEventDetail, DragStartEventDetail, DropEventDetail, FocusEventBind, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT, KeyEventDetail, MouseDownEventBind, MouseEnterEventBind, MouseLeaveEventBind, MouseMoveEventBind, MouseUpEventBind, MouseWheelDetail, named_key_to_str, TouchCancelEventBind, TouchEndEventBind, TouchMoveEventBind, TouchStartEventBind};
 use crate::event_loop::{run_with_event_loop, send_event};
 use crate::ext::common::create_event_handler;
+use crate::ext::ext_frame::FRAMES;
 use crate::js::js_value_util::{FromJsValue, ToJsValue};
 use crate::mrc::{Mrc, MrcWeak};
 use crate::renderer::CpuRenderer;
@@ -202,6 +203,12 @@ impl FrameRef {
         return !event.context.prevent_default;
     }
 
+    pub fn handle_input(&mut self, content: &str) {
+        if let Some(focusing) = &mut self.focusing {
+            focusing.handle_input(content);
+        }
+    }
+
     pub fn handle_event(&mut self, event: WindowEvent) {
         match event {
             WindowEvent::RedrawRequested => {
@@ -217,10 +224,7 @@ impl FrameRef {
                     Ime::Preedit(_, _) => {}
                     Ime::Commit(str) => {
                         println!("input:{}", str);
-                        if let Some(focusing) = &mut self.focusing {
-                            focusing.handle_input(&str);
-                        }
-
+                        self.handle_input(&str);
                     }
                     Ime::Disabled => {}
                 }
@@ -801,4 +805,12 @@ fn emit_mouse_event(node: &mut ElementRef, event_type: &str, event_type_enum: Mo
         MouseEventType::MouseEnter => node.emit_mouse_enter(detail),
         MouseEventType::MouseLeave => node.emit_mouse_leave(detail),
     }
+}
+
+pub fn frame_input(frame_id: i32, content: String) {
+    FRAMES.with_borrow_mut(|m| {
+        if let Some(f) = m.get_mut(&frame_id) {
+            f.handle_input(&content);
+        }
+    });
 }
