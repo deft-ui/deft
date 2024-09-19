@@ -1,11 +1,15 @@
 use std::any::Any;
 use std::collections::HashMap;
 use std::str::FromStr;
+use anyhow::Error;
 use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
 use skia_safe::Path;
 use yoga::Layout;
 use crate::element::{ElementRef};
+use crate::ext::common::create_event_handler;
+use crate::js::js_serde::JsValueSerializer;
+use crate::js::js_value_util::ToJsValue;
 use crate::number::DeNan;
 
 pub enum TextAlign {
@@ -80,13 +84,13 @@ pub struct TouchDetail {
     pub touches: Vec<Touch>,
 }
 
-pub trait EventDetail {
+pub trait EventDetail: 'static {
     fn raw(&self) -> Box<&dyn Any>;
     fn raw_mut(&mut self) -> Box<&mut dyn Any>;
-    fn create_js_value(&self) -> JsValue;
+    fn create_js_value(&self) -> Result<JsValue, Error>;
 }
 
-impl<T> EventDetail for T where T: Serialize + Clone + 'static {
+impl<T> EventDetail for T where T: Serialize + 'static {
     fn raw(&self) -> Box<&dyn Any> {
         Box::new(self)
     }
@@ -95,8 +99,9 @@ impl<T> EventDetail for T where T: Serialize + Clone + 'static {
         Box::new(self)
     }
 
-    fn create_js_value(&self) -> JsValue {
-        todo!()
+    fn create_js_value(&self) -> Result<JsValue, Error> {
+        let js_serializer = JsValueSerializer{};
+        Ok(self.serialize(js_serializer)?)
     }
 }
 
@@ -107,7 +112,7 @@ pub struct EventContext<T> {
 }
 pub struct Event<T> {
     pub event_type: String,
-    pub detail: Box<dyn Any>,
+    pub detail: Box<dyn EventDetail>,
     pub context: EventContext<T>,
 }
 
@@ -117,7 +122,7 @@ pub type ElementEventContext = EventContext<ElementRef>;
 
 impl<E> Event<E> {
 
-    pub fn new<T: 'static>(event_type: &str, detail: T, target: E) -> Self {
+    pub fn new<T: EventDetail>(event_type: &str, detail: T, target: E) -> Self {
         Self {
             event_type: event_type.to_string(),
             detail: Box::new(detail),
@@ -130,7 +135,7 @@ impl<E> Event<E> {
     }
 
     pub fn try_as_detail<T: 'static, F: FnMut(&T)>(&self, mut callback: F) {
-        if let Some(d) = self.detail.downcast_ref::<T>() {
+        if let Some(d) = self.detail.raw().downcast_ref::<T>() {
             callback(d);
         }
     }
@@ -200,7 +205,7 @@ impl<E> EventRegistration<E> {
 
     pub fn bind_event_listener<T: 'static, F: FnMut(&mut EventContext<E>, &mut T) + 'static>(&mut self, event_type: &str, mut handler: F) -> u32 {
         self.add_event_listener(event_type, Box::new(move |e| {
-            if let Some(me) = e.detail.downcast_mut::<T>() {
+            if let Some(me) = e.detail.raw_mut().downcast_mut::<T>() {
                 handler(&mut e.context, me);
             }
         }))
@@ -223,6 +228,18 @@ impl<E> EventRegistration<E> {
 
 }
 
+impl<E: ToJsValue + Clone + 'static> EventRegistration<E> {
+
+    pub fn add_js_event_listener(&mut self, event_type: &str, callback: JsValue) -> i32 {
+        let handler = create_event_handler(event_type, callback);
+        let id = self.add_event_listener(event_type, Box::new(move |e| {
+            //TODO no unwrap
+            handler(&mut e.context, e.detail.create_js_value().unwrap());
+        }));
+        id as i32
+    }
+
+}
 
 impl Rect {
 

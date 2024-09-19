@@ -26,7 +26,6 @@ use crate::event::{build_modifier, CaretEventBind, ClickEventBind, DragOverEvent
 use crate::event_loop::{run_with_event_loop, send_event};
 use crate::ext::common::create_event_handler;
 use crate::js::js_value_util::{FromJsValue, ToJsValue};
-use crate::js_event_bind;
 use crate::mrc::{Mrc, MrcWeak};
 use crate::renderer::CpuRenderer;
 use crate::timer::{set_timeout, TimerHandle};
@@ -186,9 +185,7 @@ impl FrameRef {
     }
 
     pub fn bind_event(&mut self, event_name: String, callback: JsValue) -> Result<i32, Error> {
-        let handler = create_event_handler(&event_name, callback);
-        js_event_bind!(self, "close", (), &event_name, handler);
-        Ok(0)
+        Ok(self.event_registration.add_js_event_listener(&event_name, callback))
     }
 
     pub fn set_visible(&mut self, visible: bool) -> Result<(), Error> {
@@ -429,17 +426,9 @@ impl FrameRef {
                 MouseButton::Forward => 5,
                 MouseButton::Other(_) => 6,
             };
-            let focusing = Some(node.clone());
-            if self.focusing != focusing {
-                if let Some(old_focusing) = &mut self.focusing {
-                    let mut blur_event = ElementEvent::new("blur", (), old_focusing.clone());
-                    old_focusing.emit_event("blur", &mut blur_event);
-                }
-                self.focusing = focusing;
-                node.emit_focus(());
-            }
             match state {
                 ElementState::Pressed => {
+                    self.focus(node.clone());
                     self.pressing = Some((node.clone(), MouseDownInfo {button, frame_x, frame_y}));
                     emit_mouse_event(&mut node, e_type, event_type, button, frame_x, frame_y, screen_x, screen_y);
                 }
@@ -533,6 +522,7 @@ impl FrameRef {
                         && SystemTime::now().duration_since(self.touching.start_time).unwrap().as_millis() < 1000
                     {
                         let mut node = node.clone();
+                        self.focus(node.clone());
                         self.touching.click_timer_handle = Some(set_timeout(move || {
                             println!("clicked");
                             //TODO fix screen_x, screen_y
@@ -544,6 +534,18 @@ impl FrameRef {
                     node.emit_touch_cancel(touch_detail);
                 }
             }
+        }
+    }
+
+    fn focus(&mut self, mut node: ElementRef) {
+        let focusing = Some(node.clone());
+        if self.focusing != focusing {
+            if let Some(old_focusing) = &mut self.focusing {
+                let mut blur_event = ElementEvent::new("blur", (), old_focusing.clone());
+                old_focusing.emit_event("blur", &mut blur_event);
+            }
+            self.focusing = focusing;
+            node.emit_focus(());
         }
     }
 

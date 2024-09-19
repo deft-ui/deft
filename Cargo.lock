@@ -1630,6 +1630,7 @@ dependencies = [
  "clipboard",
  "futures-util",
  "image",
+ "jni",
  "ksni",
  "lazy_static",
  "libc",

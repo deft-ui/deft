@@ -137,10 +137,7 @@ impl SystemTrayResource {
     }
 
     pub fn bind_event(&mut self, event_name: String, callback: JsValue) -> u32 {
-        let handler = create_event_handler(&event_name, callback);
-        js_event_bind2!(self, "activate", (), &event_name, handler);
-        js_event_bind2!(self, "menuclick", String, &event_name, handler);
-        0
+        self.event_registration.add_js_event_listener(&event_name, callback) as u32
     }
 
 
@@ -191,10 +188,7 @@ pub fn tray_create(id: String) -> Result<SystemTrayResource, Error> {
 }
 
 pub fn tray_bind_event(mut n: SystemTrayResource, event_name: String, callback: JsValue) -> Result<i32, Error> {
-    let handler = create_event_handler(&event_name, callback);
-    js_event_bind!(n, "activate", (), &event_name, handler);
-    js_event_bind!(n, "menuclick", String, &event_name, handler);
-    Ok(0)
+    Ok(n.event_registration.add_js_event_listener(&event_name, callback))
 }
 
 pub fn tray_set_menus(mut n: SystemTrayResource, menus: Vec<TrayMenu>) -> Result<i32, Error> {

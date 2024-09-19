@@ -54,7 +54,7 @@ impl ElementBackend for ScrollBar {
     fn handle_event(&mut self, event_type: &str, event: &mut ElementEvent) {
         match event_type {
             "mousedown" | "mouseup" | "mousemove" | "click" => {
-                if let Some(mouse_event) = event.detail.downcast_ref::<MouseDetail>() {
+                if let Some(mouse_event) = event.detail.raw().downcast_ref::<MouseDetail>() {
                     match event_type {
                         //TODO support click
                         //"click" => self.handle_click(mouse_event),

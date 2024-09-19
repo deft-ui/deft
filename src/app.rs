@@ -5,6 +5,10 @@ use quick_js::loader::JsModuleLoader;
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
+#[cfg(target_os = "android")]
+use winit::platform::android::ActiveEventLoopExtAndroid;
+#[cfg(target_os = "android")]
+use winit::platform::android::activity::AndroidApp;
 use winit::window::WindowId;
 
 use crate::event_loop::{get_event_proxy, run_event_loop_task};
@@ -17,6 +21,8 @@ pub enum AppEvent {
     Callback(Box<dyn FnOnce() + Send + Sync>),
     CallbackWithEventLoop(Box<dyn FnOnce(&ActiveEventLoop)>),
     CheckTimer,
+    ShowSoftInput,
+    HideSoftInput,
 }
 
 impl Debug for AppEvent {
@@ -68,6 +74,16 @@ impl ApplicationHandler<AppEvent> for App {
                 AppEvent::CheckTimer => {
                     timer::check_task();
                 },
+                AppEvent::ShowSoftInput => {
+                    println!("show soft input");
+                    #[cfg(target_os = "android")]
+                    show_hide_keyboard(event_loop.android_app(), true);
+                },
+                AppEvent::HideSoftInput => {
+                    println!("hide soft input");
+                    #[cfg(target_os = "android")]
+                    show_hide_keyboard(event_loop.android_app(), false);
+                }
             }
         });
     }
@@ -92,5 +108,31 @@ pub fn exit_app(code: i32) -> Result<(), Error> {
         el.exit();
     }))).unwrap();
     Ok(())
+}
+
+#[cfg(target_os = "android")]
+fn show_hide_keyboard_fallible(app: &AndroidApp, show: bool) -> Result<(), jni::errors::Error> {
+    use jni::JavaVM;
+    use jni::objects::JObject;
+    // After Android R, it is no longer possible to show the soft keyboard
+    // with `showSoftInput` alone.
+    // Here we use `WindowInsetsController`, which is the other way.
+    let vm = unsafe { JavaVM::from_raw(app.vm_as_ptr() as _)? };
+    let activity = unsafe { JObject::from_raw(app.activity_as_ptr() as _) };
+    let mut env = vm.attach_current_thread()?;
+    let window = env.call_method(&activity, "getWindow", "()Landroid/view/Window;", &[])?.l()?;
+    let wic = env
+        .call_method(window, "getInsetsController", "()Landroid/view/WindowInsetsController;", &[])?
+        .l()?;
+    let window_insets_types = env.find_class("android/view/WindowInsets$Type")?;
+    let ime_type = env.call_static_method(&window_insets_types, "ime", "()I", &[])?.i()?;
+    env.call_method(&wic, if show { "show" } else { "hide" }, "(I)V", &[ime_type.into()])?.v()
+}
+
+#[cfg(target_os = "android")]
+fn show_hide_keyboard(app: &AndroidApp, show: bool) {
+    if let Err(e) = show_hide_keyboard_fallible(app, show) {
+       //tracing::error!("Showing or hiding the soft keyboard failed: {e:?}");
+    };
 }
 

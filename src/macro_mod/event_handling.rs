@@ -18,7 +18,7 @@ macro_rules! match_event {
 #[macro_export]
 macro_rules! match_event_type {
     ($event: expr, $detail_type: ty, $target: expr, $func: ident) => {
-        if let Some(detail) = $event.detail.downcast_ref::<$detail_type>() {
+        if let Some(detail) = $event.detail.raw().downcast_ref::<$detail_type>() {
             $target.$func(detail);
             return;
         }
