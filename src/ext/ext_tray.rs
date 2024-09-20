@@ -9,9 +9,8 @@ use winit::event_loop::EventLoopProxy;
 use crate::app::AppEvent;
 use crate::base::{Event, EventHandler, EventRegistration};
 use crate::event_loop::get_event_proxy;
-use crate::ext::common::create_event_handler;
 use crate::js::js_value_util::{FromJsValue, ToJsValue};
-use crate::{define_ref_and_resource, js_event_bind, js_event_bind2};
+use crate::{define_ref_and_resource};
 use crate::mrc::Mrc;
 
 
@@ -76,7 +75,7 @@ pub struct TrayMenu {
 }
 
 impl SystemTrayResource {
-    pub fn new(tray_id: &str, event_loop_proxy: EventLoopProxy<AppEvent>) -> Self {
+    pub fn create(tray_id: &str, event_loop_proxy: EventLoopProxy<AppEvent>) -> Self {
         let inner_id = NEXT_TRAY_ID.get();
         NEXT_TRAY_ID.set(inner_id + 1);
 
@@ -183,7 +182,7 @@ impl SystemTrayResource {
 // Js Api
 
 pub fn tray_create(id: String) -> Result<SystemTrayResource, Error> {
-    let tray = SystemTrayResource::new(&id, get_event_proxy());
+    let tray = SystemTrayResource::create(&id, get_event_proxy());
     Ok(tray)
 }
 
