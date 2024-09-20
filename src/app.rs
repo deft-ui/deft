@@ -1,6 +1,8 @@
 use std::fmt::{Debug, Formatter};
 
 use anyhow::Error;
+use jni::objects::JValue;
+use jni::sys::{jboolean, jlong};
 use quick_js::loader::JsModuleLoader;
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
@@ -14,6 +16,7 @@ use winit::window::WindowId;
 use crate::event_loop::{get_event_proxy, run_event_loop_task};
 use crate::ext::ext_frame::FRAMES;
 use crate::ext::ext_localstorage::localstorage_flush;
+use crate::frame::frame_input;
 use crate::js::js_engine::JsEngine;
 use crate::timer;
 
@@ -21,8 +24,9 @@ pub enum AppEvent {
     Callback(Box<dyn FnOnce() + Send + Sync>),
     CallbackWithEventLoop(Box<dyn FnOnce(&ActiveEventLoop)>),
     CheckTimer,
-    ShowSoftInput,
-    HideSoftInput,
+    ShowSoftInput(i32),
+    HideSoftInput(i32),
+    CommitInput(i32, String),
 }
 
 impl Debug for AppEvent {
@@ -74,16 +78,19 @@ impl ApplicationHandler<AppEvent> for App {
                 AppEvent::CheckTimer => {
                     timer::check_task();
                 },
-                AppEvent::ShowSoftInput => {
+                AppEvent::ShowSoftInput(frame_id) => {
                     println!("show soft input");
                     #[cfg(target_os = "android")]
-                    show_hide_keyboard(event_loop.android_app(), true);
+                    show_hide_keyboard(event_loop.android_app().clone(), frame_id, true);
                 },
-                AppEvent::HideSoftInput => {
+                AppEvent::HideSoftInput(frame_id) => {
                     println!("hide soft input");
                     #[cfg(target_os = "android")]
-                    show_hide_keyboard(event_loop.android_app(), false);
-                }
+                    show_hide_keyboard(event_loop.android_app().clone(), frame_id, false);
+                },
+                AppEvent::CommitInput(frame_id, content) => {
+                    frame_input(frame_id, content);
+                },
             }
         });
     }
@@ -111,27 +118,23 @@ pub fn exit_app(code: i32) -> Result<(), Error> {
 }
 
 #[cfg(target_os = "android")]
-fn show_hide_keyboard_fallible(app: &AndroidApp, show: bool) -> Result<(), jni::errors::Error> {
+fn show_hide_keyboard_fallible(app: AndroidApp, frame_id: i32, show: bool) -> Result<(), jni::errors::Error> {
     use jni::JavaVM;
     use jni::objects::JObject;
-    // After Android R, it is no longer possible to show the soft keyboard
-    // with `showSoftInput` alone.
-    // Here we use `WindowInsetsController`, which is the other way.
     let vm = unsafe { JavaVM::from_raw(app.vm_as_ptr() as _)? };
     let activity = unsafe { JObject::from_raw(app.activity_as_ptr() as _) };
     let mut env = vm.attach_current_thread()?;
-    let window = env.call_method(&activity, "getWindow", "()Landroid/view/Window;", &[])?.l()?;
-    let wic = env
-        .call_method(window, "getInsetsController", "()Landroid/view/WindowInsetsController;", &[])?
-        .l()?;
-    let window_insets_types = env.find_class("android/view/WindowInsets$Type")?;
-    let ime_type = env.call_static_method(&window_insets_types, "ime", "()I", &[])?.i()?;
-    env.call_method(&wic, if show { "show" } else { "hide" }, "(I)V", &[ime_type.into()])?.v()
+    let frame_id = frame_id as jlong;
+    let show = show as jboolean;
+    env.call_method(&activity, "showInput", "(JZ)V", &[
+        JValue::Long(frame_id), JValue::Bool(show)
+    ])?.v()?;
+    Ok(())
 }
 
 #[cfg(target_os = "android")]
-fn show_hide_keyboard(app: &AndroidApp, show: bool) {
-    if let Err(e) = show_hide_keyboard_fallible(app, show) {
+fn show_hide_keyboard(app: AndroidApp, frame_id: i32, show: bool) {
+    if let Err(e) = show_hide_keyboard_fallible(app, frame_id, show) {
        //tracing::error!("Showing or hiding the soft keyboard failed: {e:?}");
     };
 }

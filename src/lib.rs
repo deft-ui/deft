@@ -65,6 +65,8 @@ mod js;
 mod performance;
 
 mod cache;
+#[cfg(target_os = "android")]
+mod android;
 
 
 fn main_js_deserializer() {
