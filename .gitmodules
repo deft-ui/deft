@@ -1,9 +1,9 @@
 [submodule "third_party/quickjs-rs"]
 	path = third_party/quickjs-rs
-	url = git@github.com:kasonyang/quickjs-rs.git
+	url = https://github.com/kasonyang/quickjs-rs.git
 [submodule "third_party/winit"]
 	path = third_party/winit
-	url = git@github.com:kasonyang/winit.git
+	url = https://github.com/kasonyang/winit.git
 [submodule "third_party/yoga-rs"]
 	path = third_party/yoga-rs
-	url = git@github.com:kasonyang/yoga-rs.git
+	url = https://github.com/kasonyang/yoga-rs.git
