@@ -14,3 +14,4 @@ pub mod ext_audio;
 pub mod ext_fetch;
 mod audio_player;
 pub mod ext_base64;
+pub mod ext_shell;

@@ -1,3 +1,4 @@
+use std::env;
 use std::future::Future;
 use std::ops::{Deref, DerefMut};
 use anyhow::Error;
@@ -54,7 +55,8 @@ impl JsContext {
     }
 
     pub fn execute_main(&mut self) {
-        self.context.execute_module("index.js").unwrap();
+        let module_name = env::var("LENTO_ENTRY").unwrap_or("index.js".to_string());
+        self.context.execute_module(&module_name).unwrap();
     }
 
     pub fn execute_pending_job(&self) -> Result<bool, ExecutionError> {

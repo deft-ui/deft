@@ -25,7 +25,7 @@ use crate::js::js_deserialze::JsDeserializer;
 use crate::element::label::{AttributeText, DEFAULT_TYPE_FACE, Label};
 use crate::element::text::Text;
 use crate::element::text::text_paragraph::TextParams;
-use crate::loader::{RemoteModuleLoader, StaticModuleLoader};
+use crate::loader::{DefaultModuleLoader, RemoteModuleLoader, StaticModuleLoader};
 use crate::performance::MemoryUsage;
 use crate::renderer::CpuRenderer;
 use crate::websocket::WebSocketManager;
@@ -81,9 +81,10 @@ fn main_js_deserializer() {
 }
 
 #[cfg(not(feature = "production"))]
-fn create_module_loader() -> FsJsModuleLoader {
-    // RemoteModuleLoader::new("http://localhost:7800/".to_string())
-   FsJsModuleLoader::new(".")
+fn create_module_loader() -> DefaultModuleLoader {
+    let mut loader = DefaultModuleLoader::new(true);
+    loader.set_fs_base(".");
+    loader
 }
 
 #[cfg(feature = "production")]
