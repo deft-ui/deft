@@ -4,14 +4,12 @@ use anyhow::anyhow;
 use quick_js::loader::{FsJsModuleLoader, JsModuleLoader};
 
 pub struct RemoteModuleLoader {
-    base: String,
+
 }
 
 impl RemoteModuleLoader {
-    pub fn new(base: String) -> Self {
-        Self {
-            base,
-        }
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
@@ -20,7 +18,7 @@ impl JsModuleLoader for RemoteModuleLoader {
         let url = if module_name.starts_with("http://") || module_name.starts_with("https://") {
             module_name.to_string()
         } else {
-            format!("{}{}", self.base, module_name)
+            return Err(Error::new(ErrorKind::AddrNotAvailable, anyhow!("Failed to resolve module: {}", module_name)));
         };
         let body = reqwest::blocking::get(&url).map_err(|e| Error::new(ErrorKind::Other, e))?
             .text().map_err(|e| Error::new(ErrorKind::Other, e))?;
@@ -59,19 +57,20 @@ pub struct DefaultModuleLoader {
 
 impl DefaultModuleLoader {
 
-    pub fn new() -> Self {
+    pub fn new(allow_remote: bool) -> Self {
+        let remote_module_loader = if allow_remote {
+            Some(RemoteModuleLoader::new())
+        } else {
+            None
+        };
         Self {
-            remote_module_loader: None,
+            remote_module_loader,
             fs_module_loader: None,
         }
     }
 
     pub fn set_fs_base(&mut self, dir: &str) {
         self.fs_module_loader = Some(FsJsModuleLoader::new(dir))
-    }
-
-    pub fn set_remote_base(&mut self, base: &str) {
-        self.remote_module_loader = Some(RemoteModuleLoader::new(base.to_string()))
     }
 
 }

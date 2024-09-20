@@ -22,6 +22,7 @@ use crate::ext::ext_fs::{fs_create_dir, fs_create_dir_all, fs_delete_file, fs_ex
 use crate::ext::ext_http::http_request;
 use crate::ext::ext_localstorage::{localstorage_get, localstorage_set};
 use crate::ext::ext_path::{path_filename, path_join};
+use crate::ext::ext_shell::shell_spawn;
 use crate::ext::ext_timer::{timer_clear_interval, timer_clear_timeout, timer_set_interval, timer_set_timeout};
 #[cfg(feature = "tray")]
 use crate::ext::ext_tray::{SystemTrayResource, tray_create, TrayMenu};
@@ -152,11 +153,14 @@ impl JsEngine {
         // base64
         export_js_api!(js_context, "base64_encode_str", base64_encode_str, String);
 
+        // shell
+        export_js_api!(js_context, "shell_spawn", shell_spawn, String, Option::<Vec<String>>);
+
         //process
         export_js_api!(js_context, "process_exit", exit_app, i32);
 
         let libjs = String::from_utf8_lossy(include_bytes!("../../lib.js"));
-        js_context.eval_module(&libjs).unwrap();
+        js_context.eval_module(&libjs, "lib.js").unwrap();
 
         Self {
             js_context,
