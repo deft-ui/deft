@@ -353,7 +353,7 @@ impl ElementBackend for Scroll {
             if is_in_vertical_bar {
                 let indicator_rect = self.calculate_vertical_indicator_rect();
                 if indicator_rect.contains_point(d.offset_x, d.offset_y) {
-                    self.begin_scroll_y(d.screen_y);
+                    self.begin_scroll_y(d.frame_y);
                 } else {
                     //TODO scroll page
                 }
@@ -363,7 +363,7 @@ impl ElementBackend for Scroll {
             if is_in_horizontal_bar {
                 let indicator_rect = self.calculate_horizontal_indicator_rect();
                 if indicator_rect.contains_point(d.offset_x, d.offset_y) {
-                    self.begin_scroll_x(d.screen_x);
+                    self.begin_scroll_x(d.frame_x);
                 } else {
                     //TODO scroll page
                 }
@@ -372,8 +372,8 @@ impl ElementBackend for Scroll {
         }) || event.accept_mouse_up(|d| {
             self.end_scroll();
         }) || event.accept_mouse_move(|d| {
-            self.update_scroll_x(d.screen_x, true);
-            self.update_scroll_y(d.screen_y, true);
+            self.update_scroll_x(d.frame_x, true);
+            self.update_scroll_y(d.frame_y, true);
         }) || event.accept_caret_change(|d| {
             self.handle_caret_change(d);
         }) || if let Some(e) = event.detail.raw().downcast_ref::<MouseWheelDetail>() {
