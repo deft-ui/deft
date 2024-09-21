@@ -18,7 +18,7 @@ skia-window = { path = "skia-window" }
 bitflags = "2.0"
 lazy_static = "1.4"
 skia-bindings = { version = "0.75.0", default-features = false }
-skia-safe = {version = "0.75.0", features = ["textlayout", "svg", "x11"]}
+
 
 ureq = { version = "2.8.0", optional = true }
 base64 = { version = "0.22.0" }
@@ -50,8 +50,12 @@ x11=["tray"]
 production=[]
 
 [target.'cfg(target_os = "android")'.dependencies]
+skia-safe = {version = "0.75.0", features = ["textlayout", "svg"]}
 android_logger = "0.11.0"
-
+[target.'cfg(target_os = "linux")'.dependencies]
+skia-safe = {version = "0.75.0", features = ["textlayout", "svg", "x11"]}
+[target.'cfg(target_os = "macos")'.dependencies]
+skia-safe = {version = "0.75.0", features = ["textlayout", "svg"]}
 
 [dev-dependencies]
 serial_test = "3.0"
