@@ -142,6 +142,10 @@ define_props!(
     "flexwrap" => FlexWrap,
     "columngap" => ColumnGap,
     "rowgap" => RowGap,
+    "left" => Left,
+    "right" => Right,
+    "top" => Top,
+    "bottom" => Bottom,
     ;
     "background" => Background,
     "gap" => Gap,
@@ -558,6 +562,18 @@ impl StyleNode {
             StylePropertyKey::Position => {
                 self.set_position_type(parse_position_type(&value.to_str("")))
             },
+            StylePropertyKey::Top => {
+                self.yoga_node.set_position(Edge::Top, parse_length(&value.to_str("")));
+            },
+            StylePropertyKey::Right => {
+                self.yoga_node.set_position(Edge::Right, parse_length(&value.to_str("")));
+            },
+            StylePropertyKey::Bottom => {
+                self.yoga_node.set_position(Edge::Bottom, parse_length(&value.to_str("")));
+            },
+            StylePropertyKey::Left => {
+                self.yoga_node.set_position(Edge::Left, parse_length(&value.to_str("")));
+            },
             StylePropertyKey::Overflow => {
                 self.set_overflow(parse_overflow(&value.to_str("")))
             },
@@ -609,12 +625,7 @@ impl StyleNode {
                     layout.set_row_gap(value.to_f32(0.0))
                 });
             },
-            //TODO aspectratio , backgroundcolor
-            // right
-            // top
-            // bottom
-            // left
-            _ => repaint = false,
+            //TODO aspectratio
         }
         if let Some(on_changed) = &mut self.on_changed {
             on_changed(k.name());
