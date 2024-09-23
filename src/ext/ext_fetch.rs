@@ -54,6 +54,16 @@ pub async fn fetch_response_headers(response: FetchResponse) -> Result<Vec<Heade
     Ok(headers)
 }
 
+pub async fn fetch_response_body_string(response: FetchResponse) -> Result<String, Error> {
+    let mut rsp = response.response.lock().await;
+    let mut result = Vec::new();
+    while let Some(c) = rsp.chunk().await? {
+        let mut data = c.to_vec();
+        result.append(&mut data);
+    }
+    Ok(String::from_utf8(result)?)
+}
+
 pub async fn fetch_response_save(response: FetchResponse, path: String) -> Result<usize, Error> {
     let mut file = File::create_new(path).await?;
     let mut response = response.clone();
