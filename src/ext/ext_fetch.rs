@@ -1,10 +1,13 @@
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Error};
 use quick_js::{JsValue, ResourceValue};
-use reqwest::Response;
+use reqwest::{Method, Response};
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
@@ -26,9 +29,39 @@ pub struct Header {
     pub value: String,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct FetchOptions {
+    pub method: Option<String>,
+    pub headers: Option<HashMap<String, String>>,
+}
 
-pub async fn fetch_create(url: String) -> Result<FetchResponse, Error> {
-    let rsp = reqwest::get(url).await?;
+pub async fn fetch_create(url: String, options: Option<FetchOptions>) -> Result<FetchResponse, Error> {
+    let mut client = reqwest::Client::new();
+    let mut method = Method::GET;
+    let mut headers = HeaderMap::new();
+    if let Some(options) = &options {
+        if let Some(m) = &options.method {
+            method = match m.to_lowercase().as_str() {
+                "get" => Method::GET,
+                "post" => Method::POST,
+                "put" => Method::PUT,
+                "delete" => Method::DELETE,
+                "head" => Method::HEAD,
+                "options" => Method::OPTIONS,
+                m => return Err(anyhow!("invalid method: {}", m)),
+            };
+        }
+        if let Some(hds) = &options.headers {
+            for (k, v) in hds {
+                headers.insert(HeaderName::from_str(k)?, HeaderValue::from_str(v)?);
+            }
+        }
+    }
+    let rsp = client
+        .request(method, url)
+        .headers(headers)
+        .send()
+        .await?;
     Ok(FetchResponse {
         response: Arc::new(Mutex::new(rsp)),
     })

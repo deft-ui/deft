@@ -40,9 +40,7 @@ macro_rules! export_js_async_api {
                     let result = $func(p1, p2).await;
                     match result {
                         Ok(r) => {
-                            let serializer = JsValueSerializer {};
-                            let js_r = r.serialize(serializer)?;
-                            Ok(js_r)
+                            Ok(r.to_js_value()?)
                         },
                         Err(e) => Err(anyhow!(e)),
                     }

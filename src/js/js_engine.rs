@@ -16,7 +16,7 @@ use crate::ext::ext_appfs::{appfs_create_dir, appfs_create_dir_all, appfs_data_p
 use crate::ext::ext_audio::{audio_add_event_listener, audio_create, audio_stop, audio_remove_event_listener, AudioResource, audio_play, audio_pause, AudioOptions};
 use crate::ext::ext_base64::base64_encode_str;
 use crate::ext::ext_env::{env_exe_dir, env_exe_path};
-use crate::ext::ext_fetch::{fetch_create, fetch_response_body_string, fetch_response_headers, fetch_response_save, fetch_response_status, FetchResponse};
+use crate::ext::ext_fetch::{fetch_create, fetch_response_body_string, fetch_response_headers, fetch_response_save, fetch_response_status, FetchOptions, FetchResponse};
 use crate::ext::ext_frame::{create_frame, frame_close, frame_set_modal, FrameAttrs, handle_window_event};
 use crate::ext::ext_fs::{fs_create_dir, fs_create_dir_all, fs_delete_file, fs_exists, fs_read_dir, fs_remove_dir, fs_remove_dir_all, fs_rename, fs_stat};
 use crate::ext::ext_http::{http_request, http_upload, UploadOptions};
@@ -97,7 +97,7 @@ impl JsEngine {
         // http
         export_js_async_api!(js_context, "http_request", http_request, String);
         export_js_async_api!(js_context, "http_upload", http_upload, String, UploadOptions);
-        export_js_async_api!(js_context, "fetch_create", fetch_create, String);
+        export_js_async_api!(js_context, "fetch_create", fetch_create, String, Option<FetchOptions>);
         export_js_async_api!(js_context, "fetch_response_status", fetch_response_status, FetchResponse);
         export_js_async_api!(js_context, "fetch_response_headers", fetch_response_headers, FetchResponse);
         export_js_async_api!(js_context, "fetch_response_body_string", fetch_response_body_string, FetchResponse);
