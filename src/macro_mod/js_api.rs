@@ -74,6 +74,12 @@ macro_rules! export_js_object_api_raw {
 
 #[macro_export]
 macro_rules! export_js_object_api {
+    ($js_ctx: expr, $name: expr, $obj_type: ty, $func: ident) => {
+        {
+            crate::export_js_object_api_raw!($js_ctx, $name, $obj_type, $func, )
+        }
+
+    };
     ($js_ctx: expr, $name: expr, $obj_type: ty, $func: ident, $in_type: ty) => {
         {
             crate::export_js_object_api_raw!($js_ctx, $name, $obj_type, $func, p1 => $in_type)

@@ -167,6 +167,12 @@ pub struct ScrollEventDetail {
     pub scroll_left: f32,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Size {
+    pub width: f32,
+    pub height: f32,
+}
+
 impl CaretDetail {
 
     pub fn new(position: usize, origin_bounds: Rect, bounds: Rect) -> Self {

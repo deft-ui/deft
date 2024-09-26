@@ -12,10 +12,10 @@ use serde::{Deserialize, Serialize};
 use skia_bindings::{SkPaint_Style, SkPathOp};
 use skia_safe::{Canvas, Color, Paint, Path, Rect};
 use winit::window::CursorIcon;
-use yoga::{Direction, Edge};
+use yoga::{Direction, Edge, StyleUnit};
 
 use crate::{base, define_resource, js_call, js_call_rust, js_get_prop};
-use crate::base::{ElementEvent, ElementEventContext, ElementEventHandler, EventRegistration, ScrollEventDetail, TextChangeDetail};
+use crate::base::{ElementEvent, ElementEventContext, ElementEventHandler, EventRegistration, ScrollEventDetail, Size, TextChangeDetail};
 use crate::border::build_rect_with_radius;
 use crate::element::button::Button;
 use crate::element::container::Container;
@@ -111,6 +111,7 @@ impl ElementRef {
 
     pub fn get_property(&mut self, property_name: String) -> Result<JsValue, Error> {
         js_get_prop!("size", self, get_size, property_name);
+        js_get_prop!("content_size", self, get_real_content_size, property_name);
         let v = self.backend.get_property(&property_name)?;
         if let Some(s) = v {
             Ok(s)
@@ -321,6 +322,20 @@ impl ElementRef {
     pub fn get_size(&self) -> (f32, f32) {
         let layout = self.layout.get_layout();
         (layout.width().nan_to_zero(), layout.height().nan_to_zero())
+    }
+
+    fn compute_length(&self, length: StyleUnit, parent_length: Option<f32>) -> Option<f32> {
+        if let StyleUnit::Point(p) = length {
+            Some(p.0)
+        } else if let StyleUnit::Percent(p) = length {
+            if let Some(parent_size) = parent_length {
+                Some(parent_size * p.0)
+            } else {
+                Some(0.0)
+            }
+        } else {
+            None
+        }
     }
 
 

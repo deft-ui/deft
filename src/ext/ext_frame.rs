@@ -46,6 +46,7 @@ pub struct FrameAttrs {
     pub decorations: Option<bool>,
     pub override_redirect: Option<bool>,
     pub position: Option<(f32, f32)>,
+    pub visible: Option<bool>,
 }
 
 
@@ -57,6 +58,7 @@ pub fn create_frame(attrs: FrameAttrs) -> Result<FrameWeak, Error> {
     } else {
         attributes.title = "".to_string();
     }
+    attributes.visible = attrs.visible.unwrap_or(true);
     attributes.resizable = attrs.resizable.unwrap_or(true);
     attributes.decorations = attrs.decorations.unwrap_or(true);
     let size = LogicalSize {
@@ -156,6 +158,12 @@ impl FrameWeak {
     pub fn set_title(&mut self, title: String) {
         self.upgrade_mut(|f| {
             f.set_title(title)
+        });
+    }
+
+    pub fn resize(&mut self, size: crate::base::Size) {
+        self.upgrade_mut(|f| {
+            f.resize(size);
         });
     }
 

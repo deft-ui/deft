@@ -10,6 +10,7 @@ use winit::window::WindowId;
 
 use crate::{export_js_api, export_js_async_api, export_js_object_api};
 use crate::app::exit_app;
+use crate::base::Size;
 use crate::console::Console;
 use crate::element::{element_create, ElementRef};
 use crate::ext::ext_appfs::{appfs_create_dir, appfs_create_dir_all, appfs_data_path, appfs_delete_file, appfs_exists, appfs_read, appfs_readdir, appfs_remove_dir, appfs_remove_dir_all, appfs_write, appfs_write_new};
@@ -62,6 +63,7 @@ impl JsEngine {
         export_js_api!(js_context, "frame_close", frame_close, FrameWeak);
         export_js_object_api!(js_context, "frame_set_body", FrameWeak, set_body, ElementRef);
         export_js_object_api!(js_context, "frame_set_title", FrameWeak, set_title, String);
+        export_js_object_api!(js_context, "frame_resize", FrameWeak, resize, Size);
         export_js_object_api!(js_context, "frame_bind_event", FrameWeak, bind_event, String, JsValue);
         export_js_object_api!(js_context, "frame_set_visible", FrameWeak, set_visible, bool);
         export_js_object_api!(js_context, "frame_remove_event_listener", FrameWeak, remove_event_listener, String, u32);

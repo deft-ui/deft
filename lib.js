@@ -38,6 +38,10 @@ export class Frame {
         frame_set_title(this.frameId, title);
     }
 
+    resize(size) {
+        frame_resize(this.frameId, size);
+    }
+
     /**
      *
      * @param owner {Frame}
@@ -255,6 +259,10 @@ export class View {
      */
     getSize() {
         return view_get_property(this.el, "size");
+    }
+
+    getContentSize() {
+        return view_get_property(this.el, "content_size");
     }
 
     bindFocus(callback) {

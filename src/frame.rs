@@ -610,6 +610,13 @@ impl FrameRef {
         self.window.set_title(&title);
     }
 
+    pub fn resize(&mut self, size: crate::base::Size) {
+        let _ = self.window.request_inner_size(LogicalSize {
+            width: size.width,
+            height: size.height,
+        });
+    }
+
     fn on_resize(&mut self) {
         let size = self.window.inner_size();
         let (width, height) = (size.width, size.height);
