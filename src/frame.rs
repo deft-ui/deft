@@ -10,7 +10,7 @@ use measure_time::print_time;
 use quick_js::{JsValue, ResourceValue};
 use skia_bindings::SkClipOp;
 use skia_safe::{Canvas, Color, ColorType, ImageInfo};
-use skia_window::skia_window::SkiaWindow;
+use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 use winit::dpi::{LogicalPosition, LogicalSize, Position, Size};
 use winit::event::{ElementState, Ime, Modifiers, MouseButton, MouseScrollDelta, TouchPhase, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
@@ -639,7 +639,7 @@ impl FrameRef {
         };
         let start = SystemTime::now();
         let scale_factor = self.window.scale_factor() as f32;
-        self.window.render(|canvas| {
+        self.window.render(move |canvas| {
             canvas.save();
             if scale_factor != 1.0 {
                 canvas.scale((scale_factor, scale_factor));
@@ -694,7 +694,8 @@ impl FrameRef {
 
     fn create_window(attributes: WindowAttributes) -> SkiaWindow {
         run_with_event_loop(|el| {
-            SkiaWindow::new(el, attributes)
+            //TODO support RenderBackedType parameter
+            SkiaWindow::new(el, attributes, RenderBackendType::SoftBuffer)
         })
     }
 

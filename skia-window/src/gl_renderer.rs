@@ -17,7 +17,7 @@ use skia_safe::gpu::gl::FramebufferInfo;
 use winit::platform::x11;
 use winit::window::Window;
 
-pub struct SkiaRenderer {
+pub struct GlRenderer {
     context: RefCell<RenderContext>,
 }
 
@@ -37,7 +37,7 @@ struct RenderContext {
     context: PossiblyCurrentContext,
 }
 
-impl SkiaRenderer {
+impl GlRenderer {
     pub fn new(gl_display: &Display, window: &Window, gl_surface: glutin::surface::Surface<WindowSurface>, context: PossiblyCurrentContext) -> Self {
         unsafe {
             gl::load_with(|s| {

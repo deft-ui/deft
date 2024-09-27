@@ -23,6 +23,7 @@ glutin = "0.31"
 raw-window-handle = "0.5.0"
 skia-safe = { version = "0.75.0", features = ["gl"] }
 gl = "0.14.0"
+softbuffer = "0.4.6"
 
 
 [target.'cfg(not(target_os = "android"))'.dependencies]

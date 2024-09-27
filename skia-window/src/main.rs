@@ -1,5 +1,5 @@
 mod skia_window;
-mod skia_renderer;
+mod gl_renderer;
 
 use std::cell::RefCell;
 use std::collections::HashMap;

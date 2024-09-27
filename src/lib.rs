@@ -12,7 +12,7 @@ use quick_js::loader::FsJsModuleLoader;
 use serde::{Deserialize, Serialize};
 use skia_safe::{Font, Paint};
 use skia_safe::textlayout::{paragraph, TextAlign};
-use skia_window::skia_window::SkiaWindow;
+use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 use tokio_tungstenite::connect_async;
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
@@ -216,7 +216,7 @@ fn test_border_performance_gl() {
 
     impl ApplicationHandler for TestApp {
         fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-            let mut skia_window = SkiaWindow::new(event_loop, WindowAttributes::default());
+            let mut skia_window = SkiaWindow::new(event_loop, WindowAttributes::default(), RenderBackendType::SoftBuffer);
             skia_window.render(|canvas| {
                 crate::renderer::test_border(canvas);
             });
