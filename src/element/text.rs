@@ -81,7 +81,7 @@ impl Text {
         };
         let text = "".to_string();
 
-        let paragraphs = Self::build_lines(&text, &text_params);
+        let paragraphs = Self::build_lines(&text, &text_params, true);
         let paragraph_props = ParagraphRef {
             data: Rc::new(RefCell::new(ParagraphData {
                 lines: paragraphs,
@@ -154,7 +154,8 @@ impl Text {
 
     fn rebuild_line(&mut self, line: usize, new_text: String) {
         let mut pi = self.paragraph_ref.data.borrow_mut();
-        let mut ps = Self::build_lines(&new_text, &self.text_params);
+        let is_ending = pi.lines.len() - 1 == line;
+        let mut ps = Self::build_lines(&new_text, &self.text_params, is_ending);
         pi.lines.remove(line);
         let mut idx = line;
         for p in ps {
@@ -257,7 +258,7 @@ impl Text {
     }
 
     pub fn rebuild_lines(&mut self, text: &str) {
-        let paragraphs = Self::build_lines(text, &self.text_params);
+        let paragraphs = Self::build_lines(text, &self.text_params, true);
         let mut pi = self.paragraph_ref.data.borrow_mut();
         pi.update_line(paragraphs);
     }
@@ -396,12 +397,15 @@ impl Text {
         }
     }
 
-    pub fn build_lines(text: &str, params: &TextParams) -> Vec<Line> {
+    pub fn build_lines(text: &str, params: &TextParams, is_ending: bool) -> Vec<Line> {
         let mut lines: Vec<&str> = if text.is_empty() {
             vec![""]
         } else {
             text.split_inclusive('\n').into_iter().collect()
         };
+        if is_ending && text.ends_with('\n') {
+            lines.push("");
+        }
         let mut result = Vec::new();
         for ln in lines {
             // let p = SimpleTextParagraph::new(ln, params);
