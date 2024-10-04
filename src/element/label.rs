@@ -82,7 +82,8 @@ extern "C" fn measure_label(node_ref: NodeRef, width: f32, _mode: MeasureMode, _
             let paragraph = &mut paragraph_props_ptr.paragraph.borrow_mut();
             let p = paragraph.get_paragraph(width);
             let height = p.height();
-            let text_width = p.max_intrinsic_width();
+            // let text_width = p.max_intrinsic_width();
+            let text_width = f32::min(p.max_width(), p.max_intrinsic_width());
             // println!("text len:{}, width:{}, height:{}", paragraph.chars_count, text_width, height);
             return Size {
                 width: text_width,
