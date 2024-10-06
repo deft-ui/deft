@@ -643,6 +643,8 @@ export class ScrollElement extends ContainerBasedElement {
     }
 
     scrollBy(value) {
+        value.x = value.x || 0;
+        value.y = value.y || 0;
         view_set_property(this.el, "scroll_by", value);
     }
 
