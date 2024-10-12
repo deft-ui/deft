@@ -743,6 +743,9 @@ fn draw_element(canvas: &Canvas, element: &ElementRef) {
 
         // translate to element left-top
         canvas.translate((bounds.x, bounds.y));
+        if let Some(m) = element.layout.transform {
+            canvas.concat(&m);
+        }
 
         // set clip path
         let clip_path = element.get_border_box_path();

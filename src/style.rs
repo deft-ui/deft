@@ -1,10 +1,12 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::f32::consts::PI;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
-use ordered_float::OrderedFloat;
+use anyhow::{anyhow, Error};
+use ordered_float::{Float, OrderedFloat};
 use quick_js::JsValue;
-use skia_safe::{Color, Image, Path};
+use skia_safe::{Color, Image, Matrix, Path};
 use yoga::{Align, Direction, Display, Edge, FlexDirection, Justify, Node, Overflow, PositionType, StyleUnit, Wrap};
 use crate::base::Rect;
 use crate::color::parse_hex_color;
@@ -146,6 +148,7 @@ define_props!(
     "right" => Right,
     "top" => Top,
     "bottom" => Bottom,
+    "transform" => Transform,
     ;
     "background" => Background,
     "gap" => Gap,
@@ -309,6 +312,16 @@ impl StylePropertyValue {
             StylePropertyValue::Invalid => default,
         }
     }
+
+    pub fn to_matrix(&self) -> Option<Matrix> {
+        match self {
+            StylePropertyValue::String(str) => {
+                parse_transform(str)
+            }
+            _ => None,
+        }
+    }
+
 }
 
 pub struct Style {
@@ -377,6 +390,7 @@ pub struct StyleNodeInner {
     pub border_color: [Color;4],
     pub background_color: ColorPropValue,
     pub background_image: Option<Image>,
+    pub transform: Option<Matrix>,
     pub computed_style: ComputedStyle,
     pub on_changed: Option<Box<dyn FnMut(&str)>>,
 }
@@ -435,6 +449,7 @@ impl StyleNode {
             background_color: ColorPropValue::Color(Color::TRANSPARENT),
             color: ColorPropValue::Inherit,
             background_image: None,
+            transform: None,
             computed_style: ComputedStyle::default(),
             on_changed: None,
             border_paths: CacheValue::new(|p: &BorderParams| {
@@ -589,7 +604,11 @@ impl StyleNode {
             StylePropertyKey::BorderBottomLeftRadius => {
                 self.border_radius[3] = value.to_f32(0.0)
             },
+            StylePropertyKey::Transform => {
+                self.transform = value.to_matrix()
+            }
 
+            // container node style
             StylePropertyKey::JustifyContent => {
                 self.with_container_node_mut(|layout| {
                     layout.set_justify_content(parse_justify(&value.to_str("")))
@@ -898,5 +917,58 @@ pub fn parse_overflow(value: &str) -> Overflow {
         "hidden" => Overflow::Hidden,
         "scroll" => Overflow::Scroll,
         _ => Overflow::Visible,
+    }
+}
+
+fn parse_transform(value: &str) -> Option<Matrix> {
+    let value = value.trim();
+    if !value.ends_with(")") {
+        return None;
+    }
+    let left_p = value.find("(")?;
+    let func = &value[0..left_p];
+    let param_str = &value[left_p + 1..value.len() - 1];
+    match func {
+        "matrix" => parse_matrix(param_str).ok(),
+        "rotate" => parse_rotate(param_str).ok(),
+        _ => None,
+    }
+}
+
+fn parse_matrix(value: &str) -> Result<Matrix, Error> {
+    let parts: Vec<&str> = value.split(",").collect();
+    if parts.len() != 6 {
+        return Err(anyhow!("invalid value"));
+    }
+    Ok(create_matrix([
+        f32::from_str(parts.get(0).unwrap())?,
+        f32::from_str(parts.get(1).unwrap())?,
+        f32::from_str(parts.get(2).unwrap())?,
+        f32::from_str(parts.get(3).unwrap())?,
+        f32::from_str(parts.get(4).unwrap())?,
+        f32::from_str(parts.get(5).unwrap())?,
+    ]))
+}
+
+fn create_matrix(values: [f32; 6]) -> Matrix {
+    let scale_x = values[0];
+    let skew_y =  values[1];
+    let skew_x =  values[2];
+    let scale_y = values[3];
+    let trans_x = values[4];
+    let trans_y = values[5];
+    Matrix::new_all(
+        scale_x, skew_x, trans_x,
+        skew_y, scale_y, trans_y,
+        0.0, 0.0, 1.0,
+    )
+}
+
+fn parse_rotate(value: &str) -> Result<Matrix, Error> {
+    if let Some(v) = value.strip_suffix("deg") {
+        let v = f32::from_str(v)? / 180.0 * PI;
+        Ok(create_matrix([v.cos(), v.sin(), -v.sin(), v.cos(), 0.0, 0.0]))
+    } else {
+        Err(anyhow!("invalid value"))
     }
 }
