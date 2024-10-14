@@ -15,6 +15,7 @@ use winit::window::CursorIcon;
 use yoga::{Direction, Edge, StyleUnit};
 
 use crate::{base, define_resource, js_call, js_call_rust, js_get_prop};
+use crate::animation::{AnimationInstance, SimpleFrameController};
 use crate::base::{ElementEvent, ElementEventContext, ElementEventHandler, EventRegistration, ScrollEventDetail, Size, TextChangeDetail};
 use crate::border::build_rect_with_radius;
 use crate::element::button::Button;
@@ -26,6 +27,7 @@ use crate::element::scroll::Scroll;
 use crate::element::textedit::TextEdit;
 use crate::event::{BlurEvent, CaretEvent, ClickEventBind, DragOverEvent, DragOverEventDetail, DragStartEvent, DragStartEventDetail, DropEvent, DropEventDetail, FocusEvent, KeyDownEvent, KeyUpEvent, MouseClickEvent, MouseDownEvent, MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, ScrollEvent, TextChangeEvent, TextUpdateEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent};
 use crate::ext::common::create_event_handler;
+use crate::ext::ext_animation::AnimationResource;
 use crate::ext::ext_frame::{VIEW_TYPE_BUTTON, VIEW_TYPE_CONTAINER, VIEW_TYPE_ENTRY, VIEW_TYPE_IMAGE, VIEW_TYPE_LABEL, VIEW_TYPE_SCROLL, VIEW_TYPE_TEXT_EDIT};
 use crate::frame::{FrameRef, FrameWeak};
 use crate::img_manager::IMG_MANAGER;
@@ -33,7 +35,7 @@ use crate::js::js_serde::JsValueSerializer;
 use crate::js::js_value_util::{FromJsValue, SerializeToJsValue, ToJsValue};
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
-use crate::style::{AllStylePropertyKey, ColorHelper, expand_mixed_style, parse_style, StyleNode, StylePropertyKey, StylePropertyValue};
+use crate::style::{ColorHelper, parse_style_obj, StyleNode, StyleProp};
 
 pub mod container;
 pub mod entry;
@@ -457,38 +459,63 @@ impl ElementRef {
     }
 
     pub fn set_style(&mut self, style: JsValue) {
-        self.set_style_props(parse_style(style))
+        self.set_style_props(parse_style_obj(style))
     }
 
-    pub fn set_style_props(&mut self, style: HashMap<AllStylePropertyKey, StylePropertyValue>) {
-        self.style_props = style;
+    pub fn set_style_props(&mut self, styles: Vec<StyleProp>) {
+        self.style_props = styles;
         self.apply_style();
     }
 
     pub fn set_hover_style(&mut self, style: JsValue) {
-        self.hover_style_props = parse_style(style);
+        self.hover_style_props = parse_style_obj(style);
         if self.hover {
             self.apply_style();
         }
     }
 
+    pub fn set_animation(&self, mut animation_res: AnimationResource) {
+        let mut ele = self.clone();
+        println!("running animation");
+        animation_res.run(Box::new(move |styles| {
+            // println!("rendering {:?}", styles);
+            let mut ele = ele.clone();
+            ele.animation_style_props = styles;
+            ele.apply_style();
+        }));
+    }
+
     fn calculate_changed_style<'a>(
-        old_style: &'a HashMap<StylePropertyKey, StylePropertyValue>,
-        new_style: &'a HashMap<StylePropertyKey, StylePropertyValue>,
-    ) -> HashMap<&'a StylePropertyKey, &'a StylePropertyValue> {
-        let mut changed_style_props = HashMap::new();
+        old_style: &'a Vec<StyleProp>,
+        new_style: &'a Vec<StyleProp>,
+    ) -> Vec<StyleProp> {
+        let mut changed_style_props = Vec::new();
+        let mut old_style_map = HashMap::new();
+        let mut new_style_map = HashMap::new();
+        for e in old_style {
+            old_style_map.insert(e.name(), e);
+        }
+        for e in new_style {
+            new_style_map.insert(e.name(), e);
+        }
         let mut keys = HashSet::new();
-        for k in old_style.keys() {
+        for k in old_style_map.keys() {
             keys.insert(k);
         }
-        for k in new_style.keys() {
+        for k in new_style_map.keys() {
             keys.insert(k);
         }
         for k in keys {
-            let old_value = old_style.get(k);
-            let new_value = new_style.get(k);
-            if old_value != new_value {
-                changed_style_props.insert(k, new_value.unwrap_or(&StylePropertyValue::Invalid));
+            let old_value = old_style_map.get(k);
+            let new_value = new_style_map.get(k);
+            match new_value {
+                Some(t) => {
+                    changed_style_props.push(t.clone().clone())
+                },
+                None => {
+                    let ov = old_value.unwrap().clone().clone();
+                    changed_style_props.push(ov.unset());
+                }
             }
         }
         return changed_style_props;
@@ -497,17 +524,20 @@ impl ElementRef {
     fn apply_style(&mut self) {
         let mut style_props = self.style_props.clone();
         if self.hover {
-            for (k, v) in &self.hover_style_props {
-                style_props.insert(k.clone(), v.clone());
+            for v in &self.hover_style_props {
+                style_props.push(v.clone());
             }
         }
-        let new_style = expand_mixed_style(style_props);
+        for v in &self.animation_style_props {
+            style_props.push(v.clone());
+        }
+        let new_style = style_props;
 
         let old_style = self.applied_style.clone();
         let mut changed_style_props = Self::calculate_changed_style(&old_style, &new_style);
 
-        changed_style_props.iter().for_each(|(k, value)| {
-            let (repaint, need_layout) = self.layout.set_style(k, value);
+        changed_style_props.iter().for_each(| e | {
+            let (repaint, need_layout) = self.layout.set_style(e);
             if need_layout || repaint {
                 self.mark_dirty(need_layout);
             }
@@ -754,11 +784,13 @@ pub struct Element {
     window: Option<FrameWeak>,
     event_registration: EventRegistration<ElementRef>,
     pub layout: StyleNode,
-    pub style_props: HashMap<AllStylePropertyKey, StylePropertyValue>,
-    pub hover_style_props: HashMap<AllStylePropertyKey, StylePropertyValue>,
+    pub style_props: Vec<StyleProp>,
+    pub hover_style_props: Vec<StyleProp>,
+    animation_style_props: Vec<StyleProp>,
     hover: bool,
 
-    applied_style: HashMap<StylePropertyKey, StylePropertyValue>,
+    applied_style: Vec<StyleProp>,
+    // animation_instance: Option<AnimationInstance>,
 
 
     scroll_top: f32,
@@ -780,9 +812,10 @@ impl Element {
             window: None,
             event_registration: EventRegistration::new(),
             layout: StyleNode::new(),
-            style_props: HashMap::new(),
-            hover_style_props: HashMap::new(),
-            applied_style: HashMap::new(),
+            style_props: Vec::new(),
+            hover_style_props: Vec::new(),
+            animation_style_props: Vec::new(),
+            applied_style: Vec::new(),
             hover: false,
 
             scroll_top: 0.0,

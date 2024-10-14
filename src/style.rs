@@ -165,6 +165,273 @@ pub enum StylePropertyValue {
     Invalid,
 }
 
+pub type StyleColor = ColorPropValue;
+
+pub trait PropValueParse: Sized {
+    fn parse_prop_value(value: &str) -> Option<Self>;
+}
+
+impl PropValueParse for StyleColor {
+    fn parse_prop_value(value: &str) -> Option<Self> {
+        if let Some(hex) = value.strip_prefix("#") {
+            parse_hex_color(hex).map(|v| ColorPropValue::Color(v))
+        } else {
+            None
+        }
+    }
+}
+
+impl PropValueParse for StyleBorder {
+    fn parse_prop_value(value: &str) -> Option<Self> {
+        parse_border(value)
+    }
+}
+
+impl PropValueParse for StyleUnit {
+    fn parse_prop_value(value: &str) -> Option<Self> {
+        parse_style_unit(value)
+    }
+}
+
+impl PropValueParse for Display {
+    fn parse_prop_value(value: &str) -> Option<Self> {
+        parse_display2(value)
+    }
+}
+
+impl PropValueParse for f32 {
+    fn parse_prop_value(value: &str) -> Option<Self> {
+        f32::from_str(value).ok()
+    }
+}
+
+impl PropValueParse for FlexDirection {
+    fn parse_prop_value(value: &str) -> Option<Self> {
+        parse_flex_direction2(value)
+    }
+}
+
+impl PropValueParse for Direction {
+    fn parse_prop_value(value: &str) -> Option<Self> {
+        Some(parse_direction(value))
+    }
+}
+
+impl PropValueParse for Align {
+    fn parse_prop_value(value: &str) -> Option<Self> {
+        Some(parse_align(value))
+    }
+}
+
+impl PropValueParse for PositionType {
+    fn parse_prop_value(value: &str) -> Option<Self> {
+        Some(parse_position_type(value))
+    }
+}
+
+impl PropValueParse for Overflow {
+    fn parse_prop_value(value: &str) -> Option<Self> {
+        Some(parse_overflow(value))
+    }
+}
+
+impl PropValueParse for Justify {
+    fn parse_prop_value(value: &str) -> Option<Self> {
+        Some(parse_justify(value))
+    }
+}
+
+impl PropValueParse for Wrap {
+    fn parse_prop_value(value: &str) -> Option<Self> {
+        Some(parse_wrap(value))
+    }
+}
+
+
+impl PropValueParse for StyleTransform {
+    fn parse_prop_value(value: &str) -> Option<Self> {
+        //TODO support multiple op
+        if let Some(op) = StyleTransformOp::parse(value) {
+            Some(Self {
+                op_list: vec![op]
+            })
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum StyleTransformOp {
+    Rotate(f32),
+    Scale(f32, f32),
+    Translate(f32, f32),
+}
+
+impl StyleTransformOp {
+    pub fn parse(str: &str) -> Option<Self> {
+        let value = str.trim();
+        if !value.ends_with(")") {
+            return None;
+        }
+        let left_p = value.find("(")?;
+        let func = &value[0..left_p];
+        let param_str = &value[left_p + 1..value.len() - 1];
+        //TODO support double params
+        match func {
+            //"matrix" => parse_matrix(param_str).ok(),
+            "rotate" => parse_rotate_op(param_str),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct StyleTransform {
+    pub op_list: Vec<StyleTransformOp>,
+}
+
+impl StyleTransform {
+    pub fn empty() -> StyleTransform {
+        Self {
+            op_list: Vec::new(),
+        }
+    }
+
+    pub fn to_matrix(&self) -> Matrix {
+        let mut matrix = Matrix::new_identity();
+        for op in &self.op_list {
+            match op {
+                StyleTransformOp::Rotate(deg) => {
+                    matrix.post_rotate(*deg, None);
+                }
+                StyleTransformOp::Scale(_, _) => {
+                    //TODO impl
+                }
+                StyleTransformOp::Translate(_, _) => {
+                    //TODO impl
+                }
+            }
+        }
+        matrix
+    }
+
+}
+
+#[derive(Clone, Debug)]
+pub struct StyleBorder(StyleUnit, StyleColor);
+
+#[derive(Clone, Debug)]
+pub enum StylePropVal<T> {
+    Custom(T),
+    Unset,
+}
+
+impl<T: Clone> StylePropVal<T> {
+    pub fn resolve(&self, default: &T) -> T {
+        match self {
+            StylePropVal::Custom(v) => { v.clone() }
+            StylePropVal::Unset => { default.clone() }
+        }
+    }
+}
+
+macro_rules! define_style_props {
+    ($($name: ident => $type: ty, )*) => {
+        #[derive(Clone, Debug)]
+        pub enum StyleProp {
+            $(
+                $name(StylePropVal<$type>),
+            )*
+        }
+
+        impl StyleProp {
+            pub fn parse(key: &str, value: &str) -> Option<StyleProp> {
+                let key = key.to_lowercase();
+                let k = key.as_str();
+                $(
+                    if k == stringify!($name).to_lowercase().as_str() {
+                        return <$type>::parse_prop_value(value).map(|v| StyleProp::$name(StylePropVal::Custom(v)));
+                    }
+                )*
+                return None
+            }
+            pub fn name(&self) -> &str {
+                match self {
+                    $(
+                        Self::$name(_) => stringify!($name),
+                    )*
+                }
+            }
+            pub fn unset(&self) -> Self {
+                match self {
+                    $(
+                       Self::$name(_) => Self::$name(StylePropVal::Unset),
+                    )*
+                }
+            }
+        }
+    };
+}
+
+define_style_props!(
+    Color => StyleColor,
+    BackgroundColor => StyleColor,
+
+    BorderTop => StyleBorder,
+    BorderRight => StyleBorder,
+    BorderBottom => StyleBorder,
+    BorderLeft => StyleBorder,
+
+    Display => Display,
+
+    Width => StyleUnit,
+    Height => StyleUnit,
+    MaxWidth => StyleUnit,
+    MaxHeight => StyleUnit,
+    MinWidth => StyleUnit,
+    MinHeight => StyleUnit,
+
+    MarginTop => StyleUnit,
+    MarginRight => StyleUnit,
+    MarginBottom => StyleUnit,
+    MarginLeft => StyleUnit,
+
+    PaddingTop => StyleUnit,
+    PaddingRight => StyleUnit,
+    PaddingBottom => StyleUnit,
+    PaddingLeft => StyleUnit,
+    //
+    Flex => f32,
+    FlexBasis => StyleUnit,
+    FlexGrow => f32,
+    FlexShrink => f32,
+    AlignSelf => Align,
+    Direction => Direction,
+    Position => PositionType,
+    Overflow => Overflow,
+
+    BorderTopLeftRadius => f32,
+    BorderTopRightRadius => f32,
+    BorderBottomRightRadius => f32,
+    BorderBottomLeftRadius => f32,
+
+    JustifyContent => Justify,
+    FlexDirection => FlexDirection,
+    AlignContent => Align,
+    AlignItems => Align,
+    FlexWrap => Wrap,
+    ColumnGap => f32,
+    RowGap => f32,
+
+    Top => StyleUnit,
+    Right => StyleUnit,
+    Bottom => StyleUnit,
+    Left => StyleUnit,
+
+    Transform => StyleTransform,
+);
+
 pub fn expand_mixed_style(mixed: HashMap<AllStylePropertyKey, StylePropertyValue>) -> HashMap<StylePropertyKey, StylePropertyValue> {
     let mut result = HashMap::new();
     for (k, v) in mixed {
@@ -347,7 +614,7 @@ impl ComputedStyle {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum ColorPropValue {
     Inherit,
     Color(Color),
@@ -476,179 +743,185 @@ impl StyleNode {
         Rect::new(l, t, width - l - r, height - t - b)
     }
 
-    pub fn set_style(&mut self, k: &StylePropertyKey, value: &StylePropertyValue) -> (bool, bool) {
+    pub fn set_style(&mut self, p: &StyleProp) -> (bool, bool) {
         let mut repaint = true;
         let mut need_layout = true;
         let standard_node = Node::new();
-        match k {
-            StylePropertyKey::Color => {
-                self.color = value.to_color(ColorPropValue::Inherit);
+
+        match p {
+            StyleProp::Color(v) => {
+                self.color = v.resolve(&ColorPropValue::Inherit);
                 self.compute_color();
                 need_layout = false;
             }
-            StylePropertyKey::BackgroundColor => {
-                self.background_color = value.to_color(ColorPropValue::Color(Color::TRANSPARENT));
+            StyleProp::BackgroundColor (value) =>   {
+                self.background_color = value.resolve(&ColorPropValue::Color(Color::TRANSPARENT));
                 self.compute_background_color();
                 need_layout = false;
             }
-            StylePropertyKey::BorderTop => {
-                self.set_border(&value.to_str("none"), &vec![0])
+            StyleProp::BorderTop (value) =>   {
+                self.set_border(&value, &vec![0])
             }
-            StylePropertyKey::BorderRight => {
-                self.set_border(&value.to_str("none"), &vec![1])
+            StyleProp::BorderRight (value) =>   {
+                self.set_border(&value, &vec![1])
             }
-            StylePropertyKey::BorderBottom => {
-                self.set_border(&value.to_str("none"), &vec![2])
+            StyleProp::BorderBottom (value) =>   {
+                self.set_border(&value, &vec![2])
             }
-            StylePropertyKey::BorderLeft => {
-                self.set_border(&value.to_str("none"), &vec![3])
+            StyleProp::BorderLeft (value) =>   {
+                self.set_border(&value, &vec![3])
             }
-            StylePropertyKey::Display => {
-                self.set_display(parse_display(&value.to_str("")))
+            StyleProp::Display (value) =>   {
+                self.set_display(value.resolve(&Display::Flex))
             }
-            StylePropertyKey::Width => {
-                self.set_width(value.to_len(standard_node.get_style_width()))
+            StyleProp::Width (value) =>   {
+                self.set_width(value.resolve(&standard_node.get_style_width()))
             },
-            StylePropertyKey::Height => {
-                self.set_height(value.to_len(standard_node.get_style_height()))
+            StyleProp::Height (value) =>   {
+                self.set_height(value.resolve(&standard_node.get_style_height()))
             },
-            StylePropertyKey::MaxWidth => {
-                self.set_max_width(value.to_len(standard_node.get_style_max_width()))
+            StyleProp::MaxWidth (value) =>   {
+                self.set_max_width(value.resolve(&standard_node.get_style_max_width()))
             },
-            StylePropertyKey::MaxHeight => {
-                self.set_max_height(value.to_len(standard_node.get_style_max_height()))
+            StyleProp::MaxHeight (value) =>   {
+                self.set_max_height(value.resolve(&standard_node.get_style_max_height()))
             },
-            StylePropertyKey::MinWidth => {
-                self.set_min_width(value.to_len(standard_node.get_style_min_width()))
+            StyleProp::MinWidth (value) =>   {
+                self.set_min_width(value.resolve(&standard_node.get_style_min_width()))
             },
-            StylePropertyKey::MinHeight => {
-                self.set_min_height(value.to_len(standard_node.get_style_min_height()))
+            StyleProp::MinHeight (value) =>   {
+                self.set_min_height(value.resolve(&standard_node.get_style_min_height()))
             },
-            StylePropertyKey::MarginTop => {
-                self.set_margin(Edge::Top, value.to_len(standard_node.get_style_margin_top()))
+            StyleProp::MarginTop (value) =>   {
+                self.set_margin(Edge::Top, value.resolve(&standard_node.get_style_margin_top()))
             },
-            StylePropertyKey::MarginRight => {
-                self.set_margin(Edge::Right, value.to_len(standard_node.get_style_margin_right()))
+            StyleProp::MarginRight (value) =>   {
+                self.set_margin(Edge::Right, value.resolve(&standard_node.get_style_margin_right()))
             },
-            StylePropertyKey::MarginBottom => {
-                self.set_margin(Edge::Bottom, value.to_len(standard_node.get_style_margin_bottom()))
+            StyleProp::MarginBottom (value) =>   {
+                self.set_margin(Edge::Bottom, value.resolve(&standard_node.get_style_margin_bottom()))
             },
-            StylePropertyKey::MarginLeft => {
-                self.set_margin(Edge::Left, value.to_len(standard_node.get_style_margin_left()))
+            StyleProp::MarginLeft (value) =>   {
+                self.set_margin(Edge::Left, value.resolve(&standard_node.get_style_margin_left()))
             },
-            StylePropertyKey::PaddingTop => {
+            StyleProp::PaddingTop (value) =>   {
                 self.with_container_node_mut(|n| {
-                    n.set_padding(Edge::Top, value.to_len(standard_node.get_style_padding_top()))
+                    n.set_padding(Edge::Top, value.resolve(&standard_node.get_style_padding_top()))
                 })
             },
-            StylePropertyKey::PaddingRight => {
+            StyleProp::PaddingRight (value) =>   {
                 self.with_container_node_mut(|n| {
-                    n.set_padding(Edge::Right, value.to_len(standard_node.get_style_padding_right()))
+                    n.set_padding(Edge::Right, value.resolve(&standard_node.get_style_padding_right()))
                 })
             },
-            StylePropertyKey::PaddingBottom => {
+            StyleProp::PaddingBottom (value) =>   {
                 self.with_container_node_mut(|n| {
-                    n.set_padding(Edge::Bottom, value.to_len(standard_node.get_style_padding_bottom()))
+                    n.set_padding(Edge::Bottom, value.resolve(&standard_node.get_style_padding_bottom()))
                 })
             },
-            StylePropertyKey::PaddingLeft => {
+            StyleProp::PaddingLeft (value) =>   {
                 self.with_container_node_mut(|n| {
-                    n.set_padding(Edge::Left, value.to_len(standard_node.get_style_padding_left()))
+                    n.set_padding(Edge::Left, value.resolve(&standard_node.get_style_padding_left()))
                 })
             },
-            StylePropertyKey::Flex => {
-                self.set_flex(value.to_f32(standard_node.get_flex()))
+            StyleProp::Flex (value) =>   {
+                self.set_flex(value.resolve(&standard_node.get_flex()))
             },
-            StylePropertyKey::FlexBasis => {
-                self.set_flex_basis(value.to_len(standard_node.get_flex_basis()))
+            StyleProp::FlexBasis (value) =>   {
+                self.set_flex_basis(value.resolve(&standard_node.get_flex_basis()))
             },
-            StylePropertyKey::FlexGrow => {
-                self.set_flex_grow(value.to_f32(standard_node.get_flex_grow()))
+            StyleProp::FlexGrow (value) =>   {
+                self.set_flex_grow(value.resolve(&standard_node.get_flex_grow()))
             },
-            StylePropertyKey::FlexShrink => {
-                self.set_flex_shrink(value.to_f32(standard_node.get_flex_shrink()))
+            StyleProp::FlexShrink (value) =>   {
+                self.set_flex_shrink(value.resolve(&standard_node.get_flex_shrink()))
             },
-            StylePropertyKey::AlignSelf => {
-                self.set_align_self(parse_align(&value.to_str("")))
+            StyleProp::AlignSelf (value) =>   {
+                self.set_align_self(value.resolve(&Align::FlexStart))
             },
-            StylePropertyKey::Direction => {
-                self.set_direction(parse_direction(&value.to_str("")))
+            StyleProp::Direction (value) =>   {
+                self.set_direction(value.resolve(&Direction::LTR))
             },
-            StylePropertyKey::Position => {
-                self.set_position_type(parse_position_type(&value.to_str("")))
+            StyleProp::Position (value) =>   {
+                self.set_position_type(value.resolve(&PositionType::Static))
             },
-            StylePropertyKey::Top => {
-                self.yoga_node.set_position(Edge::Top, parse_length(&value.to_str("")));
+            StyleProp::Top (value) =>   {
+                self.yoga_node.set_position(Edge::Top, value.resolve(&StyleUnit::UndefinedValue));
             },
-            StylePropertyKey::Right => {
-                self.yoga_node.set_position(Edge::Right, parse_length(&value.to_str("")));
+            StyleProp::Right (value) =>   {
+                self.yoga_node.set_position(Edge::Right, value.resolve(&StyleUnit::UndefinedValue));
             },
-            StylePropertyKey::Bottom => {
-                self.yoga_node.set_position(Edge::Bottom, parse_length(&value.to_str("")));
+            StyleProp::Bottom (value) =>   {
+                self.yoga_node.set_position(Edge::Bottom, value.resolve(&StyleUnit::UndefinedValue));
             },
-            StylePropertyKey::Left => {
-                self.yoga_node.set_position(Edge::Left, parse_length(&value.to_str("")));
+            StyleProp::Left (value) =>   {
+                self.yoga_node.set_position(Edge::Left, value.resolve(&StyleUnit::UndefinedValue));
             },
-            StylePropertyKey::Overflow => {
-                self.set_overflow(parse_overflow(&value.to_str("")))
+            StyleProp::Overflow (value) =>   {
+                self.set_overflow(value.resolve(&Overflow::Hidden))
             },
-            StylePropertyKey::BorderTopLeftRadius => {
-                self.border_radius[0] = value.to_f32(0.0)
+            StyleProp::BorderTopLeftRadius (value) =>   {
+                self.border_radius[0] = value.resolve(&0.0)
             },
-            StylePropertyKey::BorderTopRightRadius => {
-                self.border_radius[1] = value.to_f32(0.0)
+            StyleProp::BorderTopRightRadius (value) =>   {
+                self.border_radius[1] = value.resolve(&0.0)
             },
-            StylePropertyKey::BorderBottomRightRadius => {
-                self.border_radius[2] = value.to_f32(0.0)
+            StyleProp::BorderBottomRightRadius (value) =>   {
+                self.border_radius[2] = value.resolve(&0.0)
             },
-            StylePropertyKey::BorderBottomLeftRadius => {
-                self.border_radius[3] = value.to_f32(0.0)
+            StyleProp::BorderBottomLeftRadius (value) =>   {
+                self.border_radius[3] = value.resolve(&0.0)
             },
-            StylePropertyKey::Transform => {
-                self.transform = value.to_matrix()
+            StyleProp::Transform (value) =>   {
+                if let StylePropVal::Custom(v) = value {
+                    self.transform = Some(v.to_matrix());
+                } else {
+                    self.transform = None;
+                }
             }
 
             // container node style
-            StylePropertyKey::JustifyContent => {
+            StyleProp::JustifyContent (value) =>   {
                 self.with_container_node_mut(|layout| {
-                    layout.set_justify_content(parse_justify(&value.to_str("")))
+                    layout.set_justify_content(value.resolve(&Justify::FlexStart))
                 });
             },
-            StylePropertyKey::FlexDirection => {
+            StyleProp::FlexDirection (value) =>   {
                 self.with_container_node_mut(|layout| {
-                    layout.set_flex_direction(parse_flex_direction(&value.to_str("")))
+                    layout.set_flex_direction(value.resolve(&FlexDirection::Column))
                 });
             },
-            StylePropertyKey::AlignContent => {
+            StyleProp::AlignContent (value) =>   {
                 self.with_container_node_mut(|layout| {
-                    layout.set_align_content(parse_align(&value.to_str("")))
+                    layout.set_align_content(value.resolve(&Align::FlexStart))
                 });
             },
-            StylePropertyKey::AlignItems => {
+            StyleProp::AlignItems (value) =>   {
                 self.with_container_node_mut(|layout| {
-                    layout.set_align_items(parse_align(&value.to_str("")))
+                    layout.set_align_items(value.resolve(&Align::FlexStart))
                 });
             },
-            StylePropertyKey::FlexWrap => {
+            StyleProp::FlexWrap (value) =>   {
                 self.with_container_node_mut(|layout| {
-                    layout.set_flex_wrap(parse_wrap(&value.to_str("")))
+                    layout.set_flex_wrap(value.resolve(&Wrap::NoWrap))
                 });
             },
-            StylePropertyKey::ColumnGap => {
+            StyleProp::ColumnGap (value) =>   {
                 self.with_container_node_mut(|layout| {
-                    layout.set_column_gap(value.to_f32(0.0))
+                    layout.set_column_gap(value.resolve(&0.0))
                 });
             },
-            StylePropertyKey::RowGap => {
+            StyleProp::RowGap (value) =>   {
                 self.with_container_node_mut(|layout| {
-                    layout.set_row_gap(value.to_f32(0.0))
+                    layout.set_row_gap(value.resolve(&0.0))
                 });
             },
             //TODO aspectratio
         }
         if let Some(on_changed) = &mut self.on_changed {
-            on_changed(k.name());
+            on_changed(p.name());
         }
+
         return (repaint, need_layout)
     }
 
@@ -687,20 +960,19 @@ impl StyleNode {
         return None
     }
 
-    fn set_border(&mut self, value: &str, edges: &Vec<usize>) {
-        let parts = value.split(" ");
-        let mut width = 0f32;
-        let mut color = Color::from_rgb(0,0,0);
-        for p in parts {
-            let p = p.trim();
-            if p.starts_with("#") {
-                if let Some(c) = parse_hex_color(p.strip_prefix('#').unwrap()) {
-                    color = c;
-                }
-            } else if let Ok(w) = f32::from_str(p) {
-                width = w;
-            }
-        }
+    fn set_border(&mut self, value: &StylePropVal<StyleBorder>, edges: &Vec<usize>) {
+        let default_border = StyleBorder(StyleUnit::UndefinedValue, StyleColor::Color(Color::TRANSPARENT));
+        let value = value.resolve(&default_border);
+        let color = match value.1 {
+            //TODO fix inherited color?
+            StyleColor::Inherit => {Color::TRANSPARENT}
+            StyleColor::Color(c) => {c}
+        };
+        //TODO fix percent?
+        let width = match value.0 {
+            StyleUnit::Point(f) => {f.0},
+            _ => 0.0,
+        };
         for index in edges {
             self.border_color[*index] = color;
             let edges_list = [Edge::Top, Edge::Right, Edge::Bottom, Edge::Left];
@@ -800,6 +1072,71 @@ pub fn parse_style(style: JsValue) -> HashMap<AllStylePropertyKey, StyleProperty
     style_map
 }
 
+pub fn parse_style_obj(style: JsValue) -> Vec<StyleProp> {
+    let mut result = Vec::new();
+    if let Some(obj) = style.get_properties() {
+        //TODO use default style
+        obj.into_iter().for_each(|(k, v)| {
+            let v_str = match v {
+                JsValue::String(s) => s,
+                JsValue::Int(i) => i.to_string(),
+                JsValue::Float(f) => f.to_string(),
+                _ => return,
+            };
+            let mut parse = |key: &str, value: &str| -> bool {
+                if let Some(p) = StyleProp::parse(key, value) {
+                    result.push(p);
+                    true
+                } else {
+                    false
+                }
+            };
+            if !parse(&k, &v_str) {
+                let key = k.to_lowercase();
+                let k = key.as_str();
+                match k {
+                    "background" => {
+                        parse("BackgroundColor", &v_str);
+                    },
+                    "gap" => {
+                        parse("RowGap", &v_str);
+                        parse("ColumnGap", &v_str);
+                    },
+                    "border" => {
+                        parse("BorderTop", &v_str);
+                        parse("BorderRight", &v_str);
+                        parse("BorderBottom", &v_str);
+                        parse("BorderLeft", &v_str);
+                    },
+                    "margin" => {
+                        let (t, r, b, l) = parse_box_prop(StylePropertyValue::String(v_str.to_string()));
+                        parse("MarginTop", &t.to_str("none"));
+                        parse("MarginRight", &r.to_str("none"));
+                        parse("MarginBottom", &b.to_str("none"));
+                        parse("MarginLeft", &l.to_str("none"));
+                    }
+                    "padding" => {
+                        let (t, r, b, l) = parse_box_prop(StylePropertyValue::String(v_str.to_string()));
+                        parse("PaddingTop", &t.to_str("none"));
+                        parse("PaddingRight", &r.to_str("none"));
+                        parse("PaddingBottom", &b.to_str("none"));
+                        parse("PaddingLeft", &l.to_str("none"));
+                    }
+                    "borderRadius" => {
+                        let (t, r, b, l) = parse_box_prop(StylePropertyValue::String(v_str.to_string()));
+                        parse("BorderTopLeftRadius", &t.to_str("none"));
+                        parse("BorderTopRightRadius", &r.to_str("none"));
+                        parse("BorderBottomRightRadius", &b.to_str("none"));
+                        parse("BorderBottomLeftRadius", &l.to_str("none"));
+                    }
+                    _ => {}
+                }
+            }
+        });
+    }
+    result
+}
+
 pub fn parse_display(str: &str) -> Display {
     if str.to_lowercase() == "none" {
         Display::None
@@ -807,6 +1144,15 @@ pub fn parse_display(str: &str) -> Display {
         Display::Flex
     }
 }
+
+pub fn parse_display2(str: &str) -> Option<Display> {
+    match str.to_lowercase().as_str() {
+        "none" => Some(Display::None),
+        "flex" => Some(Display::Flex),
+        _ => None
+    }
+}
+
 
 pub fn parse_justify(str: &str) -> Justify {
     let key = str.to_lowercase();
@@ -832,6 +1178,18 @@ pub fn parse_flex_direction(value: &str) -> FlexDirection {
     }
 }
 
+pub fn parse_flex_direction2(value: &str) -> Option<FlexDirection> {
+    let key = value.to_lowercase();
+    let r = match key.as_str() {
+        "column" => FlexDirection::Column,
+        "column-reverse" => FlexDirection::ColumnReverse,
+        "row" => FlexDirection::Row,
+        "row-reverse" => FlexDirection::RowReverse,
+        _ => return None,
+    };
+    Some(r)
+}
+
 pub fn parse_float(value: &str) -> f32 {
     f32::from_str(value).unwrap_or(0.0)
 }
@@ -849,6 +1207,24 @@ pub fn parse_length(value: &str) -> StyleUnit {
             Err(err) => {
                 eprintln!("Invalid value:{}", err);
                 StyleUnit::UndefinedValue
+            }
+        }
+    }
+}
+
+pub fn parse_style_unit(value: &str) -> Option<StyleUnit> {
+    //TODO no unwrap
+    return if value.ends_with("%") {
+        let width = f32::from_str(value.strip_suffix("%").unwrap()).unwrap();
+        Some(StyleUnit::Percent(OrderedFloat(width)))
+    } else {
+        match f32::from_str(value) {
+            Ok(v) => {
+                Some(StyleUnit::Point(OrderedFloat(v)))
+            }
+            Err(err) => {
+                eprintln!("Invalid value:{}", err);
+                None
             }
         }
     }
@@ -950,6 +1326,10 @@ fn parse_matrix(value: &str) -> Result<Matrix, Error> {
     ]))
 }
 
+pub fn format_matrix(v: &Matrix) -> String {
+    format!("matrix({},{},{},{},{},{})", v.scale_x(), v.skew_y(), v.skew_x(), v.scale_y(), v.translate_x(), v.translate_y())
+}
+
 fn create_matrix(values: [f32; 6]) -> Matrix {
     let scale_x = values[0];
     let skew_y =  values[1];
@@ -971,4 +1351,30 @@ fn parse_rotate(value: &str) -> Result<Matrix, Error> {
     } else {
         Err(anyhow!("invalid value"))
     }
+}
+
+fn parse_rotate_op(value: &str) -> Option<StyleTransformOp> {
+    if let Some(v) = value.strip_suffix("deg") {
+        let v = f32::from_str(v).ok()?;
+        Some(StyleTransformOp::Rotate(v))
+    } else {
+        None
+    }
+}
+
+fn parse_border(value: &str) -> Option<StyleBorder> {
+    let parts = value.split(" ");
+    let mut width = StyleUnit::Point(OrderedFloat(0.0));
+    let mut color = Color::from_rgb(0, 0, 0);
+    for p in parts {
+        let p = p.trim();
+        if p.starts_with("#") {
+            if let Some(c) = parse_hex_color(p.strip_prefix('#').unwrap()) {
+                color = c;
+            }
+        } else if let Some(w) = parse_style_unit(p) {
+            width = w;
+        }
+    }
+    Some(StyleBorder(width, StyleColor::Color(color)))
 }

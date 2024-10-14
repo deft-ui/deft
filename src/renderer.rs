@@ -1,4 +1,5 @@
 use measure_time::print_time;
+use ordered_float::OrderedFloat;
 use skia_bindings::SkPaint_Style;
 use skia_safe::{Canvas, Color, Paint, Surface, surfaces};
 use skia_window::skia_window::SkiaWindow;
@@ -6,11 +7,11 @@ use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopBuilder};
 use winit::window::{WindowAttributes, WindowId};
-use yoga::Direction;
+use yoga::{Direction, StyleUnit};
 use crate::app::AppEvent;
 use crate::border::build_border_paths;
 use crate::canvas_util::CanvasHelper;
-use crate::style::{Style, StyleNode, StylePropertyKey, StylePropertyValue};
+use crate::style::{Style, StyleBorder, StyleColor, StyleNode, StyleProp, StylePropertyKey, StylePropertyValue};
 
 
 //TODO remove
@@ -40,10 +41,10 @@ pub fn test_border(canvas: &Canvas) {
     print_time!("draw border time");
     let mut style = StyleNode::new();
     style.border_radius = [10.0, 10.0, 10.0, 10.0];
-    style.set_style(&StylePropertyKey::BorderLeft, &StylePropertyValue::String("1 #ccc".to_string()));
-    style.set_style(&StylePropertyKey::BorderRight, &StylePropertyValue::String("1 #ccc".to_string()));
-    style.set_style(&StylePropertyKey::BorderTop, &StylePropertyValue::String("1 #ccc".to_string()));
-    style.set_style(&StylePropertyKey::BorderBottom, &StylePropertyValue::String("1 #ccc".to_string()));
+    style.set_style(&StyleProp::parse("BorderLeft", "1 #ccc").unwrap());
+    style.set_style(&StyleProp::parse("BorderRight", "1 #ccc").unwrap());
+    style.set_style(&StyleProp::parse("BorderTop", "1 #ccc").unwrap());
+    style.set_style(&StyleProp::parse("BorderBottom", "1 #ccc").unwrap());
     style.calculate_layout(70.0, 16.0, Direction::LTR);
     let width = style.get_layout_width();
     let height = style.get_layout_height();

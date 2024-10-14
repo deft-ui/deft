@@ -64,13 +64,10 @@ macro_rules! create_element {
         {
             let mut element = ElementRef::new(<$ty>::create);
             use crate::HashMap;
-            use crate::element::AllStylePropertyKey;
-            use crate::element::StylePropertyValue;
-            let mut style = HashMap::new();
+            let mut style = Vec::new();
             $(
-                if let Some(p) = AllStylePropertyKey::from_str(stringify!($key)) {
-                   let v = StylePropertyValue::from_str($value);
-                   style.insert(p, v);
+                if let Some(p) = crate::element::StyleProp::parse(stringify!($key), $value) {
+                   style.push(p);
                 }
             )*
             element.set_style_props(style);

@@ -13,6 +13,7 @@ use crate::app::exit_app;
 use crate::base::Size;
 use crate::console::Console;
 use crate::element::{element_create, ElementRef};
+use crate::ext::ext_animation::{animation_create, AnimationOptions, AnimationResource};
 use crate::ext::ext_appfs::{appfs_create_dir, appfs_create_dir_all, appfs_data_path, appfs_delete_file, appfs_exists, appfs_read, appfs_readdir, appfs_remove_dir, appfs_remove_dir_all, appfs_write, appfs_write_new};
 use crate::ext::ext_audio::{audio_add_event_listener, audio_create, audio_stop, audio_remove_event_listener, AudioResource, audio_play, audio_pause, AudioOptions};
 use crate::ext::ext_base64::base64_encode_str;
@@ -76,6 +77,7 @@ impl JsEngine {
         export_js_object_api!(js_context, "view_remove_child", ElementRef, remove_child, u32);
         export_js_object_api!(js_context, "view_set_style", ElementRef, set_style, JsValue);
         export_js_object_api!(js_context, "view_set_hover_style", ElementRef, set_hover_style, JsValue);
+        export_js_object_api!(js_context, "view_set_animation", ElementRef, set_animation, AnimationResource);
         export_js_object_api!(js_context, "view_bind_event",ElementRef, bind_event, String, JsValue);
         export_js_object_api!(js_context, "view_remove_event_listener",ElementRef, remove_event_listener, String, u32);
 
@@ -153,6 +155,9 @@ impl JsEngine {
         export_js_api!(js_context, "audio_stop", audio_stop, AudioResource);
         export_js_api!(js_context, "audio_add_event_listener", audio_add_event_listener, AudioResource, String, JsValue);
         export_js_api!(js_context, "audio_remove_event_listener", audio_remove_event_listener, AudioResource, String, u32);
+
+        //animation
+        export_js_api!(js_context, "animation_create", animation_create, JsValue, AnimationOptions);
 
         // base64
         export_js_api!(js_context, "base64_encode_str", base64_encode_str, String);

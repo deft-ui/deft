@@ -1,10 +1,11 @@
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
+use std::ops::Add;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 use skia_safe::wrapper::NativeTransmutableWrapper;
 use crate::app::AppEvent;
 use crate::event_loop::send_event;
@@ -24,7 +25,7 @@ enum Task {
 
 struct TimeTask {
     id: u64,
-    next_execute_time: u64,
+    next_execute_time: Instant,
     task: Task,
 }
 
@@ -96,17 +97,17 @@ impl Timer {
         let tasks = Arc::new(Mutex::new(BTreeSet::<TimeTask>::new()));
         let tasks_arc = tasks.clone();
         thread::spawn(move || {
-            let mut sleep_time = DEFAULT_SLEEP_TIME;
+            let mut sleep_time = Duration::from_millis(DEFAULT_SLEEP_TIME);
             loop {
-                if let Ok(()) = receiver.recv_timeout(Duration::from_millis(sleep_time)) {
+                if let Ok(()) = receiver.recv_timeout(sleep_time) {
                     let new_sleep_time = match tasks_arc.lock().unwrap().first() {
-                        None => DEFAULT_SLEEP_TIME as i128,
-                        Some(t) => t.next_execute_time as i128 - get_now_time() as i128,
+                        None => Duration::from_millis(DEFAULT_SLEEP_TIME),
+                        Some(t) => t.next_execute_time.duration_since(get_now_time()),
                     };
-                    if new_sleep_time > 0 {
-                        sleep_time = new_sleep_time as u64;
+                    if !new_sleep_time.is_zero() {
+                        sleep_time = new_sleep_time;
                     } else {
-                        sleep_time = DEFAULT_SLEEP_TIME;
+                        sleep_time = Duration::from_millis(DEFAULT_SLEEP_TIME);
                         send_event(AppEvent::CheckTimer).unwrap();
                     }
                 } else {
@@ -125,8 +126,12 @@ impl Timer {
 }
 
 pub fn set_timeout<F: FnOnce() + 'static>(callback: F, millis: u64) -> TimerHandle {
+    set_timeout_nanos(callback, millis * 1000000)
+}
+
+pub fn set_timeout_nanos<F: FnOnce() + 'static>(callback: F, nanos: u64) -> TimerHandle {
     let id = get_next_id();
-    let execute_time = get_now_time() + millis;
+    let execute_time = get_now_time().add(Duration::from_nanos(nanos));
     add_time_task(TimeTask {
         id,
         next_execute_time: execute_time,
@@ -137,7 +142,7 @@ pub fn set_timeout<F: FnOnce() + 'static>(callback: F, millis: u64) -> TimerHand
 
 pub fn set_interval<F: Fn() + 'static>(callback: F, interval: u64) -> TimerHandle {
     let id = get_next_id();
-    let next_execute_time = get_now_time() + interval;
+    let next_execute_time = get_now_time().add(Duration::from_millis(interval));
     add_time_task(TimeTask {
         id,
         next_execute_time,
@@ -191,7 +196,7 @@ pub fn check_task() {
             }
             Task::Interval(interval, callback) => {
                 (&callback)();
-                let next_execute_time = get_now_time() + interval;
+                let next_execute_time = get_now_time().add(Duration::from_millis(interval));
                 add_time_task(TimeTask {
                     id: task.id,
                     next_execute_time,
@@ -209,6 +214,6 @@ fn wakeup_sleep() {
     })
 }
 
-fn get_now_time() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64
+fn get_now_time() -> Instant {
+    Instant::now()
 }

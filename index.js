@@ -65,6 +65,30 @@ function main() {
     });
     container.addChild(button);
 
+    let animationButton = new ButtonElement();
+    animationButton.setStyle({
+        width: 100,
+    })
+    animationButton.setTitle("Animation");
+    const animation = animation_create({
+        "0": {
+            //width: 100,
+            transform: 'rotate(0deg)'
+        },
+        "1": {
+            // width: 200,
+            transform: 'rotate(360deg)'
+        }
+    }, {
+        duration: 1000,
+        iterationCount: Infinity,
+    });
+    animationButton.bindClick(() => {
+        console.log("setting animation");
+        animationButton.setAnimation(animation);
+    });
+    container.addChild(animationButton);
+
     //
     // const textEdit = new TextEditElement();
     //

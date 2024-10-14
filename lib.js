@@ -212,6 +212,10 @@ export class View {
         view_set_style(this.el, style);
     }
 
+    setAnimation(animation) {
+        view_set_animation(this.el, animation);
+    }
+
     /**
      *
      * @param style {Record<string, any>}

@@ -65,6 +65,7 @@ mod js;
 mod performance;
 
 mod cache;
+mod animation;
 #[cfg(target_os = "android")]
 mod android;
 
@@ -164,7 +165,7 @@ fn test_layout() {
     };
     let mut paragraph = {
         print_time!("build time");
-        Text::build_lines(&text, &params)
+        Text::build_lines(&text, &params, true)
     };
     {
         print_time!("layout time");

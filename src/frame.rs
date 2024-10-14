@@ -744,7 +744,10 @@ fn draw_element(canvas: &Canvas, element: &ElementRef) {
         // translate to element left-top
         canvas.translate((bounds.x, bounds.y));
         if let Some(m) = element.layout.transform {
+            //TODO support transform origin
+            canvas.translate((bounds.width / 2.0, bounds.height / 2.0));
             canvas.concat(&m);
+            canvas.translate((-bounds.width / 2.0, -bounds.height / 2.0));
         }
 
         // set clip path
