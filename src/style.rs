@@ -11,8 +11,10 @@ use yoga::{Align, Direction, Display, Edge, FlexDirection, Justify, Node, Overfl
 use crate::base::Rect;
 use crate::color::parse_hex_color;
 use crate::{inherit_color_prop};
+use crate::animation::{AnimationInstance, SimpleFrameController};
 use crate::border::build_border_paths;
 use crate::cache::CacheValue;
+use crate::ext::ext_animation::ANIMATIONS;
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 
@@ -261,6 +263,12 @@ impl PropValueParse for StyleTransform {
     }
 }
 
+impl PropValueParse for String {
+    fn parse_prop_value(value: &str) -> Option<Self> {
+        Some(value.to_string())
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum StyleTransformOp {
     Rotate(f32),
@@ -430,6 +438,9 @@ define_style_props!(
     Left => StyleUnit,
 
     Transform => StyleTransform,
+    AnimationName => String,
+    AnimationDuration => f32,
+    AnimationIterationCount => f32,
 );
 
 pub fn expand_mixed_style(mixed: HashMap<AllStylePropertyKey, StylePropertyValue>) -> HashMap<StylePropertyKey, StylePropertyValue> {
@@ -643,6 +654,22 @@ impl ColorHelper for Color {
     }
 }
 
+struct AnimationParams {
+    name: String,
+    duration: f32,
+    iteration_count: f32,
+}
+
+impl AnimationParams {
+    pub fn new() -> Self {
+        Self {
+            name: "".to_string(),
+            duration: 0.0,
+            iteration_count: 1.0,
+        }
+    }
+}
+
 pub struct StyleNodeInner {
     yoga_node: Node,
     shadow_node: Option<Node>,
@@ -659,7 +686,10 @@ pub struct StyleNodeInner {
     pub background_image: Option<Image>,
     pub transform: Option<Matrix>,
     pub computed_style: ComputedStyle,
+    animation_params: AnimationParams,
+    animation_instance: Option<AnimationInstance>,
     pub on_changed: Option<Box<dyn FnMut(&str)>>,
+    pub animation_renderer: Option<Mrc<Box<dyn FnMut(Vec<StyleProp>)>>>,
 }
 
 #[derive(PartialEq)]
@@ -717,8 +747,11 @@ impl StyleNode {
             color: ColorPropValue::Inherit,
             background_image: None,
             transform: None,
+            animation_instance: None,
+            animation_params: AnimationParams::new(),
             computed_style: ComputedStyle::default(),
             on_changed: None,
+            animation_renderer: None,
             border_paths: CacheValue::new(|p: &BorderParams| {
                 build_border_paths(p.border_width, p.border_radius, p.width, p.height)
             }),
@@ -879,6 +912,27 @@ impl StyleNode {
                     self.transform = None;
                 }
             }
+            StyleProp::AnimationName(value) => {
+                let name = value.resolve(&"".to_string());
+                if name != self.animation_params.name {
+                    self.animation_params.name = name;
+                    self.update_animation();
+                }
+            }
+            StyleProp::AnimationDuration(value) => {
+                let duration = value.resolve(&0.0);
+                if duration != self.animation_params.duration {
+                    self.animation_params.duration = duration;
+                    self.update_animation();
+                }
+            }
+            StyleProp::AnimationIterationCount(value) => {
+                let ic = value.resolve(&1.0);
+                if ic != self.animation_params.iteration_count {
+                    self.animation_params.iteration_count = ic;
+                    self.update_animation();
+                }
+            }
 
             // container node style
             StyleProp::JustifyContent (value) =>   {
@@ -923,6 +977,34 @@ impl StyleNode {
         }
 
         return (repaint, need_layout)
+    }
+
+    fn update_animation(&mut self) {
+        if let Some(ai) = &mut self.animation_instance {
+            ai.stop();
+        }
+        let p = &self.animation_params;
+        self.animation_instance = if p.name.is_empty() || p.duration <= 0.0 || p.iteration_count <= 0.0  {
+            None
+        } else {
+            ANIMATIONS.with_borrow(|m| {
+                let ani = m.get(&p.name)?;
+                let frame_controller = SimpleFrameController::new();
+                let duration = p.duration * 1000000.0;
+                let iteration_count = p.iteration_count;
+                let ani_instance = AnimationInstance::new(ani.clone(), duration, iteration_count, Box::new(frame_controller));
+                Some(ani_instance)
+            })
+        };
+        let mut ar = self.animation_renderer.clone();
+        if let Some(ai) = &mut self.animation_instance {
+            if let Some(ar) = &mut ar {
+                let mut ar = ar.clone();
+                ai.run(Box::new(move |styles| {
+                    ar(styles);
+                }));
+            }
+        }
     }
 
     inherit_color_prop!(

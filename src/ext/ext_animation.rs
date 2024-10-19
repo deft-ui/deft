@@ -1,11 +1,17 @@
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::str::FromStr;
 use anyhow::{anyhow, Error};
 use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
-use crate::animation::{AnimationDef, AnimationInstance, SimpleFrameController};
+use crate::animation::{Animation, AnimationDef, AnimationInstance, SimpleFrameController};
 use crate::define_ref_and_resource;
 use crate::style::{parse_style_obj};
 define_ref_and_resource!(AnimationResource, AnimationInstance);
+
+thread_local! {
+    pub static  ANIMATIONS: RefCell<HashMap<String, Animation>> = RefCell::new(HashMap::new());
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +20,7 @@ pub struct AnimationOptions {
     iteration_count: Option<f32>,
 }
 
-pub fn animation_create(key_frames: JsValue, options: AnimationOptions) -> Result<AnimationResource, Error> {
+pub fn animation_create(name: String, key_frames: JsValue) -> Result<(), Error> {
     let mut ad = AnimationDef::new();
     if let Some(ps) = key_frames.get_properties() {
         for (k, v) in ps {
@@ -24,11 +30,10 @@ pub fn animation_create(key_frames: JsValue, options: AnimationOptions) -> Resul
             ad = ad.key_frame(p, styles);
         }
         let ani = ad.build();
-        let frame_controller = SimpleFrameController::new();
-        let duration = options.duration * 1000000.0;
-        let iteration_count = options.iteration_count.unwrap_or(1.0);
-        let ani_instance = AnimationInstance::new(ani, duration, iteration_count, Box::new(frame_controller));
-        Ok(AnimationResource::new(ani_instance))
+        ANIMATIONS.with_borrow_mut(|m| {
+            m.insert(name, ani);
+        });
+        Ok(())
     } else {
         Err(anyhow!("invalid argument"))
     }

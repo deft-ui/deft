@@ -157,7 +157,7 @@ impl JsEngine {
         export_js_api!(js_context, "audio_remove_event_listener", audio_remove_event_listener, AudioResource, String, u32);
 
         //animation
-        export_js_api!(js_context, "animation_create", animation_create, JsValue, AnimationOptions);
+        export_js_api!(js_context, "animation_create", animation_create, String, JsValue);
 
         // base64
         export_js_api!(js_context, "base64_encode_str", base64_encode_str, String);

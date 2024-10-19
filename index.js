@@ -68,9 +68,9 @@ function main() {
     let animationButton = new ButtonElement();
     animationButton.setStyle({
         width: 100,
-    })
+    });
     animationButton.setTitle("Animation");
-    const animation = animation_create({
+    animation_create("rotate", {
         "0": {
             //width: 100,
             transform: 'rotate(0deg)'
@@ -79,14 +79,12 @@ function main() {
             // width: 200,
             transform: 'rotate(360deg)'
         }
-    }, {
-        duration: 1000,
-        iterationCount: Infinity,
     });
-    animationButton.bindClick(() => {
-        console.log("setting animation");
-        animationButton.setAnimation(animation);
-    });
+    animationButton.setHoverStyle({
+        animationName: 'rotate',
+        animationDuration: 1000,
+        animationIterationCount: Infinity,
+    })
     container.addChild(animationButton);
 
     //

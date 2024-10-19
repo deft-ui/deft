@@ -134,6 +134,7 @@ pub struct AnimationState {
     duration: f32,
     iteration_count: f32,
     frame_controller: Box<dyn FrameController>,
+    stopped: bool,
 }
 
 pub struct AnimationInstance {
@@ -201,13 +202,14 @@ impl AnimationInstance {
             duration,
             iteration_count,
             frame_controller,
+            stopped: false,
         };
         Self {
             state: Mrc::new(state),
         }
     }
 
-    pub fn run(&mut self, renderer: Box<dyn Fn(Vec<StyleProp>)>) {
+    pub fn run(&mut self, renderer: Box<dyn FnMut(Vec<StyleProp>)>) {
         let mut state = self.state.clone();
         self.state.frame_controller.request_next_frame(Box::new(move |t| {
             // println!("animation started:{}", t);
@@ -216,10 +218,15 @@ impl AnimationInstance {
         }));
     }
 
-    fn render_frame(mut state: Mrc<AnimationState>, now: f32,  renderer: Box<dyn Fn(Vec<StyleProp>)>) {
+    pub fn stop(&mut self) {
+        // println!("stopped");
+        self.state.stopped = true;
+    }
+
+    fn render_frame(mut state: Mrc<AnimationState>, now: f32, mut renderer: Box<dyn FnMut(Vec<StyleProp>)>) {
         let elapsed = now - state.start_time;
         let position = elapsed / state.duration;
-        let frame = if position > state.iteration_count {
+        let frame = if position > state.iteration_count || state.stopped {
             Vec::new()
         } else {
             state.animation.get_frame(position - position as usize as f32)

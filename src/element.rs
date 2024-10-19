@@ -78,11 +78,23 @@ impl ElementRef {
                 inner.backend.handle_style_changed(key);
             }
         }));
+        let ele_weak = ele.inner.as_weak();
+        ele.inner.layout.animation_renderer = Some(Mrc::new(Box::new(move |styles| {
+            if let Some(inner) = ele_weak.upgrade() {
+                let mut el = ElementRef::from_inner(inner);
+                el.animation_style_props = styles;
+                el.apply_style();
+            }
+        })));
         let ele_cp = ele.clone();
         // let bk = backend(ele_cp);
         ele.backend = Box::new(backend(ele_cp));
         //ele.backend.bind(ele_cp);
         ele
+    }
+
+    pub fn from_inner(inner: Mrc<Element>) -> Self {
+        Self { inner }
     }
 
     pub fn create_shadow(&mut self) {
@@ -535,6 +547,7 @@ impl ElementRef {
 
         let old_style = self.applied_style.clone();
         let mut changed_style_props = Self::calculate_changed_style(&old_style, &new_style);
+        // println!("changed style props:{:?}", changed_style_props);
 
         changed_style_props.iter().for_each(| e | {
             let (repaint, need_layout) = self.layout.set_style(e);
