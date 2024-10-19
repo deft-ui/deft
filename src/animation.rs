@@ -218,7 +218,7 @@ impl AnimationInstance {
         }));
     }
 
-    pub fn stop(&mut self) {
+    fn stop(&mut self) {
         // println!("stopped");
         self.state.stopped = true;
     }
@@ -241,6 +241,12 @@ impl AnimationInstance {
         } else {
             //TODO notify ended?
         }
+    }
+}
+
+impl Drop for AnimationInstance {
+    fn drop(&mut self) {
+        self.stop();
     }
 }
 

@@ -980,9 +980,6 @@ impl StyleNode {
     }
 
     fn update_animation(&mut self) {
-        if let Some(ai) = &mut self.animation_instance {
-            ai.stop();
-        }
         let p = &self.animation_params;
         self.animation_instance = if p.name.is_empty() || p.duration <= 0.0 || p.iteration_count <= 0.0  {
             None
