@@ -1201,7 +1201,7 @@ pub fn parse_style_obj(style: JsValue) -> Vec<StyleProp> {
                         parse("PaddingBottom", &b.to_str("none"));
                         parse("PaddingLeft", &l.to_str("none"));
                     }
-                    "borderRadius" => {
+                    "borderradius" => {
                         let (t, r, b, l) = parse_box_prop(StylePropertyValue::String(v_str.to_string()));
                         parse("BorderTopLeftRadius", &t.to_str("none"));
                         parse("BorderTopRightRadius", &r.to_str("none"));
