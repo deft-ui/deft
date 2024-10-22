@@ -33,12 +33,14 @@ pub struct Header {
 pub struct FetchOptions {
     pub method: Option<String>,
     pub headers: Option<HashMap<String, String>>,
+    pub body: Option<String>,
 }
 
 pub async fn fetch_create(url: String, options: Option<FetchOptions>) -> Result<FetchResponse, Error> {
     let mut client = reqwest::Client::new();
     let mut method = Method::GET;
     let mut headers = HeaderMap::new();
+    let mut body = None;
     if let Some(options) = &options {
         if let Some(m) = &options.method {
             method = match m.to_lowercase().as_str() {
@@ -56,12 +58,15 @@ pub async fn fetch_create(url: String, options: Option<FetchOptions>) -> Result<
                 headers.insert(HeaderName::from_str(k)?, HeaderValue::from_str(v)?);
             }
         }
+        body = options.body.clone();
     }
-    let rsp = client
+    let mut req_builder = client
         .request(method, url)
-        .headers(headers)
-        .send()
-        .await?;
+        .headers(headers);
+    if let Some(body) = body {
+        req_builder = req_builder.body(body);
+    }
+    let rsp = req_builder.send().await?;
     Ok(FetchResponse {
         response: Arc::new(Mutex::new(rsp)),
     })
