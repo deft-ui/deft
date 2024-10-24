@@ -408,6 +408,7 @@ define_event!(TouchEndEvent,    TouchEndEventBind,    "touchend",    bind_touch_
 define_event!(TouchCancelEvent, TouchCancelEventBind, "touchcancel", bind_touch_cancel, emit_touch_cancel, AcceptTouchCancelEvent, accept_touch_cancel, TouchDetail);
 define_event!(FocusEvent,       FocusEventBind,       "focus",       bind_focus,        emit_focus,        AcceptFocusEvent,       accept_focus,        ());
 define_event!(BlurEvent,        BlurEventBind,        "blur",        bind_blur,         emit_blur,         AcceptBlurEvent,        accept_blur,         ());
+define_event!(FocusShiftEvent,  FocusShiftBind,       "focusshift",  bind_focus_shift,  emit_focus_shift,  AcceptFocusShiftEvent,  accept_focus_shift,  ());
 define_event!(TextChangeEvent,  TextChangeBind,       "textchange",  bind_text_change,  emit_text_change,  AcceptTextChange,       accept_text_change,  TextChangeDetail);
 define_event!(ScrollEvent,      ScrollBind,           "scroll",      bind_scroll,       emit_scroll,       AcceptScroll,           accept_scroll,       ScrollEventDetail);
 define_event!(DragStartEvent,   DragStartBind,        "dragstart",   bind_drag_start,   emit_drag_start,   AccpetDragStart,        accept_drag_start,   DragStartEventDetail);

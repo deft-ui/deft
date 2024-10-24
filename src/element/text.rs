@@ -11,13 +11,13 @@ use skia_safe::{Canvas, Color, Font, FontMgr, FontStyle, Paint, Typeface};
 use skia_safe::textlayout::{FontCollection, TextAlign};
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 
-use crate::base::{ElementEvent, Rect, TextUpdateDetail};
+use crate::base::{ElementEvent, MouseDetail, MouseEventType, Rect, TextUpdateDetail};
 use crate::color::parse_hex_color;
 use crate::element::{ElementBackend, ElementRef};
-use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
 use crate::element::text::skia_text_paragraph::{SkiaTextParagraph};
 use crate::element::text::text_paragraph::{ParagraphData, Line, ParagraphRef, TextParams};
-use crate::js_call;
+use crate::{js_call, match_event_type};
+use crate::event::{AcceptFocusShiftEvent, FocusShiftBind};
 use crate::number::DeNan;
 use crate::string::StringUtils;
 
@@ -38,6 +38,7 @@ pub struct Text {
     /// Option<(start atom offset, end atom offset)>
     selection: Option<(AtomOffset, AtomOffset)>,
     element: ElementRef,
+    selecting_begin: Option<AtomOffset>,
 }
 
 thread_local! {
@@ -97,6 +98,7 @@ impl Text {
             element,
             last_width: 0.0,
             text_params,
+            selecting_begin: None,
         }
     }
 
@@ -167,10 +169,12 @@ impl Text {
     pub fn select(&mut self, start: usize, end: usize) {
         //TODO validate params
         self.selection = Some((start, end));
+        self.mark_dirty(false);
     }
 
     pub fn unselect(&mut self) {
         self.selection = None;
+        self.mark_dirty(false);
     }
 
     pub fn delete_selected_text(&mut self) {
@@ -357,6 +361,44 @@ impl Text {
         })
     }
 
+    fn begin_select(&mut self, caret: AtomOffset) {
+        self.element.emit_focus_shift(());
+        self.unselect();
+        self.selecting_begin = Some(caret);
+    }
+
+    fn end_select(&mut self) {
+        self.selecting_begin = None;
+    }
+
+    pub fn get_atom_offset_by_coordinate(&self, position: (f32, f32)) -> AtomOffset {
+        let (row, col) = self.get_caret_at_offset_coordinate(position);
+        self.get_atom_offset_by_location((row, col))
+    }
+
+    fn handle_mouse_event(&mut self, event: &MouseDetail) {
+        match event.event_type {
+            MouseEventType::MouseDown => {
+                let caret = self.get_atom_offset_by_coordinate((event.offset_x, event.offset_y));
+                self.begin_select(caret);
+            }
+            MouseEventType::MouseMove => {
+                if self.selecting_begin.is_some() {
+                    let caret = self.get_atom_offset_by_coordinate((event.offset_x, event.offset_y));
+                    if let Some(sb) = &self.selecting_begin {
+                        let start = AtomOffset::min(*sb, caret);
+                        let end = AtomOffset::max(*sb, caret);
+                        self.select(start, end);
+                    }
+                }
+            }
+            MouseEventType::MouseUp => {
+                self.end_select();
+            }
+            _ => {},
+        }
+    }
+
     pub fn with_lines_mut<R, F: FnOnce(&mut Vec<Line>) -> R>(&self, callback: F) -> R {
         let layout = &self.element.layout;
         let content_width = layout.get_layout_width()
@@ -522,6 +564,12 @@ impl ElementBackend for Text {
         }
     }
 
+    fn handle_event_default_behavior(&mut self, _event_type: &str, event: &mut ElementEvent) -> bool {
+        event.accept_focus_shift(|_| {
+            self.unselect();
+        })
+    }
+
     fn handle_origin_bounds_change(&mut self, bounds: &Rect) {
         let mut pi = self.paragraph_ref.data.borrow_mut();
         //TODO check font/color changed?
@@ -531,6 +579,10 @@ impl ElementBackend for Text {
             });
             self.last_width = bounds.width;
         }
+    }
+
+    fn handle_event(&mut self, _event_type: &str, event: &mut ElementEvent) {
+        match_event_type!(event, MouseDetail, self, handle_mouse_event);
     }
 }
 

@@ -42,6 +42,10 @@ pub enum MouseEventType {
     MouseLeave,
 }
 
+pub struct FocusShiftDetail {
+    element: u32,
+}
+
 #[derive(Debug, Copy, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MouseDetail {

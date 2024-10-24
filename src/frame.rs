@@ -22,7 +22,7 @@ use crate::base::MouseEventType::{MouseClick, MouseUp};
 use crate::canvas_util::CanvasHelper;
 use crate::cursor::search_cursor;
 use crate::element::ElementRef;
-use crate::event::{build_modifier, CaretEventBind, ClickEventBind, DragOverEventDetail, DragStartEventDetail, DropEventDetail, FocusEventBind, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT, KeyEventDetail, MouseDownEventBind, MouseEnterEventBind, MouseLeaveEventBind, MouseMoveEventBind, MouseUpEventBind, MouseWheelDetail, named_key_to_str, TouchCancelEventBind, TouchEndEventBind, TouchMoveEventBind, TouchStartEventBind};
+use crate::event::{build_modifier, CaretEventBind, ClickEventBind, DragOverEventDetail, DragStartEventDetail, DropEventDetail, FocusShiftBind, FocusEventBind, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT, KeyEventDetail, MouseDownEventBind, MouseEnterEventBind, MouseLeaveEventBind, MouseMoveEventBind, MouseUpEventBind, MouseWheelDetail, named_key_to_str, TouchCancelEventBind, TouchEndEventBind, TouchMoveEventBind, TouchStartEventBind};
 use crate::event_loop::{run_with_event_loop, send_event};
 use crate::ext::common::create_event_handler;
 use crate::ext::ext_frame::FRAMES;
@@ -547,6 +547,8 @@ impl FrameRef {
             if let Some(old_focusing) = &mut self.focusing {
                 let mut blur_event = ElementEvent::new("blur", (), old_focusing.clone());
                 old_focusing.emit_event("blur", &mut blur_event);
+
+                old_focusing.emit_focus_shift(());
             }
             self.focusing = focusing;
             node.emit_focus(());

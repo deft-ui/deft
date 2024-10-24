@@ -24,6 +24,7 @@ use crate::element::entry::Entry;
 use crate::element::image::Image;
 use crate::element::label::Label;
 use crate::element::scroll::Scroll;
+use crate::element::text::Text;
 use crate::element::textedit::TextEdit;
 use crate::event::{BlurEvent, CaretEvent, ClickEventBind, DragOverEvent, DragOverEventDetail, DragStartEvent, DragStartEventDetail, DropEvent, DropEventDetail, FocusEvent, KeyDownEvent, KeyUpEvent, MouseClickEvent, MouseDownEvent, MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, ScrollEvent, TextChangeEvent, TextUpdateEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent};
 use crate::ext::common::create_event_handler;
@@ -905,7 +906,7 @@ pub fn element_create(view_type: i32) -> Result<ElementRef, Error> {
     let view = match view_type {
         VIEW_TYPE_CONTAINER => ElementRef::new(Container::create),
         VIEW_TYPE_SCROLL => ElementRef::new(Scroll::create),
-        VIEW_TYPE_LABEL => ElementRef::new(Label::create),
+        VIEW_TYPE_LABEL => ElementRef::new(Text::create),
         VIEW_TYPE_ENTRY => ElementRef::new(Entry::create),
         VIEW_TYPE_BUTTON => ElementRef::new(Button::create),
         VIEW_TYPE_TEXT_EDIT => ElementRef::new(TextEdit::create),
