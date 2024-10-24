@@ -44,6 +44,7 @@ base16ct = { version = "0.2.0", features = ["alloc"] }
 jni = "0.21.1"
 tokio-util = { version = "0.7.12", features = ["codec"] }
 maplit = "1.0.2"
+native-dialog = "0.7.0"
 
 [features]
 default=[]

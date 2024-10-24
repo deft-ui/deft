@@ -16,3 +16,5 @@ mod audio_player;
 pub mod ext_base64;
 pub mod ext_shell;
 pub mod ext_animation;
+pub mod ext_dialog;
+pub mod promise;

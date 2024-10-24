@@ -17,6 +17,7 @@ use crate::ext::ext_animation::{animation_create, AnimationOptions, AnimationRes
 use crate::ext::ext_appfs::{appfs_create_dir, appfs_create_dir_all, appfs_data_path, appfs_delete_file, appfs_exists, appfs_read, appfs_readdir, appfs_remove_dir, appfs_remove_dir_all, appfs_write, appfs_write_new};
 use crate::ext::ext_audio::{audio_add_event_listener, audio_create, audio_stop, audio_remove_event_listener, AudioResource, audio_play, audio_pause, AudioOptions};
 use crate::ext::ext_base64::base64_encode_str;
+use crate::ext::ext_dialog::{dialog_show_file_dialog, FileDialogOptions};
 use crate::ext::ext_env::{env_exe_dir, env_exe_path};
 use crate::ext::ext_fetch::{fetch_create, fetch_response_body_string, fetch_response_headers, fetch_response_save, fetch_response_status, FetchOptions, FetchResponse};
 use crate::ext::ext_frame::{create_frame, frame_close, frame_set_modal, FrameAttrs, handle_window_event};
@@ -97,6 +98,9 @@ impl JsEngine {
         export_js_async_api!(js_context, "fs_create_dir_all", fs_create_dir_all, String);
         export_js_async_api!(js_context, "fs_remove_dir", fs_remove_dir, String);
         export_js_async_api!(js_context, "fs_remove_dir_all", fs_remove_dir_all, String);
+
+        // dialog
+        export_js_async_api!(js_context, "dialog_show_file_dialog", dialog_show_file_dialog, FileDialogOptions);
 
         // http
         export_js_async_api!(js_context, "http_request", http_request, String);
