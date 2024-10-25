@@ -38,7 +38,7 @@ use crate::js::js_value_util::DeserializeFromJsValue;
 use crate::mrc::Mrc;
 
 pub struct JsEngine {
-    js_context: Mrc<JsContext>,
+    pub js_context: Mrc<JsContext>,
 }
 
 impl JsEngine {

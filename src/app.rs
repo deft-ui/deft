@@ -19,6 +19,8 @@ use crate::ext::ext_frame::FRAMES;
 use crate::ext::ext_localstorage::localstorage_flush;
 use crate::frame::frame_input;
 use crate::js::js_engine::JsEngine;
+use crate::js::js_runtime::JsContext;
+use crate::mrc::Mrc;
 use crate::timer;
 
 pub enum AppEvent {
@@ -38,16 +40,26 @@ impl Debug for AppEvent {
     }
 }
 
+pub trait LentoApp {
+    fn init_js_context(&mut self, js_content: &Mrc<JsContext>) {
+        let _ = js_content;
+    }
+}
+
+
 pub struct App {
     js_engine: JsEngine,
+    lento_app: Box<dyn LentoApp>,
 }
 
 impl App {
-    pub fn new<L: JsModuleLoader>(module_loader: L) -> Self {
+    pub fn new<L: JsModuleLoader>(module_loader: L, mut lento_app: Box<dyn LentoApp>) -> Self {
         let js_engine = JsEngine::new(module_loader);
         js_engine.add_global_func(animation_create::new());
+        lento_app.init_js_context(&js_engine.js_context);
         Self {
             js_engine,
+            lento_app,
         }
     }
 

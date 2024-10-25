@@ -18,7 +18,7 @@ use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopBuilder, EventLoopProxy};
 use yoga::Node;
-use crate::app::{App, AppEvent};
+use crate::app::{App, AppEvent, LentoApp};
 use crate::element::ScrollByOption;
 use crate::event_loop::set_event_proxy;
 use crate::js::js_deserialze::JsDeserializer;
@@ -37,10 +37,10 @@ use crate::data_dir::get_data_path;
 mod border;
 mod base;
 mod style;
-mod mrc;
+pub mod mrc;
 mod console;
 mod color;
-mod app;
+pub mod app;
 // mod graphics;
 mod renderer;
 mod frame;
@@ -59,9 +59,9 @@ mod event;
 mod cursor;
 mod img_manager;
 mod data_dir;
-mod macro_mod;
+pub mod macro_mod;
 mod ext;
-mod js;
+pub mod js;
 mod performance;
 
 mod cache;
@@ -96,16 +96,27 @@ fn create_module_loader() -> StaticModuleLoader {
     loader
 }
 
-fn run_event_loop(mut event_loop: EventLoop<AppEvent>) {
+fn run_event_loop(mut event_loop: EventLoop<AppEvent>, lento_app: Box<dyn LentoApp>) {
     let el_proxy = event_loop.create_proxy();
     set_event_proxy(el_proxy.clone());
-    let mut app = App::new(create_module_loader());
+    let mut app = App::new(create_module_loader(), lento_app);
     event_loop.run_app(&mut app).unwrap();
 }
 
-fn main() {
+pub fn bootstrap(lento_app: Box<dyn LentoApp>) {
     let event_loop: EventLoop<AppEvent> = EventLoop::with_user_event().build().unwrap();
-    run_event_loop(event_loop);
+    run_event_loop(event_loop, lento_app);
+}
+
+struct DefaultLentoApp {
+
+}
+
+impl LentoApp for DefaultLentoApp {}
+
+fn main() {
+    let app = DefaultLentoApp {};
+    bootstrap(Box::new(app));
 }
 
 #[cfg(target_os = "android")]
