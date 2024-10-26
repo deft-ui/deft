@@ -108,17 +108,6 @@ pub fn bootstrap(lento_app: Box<dyn LentoApp>) {
     run_event_loop(event_loop, lento_app);
 }
 
-struct DefaultLentoApp {
-
-}
-
-impl LentoApp for DefaultLentoApp {}
-
-fn main() {
-    let app = DefaultLentoApp {};
-    bootstrap(Box::new(app));
-}
-
 #[cfg(target_os = "android")]
 #[no_mangle]
 fn android_main(app: AndroidApp) {

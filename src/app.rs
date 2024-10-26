@@ -41,8 +41,8 @@ impl Debug for AppEvent {
 }
 
 pub trait LentoApp {
-    fn init_js_context(&mut self, js_content: &Mrc<JsContext>) {
-        let _ = js_content;
+    fn init_js_engine(&mut self, js_engine: &mut JsEngine) {
+        let _ = js_engine;
     }
 }
 
@@ -54,9 +54,9 @@ pub struct App {
 
 impl App {
     pub fn new<L: JsModuleLoader>(module_loader: L, mut lento_app: Box<dyn LentoApp>) -> Self {
-        let js_engine = JsEngine::new(module_loader);
+        let mut js_engine = JsEngine::new(module_loader);
         js_engine.add_global_func(animation_create::new());
-        lento_app.init_js_context(&js_engine.js_context);
+        lento_app.init_js_engine(&mut js_engine);
         Self {
             js_engine,
             lento_app,
