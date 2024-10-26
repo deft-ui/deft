@@ -1,19 +1,20 @@
 use std::fmt::Debug;
+use std::panic::{RefUnwindSafe};
 
-use anyhow::anyhow;
+use anyhow::{anyhow};
 use quick_js::{Context, JsValue};
 use quick_js::loader::JsModuleLoader;
-use serde::Serialize;
 use tokio::runtime::Builder;
 use winit::event::WindowEvent;
 use winit::window::WindowId;
+use lento_js::{JsFunc, JsFuncCallback};
 
 use crate::{export_js_api, export_js_async_api, export_js_object_api};
 use crate::app::exit_app;
 use crate::base::Size;
 use crate::console::Console;
 use crate::element::{element_create, ElementRef};
-use crate::ext::ext_animation::{animation_create, AnimationOptions, AnimationResource};
+use crate::ext::ext_animation::{AnimationResource};
 use crate::ext::ext_appfs::{appfs_create_dir, appfs_create_dir_all, appfs_data_path, appfs_delete_file, appfs_exists, appfs_read, appfs_readdir, appfs_remove_dir, appfs_remove_dir_all, appfs_write, appfs_write_new};
 use crate::ext::ext_audio::{audio_add_event_listener, audio_create, audio_stop, audio_remove_event_listener, AudioResource, audio_play, audio_pause, AudioOptions};
 use crate::ext::ext_base64::base64_encode_str;
@@ -161,7 +162,7 @@ impl JsEngine {
         export_js_api!(js_context, "audio_remove_event_listener", audio_remove_event_listener, AudioResource, String, u32);
 
         //animation
-        export_js_api!(js_context, "animation_create", animation_create, String, JsValue);
+        // export_js_api!(js_context, "animation_create", animation_create, String, JsValue);
 
         // base64
         export_js_api!(js_context, "base64_encode_str", base64_encode_str, String);
@@ -178,6 +179,13 @@ impl JsEngine {
         Self {
             js_context,
         }
+    }
+
+    pub fn add_global_func(&self, func: impl JsFunc + RefUnwindSafe + 'static) {
+        let name = func.name().to_string();
+        self.js_context.add_callback(name.as_str(), JsFuncCallback {
+            js_func: Box::new(func)
+        }).unwrap();
     }
 
     pub fn execute_main(&mut self) {

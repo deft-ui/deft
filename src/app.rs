@@ -14,6 +14,7 @@ use winit::platform::android::activity::AndroidApp;
 use winit::window::WindowId;
 
 use crate::event_loop::{get_event_proxy, run_event_loop_task};
+use crate::ext::ext_animation::animation_create;
 use crate::ext::ext_frame::FRAMES;
 use crate::ext::ext_localstorage::localstorage_flush;
 use crate::frame::frame_input;
@@ -44,6 +45,7 @@ pub struct App {
 impl App {
     pub fn new<L: JsModuleLoader>(module_loader: L) -> Self {
         let js_engine = JsEngine::new(module_loader);
+        js_engine.add_global_func(animation_create::new());
         Self {
             js_engine,
         }

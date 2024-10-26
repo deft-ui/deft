@@ -10,6 +10,9 @@ edition = "2021"
 
 [dependencies]
 
+lento-macros = { path = "packages/lento-macros" }
+lento-js = { path = "packages/lento-js" }
+
 quick-js = {path = "third_party/quickjs-rs"}
 yoga = { path = "third_party/yoga-rs" }
 winit = { path = "third_party/winit", features = ["android-native-activity"] }

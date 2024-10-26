@@ -1,0 +1,7 @@
+[package]
+name = "lento-js"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+quick-js = {path = "../../third_party/quickjs-rs"}

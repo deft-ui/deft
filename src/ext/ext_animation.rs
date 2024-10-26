@@ -4,7 +4,8 @@ use std::str::FromStr;
 use anyhow::{anyhow, Error};
 use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
-use crate::animation::{Animation, AnimationDef, AnimationInstance, SimpleFrameController};
+use lento_js::{JsError};
+use crate::animation::{Animation, AnimationDef, AnimationInstance};
 use crate::define_ref_and_resource;
 use crate::style::{parse_style_obj};
 define_ref_and_resource!(AnimationResource, AnimationInstance);
@@ -20,7 +21,8 @@ pub struct AnimationOptions {
     iteration_count: Option<f32>,
 }
 
-pub fn animation_create(name: String, key_frames: JsValue) -> Result<(), Error> {
+#[lento_macros::js_func]
+pub fn animation_create(name: String, key_frames: JsValue) -> Result<(), JsError> {
     let mut ad = AnimationDef::new();
     if let Some(ps) = key_frames.get_properties() {
         for (k, v) in ps {
@@ -35,7 +37,7 @@ pub fn animation_create(name: String, key_frames: JsValue) -> Result<(), Error> 
         });
         Ok(())
     } else {
-        Err(anyhow!("invalid argument"))
+        Err(JsError::from_str("invalid argument"))
     }
 }
 
