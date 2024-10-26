@@ -1,25 +1,10 @@
-use std::cell::RefCell;
-use std::collections::HashMap;
 use std::str::FromStr;
-use anyhow::{anyhow, Error};
 use quick_js::JsValue;
-use serde::{Deserialize, Serialize};
 use lento_js::{JsError};
-use crate::animation::{Animation, AnimationDef, AnimationInstance};
-use crate::define_ref_and_resource;
+use lento_core::animation::{AnimationDef};
+use lento_core::animation::ANIMATIONS;
 use crate::style::{parse_style_obj};
-define_ref_and_resource!(AnimationResource, AnimationInstance);
 
-thread_local! {
-    pub static  ANIMATIONS: RefCell<HashMap<String, Animation>> = RefCell::new(HashMap::new());
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AnimationOptions {
-    duration: f32,
-    iteration_count: Option<f32>,
-}
 
 #[lento_macros::js_func]
 pub fn animation_create(name: String, key_frames: JsValue) -> Result<(), JsError> {
@@ -40,4 +25,3 @@ pub fn animation_create(name: String, key_frames: JsValue) -> Result<(), JsError
         Err(JsError::from_str("invalid argument"))
     }
 }
-

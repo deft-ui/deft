@@ -14,7 +14,6 @@ use winit::platform::android::activity::AndroidApp;
 use winit::window::WindowId;
 
 use crate::event_loop::{get_event_proxy, run_event_loop_task};
-use crate::ext::ext_animation::animation_create;
 use crate::ext::ext_frame::FRAMES;
 use crate::ext::ext_localstorage::localstorage_flush;
 use crate::frame::frame_input;
@@ -48,14 +47,13 @@ pub trait LentoApp {
 
 
 pub struct App {
-    js_engine: JsEngine,
-    lento_app: Box<dyn LentoApp>,
+    pub js_engine: JsEngine,
+    pub lento_app: Box<dyn LentoApp>,
 }
 
 impl App {
     pub fn new<L: JsModuleLoader>(module_loader: L, mut lento_app: Box<dyn LentoApp>) -> Self {
         let mut js_engine = JsEngine::new(module_loader);
-        js_engine.add_global_func(animation_create::new());
         lento_app.init_js_engine(&mut js_engine);
         Self {
             js_engine,

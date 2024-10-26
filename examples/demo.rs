@@ -1,9 +1,7 @@
 use lento::app::LentoApp;
 use lento::bootstrap;
 
-struct DefaultLentoApp {
-
-}
+struct DefaultLentoApp {}
 
 impl LentoApp for DefaultLentoApp {}
 

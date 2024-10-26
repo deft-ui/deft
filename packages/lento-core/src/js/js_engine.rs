@@ -14,7 +14,7 @@ use crate::app::exit_app;
 use crate::base::Size;
 use crate::console::Console;
 use crate::element::{element_create, ElementRef};
-use crate::ext::ext_animation::{AnimationResource};
+use crate::animation::{AnimationResource};
 use crate::ext::ext_appfs::{appfs_create_dir, appfs_create_dir_all, appfs_data_path, appfs_delete_file, appfs_exists, appfs_read, appfs_readdir, appfs_remove_dir, appfs_remove_dir_all, appfs_write, appfs_write_new};
 use crate::ext::ext_audio::{audio_add_event_listener, audio_create, audio_stop, audio_remove_event_listener, AudioResource, audio_play, audio_pause, AudioOptions};
 use crate::ext::ext_base64::base64_encode_str;

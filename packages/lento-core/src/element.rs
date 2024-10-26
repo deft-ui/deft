@@ -28,7 +28,7 @@ use crate::element::text::Text;
 use crate::element::textedit::TextEdit;
 use crate::event::{BlurEvent, CaretEvent, ClickEventBind, DragOverEvent, DragOverEventDetail, DragStartEvent, DragStartEventDetail, DropEvent, DropEventDetail, FocusEvent, KeyDownEvent, KeyUpEvent, MouseClickEvent, MouseDownEvent, MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, ScrollEvent, TextChangeEvent, TextUpdateEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent};
 use crate::ext::common::create_event_handler;
-use crate::ext::ext_animation::AnimationResource;
+use crate::animation::AnimationResource;
 use crate::ext::ext_frame::{VIEW_TYPE_BUTTON, VIEW_TYPE_CONTAINER, VIEW_TYPE_ENTRY, VIEW_TYPE_IMAGE, VIEW_TYPE_LABEL, VIEW_TYPE_SCROLL, VIEW_TYPE_TEXT_EDIT};
 use crate::frame::{FrameRef, FrameWeak};
 use crate::img_manager::IMG_MANAGER;

@@ -6,6 +6,10 @@ use yoga::StyleUnit;
 use crate::mrc::Mrc;
 use crate::style::{StyleProp, StylePropVal, StyleTransform, StyleTransformOp};
 use crate::timer::{set_timeout, set_timeout_nanos, TimerHandle};
+use std::cell::RefCell;
+use anyhow::{anyhow, Error};
+use quick_js::JsValue;
+use crate::define_ref_and_resource;
 
 macro_rules! interpolate_values {
     ($prev: expr, $next: expr, $percent: expr; $($ty: ident => $handler: ident,)* ) => {
@@ -39,6 +43,13 @@ macro_rules! match_both {
         }
     };
 }
+
+define_ref_and_resource!(AnimationResource, AnimationInstance);
+
+thread_local! {
+    pub static  ANIMATIONS: RefCell<HashMap<String, Animation>> = RefCell::new(HashMap::new());
+}
+
 
 fn interpolate_f32(prev: &f32, next: &f32, position: f32) -> Option<f32> {
     let delta = (next - prev) * position;

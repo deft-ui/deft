@@ -14,7 +14,7 @@ use crate::{inherit_color_prop};
 use crate::animation::{AnimationInstance, SimpleFrameController};
 use crate::border::build_border_paths;
 use crate::cache::CacheValue;
-use crate::ext::ext_animation::ANIMATIONS;
+use crate::animation::ANIMATIONS;
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 

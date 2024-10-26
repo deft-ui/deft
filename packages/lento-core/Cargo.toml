@@ -1,5 +1,5 @@
 [package]
-name = "lento"
+name = "lento-core"
 readme = "README.md"
 license = "MIT"
 
@@ -10,13 +10,12 @@ edition = "2021"
 
 [dependencies]
 
-lento-macros = { path = "packages/lento-macros" }
-lento-js = { path = "packages/lento-js" }
+lento-js = { path = "../lento-js" }
 
-quick-js = {path = "third_party/quickjs-rs"}
-yoga = { path = "third_party/yoga-rs" }
-winit = { path = "third_party/winit", features = ["android-native-activity"] }
-skia-window = { path = "skia-window" }
+quick-js = {path = "../../third_party/quickjs-rs"}
+yoga = { path = "../../third_party/yoga-rs" }
+winit = { path = "../../third_party/winit", features = ["android-native-activity"] }
+skia-window = { path = "../../skia-window" }
 
 bitflags = "2.0"
 lazy_static = "1.4"
@@ -69,12 +68,12 @@ static_assertions = "1.1"
 
 raw-window-handle = { version = "0.5.0" }
 
-[lib]
-name = "lento"
-path = "src/lib.rs"
-crate_type=["cdylib", "lib"]
-proc-macro = true
-
-[[bin]]
-path="src/lib.rs"
-name="lento_demo"
+#[lib]
+#name = "lento"
+#path = "src/lib.rs"
+#crate_type=["cdylib", "lib"]
+#proc-macro = true
+#
+#[[bin]]
+#path="src/lib.rs"
+#name="lento_demo"
