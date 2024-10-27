@@ -7,7 +7,6 @@ use std::time::{SystemTime};
 use futures_util::StreamExt;
 use measure_time::{info, print_time};
 use memory_stats::memory_stats;
-use quick_js::JsValue;
 use quick_js::loader::FsJsModuleLoader;
 use serde::{Deserialize, Serialize};
 use skia_safe::{Font, Paint};
@@ -33,6 +32,7 @@ use winit::platform::android::activity::AndroidApp;
 use winit::window::{WindowAttributes, WindowId};
 use crate::data_dir::get_data_path;
 
+pub use quick_js::JsValue;
 pub use winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopBuilder, EventLoopProxy};
 pub mod border;
 pub mod base;

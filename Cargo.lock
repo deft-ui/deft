@@ -1699,7 +1699,6 @@ name = "lento"
 version = "0.1.0"
 dependencies = [
  "lento-core",
- "lento-js",
  "lento-macros",
  "quick-js",
 ]
@@ -1719,7 +1718,6 @@ dependencies = [
  "image",
  "jni",
  "lazy_static",
- "lento-js",
  "libc",
  "maplit",
  "measure_time",
@@ -1744,17 +1742,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "lento-js"
-version = "0.1.0"
-dependencies = [
- "quick-js",
-]
-
-[[package]]
 name = "lento-macros"
 version = "0.1.0"
 dependencies = [
- "lento-js",
+ "lento-core",
  "quote",
  "syn 2.0.85",
 ]

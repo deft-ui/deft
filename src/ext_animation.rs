@@ -1,13 +1,13 @@
 use std::str::FromStr;
-use quick_js::JsValue;
-use lento_js::{JsError};
 use lento_core::animation::{AnimationDef};
 use lento_core::animation::ANIMATIONS;
-use crate::style::{parse_style_obj};
+use lento_core::style::parse_style_obj;
+use lento_core as lento;
+use lento_core::js::js_binding::JsError;
 
 
 #[lento_macros::js_func]
-pub fn animation_create(name: String, key_frames: JsValue) -> Result<(), JsError> {
+pub fn animation_create(name: String, key_frames: lento::JsValue) -> Result<(), JsError> {
     let mut ad = AnimationDef::new();
     if let Some(ps) = key_frames.get_properties() {
         for (k, v) in ps {

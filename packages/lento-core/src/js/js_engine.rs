@@ -2,12 +2,11 @@ use std::fmt::Debug;
 use std::panic::{RefUnwindSafe};
 
 use anyhow::{anyhow};
-use quick_js::{Context, JsValue};
+use quick_js::{Callback, Context, JsValue, ValueError};
 use quick_js::loader::JsModuleLoader;
 use tokio::runtime::Builder;
 use winit::event::WindowEvent;
 use winit::window::WindowId;
-use lento_js::{JsFunc, JsFuncCallback};
 
 use crate::{export_js_api, export_js_async_api, export_js_object_api};
 use crate::app::exit_app;
@@ -32,6 +31,7 @@ use crate::ext::ext_timer::{timer_clear_interval, timer_clear_timeout, timer_set
 use crate::ext::ext_tray::{SystemTrayResource, tray_create, TrayMenu};
 use crate::ext::ext_websocket::{WsConnectionResource, ws_connect, ws_read};
 use crate::frame::FrameWeak;
+use crate::js::js_binding::{JsCallError, JsFunc};
 use crate::js::js_runtime::JsContext;
 use crate::js::js_serde::JsValueSerializer;
 use crate::js::js_value_util::DeserializeFromJsValue;
@@ -39,6 +39,36 @@ use crate::mrc::Mrc;
 
 pub struct JsEngine {
     pub js_context: Mrc<JsContext>,
+}
+
+struct JsFuncCallback {
+    js_context: Mrc<JsContext>,
+    pub js_func: Box<dyn JsFunc + RefUnwindSafe>,
+}
+
+impl Callback<()> for JsFuncCallback {
+    fn argument_count(&self) -> usize {
+        self.js_func.args_count()
+    }
+
+    fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError> {
+        let mut js_context = self.js_context.clone();
+        match self.js_func.call(&mut js_context, args) {
+            Ok(v) => {
+                Ok(Ok(v))
+            }
+            Err(e) => {
+                match e {
+                    JsCallError::ConversionError(ce) => {
+                        Err(ce)
+                    }
+                    JsCallError::ExecutionError(ee) => {
+                        Ok(Err(ee.to_string()))
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl JsEngine {
@@ -183,8 +213,10 @@ impl JsEngine {
 
     pub fn add_global_func(&self, func: impl JsFunc + RefUnwindSafe + 'static) {
         let name = func.name().to_string();
+        let js_context = self.js_context.clone();
         self.js_context.add_callback(name.as_str(), JsFuncCallback {
-            js_func: Box::new(func)
+            js_func: Box::new(func),
+            js_context,
         }).unwrap();
     }
 

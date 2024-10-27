@@ -1,7 +1,8 @@
 use std::error::Error;
 use std::fmt::Display;
-use std::panic::RefUnwindSafe;
-use quick_js::{Callback, JsValue, ValueError};
+use quick_js::{JsValue, ValueError};
+use crate::js::js_runtime::JsContext;
+use crate::mrc::Mrc;
 
 #[derive(Clone)]
 pub struct JsError {
@@ -49,7 +50,7 @@ impl Display for JsError {
 pub trait JsFunc {
     fn name(&self) -> &str;
     fn args_count(&self) -> usize;
-    fn call(&self, args: Vec<JsValue>) -> Result<JsValue, JsCallError>;
+    fn call(&self, js_context: &mut Mrc<JsContext>, args: Vec<JsValue>) -> Result<JsValue, JsCallError>;
 }
 
 pub trait FromJsValue: Sized {
@@ -115,34 +116,6 @@ impl<T: ToJsValue> ToJsCallResult for Result<T, JsError> {
             }
             Err(e) => {
                 Err(JsCallError::ExecutionError(e))
-            }
-        }
-    }
-}
-
-pub struct JsFuncCallback {
-    pub js_func: Box<dyn JsFunc + RefUnwindSafe>,
-}
-
-impl Callback<()> for JsFuncCallback {
-    fn argument_count(&self) -> usize {
-        self.js_func.args_count()
-    }
-
-    fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError> {
-        match self.js_func.call(args) {
-            Ok(v) => {
-                Ok(Ok(v))
-            }
-            Err(e) => {
-                match e {
-                    JsCallError::ConversionError(ce) => {
-                        Err(ce)
-                    }
-                    JsCallError::ExecutionError(ee) => {
-                        Ok(Err(ee.to_string()))
-                    }
-                }
             }
         }
     }

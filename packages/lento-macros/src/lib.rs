@@ -45,7 +45,7 @@ pub fn js_func(_attr: TokenStream, func: TokenStream) -> TokenStream {
 
         }
 
-        impl lento_js::JsFunc for #func_name {
+        impl lento::js::JsFunc for #func_name {
             fn name(&self) -> &str {
                 #func_name_str
             }
@@ -54,10 +54,11 @@ pub fn js_func(_attr: TokenStream, func: TokenStream) -> TokenStream {
                 #idx
             }
 
-            fn call(&self, args: Vec<JsValue>) -> Result<JsValue, lento_js::JsCallError> {
-                use lento_js::FromJsValue;
-                use lento_js::ToJsValue;
-                use lento_js::ToJsCallResult;
+            fn call(&self, js_context: &mut lento::mrc::Mrc<lento::js::JsContext>, args: Vec<lento::js::JsValue>) -> Result<lento::js::JsValue, lento::js::JsCallError> {
+                use lento::js::FromJsValue;
+                use lento::js::ToJsValue;
+                use lento::js::ToJsCallResult;
+
                 let r = Self::#func_name( #(#param_list, )* );
                 r.to_js_call_result()
             }

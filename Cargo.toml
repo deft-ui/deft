@@ -1,0 +1,14 @@
+[package]
+name = "lento"
+readme = "README.md"
+license = "MIT"
+
+version = "0.1.0"
+authors = ["KasonYang <me@kason.site>"]
+edition = "2021"
+
+[dependencies]
+lento-core = { path = "packages/lento-core" }
+lento-macros = { path = "packages/lento-macros" }
+
+quick-js = {path = "third_party/quickjs-rs"}
