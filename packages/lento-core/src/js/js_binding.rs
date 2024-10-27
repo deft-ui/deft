@@ -4,7 +4,7 @@ use quick_js::{JsValue, ValueError};
 use crate::js::js_runtime::JsContext;
 use crate::mrc::Mrc;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct JsError {
     message: String,
 }
@@ -30,6 +30,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub enum JsCallError {
     ConversionError(ValueError),
     ExecutionError(JsError),

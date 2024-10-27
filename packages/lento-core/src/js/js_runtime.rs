@@ -2,7 +2,7 @@ use std::env;
 use std::future::Future;
 use std::ops::{Deref, DerefMut};
 use anyhow::Error;
-use quick_js::{Context, ExecutionError, JsPromise, JsValue};
+use quick_js::{Context, ExecutionError, JsPromise, JsValue, ValueError};
 use skia_safe::textlayout::TextAlign;
 use tokio::runtime::Runtime;
 use winit::event_loop::EventLoopProxy;
@@ -13,6 +13,7 @@ use crate::cursor::parse_cursor;
 use crate::js::js_value_util::JsValueHelper;
 use crate::element::label::parse_align;
 use crate::event_loop::{get_event_proxy,run_on_event_loop};
+use crate::js::{ToJsCallResult};
 use crate::resource_table::ResourceTable;
 
 pub struct JsContext {
@@ -50,6 +51,22 @@ impl JsContext {
                 }
             }
             // resolver.resolve(result)
+        });
+        result
+    }
+
+    pub fn create_async_task2<F, O>(&mut self, future: F) -> JsValue
+    where
+        F: Future<Output=O> + Send + 'static,
+        O: ToJsCallResult,
+    {
+        let (result, resolver) = self.create_promise();
+        self.runtime.spawn(async move {
+            let res = future.await;
+            match res.to_js_call_result() {
+                Ok(r) => {resolver.resolve(r)}
+                Err(e) => {resolver.reject(JsValue::String(format!("js call error:{:?}", e)))}
+            }
         });
         result
     }
