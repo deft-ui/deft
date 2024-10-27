@@ -412,3 +412,10 @@ impl UnsafeFnOnce {
 
 unsafe impl Send for UnsafeFnOnce {}
 unsafe impl Sync for UnsafeFnOnce {}
+
+pub struct UnsafeFnMut<P> {
+    pub callback: Box<dyn FnMut(P)>
+}
+
+unsafe impl<P> Send for UnsafeFnMut<P> {}
+unsafe impl<P> Sync for UnsafeFnMut<P> {}

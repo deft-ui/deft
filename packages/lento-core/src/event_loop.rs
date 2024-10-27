@@ -1,9 +1,9 @@
 use std::cell::{Cell};
 use std::ptr::null_mut;
-use std::sync::OnceLock;
+use std::sync::{Arc, Mutex, OnceLock};
 use winit::event_loop::{ActiveEventLoop, EventLoopClosed, EventLoopProxy};
 use crate::app::AppEvent;
-use crate::base::UnsafeFnOnce;
+use crate::base::{UnsafeFnMut, UnsafeFnOnce};
 
 #[derive(Debug)]
 struct  EventLoopProxyHolder {
@@ -32,6 +32,21 @@ impl EventLoopCallback {
     }
 }
 
+#[derive(Clone)]
+pub struct EventLoopFnMutCallback<P> {
+    callback: Arc<Mutex<UnsafeFnMut<P>>>,
+}
+
+impl<P: Send + Sync + 'static> EventLoopFnMutCallback<P> {
+    pub fn call(&mut self, param: P) {
+        let cb = self.callback.clone();
+        run_on_event_loop(move || {
+            let mut cb = cb.lock().unwrap();
+            (cb.callback)(param);
+        })
+    }
+}
+
 static EVENT_LOOP_PROXY: OnceLock<EventLoopProxyHolder> = OnceLock::new();
 
 fn get_event_loop_proxy_internal() -> &'static EventLoopProxyHolder {
@@ -47,6 +62,15 @@ pub fn get_event_proxy() -> EventLoopProxy<AppEvent> {
 pub fn create_event_loop_callback<F: FnOnce() + 'static>(callback: F) -> EventLoopCallback {
     let callback = unsafe { UnsafeFnOnce::new(callback) };
     EventLoopCallback { callback: Some(callback) }
+}
+
+pub fn create_event_loop_fn_mut<P: Send + Sync, F: FnMut(P) + 'static>(callback: F) -> EventLoopFnMutCallback<P> {
+    let fn_mut = UnsafeFnMut {
+        callback: Box::new(callback)
+    };
+    EventLoopFnMutCallback {
+        callback: Arc::new(Mutex::new(fn_mut)),
+    }
 }
 
 pub fn run_on_event_loop<F: FnOnce() + 'static + Send + Sync>(callback: F) {
