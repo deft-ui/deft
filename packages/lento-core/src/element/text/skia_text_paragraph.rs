@@ -2,6 +2,7 @@ use skia_safe::{Canvas, Font, Paint, Point, Rect};
 use skia_safe::textlayout::{Paragraph as SkParagraph, ParagraphBuilder, ParagraphStyle, StrutStyle, TextAlign, TextStyle};
 use crate::element::text::{FONT_COLLECTION, FONT_MGR, ZERO_WIDTH_WHITESPACE};
 use crate::element::text::text_paragraph::TextParams;
+use crate::string::StringUtils;
 
 pub struct SkiaTextParagraph {
     text: String,
@@ -53,7 +54,7 @@ impl SkiaTextParagraph {
     }
 
     pub fn build_paragraph(text: &str, params: &TextParams) -> SkParagraph {
-        let mut text = text.trim_end().to_string();
+        let mut text = text.trim_line_endings().to_string();
         text.push_str(ZERO_WIDTH_WHITESPACE);
         let mut font_collection = FONT_COLLECTION.with(|f| f.clone());
         FONT_MGR.with(|fm| {

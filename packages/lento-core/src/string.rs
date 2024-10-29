@@ -5,6 +5,7 @@ pub trait StringUtils {
     fn slice(&self, range: impl RangeBounds<usize>) -> &str;
     fn byte_index(&self, char_index: usize) -> usize;
     fn chars_count(&self) -> usize;
+    fn trim_line_endings(&self) -> &str;
 }
 
 impl StringUtils for str {
@@ -54,4 +55,9 @@ impl StringUtils for str {
         } - start;
         self.substring(start, len)
     }
+
+    fn trim_line_endings(&self) -> &str {
+        self.trim_end_matches(|e| e == '\r' || e == '\n')
+    }
+
 }

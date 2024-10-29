@@ -87,21 +87,21 @@ function main() {
     })
     container.addChild(animationButton);
 
-    //
-    // const textEdit = new TextEditElement();
-    //
-    // //textEdit.setAlign("center")
-    // textEdit.setText("TextEdit 测试test");
-    //
-    // textEdit.setStyle({
-    //     "height": 100,
-    //     "width": 100,
-    //     "background": "#ccc",
-    //     // "border": "1 #ccc"
-    //     // "minWidth": 600,
-    // });
-    //
-    // container.addChild(textEdit);
+
+    const textEdit = new TextEditElement();
+
+    //textEdit.setAlign("center")
+    textEdit.setText("TextEdit 测试test");
+
+    textEdit.setStyle({
+        "height": 50,
+        "width": 100,
+        // "background": "#ccc",
+        // "border": "1 #ccc"
+        // "minWidth": 600,
+    });
+
+    container.addChild(textEdit);
     //
     // //container.removeChild(label2);
     //
