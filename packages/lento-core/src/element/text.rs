@@ -112,7 +112,7 @@ impl Text {
             let mut event = ElementEvent::new("textupdate", TextUpdateDetail {
                 value: text
             }, self.element.clone());
-            self.element.emit_event("textupdate", &mut event);
+            self.element.emit_event("textupdate", event);
         }
     }
 
@@ -155,15 +155,18 @@ impl Text {
     }
 
     fn rebuild_line(&mut self, line: usize, new_text: String) {
-        let mut pi = self.paragraph_ref.data.borrow_mut();
-        let is_ending = pi.lines.len() - 1 == line;
-        let mut ps = Self::build_lines(&new_text, &self.text_params, is_ending);
-        pi.lines.remove(line);
-        let mut idx = line;
-        for p in ps {
-            pi.lines.insert(idx, p);
-            idx += 1;
+        {
+            let mut pi = self.paragraph_ref.data.borrow_mut();
+            let is_ending = pi.lines.len() - 1 == line;
+            let mut ps = Self::build_lines(&new_text, &self.text_params, is_ending);
+            pi.lines.remove(line);
+            let mut idx = line;
+            for p in ps {
+                pi.lines.insert(idx, p);
+                idx += 1;
+            }
         }
+        self.mark_dirty(true);
     }
 
     pub fn select(&mut self, start: usize, end: usize) {
@@ -453,7 +456,7 @@ impl Text {
             // let p = SimpleTextParagraph::new(ln, params);
             let p = SkiaTextParagraph::new(ln.to_string(), params);
             result.push(Line {
-                atom_count: ln.trim_end().chars().count() + 1,
+                atom_count: ln.trim_line_endings().chars().count() + 1,
                 paragraph: p,
                 paragraph_dirty: true,
             })

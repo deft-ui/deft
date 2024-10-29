@@ -276,8 +276,8 @@ impl FrameRef {
 
                 if let Some(focusing) = &mut self.focusing {
                     let event_type = if detail.pressed { "keydown" } else { "keyup" };
-                    let mut event = ElementEvent::new(event_type, detail, focusing.clone());
-                    focusing.emit_event(event_type, &mut event);
+                    let event = ElementEvent::new(event_type, detail, focusing.clone());
+                    focusing.emit_event(event_type, event);
                 }
             }
             WindowEvent::MouseInput { button, state, .. } => {
@@ -339,7 +339,7 @@ impl FrameRef {
     fn handle_mouse_wheel(&mut self, delta: (f32, f32)) {
         if let Some(mut target_node) = self.get_node_by_point() {
             let mut event = ElementEvent::new("mousewheel", MouseWheelDetail {cols: delta.0, rows: delta.1}, target_node.clone());
-            target_node.emit_event("mousewheel",&mut event);
+            target_node.emit_event("mousewheel",event);
         }
 
     }
@@ -356,7 +356,7 @@ impl FrameRef {
                 if let Some(target) = &mut target_node {
                     if target != pressing {
                         let mut event = ElementEvent::new("dragover", DragOverEventDetail {}, target.clone());
-                        target.emit_event("dragover", &mut event);
+                        target.emit_event("dragover", event);
                         self.last_drag_over = Some(target.clone());
                     }
                 }
@@ -365,8 +365,8 @@ impl FrameRef {
                     f32::abs(frame_x - down_info.frame_x) > 3.0
                     || f32::abs(frame_y - down_info.frame_y) > 3.0
                 ) {
-                    let mut event = ElementEvent::new("dragstart", DragStartEventDetail {}, pressing.clone());
-                    pressing.emit_event("dragstart", &mut event);
+                    let event = ElementEvent::new("dragstart", DragStartEventDetail {}, pressing.clone());
+                    pressing.emit_event("dragstart", event);
                     //TODO check preventDefault?
                     self.window.set_cursor(Cursor::Icon(CursorIcon::Grabbing));
                     self.dragging = true;
@@ -545,8 +545,8 @@ impl FrameRef {
         let focusing = Some(node.clone());
         if self.focusing != focusing {
             if let Some(old_focusing) = &mut self.focusing {
-                let mut blur_event = ElementEvent::new("blur", (), old_focusing.clone());
-                old_focusing.emit_event("blur", &mut blur_event);
+                let blur_event = ElementEvent::new("blur", (), old_focusing.clone());
+                old_focusing.emit_event("blur", blur_event);
 
                 old_focusing.emit_focus_shift(());
             }
@@ -562,8 +562,8 @@ impl FrameRef {
                 self.dragging = false;
                 self.window.set_cursor(Cursor::Icon(CursorIcon::Default));
                 if let Some(last_drag_over) = &mut self.last_drag_over {
-                    let mut event = ElementEvent::new("drop", DropEventDetail{}, last_drag_over.clone());
-                    last_drag_over.emit_event("drop", &mut event);
+                    let event = ElementEvent::new("drop", DropEventDetail{}, last_drag_over.clone());
+                    last_drag_over.emit_event("drop", event);
                 }
             }
             self.pressing = None;

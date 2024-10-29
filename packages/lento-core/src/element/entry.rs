@@ -147,8 +147,8 @@ impl Entry {
                 }
             }
 
-            self.emit_caret_change();
             self.element.mark_dirty(false);
+            self.emit_caret_change();
         }
     }
 
@@ -350,13 +350,13 @@ impl Entry {
         let mut event = ElementEvent::new("textupdate", TextUpdateDetail {
             value: self.base.get_text().to_string()
         }, self.element.clone());
-        self.element.emit_event("textupdate", &mut event);
+        self.element.emit_event("textupdate", event);
 
         // emit text change
         let mut event = ElementEvent::new("textchange",TextChangeDetail {
             value: self.base.get_text().to_string(),
         }, self.element.clone());
-        self.element.emit_event("textchange", &mut event);
+        self.element.emit_event("textchange", event);
     }
 
 }

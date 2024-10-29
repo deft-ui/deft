@@ -142,7 +142,7 @@ impl Label {
             let mut event = ElementEvent::new("textupdate", TextUpdateDetail {
                 value: text
             }, self.element.clone());
-            self.element.emit_event("textupdate", &mut event);
+            self.element.emit_event("textupdate", event);
         }
     }
 

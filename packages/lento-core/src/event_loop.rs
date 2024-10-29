@@ -73,6 +73,23 @@ pub fn create_event_loop_fn_mut<P: Send + Sync, F: FnMut(P) + 'static>(callback:
     }
 }
 
+/// Schedule a marco task. Only safe when calling from main event loop.
+pub unsafe fn schedule_macro_task_unsafe<F: FnOnce() + 'static>(callback: F) {
+    let callback_fn =  UnsafeFnOnce::new(callback);
+    let callback = Box::new(move || {
+        callback_fn.call();
+    });
+    send_event(AppEvent::Callback(callback)).unwrap();
+}
+
+/// Schedule a marco task.
+pub fn schedule_macro_task<F: FnOnce() + Sync + Send + 'static>(callback: F) {
+    let cb = Box::new(|| {
+        callback();
+    });
+    send_event(AppEvent::Callback(cb)).unwrap();
+}
+
 pub fn run_on_event_loop<F: FnOnce() + 'static + Send + Sync>(callback: F) {
     let proxy = get_event_proxy();
     proxy.send_event(AppEvent::Callback(Box::new(callback))).unwrap();

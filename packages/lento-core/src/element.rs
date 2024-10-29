@@ -1,13 +1,12 @@
-use std::cell::{Cell, RefCell};
+use std::cell::{Cell};
 use std::collections::{HashMap, HashSet};
 use std::default::Default;
 use std::ops::{Deref, DerefMut};
-use std::rc::Rc;
 use std::str::FromStr;
 
 use anyhow::{anyhow, Error};
 use ordered_float::Float;
-use quick_js::{JsValue, ResourceValue};
+use quick_js::{JsValue};
 use serde::{Deserialize, Serialize};
 use skia_bindings::{SkPaint_Style, SkPathOp};
 use skia_safe::{Canvas, Color, Paint, Path, Rect};
@@ -15,20 +14,18 @@ use winit::window::CursorIcon;
 use yoga::{Direction, Edge, StyleUnit};
 
 use crate::{base, define_resource, js_call, js_call_rust, js_get_prop};
-use crate::animation::{AnimationInstance, SimpleFrameController};
-use crate::base::{ElementEvent, ElementEventContext, ElementEventHandler, EventRegistration, ScrollEventDetail, Size, TextChangeDetail};
+use crate::base::{ElementEvent, ElementEventContext, ElementEventHandler, EventRegistration, ScrollEventDetail};
 use crate::border::build_rect_with_radius;
 use crate::element::button::Button;
 use crate::element::container::Container;
 use crate::element::entry::Entry;
 use crate::element::image::Image;
-use crate::element::label::Label;
 use crate::element::scroll::Scroll;
 use crate::element::text::Text;
 use crate::element::textedit::TextEdit;
-use crate::event::{BlurEvent, CaretEvent, ClickEventBind, DragOverEvent, DragOverEventDetail, DragStartEvent, DragStartEventDetail, DropEvent, DropEventDetail, FocusEvent, KeyDownEvent, KeyUpEvent, MouseClickEvent, MouseDownEvent, MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, ScrollEvent, TextChangeEvent, TextUpdateEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent};
-use crate::ext::common::create_event_handler;
+use crate::event::{ClickEventBind};
 use crate::animation::AnimationResource;
+use crate::event_loop::{schedule_macro_task_unsafe};
 use crate::ext::ext_frame::{VIEW_TYPE_BUTTON, VIEW_TYPE_CONTAINER, VIEW_TYPE_ENTRY, VIEW_TYPE_IMAGE, VIEW_TYPE_LABEL, VIEW_TYPE_SCROLL, VIEW_TYPE_TEXT_EDIT};
 use crate::frame::{FrameRef, FrameWeak};
 use crate::img_manager::IMG_MANAGER;
@@ -218,7 +215,7 @@ impl ElementRef {
             scroll_top: self.scroll_top,
             scroll_left: self.scroll_left,
         }, self.clone());
-        self.emit_event("scroll", &mut event);
+        self.emit_event("scroll", event);
     }
 
     pub fn get_backend_as<T>(&self) -> &T {
@@ -671,10 +668,16 @@ impl ElementRef {
         self.event_registration.remove_event_listener(&event_type, id)
     }
 
-    pub fn emit_event(&mut self, event_type: &str, event: &mut ElementEvent) {
-        self.emit_event_internal(event_type, event);
-        if !event.context.prevent_default {
-            self.handle_event_default_behavior(event_type, event);
+    pub fn emit_event(&mut self, event_type: &str, mut event: ElementEvent) {
+        let mut me = self.clone();
+        let event_type = event_type.to_string();
+        unsafe {
+            schedule_macro_task_unsafe(move || {
+                me.emit_event_internal(&event_type, &mut event);
+                if !event.context.prevent_default {
+                    me.handle_event_default_behavior(&event_type, &mut event);
+                }
+            });
         }
     }
 

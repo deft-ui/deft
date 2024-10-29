@@ -52,7 +52,7 @@ macro_rules! define_event {
             fn $emit_func(&mut self, detail: $ty) {
                 use crate::base::ElementEvent;
                 let mut event = ElementEvent::new($key, detail, self.clone());
-                self.emit_event($key, &mut event);
+                self.emit_event($key, event);
             }
         }
 
