@@ -11,4 +11,10 @@ edition = "2021"
 lento-core = { path = "packages/lento-core" }
 lento-macros = { path = "packages/lento-macros" }
 
-quick-js = {path = "third_party/quickjs-rs"}
+quick-js = { path = "third_party/quickjs-rs" }
+
+[features]
+default = []
+tray = ["lento-core/tray"]
+x11 = ["lento-core/x11"]
+production = ["lento-core/production"]

@@ -3,8 +3,11 @@ pub use lento_macros::*;
 pub mod ext_animation;
 
 use std::str::FromStr;
+#[cfg(feature = "production")]
+use lento_core::loader::StaticModuleLoader;
 use crate::app::{App, AppEvent, LentoApp};
 use crate::event_loop::set_event_proxy;
+#[cfg(not(feature = "production"))]
 use crate::loader::{DefaultModuleLoader};
 #[cfg(target_os = "android")]
 use winit::platform::android::activity::AndroidApp;
