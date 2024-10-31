@@ -3,8 +3,11 @@ pub use lento_macros::*;
 pub mod ext_animation;
 
 use std::str::FromStr;
+use std::{env, thread};
+use std::time::Duration;
 #[cfg(feature = "production")]
 use lento_core::loader::StaticModuleLoader;
+use quick_js::loader::JsModuleLoader;
 use crate::app::{App, AppEvent, LentoApp};
 use crate::event_loop::set_event_proxy;
 #[cfg(not(feature = "production"))]
@@ -18,13 +21,22 @@ use crate::ext_animation::animation_create;
 fn create_module_loader() -> DefaultModuleLoader {
     let mut loader = DefaultModuleLoader::new(true);
     loader.set_fs_base(".");
+    let module_name = env::var("LENTO_ENTRY").unwrap_or("index.js".to_string());
+    let start_time = std::time::Instant::now();
+    while start_time.elapsed() < Duration::from_secs(60) {
+        if loader.load(&module_name).is_ok() {
+            break;
+        }
+        thread::sleep(Duration::from_millis(1000));
+        eprintln!("Failed to load {}, retrying...", module_name);
+    }
     loader
 }
 
 #[cfg(feature = "production")]
 fn create_module_loader() -> StaticModuleLoader {
     let mut loader = StaticModuleLoader::new();
-    let source = String::from_utf8_lossy(include_bytes!("../js/bundle.js")).to_string();
+    let source = String::from_utf8_lossy(include_bytes!(env!("LENTO_JS_BUNDLE"))).to_string();
     loader.add_module("index.js".to_string(), source);
     loader
 }
