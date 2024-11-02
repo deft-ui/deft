@@ -5,7 +5,7 @@ use jni::objects::JValue;
 use jni::sys::{jboolean, jlong};
 use quick_js::loader::JsModuleLoader;
 use winit::application::ApplicationHandler;
-use winit::event::WindowEvent;
+use winit::event::{DeviceEvent, DeviceId, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 #[cfg(target_os = "android")]
 use winit::platform::android::ActiveEventLoopExtAndroid;
@@ -110,6 +110,12 @@ impl ApplicationHandler<AppEvent> for App {
     fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
         run_event_loop_task(event_loop, move || {
             self.js_engine.handle_window_event(window_id, event);
+        });
+    }
+
+    fn device_event(&mut self, event_loop: &ActiveEventLoop, device_id: DeviceId, event: DeviceEvent) {
+        run_event_loop_task(event_loop, move || {
+            self.js_engine.handle_device_event(device_id, event);
         });
     }
 

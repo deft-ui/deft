@@ -25,6 +25,9 @@ thread_local! {
     pub static MODAL_TO_OWNERS: RefCell<HashMap<WindowId, WindowId>> = RefCell::new(HashMap::new());
 }
 
+pub const FRAME_TYPE_NORMAL: &str = "normal";
+pub const FRAME_TYPE_MENU: &str = "menu";
+
 pub const VIEW_TYPE_CONTAINER: i32 = 1;
 pub const VIEW_TYPE_LABEL: i32 = 2;
 pub const VIEW_TYPE_BUTTON: i32 = 3;
@@ -38,6 +41,7 @@ pub type ViewId = i32;
 pub type FrameId = i32;
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FrameAttrs {
     pub width: Option<f32>,
     pub height: Option<f32>,
@@ -47,36 +51,12 @@ pub struct FrameAttrs {
     pub override_redirect: Option<bool>,
     pub position: Option<(f32, f32)>,
     pub visible: Option<bool>,
+    pub frame_type: Option<String>,
 }
 
 
 pub fn create_frame(attrs: FrameAttrs) -> Result<FrameWeak, Error> {
-
-    let mut attributes = Window::default_attributes();
-    if let Some(t) = &attrs.title {
-        attributes.title = t.to_string();
-    } else {
-        attributes.title = "".to_string();
-    }
-    attributes.visible = attrs.visible.unwrap_or(true);
-    attributes.resizable = attrs.resizable.unwrap_or(true);
-    attributes.decorations = attrs.decorations.unwrap_or(true);
-    let size = LogicalSize {
-        width: attrs.width.unwrap_or(800.0) as f64,
-        height: attrs.height.unwrap_or(600.0) as f64,
-    };
-    attributes.inner_size = Some(Size::Logical(size));
-    #[cfg(feature = "x11")]
-    {
-        attributes = attributes.with_override_redirect(attrs.override_redirect.unwrap_or(false));
-    }
-    if let Some(position) = attrs.position {
-        attributes.position = Some(Logical(LogicalPosition {
-            x: position.0 as f64,
-            y: position.1 as f64,
-        }));
-    }
-    let frame = FrameRef::new(attributes);
+    let frame = FrameRef::new(attrs);
     let window_id = frame.get_window_id();
     let frame_weak = frame.as_weak();
     FRAMES.with_borrow_mut(|m| m.insert(frame.get_id(), frame));

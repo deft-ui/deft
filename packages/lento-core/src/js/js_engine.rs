@@ -5,8 +5,8 @@ use anyhow::{anyhow};
 use quick_js::{Callback, Context, JsValue, ValueError};
 use quick_js::loader::JsModuleLoader;
 use tokio::runtime::Builder;
-use winit::event::WindowEvent;
-use winit::window::WindowId;
+use winit::event::{DeviceEvent, DeviceId, WindowEvent};
+use winit::window::{CursorGrabMode, WindowId};
 
 use crate::{export_js_api, export_js_async_api, export_js_object_api};
 use crate::app::exit_app;
@@ -14,13 +14,14 @@ use crate::base::Size;
 use crate::console::Console;
 use crate::element::{element_create, ElementRef};
 use crate::animation::{AnimationResource};
+use crate::event_loop::run_with_event_loop;
 use crate::ext::ext_appfs::{appfs_create_dir, appfs_create_dir_all, appfs_data_path, appfs_delete_file, appfs_exists, appfs_read, appfs_readdir, appfs_remove_dir, appfs_remove_dir_all, appfs_write, appfs_write_new};
 use crate::ext::ext_audio::{audio_add_event_listener, audio_create, audio_stop, audio_remove_event_listener, AudioResource, audio_play, audio_pause, AudioOptions};
 use crate::ext::ext_base64::base64_encode_str;
 use crate::ext::ext_dialog::{dialog_show_file_dialog, FileDialogOptions};
 use crate::ext::ext_env::{env_exe_dir, env_exe_path};
 use crate::ext::ext_fetch::{fetch_create, fetch_response_body_string, fetch_response_headers, fetch_response_save, fetch_response_status, FetchOptions, FetchResponse};
-use crate::ext::ext_frame::{create_frame, frame_close, frame_set_modal, FrameAttrs, handle_window_event};
+use crate::ext::ext_frame::{create_frame, frame_close, frame_set_modal, FrameAttrs, handle_window_event, FRAMES, FRAME_TYPE_MENU};
 use crate::ext::ext_fs::{fs_create_dir, fs_create_dir_all, fs_delete_file, fs_exists, fs_read_dir, fs_remove_dir, fs_remove_dir_all, fs_rename, fs_stat};
 use crate::ext::ext_http::{http_request, http_upload, UploadOptions};
 use crate::ext::ext_localstorage::{localstorage_get, localstorage_set};
@@ -30,10 +31,9 @@ use crate::ext::ext_timer::{timer_clear_interval, timer_clear_timeout, timer_set
 #[cfg(feature = "tray")]
 use crate::ext::ext_tray::{SystemTrayResource, tray_create, TrayMenu};
 use crate::ext::ext_websocket::{WsConnectionResource, ws_connect, ws_read};
-use crate::frame::FrameWeak;
+use crate::frame::{FrameRef, FrameType, FrameWeak};
 use crate::js::js_binding::{JsCallError, JsFunc};
 use crate::js::js_runtime::JsContext;
-use crate::js::js_serde::JsValueSerializer;
 use crate::js::js_value_util::DeserializeFromJsValue;
 use crate::mrc::Mrc;
 
@@ -226,6 +226,42 @@ impl JsEngine {
 
     pub fn handle_window_event(&mut self, window_id: WindowId, event: WindowEvent) {
         handle_window_event(window_id, event);
+    }
+
+    pub fn handle_device_event(&mut self, device_id: DeviceId, event: DeviceEvent) {
+        if let DeviceEvent::Button {..} = event {
+            let close_frames = FRAMES.with_borrow(|frames| {
+                let mut result = Vec::new();
+                let menu_frames: Vec<&FrameRef> = frames.iter()
+                    .filter(|(_, f)| f.frame_type == FrameType::Menu)
+                    .map(|(_, f)| f)
+                    .collect();
+                if menu_frames.is_empty() {
+                    return result;
+                }
+                run_with_event_loop(|el| {
+                    if let Some(pos) = el.query_pointer(device_id) {
+                        menu_frames.iter().for_each(|frame| {
+                            let w_size = frame.window.outer_size();
+                            if let Some(wp) = frame.window.outer_position().ok() {
+                                let (wx, wy) = (wp.x as f32, wp.y as f32);
+                                let (ww, wh) = (w_size.width as f32, w_size.height as f32);
+                                let is_in_frame = pos.0 >= wx && pos.0 <= wx + ww
+                                                       && pos.1 >= wy && pos.1 <= wy + wh;
+                                if !is_in_frame {
+                                    let _ = frame.window.set_cursor_grab(CursorGrabMode::None);
+                                    result.push(frame.as_weak());
+                                }
+                            }
+                        })
+                    }
+                });
+                result
+            });
+            for frame in close_frames {
+                let _ = frame_close(frame);
+            }
+        }
     }
 
     pub fn execute_pending_jobs(&self) {

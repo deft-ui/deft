@@ -2,6 +2,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::num::NonZeroU32;
 use std::ops::{Deref, DerefMut};
+use std::process::exit;
 use std::rc::Rc;
 use std::slice;
 use std::time::SystemTime;
@@ -12,11 +13,14 @@ use skia_bindings::SkClipOp;
 use skia_safe::{Canvas, Color, ColorType, ImageInfo};
 use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 use winit::dpi::{LogicalPosition, LogicalSize, Position, Size};
+use winit::dpi::Position::Logical;
+use winit::error::ExternalError;
 use winit::event::{ElementState, Ime, Modifiers, MouseButton, MouseScrollDelta, TouchPhase, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use winit::keyboard::{Key, NamedKey};
-use winit::window::{Cursor, CursorIcon, Window, WindowAttributes, WindowId};
-use crate::app::AppEvent;
+use winit::platform::x11::WindowAttributesExtX11;
+use winit::window::{Cursor, CursorGrabMode, CursorIcon, Window, WindowAttributes, WindowId};
+use crate::app::{exit_app, AppEvent};
 use crate::base::{ElementEvent, Event, EventContext, EventHandler, EventRegistration, MouseDetail, MouseEventType, Touch, TouchDetail, UnsafeFnOnce};
 use crate::base::MouseEventType::{MouseClick, MouseUp};
 use crate::canvas_util::CanvasHelper;
@@ -25,7 +29,7 @@ use crate::element::ElementRef;
 use crate::event::{build_modifier, CaretEventBind, ClickEventBind, DragOverEventDetail, DragStartEventDetail, DropEventDetail, FocusShiftBind, FocusEventBind, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT, KeyEventDetail, MouseDownEventBind, MouseEnterEventBind, MouseLeaveEventBind, MouseMoveEventBind, MouseUpEventBind, MouseWheelDetail, named_key_to_str, TouchCancelEventBind, TouchEndEventBind, TouchMoveEventBind, TouchStartEventBind};
 use crate::event_loop::{run_with_event_loop, send_event};
 use crate::ext::common::create_event_handler;
-use crate::ext::ext_frame::FRAMES;
+use crate::ext::ext_frame::{FrameAttrs, FRAMES, FRAME_TYPE_MENU, FRAME_TYPE_NORMAL};
 use crate::js::js_value_util::{FromJsValue, ToJsValue};
 use crate::mrc::{Mrc, MrcWeak};
 use crate::renderer::CpuRenderer;
@@ -69,10 +73,17 @@ impl FrameWeak {
 
 }
 
+#[derive(PartialEq)]
+pub enum FrameType {
+    Normal,
+    Menu,
+}
+
 pub struct Frame {
     id: i32,
-    window: SkiaWindow,
+    pub(crate) window: SkiaWindow,
     cursor_position: LogicalPosition<f64>,
+    pub(crate) frame_type: FrameType,
     cursor_root_position: LogicalPosition<f64>,
     body: Option<ElementRef>,
     focusing: Option<ElementRef>,
@@ -102,9 +113,38 @@ thread_local! {
 }
 
 impl FrameRef {
-    pub fn new(attributes: WindowAttributes) -> Self {
+    pub fn new(attrs: FrameAttrs) -> Self {
         let id = NEXT_FRAME_ID.get();
         NEXT_FRAME_ID.set(id + 1);
+
+        let mut attributes = Window::default_attributes();
+        if let Some(t) = &attrs.title {
+            attributes.title = t.to_string();
+        } else {
+            attributes.title = "".to_string();
+        }
+        attributes.visible = attrs.visible.unwrap_or(true);
+        attributes.resizable = attrs.resizable.unwrap_or(true);
+        attributes.decorations = attrs.decorations.unwrap_or(true);
+        let size = LogicalSize {
+            width: attrs.width.unwrap_or(800.0) as f64,
+            height: attrs.height.unwrap_or(600.0) as f64,
+        };
+        attributes.inner_size = Some(Size::Logical(size));
+        #[cfg(feature = "x11")]
+        {
+            attributes = attributes.with_override_redirect(attrs.override_redirect.unwrap_or(false));
+        }
+        if let Some(position) = attrs.position {
+            attributes.position = Some(Logical(LogicalPosition {
+                x: position.0 as f64,
+                y: position.1 as f64,
+            }));
+        }
+        let frame_type = match attrs.frame_type.unwrap_or(FRAME_TYPE_NORMAL.to_string()).as_str() {
+            FRAME_TYPE_MENU => FrameType::Menu,
+            _ => FrameType::Normal,
+        };
 
         let window = Self::create_window(attributes.clone());
         let state = Frame {
@@ -136,6 +176,7 @@ impl FrameRef {
                 touches: Default::default(),
                 click_timer_handle: None,
             },
+            frame_type,
         };
         let mut handle = FrameRef {
             inner: Mrc::new(state),
