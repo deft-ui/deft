@@ -320,6 +320,16 @@ impl FrameRef {
                 let loc = touch.location.to_logical(self.window.scale_factor());
                 self.emit_touch_event(touch.id, touch.phase, loc.x, loc.y);
             }
+            WindowEvent::Focused(focus) => {
+                let target = self.as_weak();
+                if focus {
+                    let mut event = Event::new("focus", (), target);
+                    self.event_registration.emit_event(&mut event);
+                } else {
+                    let mut event = Event::new("blur", (), target);
+                    self.event_registration.emit_event(&mut event);
+                }
+            }
             _ => (),
         }
     }

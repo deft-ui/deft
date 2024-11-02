@@ -66,6 +66,14 @@ export class Frame {
         this.bindEvent("close", callback);
     }
 
+    bindFocus(callback) {
+        this.bindEvent("focus", callback);
+    }
+
+    bindBlur(callback) {
+        this.bindEvent("blur", callback);
+    }
+
     bindEvent(type, callback) {
         this.eventRegistry.bindEvent(type, callback);
     }
