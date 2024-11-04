@@ -423,6 +423,10 @@ export class LabelElement extends View {
         view_set_property(this.el, "align", align);
     }
 
+    setSelection(selection) {
+        view_set_property(this.el, "selection", selection);
+    }
+
 }
 
 export class ImageElement extends View {

@@ -109,7 +109,7 @@ impl Text {
             self.rebuild_lines(&text);
             self.mark_dirty(true);
 
-            let mut event = ElementEvent::new("textupdate", TextUpdateDetail {
+            let event = ElementEvent::new("textupdate", TextUpdateDetail {
                 value: text
             }, self.element.clone());
             self.element.emit_event("textupdate", event);
@@ -454,6 +454,7 @@ impl Text {
         let mut result = Vec::new();
         for ln in lines {
             // let p = SimpleTextParagraph::new(ln, params);
+            let ln = Self::preprocess_text(ln);
             let p = SkiaTextParagraph::new(ln.to_string(), params);
             result.push(Line {
                 atom_count: ln.trim_line_endings().chars().count() + 1,
@@ -467,6 +468,11 @@ impl Text {
     fn mark_dirty(&mut self, layout_dirty: bool) {
         self.element.mark_dirty(layout_dirty);
     }
+
+    fn preprocess_text(text: &str) -> String {
+        text.replace("\r\n", "\n")
+    }
+
 }
 
 
@@ -556,6 +562,7 @@ impl ElementBackend for Text {
         js_call!("text", String, self, set_text, p, v);
         js_call!("fontsize", f32, self, set_font_size, p, v);
         js_call!("align", TextAlign, self, set_align, p, v);
+        js_call!("selection", (usize, usize), self, set_selection, p, v);
     }
 
     fn get_property(&mut self, property_name: &str) -> Result<Option<JsValue>, Error> {
