@@ -701,7 +701,7 @@ impl FrameRef {
             canvas.restore();
         });
         let _time = SystemTime::now().duration_since(start).unwrap();
-        println!("Render time:{}", _time.as_millis());
+        // println!("Render time:{}", _time.as_millis());
     }
 
     #[inline]

@@ -122,6 +122,11 @@ impl ElementRef {
     }
 
     pub fn get_property(&mut self, property_name: String) -> Result<JsValue, Error> {
+        js_get_prop!("scroll_top", self, get_scroll_top, property_name);
+        js_get_prop!("scroll_left", self, get_scroll_left, property_name);
+        js_get_prop!("scroll_height", self, get_scroll_height, property_name);
+        js_get_prop!("scroll_width", self, get_scroll_width, property_name);
+        //TODO support clientSize?
         js_get_prop!("size", self, get_size, property_name);
         js_get_prop!("content_size", self, get_real_content_size, property_name);
         let v = self.backend.get_property(&property_name)?;
@@ -208,6 +213,14 @@ impl ElementRef {
             self.emit_scroll_event();
             self.mark_dirty(false);
         }
+    }
+
+    pub fn get_scroll_height(&self) -> f32 {
+        self.get_real_content_size().1
+    }
+
+    pub fn get_scroll_width(&self) -> f32 {
+        self.get_real_content_size().0
     }
 
     fn emit_scroll_event(&mut self) {
@@ -493,6 +506,10 @@ impl ElementRef {
             ele.animation_style_props = styles;
             ele.apply_style();
         }));
+    }
+
+    pub fn get_bounding_client_rect(&self) -> base::Rect {
+        self.get_origin_bounds()
     }
 
     fn calculate_changed_style<'a>(

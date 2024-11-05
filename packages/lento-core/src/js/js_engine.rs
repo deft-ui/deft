@@ -110,6 +110,7 @@ impl JsEngine {
         export_js_object_api!(js_context, "view_set_style", ElementRef, set_style, JsValue);
         export_js_object_api!(js_context, "view_set_hover_style", ElementRef, set_hover_style, JsValue);
         export_js_object_api!(js_context, "view_set_animation", ElementRef, set_animation, AnimationResource);
+        export_js_object_api!(js_context, "view_get_bounding_client_rect", ElementRef, get_bounding_client_rect);
         export_js_object_api!(js_context, "view_bind_event",ElementRef, bind_event, String, JsValue);
         export_js_object_api!(js_context, "view_remove_event_listener",ElementRef, remove_event_listener, String, u32);
 

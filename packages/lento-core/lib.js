@@ -277,6 +277,26 @@ export class View {
         return view_get_property(this.el, "content_size");
     }
 
+    getBoundingClientRect() {
+        return view_get_bounding_client_rect(this.el);
+    }
+
+    getScrollTop() {
+        return view_get_property(this.el, "scroll_top");
+    }
+
+    getScrollLeft() {
+        return view_get_property(this.el, "scroll_left");
+    }
+
+    getScrollHeight() {
+        return view_get_property(this.el, "scroll_height");
+    }
+
+    getScrollWidth() {
+        return view_get_property(this.el, "scroll_width");
+    }
+
     bindFocus(callback) {
         this.bindEvent("focus", callback);
     }
