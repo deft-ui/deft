@@ -30,7 +30,7 @@ use crate::ext::ext_shell::shell_spawn;
 use crate::ext::ext_timer::{timer_clear_interval, timer_clear_timeout, timer_set_interval, timer_set_timeout};
 #[cfg(feature = "tray")]
 use crate::ext::ext_tray::{SystemTrayResource, tray_create, TrayMenu};
-use crate::ext::ext_websocket::{WsConnectionResource, ws_connect, ws_read};
+use crate::ext::ext_websocket::{WsConnectionResource, ws_connect, ws_read, ws_send_str};
 use crate::frame::{FrameRef, FrameType, FrameWeak};
 use crate::js::js_binding::{JsCallError, JsFunc};
 use crate::js::js_runtime::JsContext;
@@ -147,6 +147,7 @@ impl JsEngine {
         // websocket
         export_js_async_api!(js_context, "ws_connect", ws_connect, String);
         export_js_async_api!(js_context, "ws_read", ws_read, WsConnectionResource);
+        export_js_async_api!(js_context, "ws_send_str", ws_send_str, WsConnectionResource, String);
 
         // tray
         #[cfg(feature = "tray")]

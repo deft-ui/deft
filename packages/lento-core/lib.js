@@ -711,6 +711,13 @@ export class WebSocket {
         listeners.push(callback);
     }
 
+    send(data) {
+        //TODO check status
+        ws_send_str(this.client, data + "").catch(error => {
+            this._emit('error', error);
+        });
+    }
+
     async _connect(url) {
         try {
             this.client = await ws_connect(url);
