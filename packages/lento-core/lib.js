@@ -712,9 +712,14 @@ export class WebSocket {
     }
 
     async _connect(url) {
-        this.client = await ws_connect(url);
-        this._emit("open");
-        this._doRead();
+        try {
+            this.client = await ws_connect(url);
+            this._emit("open");
+            this._doRead();
+        } catch (error) {
+            this._emit("error", error);
+        }
+
     }
 
     async _doRead() {
