@@ -20,7 +20,7 @@ impl JsError {
 
 impl<E> From<E> for JsError
 where
-    E: Error + Send + Sync + 'static,
+    E: Error + 'static,
 {
     #[cold]
     fn from(error: E) -> Self {

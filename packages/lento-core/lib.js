@@ -8,6 +8,35 @@ const VT_SCROLL = 7
 const VT_TEXT_EDIT = 8
 const VT_IMAGE = 9;
 
+class Clipboard {
+    /**
+     *
+     * @returns {Promise<string>}
+     */
+    async readText() {
+        return clipboard_read_text();
+    }
+
+    /**
+     *
+     * @param text {string}
+     * @returns {Promise<void>}
+     */
+    async writeText(text) {
+        clipboard_write_text(text);
+    }
+}
+class Navigator {
+
+    /**
+     * @var {Clipboard}
+     */
+    clipboard;
+    constructor() {
+        this.clipboard = new Clipboard();
+    }
+}
+
 export class Frame {
 
     /**
@@ -873,6 +902,7 @@ const localStorage = {
     }
 }
 
+globalThis.navigator = new Navigator();
 globalThis.Frame = Frame;
 if (globalThis.tray_create) {
     globalThis.SystemTray = SystemTray;

@@ -1,6 +1,7 @@
 pub use lento_core::*;
 pub use lento_macros::*;
 pub mod ext_animation;
+pub mod ext_clipboard;
 
 use std::str::FromStr;
 use std::{env, thread};
@@ -15,7 +16,7 @@ use crate::loader::{DefaultModuleLoader};
 #[cfg(target_os = "android")]
 use winit::platform::android::activity::AndroidApp;
 use crate::ext_animation::animation_create;
-
+use crate::ext_clipboard::{clipboard_read_text, clipboard_write_text};
 
 #[cfg(not(feature = "production"))]
 fn create_module_loader() -> DefaultModuleLoader {
@@ -43,6 +44,9 @@ fn create_module_loader() -> StaticModuleLoader {
 
 fn init_app(app: &mut App) {
     app.js_engine.add_global_func(animation_create::new());
+
+    app.js_engine.add_global_func(clipboard_write_text::new());
+    app.js_engine.add_global_func(clipboard_read_text::new());
 }
 
 fn run_event_loop(mut event_loop: EventLoop<AppEvent>, lento_app: Box<dyn LentoApp>) {
