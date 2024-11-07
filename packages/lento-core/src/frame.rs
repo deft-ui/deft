@@ -622,12 +622,32 @@ impl FrameRef {
     }
 
     pub fn update(&mut self) {
+        let auto_size = !self.attributes.resizable;
         if self.layout_dirty {
             let size = self.window.inner_size();
             let scale_factor = self.window.scale_factor() as f32;
+            let width = if auto_size {
+                f32::NAN
+            } else {
+                size.width as f32 / scale_factor
+            };
+            let height = if auto_size {
+                f32::NAN
+            } else {
+                size.height as f32 / scale_factor
+            };
             if let Some(body) = &mut self.body {
                 print_time!("calculate layout, {} x {}", size.width, size.height);
-                body.calculate_layout(size.width as f32 / scale_factor, size.height as f32 / scale_factor);
+                body.calculate_layout(width, height);
+                if auto_size {
+                    let (final_width, final_height) = body.get_size();
+                    if size.width != final_width as u32 && size.height != final_height as u32 {
+                        self.resize(crate::base::Size {
+                            width: final_width,
+                            height: final_height,
+                        });
+                    }
+                }
             }
         }
         self.paint();
