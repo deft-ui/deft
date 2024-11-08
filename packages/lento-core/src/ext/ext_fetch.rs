@@ -34,14 +34,22 @@ pub struct FetchOptions {
     pub method: Option<String>,
     pub headers: Option<HashMap<String, String>>,
     pub body: Option<String>,
+    pub proxy: Option<String>,
 }
 
 pub async fn fetch_create(url: String, options: Option<FetchOptions>) -> Result<FetchResponse, Error> {
-    let mut client = reqwest::Client::new();
+    let mut client_builder = reqwest::Client::builder();
     let mut method = Method::GET;
     let mut headers = HeaderMap::new();
     let mut body = None;
     if let Some(options) = &options {
+        if let Some(proxy) = &options.proxy {
+            if proxy.is_empty() {
+                client_builder = client_builder.no_proxy();
+            } else {
+                client_builder = client_builder.proxy(reqwest::Proxy::all(proxy)?);
+            }
+        }
         if let Some(m) = &options.method {
             method = match m.to_lowercase().as_str() {
                 "get" => Method::GET,
@@ -60,6 +68,7 @@ pub async fn fetch_create(url: String, options: Option<FetchOptions>) -> Result<
         }
         body = options.body.clone();
     }
+    let mut client = client_builder.build()?;
     let mut req_builder = client
         .request(method, url)
         .headers(headers);
