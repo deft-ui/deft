@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use skia_safe::{Font, Paint};
 use skia_safe::textlayout::TextAlign;
+use yoga::MeasureMode;
 use crate::element::text::{AtomOffset, ColOffset};
 use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
 use crate::element::text::skia_text_paragraph::SkiaTextParagraph;
@@ -15,6 +16,8 @@ pub struct ParagraphRef {
 pub struct ParagraphData {
     pub lines: Vec<Line>,
     pub text_wrap: bool,
+    // (width mode, height mode)
+    pub measure_mode: Option<(MeasureMode, MeasureMode)>,
 }
 
 pub struct Line {

@@ -47,7 +47,7 @@ thread_local! {
     pub static FONT_COLLECTION: FontCollection = FontCollection::new();
 }
 
-extern "C" fn measure_label(node_ref: NodeRef, width: f32, _mode: MeasureMode, _height: f32, _height_mode: MeasureMode) -> Size {
+extern "C" fn measure_label(node_ref: NodeRef, width: f32, width_mode: MeasureMode, _height: f32, height_mode: MeasureMode) -> Size {
     if let Some(ctx) = Node::get_context(&node_ref) {
         if let Some(paragraph_props_ptr) = ctx.downcast_ref::<ParagraphRef>() {
             let paragraph = &mut paragraph_props_ptr.data.borrow_mut();
@@ -58,6 +58,7 @@ extern "C" fn measure_label(node_ref: NodeRef, width: f32, _mode: MeasureMode, _
                 height += p.paragraph.height();
                 text_width = text_width.max(p.paragraph.max_intrinsic_width());
             }
+            paragraph.measure_mode = Some((width_mode, height_mode));
             // measure_time::print_time!("text len:{}, width:{}, height:{}", paragraph.paragraphs.len(), text_width, height);
             return Size {
                 width: text_width,
@@ -87,6 +88,7 @@ impl Text {
             data: Rc::new(RefCell::new(ParagraphData {
                 lines: paragraphs,
                 text_wrap: true,
+                measure_mode: None,
             })),
         };
         let mut selection_paint = Paint::default();
@@ -107,7 +109,8 @@ impl Text {
         if old_text != text {
             self.selection = None;
             self.rebuild_lines(&text);
-            self.mark_dirty(true);
+            self.mark_dirty(false);
+            self.mark_layout_dirty_if_needed();
 
             let event = ElementEvent::new("textupdate", TextUpdateDetail {
                 value: text
@@ -467,6 +470,31 @@ impl Text {
 
     fn mark_dirty(&mut self, layout_dirty: bool) {
         self.element.mark_dirty(layout_dirty);
+    }
+
+    fn mark_layout_dirty_if_needed(&mut self) {
+        let d = self.paragraph_ref.data.borrow_mut().measure_mode;
+        match d {
+            None => return,
+            Some((width_mode, height_mode)) => {
+                if width_mode == MeasureMode::AtMost {
+                    self.mark_dirty(true);
+                } else if height_mode == MeasureMode::AtMost {
+                    //TODO use cached value?
+                    let old_height = self.element.get_size().1;
+                    let new_height = self.with_lines_mut(|ps| {
+                        let mut height = 0f32;
+                        for p in ps {
+                            height += p.paragraph.height();
+                        }
+                        height
+                    });
+                    if new_height != old_height {
+                        self.mark_dirty(true);
+                    }
+                }
+            }
+        }
     }
 
     fn preprocess_text(text: &str) -> String {
