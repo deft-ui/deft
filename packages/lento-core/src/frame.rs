@@ -200,6 +200,9 @@ impl FrameRef {
     }
 
     pub fn mark_dirty(&mut self, layout_dirty: bool) {
+        // Note: Uncomment to debug layout problems
+        // if layout_dirty && !self.layout_dirty { crate::trace::print_trace("layout dirty") }
+
         self.layout_dirty |= layout_dirty;
         if !self.dirty {
             self.dirty = true;
