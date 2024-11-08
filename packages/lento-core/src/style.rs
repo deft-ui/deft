@@ -269,7 +269,7 @@ impl PropValueParse for String {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum StyleTransformOp {
     Rotate(f32),
     Scale(f32, f32),
@@ -294,7 +294,7 @@ impl StyleTransformOp {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct StyleTransform {
     pub op_list: Vec<StyleTransformOp>,
 }
@@ -326,10 +326,10 @@ impl StyleTransform {
 
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct StyleBorder(StyleUnit, StyleColor);
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum StylePropVal<T> {
     Custom(T),
     Unset,
@@ -346,7 +346,7 @@ impl<T: Clone> StylePropVal<T> {
 
 macro_rules! define_style_props {
     ($($name: ident => $type: ty, )*) => {
-        #[derive(Clone, Debug)]
+        #[derive(Clone, Debug, PartialEq)]
         pub enum StyleProp {
             $(
                 $name(StylePropVal<$type>),
@@ -625,7 +625,7 @@ impl ComputedStyle {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ColorPropValue {
     Inherit,
     Color(Color),

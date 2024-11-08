@@ -63,6 +63,7 @@ pub mod macro_mod;
 pub mod ext;
 pub mod js;
 pub mod performance;
+mod trace;
 
 pub mod cache;
 pub mod animation;

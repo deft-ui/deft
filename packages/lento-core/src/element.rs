@@ -534,18 +534,15 @@ impl ElementRef {
         }
         for k in keys {
             let old_value = old_style_map.get(k);
-            let new_value = new_style_map.get(k);
-            match new_value {
-                Some(t) => {
-                    changed_style_props.push(t.clone().clone())
-                },
-                None => {
-                    let ov = old_value.unwrap().clone().clone();
-                    changed_style_props.push(ov.unset());
-                }
+            let new_value = match new_style_map.get(k) {
+                Some(t) => t.clone().clone(),
+                None => old_value.unwrap().clone().clone().unset(),
+            };
+            if old_value != Some(&&new_value) {
+                changed_style_props.push(new_value)
             }
         }
-        return changed_style_props;
+        changed_style_props
     }
 
     fn apply_style(&mut self) {
