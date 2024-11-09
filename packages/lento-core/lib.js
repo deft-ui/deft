@@ -42,13 +42,17 @@ export class Frame {
     /**
      * @type EventRegistry
      */
-    eventRegistry;
+    #eventRegistry;
 
-    frameId;
+    #frameId;
 
+    /**
+     *
+     * @param attrs {FrameAttrs}
+     */
     constructor(attrs) {
-        this.frameId = frame_create(attrs || {});
-        this.eventRegistry = new EventRegistry(this.frameId, frame_bind_event, frame_remove_event_listener);
+        this.#frameId = frame_create(attrs || {});
+        this.#eventRegistry = new EventRegistry(this.#frameId, frame_bind_event, frame_remove_event_listener);
     }
 
     /**
@@ -56,7 +60,7 @@ export class Frame {
      * @param view {View}
      */
     setBody(view) {
-        frame_set_body(this.frameId, view.el);
+        frame_set_body(this.#frameId, view.el);
     }
 
     /**
@@ -64,11 +68,15 @@ export class Frame {
      * @param title {string}
      */
     setTitle(title) {
-        frame_set_title(this.frameId, title);
+        frame_set_title(this.#frameId, title);
     }
 
+    /**
+     *
+     * @param size {Size}
+     */
     resize(size) {
-        frame_resize(this.frameId, size);
+        frame_resize(this.#frameId, size);
     }
 
     /**
@@ -76,11 +84,11 @@ export class Frame {
      * @param owner {Frame}
      */
     setModal(owner) {
-        frame_set_modal(this.frameId, owner.frameId)
+        frame_set_modal(this.#frameId, owner.#frameId)
     }
 
     close() {
-        frame_close(this.frameId);
+        frame_close(this.#frameId);
     }
 
     /**
@@ -88,23 +96,35 @@ export class Frame {
      * @param visible {boolean}
      */
     setVisible(visible) {
-        frame_set_visible(this.frameId, visible);
+        frame_set_visible(this.#frameId, visible);
     }
 
+    /**
+     *
+     * @param callback {CloseEventCallback}
+     */
     bindClose(callback) {
         this.bindEvent("close", callback);
     }
 
+    /**
+     *
+     * @param callback {FocusEventCallback}
+     */
     bindFocus(callback) {
         this.bindEvent("focus", callback);
     }
 
+    /**
+     *
+     * @param callback {BlurEventCallback}
+     */
     bindBlur(callback) {
         this.bindEvent("blur", callback);
     }
 
     bindEvent(type, callback) {
-        this.eventRegistry.bindEvent(type, callback);
+        this.#eventRegistry.bindEvent(type, callback);
     }
 
 }
@@ -183,11 +203,11 @@ export class SystemTray {
     /**
      * @type EventRegistry
      */
-    eventRegistry;
+    #eventRegistry;
     tray;
     constructor() {
         this.tray = tray_create("Test");
-        this.eventRegistry = new EventRegistry(this.tray, tray_bind_event, tray_remove_event_listener);
+        this.#eventRegistry = new EventRegistry(this.tray, tray_bind_event, tray_remove_event_listener);
     }
 
     setTitle(title) {
@@ -203,11 +223,11 @@ export class SystemTray {
     }
 
     bindActivate(callback) {
-        this.eventRegistry.bindEvent("activate", callback);
+        this.#eventRegistry.bindEvent("activate", callback);
     }
 
     bindMenuClick(callback) {
-        this.eventRegistry.bindEvent("menuclick", callback);
+        this.#eventRegistry.bindEvent("menuclick", callback);
     }
 
 }
@@ -226,7 +246,7 @@ export class View {
     /**
      * @type EventRegistry
      */
-    eventRegistry;
+    #eventRegistry;
 
     /**
      *
@@ -238,7 +258,7 @@ export class View {
         if (!this.el) {
             throw new Error("Failed to create view:" + viewType)
         }
-        this.eventRegistry = new EventRegistry(this.el, view_bind_event, view_remove_event_listener);
+        this.#eventRegistry = new EventRegistry(this.el, view_bind_event, view_remove_event_listener);
     }
 
     /**
@@ -302,62 +322,122 @@ export class View {
         return view_get_property(this.el, "size");
     }
 
+    /**
+     *
+     * @returns {[number, number]}
+     */
     getContentSize() {
         return view_get_property(this.el, "content_size");
     }
 
+    /**
+     *
+     * @returns {ElementRect}
+     */
     getBoundingClientRect() {
         return view_get_bounding_client_rect(this.el);
     }
 
+    /**
+     *
+     * @returns {number}
+     */
     getScrollTop() {
         return view_get_property(this.el, "scroll_top");
     }
 
+    /**
+     *
+     * @returns {number}
+     */
     getScrollLeft() {
         return view_get_property(this.el, "scroll_left");
     }
 
+    /**
+     *
+     * @returns {number}
+     */
     getScrollHeight() {
         return view_get_property(this.el, "scroll_height");
     }
 
+    /**
+     *
+     * @returns {number}
+     */
     getScrollWidth() {
         return view_get_property(this.el, "scroll_width");
     }
 
+    /**
+     *
+     * @param callback {BoundsChangeCallback}
+     */
     bindBoundsChange(callback) {
         this.bindEvent("boundschange", callback);
     }
 
+    /**
+     *
+     * @param callback {FocusEventCallback}
+     */
     bindFocus(callback) {
         this.bindEvent("focus", callback);
     }
 
+    /**
+     *
+     * @param callback {BlurEventCallback}
+     */
     bindBlur(callback) {
         this.bindEvent("blur", callback);
     }
 
+    /**
+     *
+     * @param callback {MouseEventCallback}
+     */
     bindClick(callback) {
         this.bindEvent("click", callback);
     }
 
+    /**
+     *
+     * @param callback {MouseEventCallback}
+     */
     bindMouseDown(callback) {
         this.bindEvent("mousedown", callback);
     }
 
+    /**
+     *
+     * @param callback {MouseEventCallback}
+     */
     bindMouseUp(callback) {
         this.bindEvent("mouseup", callback);
     }
 
+    /**
+     *
+     * @param callback {MouseEventCallback}
+     */
     bindMouseMove(callback) {
         this.bindEvent("mousemove", callback);
     }
 
+    /**
+     *
+     * @param callback {MouseEventCallback}
+     */
     bindMouseEnter(callback) {
         this.bindEvent("mouseenter", callback);
     }
 
+    /**
+     *
+     * @param callback {MouseEventCallback}
+     */
     bindMouseLeave(callback) {
         this.bindEvent("mouseleave", callback);
     }
@@ -395,7 +475,7 @@ export class View {
     }
 
     bindEvent(type, callback) {
-        this.eventRegistry.bindEvent(type, callback);
+        this.#eventRegistry.bindEvent(type, callback);
     }
 
     toString() {
@@ -406,11 +486,11 @@ export class View {
 
 export class Audio {
     context;
-    eventRegistry;
+    #eventRegistry;
     id;
     constructor(config) {
         this.id = audio_create(config || {})
-        this.eventRegistry = new EventRegistry(this.id, audio_add_event_listener, audio_remove_event_listener);
+        this.#eventRegistry = new EventRegistry(this.id, audio_add_event_listener, audio_remove_event_listener);
     }
 
     play() {
@@ -426,31 +506,31 @@ export class Audio {
     }
 
     bindLoad(callback) {
-        this.eventRegistry.bindEvent('load', callback);
+        this.#eventRegistry.bindEvent('load', callback);
     }
 
     bindTimeUpdate(callback) {
-        this.eventRegistry.bindEvent("timeupdate", callback);
+        this.#eventRegistry.bindEvent("timeupdate", callback);
     }
 
     bindEnd(callback) {
-        this.eventRegistry.bindEvent("end", callback);
+        this.#eventRegistry.bindEvent("end", callback);
     }
 
     bindPause(callback) {
-        this.eventRegistry.bindEvent("pause", callback);
+        this.#eventRegistry.bindEvent("pause", callback);
     }
 
     bindStop(callback) {
-        this.eventRegistry.bindEvent("stop", callback);
+        this.#eventRegistry.bindEvent("stop", callback);
     }
 
     bindCurrentChange(callback) {
-        this.eventRegistry.bindEvent("currentchange", callback);
+        this.#eventRegistry.bindEvent("currentchange", callback);
     }
 
     bindEvent(type, callback) {
-        this.eventRegistry.bindEvent(type, callback);
+        this.#eventRegistry.bindEvent(type, callback);
     }
 
 }
@@ -549,7 +629,7 @@ export class EntryElement extends View {
 
 }
 
-class TextEditElement extends View {
+export class TextEditElement extends View {
     constructor() {
         super(VT_TEXT_EDIT);
     }
@@ -733,7 +813,7 @@ export class WebSocket {
 
     constructor(url) {
         this.listeners = Object.create(null);
-        this._connect(url);
+        this.#connect(url);
     }
 
     addEventListener(name, callback) {
@@ -747,43 +827,43 @@ export class WebSocket {
     send(data) {
         //TODO check status
         ws_send_str(this.client, data + "").catch(error => {
-            this._emit('error', error);
+            this.#emit('error', error);
         });
     }
 
-    async _connect(url) {
+    async #connect(url) {
         try {
             this.client = await ws_connect(url);
-            this._emit("open");
-            this._doRead();
+            this.#emit("open");
+            this.#doRead();
         } catch (error) {
-            this._emit("error", error);
+            this.#emit("error", error);
         }
 
     }
 
-    async _doRead() {
+    async #doRead() {
         try {
             for (;;) {
                 let msg = await ws_read(this.client);
                 if (msg === false) {
-                    this._emit("close");
+                    this.#emit("close");
                     break;
                 }
                 let type = typeof msg;
                 if (type === "undefined") {
                     continue;
                 } else if (type === "string") {
-                    this._emit("message", {data: msg});
+                    this.#emit("message", {data: msg});
                 }
             }
         } catch (error) {
             console.error(error);
-            this._emit("close");
+            this.#emit("close");
         }
     }
 
-    _emit(name, data) {
+    #emit(name, data) {
         console.log("emit", name, data);
         /**
          * @type {Event}
@@ -897,6 +977,10 @@ globalThis.console = {
     error: log,
 }
 
+/**
+ *
+ * @type {LocalStorage}
+ */
 const localStorage = {
     getItem(key) {
         return localstorage_get(key)
