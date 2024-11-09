@@ -18,6 +18,7 @@ use winit::error::ExternalError;
 use winit::event::{ElementState, Ime, Modifiers, MouseButton, MouseScrollDelta, TouchPhase, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use winit::keyboard::{Key, NamedKey};
+#[cfg(feature = "x11")]
 use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorGrabMode, CursorIcon, Window, WindowAttributes, WindowId};
 use crate::app::{exit_app, AppEvent};
@@ -747,8 +748,11 @@ impl FrameRef {
 
     fn create_window(attributes: WindowAttributes) -> SkiaWindow {
         run_with_event_loop(|el| {
-            //TODO support RenderBackedType parameter
-            SkiaWindow::new(el, attributes, RenderBackendType::SoftBuffer)
+            //TODO support RenderBackedType parameter#[cfg(not(target_os = "android"))]
+            let backend_type = RenderBackendType::SoftBuffer;
+            #[cfg(target_os = "android")]
+            let backend_type = RenderBackendType::GL;
+            SkiaWindow::new(el, attributes, backend_type)
         })
     }
 

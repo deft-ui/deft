@@ -8,6 +8,7 @@ use winit::platform::android::activity::AndroidApp;
 use winit::window::{Window, WindowAttributes, WindowId};
 
 use crate::gl_surface::SurfaceState;
+#[cfg(not(target_os = "android"))]
 use crate::soft_surface::SoftSurface;
 use crate::surface::RenderBackend;
 
@@ -26,6 +27,9 @@ impl SkiaWindow {
         let window = event_loop.create_window(attributes).unwrap();
         let surface_state: Box<dyn RenderBackend> = match backend {
             RenderBackendType::SoftBuffer => {
+                #[cfg(target_os = "android")]
+                panic!("Android does not support this backend!");
+                #[cfg(not(target_os = "android"))]
                 Box::new(SoftSurface::new(event_loop, window))
             }
             RenderBackendType::GL => {

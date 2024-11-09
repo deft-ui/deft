@@ -11,7 +11,11 @@ edition = "2021"
 lento-core = { path = "packages/lento-core" }
 lento-macros = { path = "packages/lento-macros" }
 
+winit = { path = "third_party/winit" }
 quick-js = { path = "third_party/quickjs-rs" }
+
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger = "0.11.0"
 
 [features]
 default = []
