@@ -101,7 +101,7 @@ export class Frame {
 
     /**
      *
-     * @param callback {CloseEventCallback}
+     * @param callback {(event: IVoidEvent) => void}
      */
     bindClose(callback) {
         this.bindEvent("close", callback);
@@ -109,7 +109,7 @@ export class Frame {
 
     /**
      *
-     * @param callback {FocusEventCallback}
+     * @param callback {(event: IVoidEvent) => void}
      */
     bindFocus(callback) {
         this.bindEvent("focus", callback);
@@ -117,7 +117,7 @@ export class Frame {
 
     /**
      *
-     * @param callback {BlurEventCallback}
+     * @param callback {(event: IVoidEvent) => void}
      */
     bindBlur(callback) {
         this.bindEvent("blur", callback);
@@ -129,11 +129,21 @@ export class Frame {
 
 }
 
+/**
+ * @template D
+ * @template E
+ */
 export class EventObject {
     _propagationCancelled = false
     _preventDefault = false
     type;
+    /**
+     * @type {D}
+     */
     detail;
+    /**
+     * @type {E}
+     */
     target;
 
     constructor(type, detail, target) {
@@ -372,7 +382,7 @@ export class View {
 
     /**
      *
-     * @param callback {BoundsChangeCallback}
+     * @param callback {(event: IBoundsChangeEvent) => void}
      */
     bindBoundsChange(callback) {
         this.bindEvent("boundschange", callback);
@@ -380,7 +390,7 @@ export class View {
 
     /**
      *
-     * @param callback {FocusEventCallback}
+     * @param callback {(event: IVoidEvent) => void}
      */
     bindFocus(callback) {
         this.bindEvent("focus", callback);
@@ -388,7 +398,7 @@ export class View {
 
     /**
      *
-     * @param callback {BlurEventCallback}
+     * @param callback {(event: IVoidEvent) => void}
      */
     bindBlur(callback) {
         this.bindEvent("blur", callback);
@@ -396,7 +406,7 @@ export class View {
 
     /**
      *
-     * @param callback {MouseEventCallback}
+     * @param callback {(event: IMouseEvent) => void}
      */
     bindClick(callback) {
         this.bindEvent("click", callback);
@@ -404,7 +414,7 @@ export class View {
 
     /**
      *
-     * @param callback {MouseEventCallback}
+     * @param callback {(event: IMouseEvent) => void}
      */
     bindMouseDown(callback) {
         this.bindEvent("mousedown", callback);
@@ -412,7 +422,7 @@ export class View {
 
     /**
      *
-     * @param callback {MouseEventCallback}
+     * @param callback {(event: IMouseEvent) => void}
      */
     bindMouseUp(callback) {
         this.bindEvent("mouseup", callback);
@@ -420,7 +430,7 @@ export class View {
 
     /**
      *
-     * @param callback {MouseEventCallback}
+     * @param callback {(event: IMouseEvent) => void}
      */
     bindMouseMove(callback) {
         this.bindEvent("mousemove", callback);
@@ -428,7 +438,7 @@ export class View {
 
     /**
      *
-     * @param callback {MouseEventCallback}
+     * @param callback {(event: IMouseEvent) => void}
      */
     bindMouseEnter(callback) {
         this.bindEvent("mouseenter", callback);
@@ -436,7 +446,7 @@ export class View {
 
     /**
      *
-     * @param callback {MouseEventCallback}
+     * @param callback {(event: IMouseEvent) => void}
      */
     bindMouseLeave(callback) {
         this.bindEvent("mouseleave", callback);

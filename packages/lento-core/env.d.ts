@@ -23,23 +23,6 @@ declare interface Size {
     height: number;
 }
 
-declare interface EventData<T> {
-    detail: T
-}
-
-declare interface EventCallback<T> {
-    (event: EventData<T>): void;
-}
-
-declare interface CloseEventCallback extends EventCallback<void> {}
-declare interface FocusEventCallback extends EventCallback<void> {}
-declare interface BlurEventCallback extends EventCallback<void> {}
-
-declare interface BoundsChangeCallback extends EventCallback<{
-    originBounds: ElementRect
-}> {
-}
-
 declare interface MouseDetail {
     button: number,
     offsetX: number;
@@ -50,8 +33,75 @@ declare interface MouseDetail {
     screenY: number;
 }
 
-declare type IMouseEvent = EventData<MouseDetail>;
+declare interface CaretDetail {
+    position: number,
+    originBounds: ElementRect,
+    bounds: ElementRect,
+}
 
+declare interface KeyDetail {
+    modifiers: number,
+    ctrlKey: boolean,
+    altKey: boolean,
+    metaKey: boolean,
+    shiftKey: boolean,
+    key: string,
+    keyStr: string,
+    repeat: boolean,
+    pressed: boolean,
+}
+
+declare interface MouseWheelDetail {
+    cols: number;
+    rows: number;
+}
+
+declare interface TextDetail {
+    value: string;
+}
+
+
+declare interface TextChangeDetail {
+    value: string;
+}
+
+declare interface ScrollDetail {
+    scrollTop: number;
+    scrollLeft: number;
+}
+
+declare interface BoundsChangeDetail {
+    originBounds: ElementRect,
+}
+
+declare interface TouchInfo {
+    identifier: number;
+    offsetX: number;
+    offsetY: number;
+    frameX: number;
+    frameY: number;
+}
+
+declare interface TouchDetail {
+    touches: TouchInfo[],
+}
+
+declare class IEvent<D> {
+    detail: D;
+    target: any;
+    stopPropagation(): void;
+    preventDefault(): void;
+}
+
+declare type IVoidEvent = IEvent<void>;
+declare type ICaretEvent = IEvent<CaretDetail>;
+declare type IMouseEvent = IEvent<MouseDetail>;
+declare type IKeyEvent = IEvent<KeyDetail>;
+declare type IMouseWheelEvent = IEvent<MouseWheelDetail>;
+declare type ITextEvent = IEvent<TextDetail>;
+declare type ITouchEvent = IEvent<TouchDetail>;
+declare type IScrollEvent = IEvent<ScrollDetail>;
+declare type IBoundsChangeEvent = IEvent<BoundsChangeDetail>;
 
 declare interface LocalStorage {
     getItem(key: string): string | null,
