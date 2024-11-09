@@ -326,6 +326,10 @@ export class View {
         return view_get_property(this.el, "scroll_width");
     }
 
+    bindBoundsChange(callback) {
+        this.bindEvent("boundschange", callback);
+    }
+
     bindFocus(callback) {
         this.bindEvent("focus", callback);
     }

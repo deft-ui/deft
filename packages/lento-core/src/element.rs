@@ -23,7 +23,7 @@ use crate::element::image::Image;
 use crate::element::scroll::Scroll;
 use crate::element::text::Text;
 use crate::element::textedit::TextEdit;
-use crate::event::{ClickEventBind};
+use crate::event::{BoundsChangeBind, BoundsChangeEventDetail, ClickEventBind};
 use crate::animation::AnimationResource;
 use crate::event_loop::{schedule_macro_task_unsafe};
 use crate::ext::ext_frame::{VIEW_TYPE_BUTTON, VIEW_TYPE_CONTAINER, VIEW_TYPE_ENTRY, VIEW_TYPE_IMAGE, VIEW_TYPE_LABEL, VIEW_TYPE_SCROLL, VIEW_TYPE_TEXT_EDIT};
@@ -753,6 +753,15 @@ impl ElementRef {
     pub fn on_layout_update(&mut self) {
         //TODO emit size change
         let origin_bounds = self.get_origin_bounds();
+        if origin_bounds != self.rect {
+            let detail = BoundsChangeEventDetail {
+                origin_bounds: origin_bounds.clone(),
+            };
+            let mut event = ElementEvent::new("boundschange", detail, self.clone());
+            // Disable bubble
+            event.context.propagation_cancelled = true;
+            self.event_registration.emit_event(&mut event);
+        }
         //TODO performance: maybe not changed?
         //TODO change is_visible?
         if !origin_bounds.is_empty() {
@@ -828,6 +837,7 @@ pub struct Element {
     scroll_left: f32,
     draggable: bool,
     cursor: CursorIcon,
+    rect: base::Rect,
 }
 
 
@@ -853,6 +863,7 @@ impl Element {
             scroll_left: 0.0,
             draggable: false,
             cursor: CursorIcon::Default,
+            rect: base::Rect::empty(),
         }
     }
 

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use winit::keyboard::{ModifiersState, NamedKey};
 use crate::base::{CaretDetail, MouseDetail, ScrollEventDetail, TextChangeDetail, TextUpdateDetail, TouchDetail};
-use crate::define_event;
+use crate::{base, define_event};
 
 pub const KEY_MOD_CTRL: u32 = 0x1;
 pub const KEY_MOD_ALT: u32 = 0x1 << 1;
@@ -391,6 +391,12 @@ pub struct MouseWheelDetail {
     pub rows: f32,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BoundsChangeEventDetail {
+    pub origin_bounds: base::Rect,
+}
+
 define_event!(CaretEvent,       CaretEventBind,       "caretchange", bind_caret_change, emit_caret_change, AcceptCaretEvent,       accept_caret_change, CaretDetail);
 define_event!(MouseDownEvent,   MouseDownEventBind,   "mousedown",   bind_mouse_down,   emit_mouse_down,   AcceptMouseDownEvent,   accept_mouse_down,   MouseDetail);
 define_event!(MouseUpEvent,     MouseUpEventBind,     "mouseup",     bind_mouse_up,     emit_mouse_up,     AcceptMouseUpEvent,     accept_mouse_up,     MouseDetail);
@@ -414,4 +420,5 @@ define_event!(ScrollEvent,      ScrollBind,           "scroll",      bind_scroll
 define_event!(DragStartEvent,   DragStartBind,        "dragstart",   bind_drag_start,   emit_drag_start,   AccpetDragStart,        accept_drag_start,   DragStartEventDetail);
 define_event!(DragOverEvent,    DragOverBind,         "dragover",    bind_drag_over,    emit_drag_over,    AccpetDragOver,         accept_drag_over,    DragOverEventDetail);
 define_event!(DropEvent,        DropBind,             "drop",        bind_drop,         emit_drop,         AccpetDrop,             accept_drop,         DropEventDetail);
+define_event!(BoundsChangeEvent,BoundsChangeBind,     "boundschange",bind_bounds_change,emit_bounds_change,AcceptBoundsChange,     accept_bounds_change,BoundsChangeEventDetail);
 

@@ -24,7 +24,7 @@ pub enum VerticalAlign {
     Bottom,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Rect {
     pub x: f32,
     pub y: f32,
