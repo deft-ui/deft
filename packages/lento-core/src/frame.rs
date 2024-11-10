@@ -98,6 +98,8 @@ pub struct Frame {
     dirty: bool,
     event_registration: EventRegistration<FrameWeak>,
     attributes: WindowAttributes,
+    init_width: Option<f32>,
+    init_height: Option<f32>,
 }
 
 pub type FrameEventHandler = EventHandler<FrameWeak>;
@@ -182,6 +184,8 @@ impl FrameRef {
                 click_timer_handle: None,
             },
             frame_type,
+            init_width: attrs.width,
+            init_height: attrs.height,
         };
         let mut handle = FrameRef {
             inner: Mrc::new(state),
@@ -635,12 +639,12 @@ impl FrameRef {
             let size = self.window.inner_size();
             let scale_factor = self.window.scale_factor() as f32;
             let width = if auto_size {
-                f32::NAN
+                self.init_width.unwrap_or(f32::NAN)
             } else {
                 size.width as f32 / scale_factor
             };
             let height = if auto_size {
-                f32::NAN
+                self.init_height.unwrap_or(f32::NAN)
             } else {
                 size.height as f32 / scale_factor
             };

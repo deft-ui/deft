@@ -16,7 +16,7 @@ quick-js = { path = "third_party/quickjs-rs" }
 clipboard = "0.5.0"
 
 [features]
-default = []
+default = ["x11"]
 tray = ["lento-core/tray"]
 x11 = ["lento-core/x11"]
 production = ["lento-core/production"]
