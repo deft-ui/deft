@@ -277,8 +277,6 @@ export class View {
      */
     el
 
-    viewType
-
     /**
      * @type EventRegistry
      */
@@ -286,15 +284,19 @@ export class View {
 
     /**
      *
-     * @param viewType {number}
+     * @param el {any}
+     * @param context {object}
      */
-    constructor(viewType) {
-        const myContext = {};
+    constructor(el, context) {
+        const myContext = context || {};
         CONTEXT2ELEMENT.set(myContext, this);
-        this.viewType = viewType;
-        this.el = view_create(viewType, myContext);
+        if (typeof el === "number") {
+            this.el = view_create(el, myContext);
+        } else {
+            this.el = el;
+        }
         if (!this.el) {
-            throw new Error("Failed to create view:" + viewType)
+            throw new Error("Failed to create view:" + el)
         }
         this.#eventRegistry = new EventRegistry(this.el, view_bind_event, view_remove_event_listener, this, (target) => {
             const myContext = view_get_js_context(target);
@@ -522,7 +524,7 @@ export class View {
     }
 
     toString() {
-        return this.el + "@" + this.viewType
+        return this.el + "@" + this.constructor.name
     }
 
 }
