@@ -1,6 +1,9 @@
 use std::error::Error;
 use std::fmt::Display;
+use std::ops::{Deref, DerefMut};
 use quick_js::{JsValue, ValueError};
+use serde::Deserialize;
+use crate::js::js_deserialze::JsDeserializer;
 use crate::js::js_runtime::JsContext;
 use crate::mrc::Mrc;
 
@@ -118,6 +121,43 @@ impl<T: ToJsValue> ToJsCallResult for Result<T, JsError> {
             Err(e) => {
                 Err(JsCallError::ExecutionError(e))
             }
+        }
+    }
+}
+
+
+pub struct JsPo<T> {
+    value: T,
+}
+
+impl<T> JsPo<T> {
+    pub fn take(self) -> T {
+        self.value
+    }
+}
+
+impl<T> Deref for JsPo<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+
+impl<T> DerefMut for JsPo<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.value
+    }
+}
+
+impl<T> FromJsValue for JsPo<T>
+where
+    T: for <'a> Deserialize<'a>,
+{
+    fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
+        match T::deserialize(JsDeserializer { value }) {
+            Ok(v) => Ok(JsPo { value: v }),
+            Err(e) => Err(ValueError::Internal(e.to_string())),
         }
     }
 }
