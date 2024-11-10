@@ -33,6 +33,7 @@ use crate::js::js_serde::JsValueSerializer;
 use crate::js::js_value_util::{FromJsValue, SerializeToJsValue, ToJsValue};
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
+use crate::resource_table::ResourceTable;
 use crate::style::{ColorHelper, parse_style_obj, StyleNode, StyleProp};
 
 pub mod container;
@@ -56,6 +57,10 @@ pub struct ElementRef {
 }
 
 define_resource!(ElementRef);
+
+struct ElementJsContext {
+    context: JsValue,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ScrollByOption {
@@ -838,6 +843,7 @@ pub struct Element {
     draggable: bool,
     cursor: CursorIcon,
     rect: base::Rect,
+    resource_table: ResourceTable,
 }
 
 
@@ -864,6 +870,7 @@ impl Element {
             draggable: false,
             cursor: CursorIcon::Default,
             rect: base::Rect::empty(),
+            resource_table: ResourceTable::new(),
         }
     }
 
@@ -930,8 +937,8 @@ pub trait ElementBackend {
     }
 }
 
-pub fn element_create(view_type: i32) -> Result<ElementRef, Error> {
-    let view = match view_type {
+pub fn element_create(view_type: i32, context: JsValue) -> Result<ElementRef, Error> {
+    let mut view = match view_type {
         VIEW_TYPE_CONTAINER => ElementRef::new(Container::create),
         VIEW_TYPE_SCROLL => ElementRef::new(Scroll::create),
         VIEW_TYPE_LABEL => ElementRef::new(Text::create),
@@ -941,5 +948,14 @@ pub fn element_create(view_type: i32) -> Result<ElementRef, Error> {
         VIEW_TYPE_IMAGE => ElementRef::new(Image::create),
         _ => return Err(anyhow!("invalid view_type")),
     };
+    view.resource_table.put(ElementJsContext { context });
+
     Ok(view)
+}
+
+pub fn element_get_js_context(mut element: ElementRef) -> Result<JsValue, Error> {
+    let e = element.resource_table.get::<ElementJsContext>()
+        .map(|e| e.context.clone())
+        .unwrap_or(JsValue::Undefined);
+    Ok(e)
 }

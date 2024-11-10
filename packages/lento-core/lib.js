@@ -8,6 +8,9 @@ const VT_SCROLL = 7
 const VT_TEXT_EDIT = 8
 const VT_IMAGE = 9;
 
+//Note: CONTEXT2ELEMENT must be an weak map to avoid cyclic references.
+const CONTEXT2ELEMENT = new WeakMap();
+
 class Clipboard {
     /**
      *
@@ -52,7 +55,7 @@ export class Frame {
      */
     constructor(attrs) {
         this.#frameId = frame_create(attrs || {});
-        this.#eventRegistry = new EventRegistry(this.#frameId, frame_bind_event, frame_remove_event_listener);
+        this.#eventRegistry = new EventRegistry(this.#frameId, frame_bind_event, frame_remove_event_listener, this);
     }
 
     /**
@@ -146,10 +149,16 @@ export class EventObject {
      */
     target;
 
-    constructor(type, detail, target) {
+    /**
+     * @type {E}
+     */
+    currentTarget;
+
+    constructor(type, detail, target, currentTarget) {
         this.type = type;
         this.detail = detail;
         this.target = target;
+        this.currentTarget = currentTarget;
     }
 
     stopPropagation() {
@@ -174,11 +183,15 @@ export class EventRegistry {
     _id;
     _remove_api;
     _add_api;
+    #contextGetter;
+    #self;
 
-    constructor(id, addApi, removeApi) {
+    constructor(id, addApi, removeApi, self, contextGetter) {
         this._id = id;
         this._add_api = addApi;
         this._remove_api = removeApi;
+        this.#contextGetter = contextGetter;
+        this.#self = self;
     }
 
     bindEvent(type, callback) {
@@ -191,6 +204,15 @@ export class EventRegistry {
             this._remove_api(this._id, type, oldListenerId);
         }
 
+        const getJsContext = (target) => {
+            if (target && this.#contextGetter) {
+                return this.#contextGetter(target);
+            }
+            return target;
+        }
+
+        const self = this.#self;
+
         /**
          *
          * @param type {string}
@@ -200,9 +222,13 @@ export class EventRegistry {
          * @private
          */
         function eventCallback(type, detail, target) {
-            const event = new EventObject(type, detail, target);
-            callback && callback(event);
-            return event.result();
+            const event = new EventObject(type, detail, getJsContext(target), self);
+            try {
+                callback && callback(event);
+                return event.result();
+            } catch (error) {
+                console.error('event handling error', error);
+            }
         }
 
         this.eventListeners[type] = this._add_api(this._id, type, eventCallback);
@@ -217,7 +243,7 @@ export class SystemTray {
     tray;
     constructor() {
         this.tray = tray_create("Test");
-        this.#eventRegistry = new EventRegistry(this.tray, tray_bind_event, tray_remove_event_listener);
+        this.#eventRegistry = new EventRegistry(this.tray, tray_bind_event, tray_remove_event_listener, this);
     }
 
     setTitle(title) {
@@ -263,12 +289,19 @@ export class View {
      * @param viewType {number}
      */
     constructor(viewType) {
+        const myContext = {};
+        CONTEXT2ELEMENT.set(myContext, this);
         this.viewType = viewType;
-        this.el = view_create(viewType);
+        this.el = view_create(viewType, myContext);
         if (!this.el) {
             throw new Error("Failed to create view:" + viewType)
         }
-        this.#eventRegistry = new EventRegistry(this.el, view_bind_event, view_remove_event_listener);
+        this.#eventRegistry = new EventRegistry(this.el, view_bind_event, view_remove_event_listener, this, (target) => {
+            const myContext = view_get_js_context(target);
+            if (myContext) {
+                return CONTEXT2ELEMENT.get(myContext);
+            }
+        });
     }
 
     /**
@@ -500,7 +533,7 @@ export class Audio {
     id;
     constructor(config) {
         this.id = audio_create(config || {})
-        this.#eventRegistry = new EventRegistry(this.id, audio_add_event_listener, audio_remove_event_listener);
+        this.#eventRegistry = new EventRegistry(this.id, audio_add_event_listener, audio_remove_event_listener, this);
     }
 
     play() {
@@ -1021,3 +1054,26 @@ globalThis.KEY_MOD_META = 0x1 << 2;
 globalThis.KEY_MOD_SHIFT = 0x1 << 3;
 
 globalThis.localStorage = localStorage;
+
+/**
+ * @template T
+ * @typedef {{
+ *     detail: T,
+ *     target: View,
+ *     currentTarget: View,
+ *     stopPropagation(): void,
+ *     preventDefault(): void,
+ * }} IEvent<T>
+ */
+
+/**
+ * @typedef {IEvent<BoundsChangeDetail>} IBoundsChangeEvent
+ * @typedef {IEvent<void>} IVoidEvent
+ * @typedef {IEvent<CaretDetail>} ICaretEvent
+ * @typedef {IEvent<MouseDetail>} IMouseEvent
+ * @typedef {IEvent<KeyDetail>} IKeyEvent
+ * @typedef {IEvent<MouseWheelDetail>} IMouseWheelEvent
+ * @typedef {IEvent<TextDetail>} ITextEvent
+ * @typedef {IEvent<TouchDetail>} ITouchEvent
+ * @typedef {IEvent<ScrollDetail>} IScrollEvent
+ */

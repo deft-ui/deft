@@ -86,23 +86,6 @@ declare interface TouchDetail {
     touches: TouchInfo[],
 }
 
-declare class IEvent<D> {
-    detail: D;
-    target: any;
-    stopPropagation(): void;
-    preventDefault(): void;
-}
-
-declare type IVoidEvent = IEvent<void>;
-declare type ICaretEvent = IEvent<CaretDetail>;
-declare type IMouseEvent = IEvent<MouseDetail>;
-declare type IKeyEvent = IEvent<KeyDetail>;
-declare type IMouseWheelEvent = IEvent<MouseWheelDetail>;
-declare type ITextEvent = IEvent<TextDetail>;
-declare type ITouchEvent = IEvent<TouchDetail>;
-declare type IScrollEvent = IEvent<ScrollDetail>;
-declare type IBoundsChangeEvent = IEvent<BoundsChangeDetail>;
-
 declare type Align =
     'auto'
     | 'flex-start'

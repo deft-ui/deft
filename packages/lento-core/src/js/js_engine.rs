@@ -12,7 +12,7 @@ use crate::{export_js_api, export_js_async_api, export_js_object_api};
 use crate::app::exit_app;
 use crate::base::Size;
 use crate::console::Console;
-use crate::element::{element_create, ElementRef};
+use crate::element::{element_create, element_get_js_context, ElementRef};
 use crate::animation::{AnimationResource};
 use crate::event_loop::run_with_event_loop;
 use crate::ext::ext_appfs::{appfs_create_dir, appfs_create_dir_all, appfs_data_path, appfs_delete_file, appfs_exists, appfs_read, appfs_readdir, appfs_remove_dir, appfs_remove_dir_all, appfs_write, appfs_write_new};
@@ -102,7 +102,8 @@ impl JsEngine {
         export_js_object_api!(js_context, "frame_remove_event_listener", FrameWeak, remove_event_listener, String, u32);
 
         // view
-        export_js_api!(js_context, "view_create", element_create, i32);
+        export_js_api!(js_context, "view_create", element_create, i32, JsValue);
+        export_js_api!(js_context, "view_get_js_context", element_get_js_context, ElementRef);
         export_js_object_api!(js_context, "view_set_property",  ElementRef, set_property, String, JsValue);
         export_js_object_api!(js_context, "view_get_property", ElementRef, get_property, String);
         export_js_object_api!(js_context, "view_add_child", ElementRef, add_child, ElementRef, i32);
