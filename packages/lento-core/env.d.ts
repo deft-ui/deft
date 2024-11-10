@@ -103,6 +103,83 @@ declare type ITouchEvent = IEvent<TouchDetail>;
 declare type IScrollEvent = IEvent<ScrollDetail>;
 declare type IBoundsChangeEvent = IEvent<BoundsChangeDetail>;
 
+declare type Align =
+    'auto'
+    | 'flex-start'
+    | 'center'
+    | 'flex-end'
+    | 'stretch'
+    | 'baseline'
+    | 'space-between'
+    | 'space-around'
+
+declare interface StyleProps extends Record<string, number | string>{
+    color?: string,
+    backgroundColor?: string;
+
+    borderTop?: string;
+    borderRight?: string;
+    borderBottom?: string;
+    borderLeft?: string;
+
+    display?: "none" | "flex",
+
+    width?: number | string,
+    height?: number | string,
+    maxWidth?: number | string,
+    maxHeight?: number | string,
+    minWidth?: number | string,
+    minHeight?: number | string,
+
+    marginTop?: number | string,
+    marginRight?: number | string,
+    marginBottom?: number | string,
+    marginLeft?: number | string,
+
+    paddingTop?: number | string,
+    paddingRight?: number | string,
+    paddingBottom?: number | string,
+    paddingLeft?: number | string,
+
+    flex?: number,
+    flexBasis?: number | string,
+    flexGrow?: number,
+    flexShrink?: number,
+    alignSelf?: Align,
+    direction?: 'inherit' | 'ltr' | 'rtl',
+    position?: 'static' | 'relative' | 'absolute',
+    overflow?: 'visible' | 'hidden' | 'scroll',
+
+    borderTopLeftRadius?: number,
+    borderTopRightRadius?: number,
+    borderBottomRightRadius?: number,
+    borderBottomLeftRadius?: number,
+
+    justifyContent?: 'flex-start' | 'center' | 'flex-end' | 'space-between' | 'space-around' | 'space-evenly',
+    flexDirection?: 'column' | 'column-reverse' | 'row' | 'row-reverse',
+    alignContent?: Align,
+    alignItems?: Align,
+    flexWrap?: 'no-wrap' | 'wrap' | 'wrap-reverse',
+    columnGap?: number,
+    rowGap?: number,
+    top?: number | string,
+    right?: number | string,
+    bottom?: number | string,
+    left?: number | string,
+    transform?: string,
+    animationName?: string,
+    animationDuration?: number,
+    animationIterationCount?: number,
+
+    // short hands
+    background?: string,
+    gap?: number,
+    border?: string,
+    margin?: number | string,
+    padding?: number | string,
+    borderRadius?: number | string,
+}
+
 declare interface LocalStorage {
     getItem(key: string): string | null,
 

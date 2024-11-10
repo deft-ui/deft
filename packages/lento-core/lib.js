@@ -273,7 +273,7 @@ export class View {
 
     /**
      *
-     * @param style {Record<string, any>}
+     * @param style {StyleProps}
      */
     setStyle(style) {
         view_set_style(this.el, style);
@@ -285,7 +285,7 @@ export class View {
 
     /**
      *
-     * @param style {Record<string, any>}
+     * @param style {StyleProps}
      */
     setHoverStyle(style) {
         view_set_hover_style(this.el, style);
