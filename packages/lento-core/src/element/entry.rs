@@ -450,7 +450,7 @@ impl ElementBackend for Entry {
 
 #[test]
 pub fn test_edit_history() {
-    let mut el = ElementRef::new(Entry::create);
+    let mut el = ElementRef::create(Entry::create);
     let entry = el.get_backend_mut_as::<Entry>();
     let text1 = "hello";
     let text2 = "world";

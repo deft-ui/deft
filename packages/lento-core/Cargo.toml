@@ -9,6 +9,7 @@ edition = "2021"
 
 
 [dependencies]
+lento-macros = { path = "../lento-macros" }
 
 quick-js = {path = "../../third_party/quickjs-rs"}
 yoga = { path = "../../third_party/yoga-rs" }

@@ -1807,6 +1807,7 @@ dependencies = [
  "jni",
  "ksni",
  "lazy_static",
+ "lento-macros",
  "libc",
  "maplit",
  "measure_time",
@@ -1834,7 +1835,6 @@ dependencies = [
 name = "lento-macros"
 version = "0.1.0"
 dependencies = [
- "lento-core",
  "quote",
  "syn 2.0.85",
 ]

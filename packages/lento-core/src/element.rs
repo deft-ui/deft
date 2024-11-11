@@ -5,6 +5,7 @@ use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 
 use anyhow::{anyhow, Error};
+use lento_macros::mrc_object;
 use ordered_float::Float;
 use quick_js::{JsValue};
 use serde::{Deserialize, Serialize};
@@ -46,14 +47,10 @@ pub mod image;
 pub mod label;
 mod edit_history;
 pub mod text;
+use crate as lento;
 
 thread_local! {
     pub static NEXT_ELEMENT_ID: Cell<u32> = Cell::new(1);
-}
-
-#[derive(PartialEq, Clone)]
-pub struct ElementRef {
-    inner: Mrc<Element>
 }
 
 define_resource!(ElementRef);
@@ -69,7 +66,7 @@ pub struct ScrollByOption {
 }
 
 impl ElementRef {
-    pub fn new<T: ElementBackend + 'static, F: FnOnce(ElementRef) -> T>(backend: F) -> Self {
+    pub fn create<T: ElementBackend + 'static, F: FnOnce(ElementRef) -> T>(backend: F) -> Self {
         let empty_backend = EmptyElementBackend{};
         let inner =  Mrc::new(Element::new(empty_backend));
         let mut ele = Self {
@@ -807,21 +804,7 @@ impl ElementRef {
 
 }
 
-impl Deref for ElementRef {
-    type Target = Element;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl DerefMut for ElementRef {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
-    }
-}
-
-
+#[mrc_object]
 pub struct Element {
     id: u32,
     backend: Box<dyn ElementBackend>,
@@ -939,13 +922,13 @@ pub trait ElementBackend {
 
 pub fn element_create(view_type: i32, context: JsValue) -> Result<ElementRef, Error> {
     let mut view = match view_type {
-        VIEW_TYPE_CONTAINER => ElementRef::new(Container::create),
-        VIEW_TYPE_SCROLL => ElementRef::new(Scroll::create),
-        VIEW_TYPE_LABEL => ElementRef::new(Text::create),
-        VIEW_TYPE_ENTRY => ElementRef::new(Entry::create),
-        VIEW_TYPE_BUTTON => ElementRef::new(Button::create),
-        VIEW_TYPE_TEXT_EDIT => ElementRef::new(TextEdit::create),
-        VIEW_TYPE_IMAGE => ElementRef::new(Image::create),
+        VIEW_TYPE_CONTAINER => ElementRef::create(Container::create),
+        VIEW_TYPE_SCROLL => ElementRef::create(Scroll::create),
+        VIEW_TYPE_LABEL => ElementRef::create(Text::create),
+        VIEW_TYPE_ENTRY => ElementRef::create(Entry::create),
+        VIEW_TYPE_BUTTON => ElementRef::create(Button::create),
+        VIEW_TYPE_TEXT_EDIT => ElementRef::create(TextEdit::create),
+        VIEW_TYPE_IMAGE => ElementRef::create(Image::create),
         _ => return Err(anyhow!("invalid view_type")),
     };
     view.resource_table.put(ElementJsContext { context });

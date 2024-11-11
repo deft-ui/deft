@@ -635,7 +635,7 @@ pub fn parse_align(align: &str) -> TextAlign {
 
 #[test]
 pub fn test_get_caret_at_offset_coordinate() {
-    let mut el = ElementRef::new(Text::create);
+    let mut el = ElementRef::create(Text::create);
     let text = el.get_backend_mut_as::<Text>();
     let (row, col) = text.get_caret_at_offset_coordinate((100.0, 100.0));
     assert_eq!(0, row);
@@ -645,7 +645,7 @@ pub fn test_get_caret_at_offset_coordinate() {
 
 #[test]
 pub fn test_get_caret_by_char_offset() {
-    let mut el = ElementRef::new(Text::create);
+    let mut el = ElementRef::create(Text::create);
     let text = el.get_backend_mut_as::<Text>();
     text.set_text("abc".to_string());
     assert_eq!((0, 2), text.get_location_by_atom_offset(2));

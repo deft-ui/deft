@@ -1,6 +1,81 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, FnArg, ItemFn};
+use syn::{parse_macro_input, FnArg, ItemFn, ItemStruct};
+
+#[proc_macro_attribute]
+pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
+    let struct_def = parse_macro_input!(struct_def as ItemStruct);
+    let weak_name = format_ident!("{}Weak", struct_def.ident);
+    let ref_name = format_ident!("{}Ref", struct_def.ident);
+    let struct_name = struct_def.ident;
+    let fields = struct_def.fields;
+
+    let expanded = quote! {
+
+        #[derive(Clone, PartialEq)]
+        pub struct #ref_name {
+            inner: lento::mrc::Mrc<#struct_name>,
+        }
+
+        impl std::ops::Deref for #ref_name {
+            type Target = lento::mrc::Mrc<#struct_name>;
+
+            fn deref(&self) -> &Self::Target {
+                &self.inner
+            }
+        }
+
+        impl std::ops::DerefMut for #ref_name {
+            fn deref_mut(&mut self) -> &mut Self::Target {
+                &mut self.inner
+            }
+        }
+
+        impl #ref_name {
+
+            pub fn new(inner: lento::mrc::Mrc<#struct_name>) -> Self {
+                Self { inner }
+            }
+
+            pub fn as_weak(&self) -> #weak_name {
+                #weak_name {
+                    inner: self.inner.as_weak(),
+                }
+            }
+        }
+
+        #[derive(Clone)]
+        pub struct #weak_name {
+            inner: lento::mrc::MrcWeak<#struct_name>,
+        }
+
+        impl #weak_name {
+            pub fn upgrade(&self) -> Option<#ref_name> {
+                if let Some(f) = self.inner.upgrade() {
+                    let mut inst = #ref_name {
+                        inner: f
+                    };
+                    Some(inst)
+                } else {
+                    None
+                }
+            }
+        }
+
+        pub struct #struct_name
+            #fields
+
+
+        impl #struct_name {
+            pub fn to_ref(self) -> #ref_name {
+                let inner = lento::mrc::Mrc::new(self);
+                #ref_name::new(inner)
+            }
+        }
+
+    };
+    expanded.into()
+}
 
 #[proc_macro_attribute]
 pub fn js_func(_attr: TokenStream, func: TokenStream) -> TokenStream {

@@ -27,7 +27,7 @@ impl ElementBackend for ScrollBar {
     fn create(mut element: ElementRef) -> Self {
         let mut base = Container::create(element.clone());
         element.set_style_property("background", BACKGROUND_COLOR);
-        let mut indicator_ele = ElementRef::new(Container::create);
+        let mut indicator_ele = ElementRef::create(Container::create);
         indicator_ele.set_style_property("background", INDICATOR_COLOR);
         indicator_ele.set_style_property("borderradius", "4");
         base.add_child_view(indicator_ele.clone(), None);

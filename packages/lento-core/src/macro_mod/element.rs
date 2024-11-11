@@ -62,7 +62,7 @@ macro_rules! inherit_color_prop {
 macro_rules! create_element {
     ($ty: ty,  { $($key: expr => $value: expr,)* }) => {
         {
-            let mut element = ElementRef::new(<$ty>::create);
+            let mut element = ElementRef::create(<$ty>::create);
             use crate::HashMap;
             let mut style = Vec::new();
             $(
