@@ -161,3 +161,23 @@ where
         }
     }
 }
+
+pub struct JsResource<T> {
+    value: T,
+}
+
+impl<T: 'static> ToJsValue for JsResource<T> {
+    fn to_js_value(self) -> Result<JsValue, ValueError> {
+        Ok(JsValue::Resource(quick_js::ResourceValue { resource: std::rc::Rc::new(std::cell::RefCell::new(self.value)) }))
+    }
+}
+
+impl<T: Clone + 'static> FromJsValue for JsResource<T> {
+    fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
+        if let Some(value) = value.as_resource(|r: &mut T| r.clone()) {
+            Ok(JsResource { value })
+        } else {
+            Err(ValueError::UnexpectedType)
+        }
+    }
+}
