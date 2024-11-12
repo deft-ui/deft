@@ -7,6 +7,7 @@ use std::rc::Rc;
 use std::slice;
 use std::time::SystemTime;
 use anyhow::{anyhow, Error};
+use lento_macros::mrc_object;
 use measure_time::print_time;
 use quick_js::{JsValue, ResourceValue};
 use skia_bindings::SkClipOp;
@@ -34,6 +35,7 @@ use crate::js::js_value_util::{FromJsValue, ToJsValue};
 use crate::mrc::{Mrc, MrcWeak};
 use crate::renderer::CpuRenderer;
 use crate::timer::{set_timeout, TimerHandle};
+use crate as lento;
 
 #[derive(Clone)]
 struct MouseDownInfo {
@@ -52,33 +54,13 @@ struct TouchingInfo {
 
 const MOUSE_AS_TOUCH: bool = false;
 
-
-#[derive(Clone)]
-pub struct FrameWeak {
-    inner: MrcWeak<Frame>,
-}
-
-impl FrameWeak {
-
-    pub fn upgrade_mut<R, F: FnOnce(&mut FrameRef) -> R>(&self, callback: F) -> Option<R> {
-        if let Some(f) = self.inner.upgrade() {
-            let mut inst = FrameRef {
-                inner: f
-            };
-            Some(callback(&mut inst))
-        } else {
-            None
-        }
-    }
-
-}
-
 #[derive(PartialEq)]
 pub enum FrameType {
     Normal,
     Menu,
 }
 
+#[mrc_object]
 pub struct Frame {
     id: i32,
     pub(crate) window: SkiaWindow,
@@ -105,17 +87,12 @@ pub struct Frame {
 pub type FrameEventHandler = EventHandler<FrameWeak>;
 pub type FrameEventContext = EventContext<FrameWeak>;
 
-// #[derive(Clone)]
-pub struct FrameRef {
-    inner: Mrc<Frame>,
-}
-
 thread_local! {
     pub static NEXT_FRAME_ID: Cell<i32> = Cell::new(1);
 }
 
 impl FrameRef {
-    pub fn new(attrs: FrameAttrs) -> Self {
+    pub fn create(attrs: FrameAttrs) -> Self {
         let id = NEXT_FRAME_ID.get();
         NEXT_FRAME_ID.set(id + 1);
 
@@ -197,15 +174,6 @@ impl FrameRef {
 
     pub fn resume(&mut self) {
         self.window = Self::create_window(self.attributes.clone());
-    }
-
-    pub fn as_weak(&self) -> FrameWeak {
-        // WeakWindowHandle {
-        //     inner: self.inner.as_weak()
-        // }
-        FrameWeak {
-            inner: self.inner.as_weak(),
-        }
     }
 
     pub fn mark_dirty(&mut self, layout_dirty: bool) {
@@ -786,14 +754,6 @@ impl FrameRef {
 
 }
 
-impl Deref for FrameRef {
-    type Target = Mrc<Frame>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
 pub struct WeakWindowHandle {
     inner: MrcWeak<Frame>,
 }
@@ -801,12 +761,6 @@ pub struct WeakWindowHandle {
 impl WeakWindowHandle {
     pub fn upgrade(&self) -> Option<FrameRef> {
         self.inner.upgrade().map(|i| FrameRef::from_inner(i))
-    }
-}
-
-impl DerefMut for FrameRef {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
     }
 }
 

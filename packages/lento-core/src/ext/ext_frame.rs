@@ -56,7 +56,7 @@ pub struct FrameAttrs {
 
 
 pub fn create_frame(attrs: FrameAttrs) -> Result<FrameWeak, Error> {
-    let frame = FrameRef::new(attrs);
+    let frame = FrameRef::create(attrs);
     let window_id = frame.get_window_id();
     let frame_weak = frame.as_weak();
     FRAMES.with_borrow_mut(|m| m.insert(frame.get_id(), frame));

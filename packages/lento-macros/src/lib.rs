@@ -60,6 +60,18 @@ pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
                     None
                 }
             }
+
+            pub fn upgrade_mut<R, F: FnOnce(&mut #ref_name) -> R>(&self, callback: F) -> Option<R> {
+                if let Some(f) = self.inner.upgrade() {
+                    let mut inst = #ref_name {
+                        inner: f
+                    };
+                    Some(callback(&mut inst))
+                } else {
+                    None
+                }
+            }
+
         }
 
         pub struct #struct_name
