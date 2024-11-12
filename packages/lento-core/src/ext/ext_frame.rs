@@ -65,30 +65,27 @@ pub fn create_frame(attrs: FrameAttrs) -> Result<FrameWeak, Error> {
 }
 
 pub fn frame_set_modal(mut frame: FrameWeak, owner: FrameWeak) -> Result<(), Error> {
-    frame.upgrade_mut(|f| {
-        owner.upgrade_mut(|o| {
-            let _ = f.set_modal(o);
-            let frame_id = f.get_window_id();
-            MODAL_TO_OWNERS.with_borrow_mut(|m| m.insert(frame_id, o.get_window_id()));
-        })
-    });
+    let mut f = frame.upgrade()?;
+    let o = owner.upgrade()?;
+    let _ = f.set_modal(&o);
+    let frame_id = f.get_window_id();
+    MODAL_TO_OWNERS.with_borrow_mut(|m| m.insert(frame_id, o.get_window_id()));
     Ok(())
 }
 
 pub fn frame_close(frame: FrameWeak) -> Result<(), Error> {
-    frame.upgrade_mut(|frame| {
-        let window_id = frame.get_window_id();
-        if frame.allow_close() {
-            WINDOW_TO_FRAME.with_borrow_mut(|m| m.remove(&window_id));
-            MODAL_TO_OWNERS.with_borrow_mut(|m| m.remove(&window_id));
-            FRAMES.with_borrow_mut(|m| {
-                m.remove(&frame.get_id());
-                if m.is_empty() {
-                    let _ = exit_app(0);
-                }
-            });
-        }
-    });
+    let mut frame = frame.upgrade()?;
+    let window_id = frame.get_window_id();
+    if frame.allow_close() {
+        WINDOW_TO_FRAME.with_borrow_mut(|m| m.remove(&window_id));
+        MODAL_TO_OWNERS.with_borrow_mut(|m| m.remove(&window_id));
+        FRAMES.with_borrow_mut(|m| {
+            m.remove(&frame.get_id());
+            if m.is_empty() {
+                let _ = exit_app(0);
+            }
+        });
+    }
     Ok(())
 }
 

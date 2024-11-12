@@ -74,13 +74,13 @@ impl ElementRef {
         };
         let ele_weak = ele.inner.as_weak();
         ele.inner.layout.on_changed = Some(Box::new(move |key| {
-            if let Some(mut inner) = ele_weak.upgrade() {
+            if let Ok(mut inner) = ele_weak.upgrade() {
                 inner.backend.handle_style_changed(key);
             }
         }));
         let ele_weak = ele.inner.as_weak();
         ele.inner.layout.animation_renderer = Some(Mrc::new(Box::new(move |styles| {
-            if let Some(inner) = ele_weak.upgrade() {
+            if let Ok(inner) = ele_weak.upgrade() {
                 let mut el = ElementRef::from_inner(inner);
                 el.animation_style_props = styles;
                 el.apply_style();
@@ -298,8 +298,8 @@ impl ElementRef {
             Some(p) => p,
         };
         let inner = match p.upgrade() {
-            None => return None,
-            Some(u) => u,
+            Err(_e) => return None,
+            Ok(u) => u,
         };
         Some(ElementRef {
             inner,

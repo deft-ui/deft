@@ -1,6 +1,19 @@
 use std::cell::Cell;
+use std::error::Error;
+use std::fmt::{Display, Formatter};
 use std::ops::{Deref, DerefMut};
 use std::panic::{RefUnwindSafe};
+
+#[derive(Debug)]
+pub struct UpgradeError {}
+
+impl Display for UpgradeError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str("failed to upgrade")
+    }
+}
+
+impl Error for UpgradeError {}
 
 struct MrcBox<T> {
     strong: Cell<usize>,
@@ -113,13 +126,13 @@ impl<T> Drop for MrcWeak<T> {
 
 impl<T> MrcWeak<T> {
 
-    pub fn upgrade(&self) -> Option<Mrc<T>> {
+    pub fn upgrade(&self) -> Result<Mrc<T>, UpgradeError> {
         let strong = self.inner().strong.get();
         if strong == 0 {
-            return None
+            return Err(UpgradeError {});
         }
         self.inner().strong.set(strong + 1);
-        Some(Mrc {
+        Ok(Mrc {
             ptr: self.ptr,
         })
     }

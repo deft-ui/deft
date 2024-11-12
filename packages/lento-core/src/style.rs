@@ -1030,7 +1030,7 @@ impl StyleNode {
 
     fn get_parent(&self) -> Option<StyleNode> {
         if let Some(p) = &self.parent {
-            if let Some(sn) = p.upgrade() {
+            if let Ok(sn) = p.upgrade() {
                 return Some(StyleNode {
                     inner: sn,
                 })

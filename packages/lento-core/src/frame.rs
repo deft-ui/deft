@@ -760,7 +760,7 @@ pub struct WeakWindowHandle {
 
 impl WeakWindowHandle {
     pub fn upgrade(&self) -> Option<FrameRef> {
-        self.inner.upgrade().map(|i| FrameRef::from_inner(i))
+        self.inner.upgrade().map(|i| FrameRef::from_inner(i)).ok()
     }
 }
 

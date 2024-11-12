@@ -104,7 +104,7 @@ impl SystemTrayResource {
         let inst_weak2 = inst.inner.as_weak();
         inst.inner.handle.update(move |t| {
             t.activate_callback = Box::new(move || {
-                if let Some(st) = inst_weak.upgrade() {
+                if let Ok(st) = inst_weak.upgrade() {
                     let mut str = SystemTrayResource {
                         inner: st,
                     };
@@ -115,7 +115,7 @@ impl SystemTrayResource {
                 let inst_weak2 = inst_weak2.clone();
                 let id = id.to_string();
                 Box::new(move |_| {
-                    if let Some(st) = inst_weak2.upgrade() {
+                    if let Ok(st) = inst_weak2.upgrade() {
                         let mut str = SystemTrayResource {
                             inner: st,
                         };
