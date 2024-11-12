@@ -7,7 +7,7 @@ use std::rc::Rc;
 use std::slice;
 use std::time::SystemTime;
 use anyhow::{anyhow, Error};
-use lento_macros::mrc_object;
+use lento_macros::{js_func, js_methods, mrc_object};
 use measure_time::print_time;
 use quick_js::{JsValue, ResourceValue};
 use skia_bindings::SkClipOp;
@@ -30,12 +30,13 @@ use crate::element::ElementRef;
 use crate::event::{build_modifier, CaretEventBind, ClickEventBind, DragOverEventDetail, DragStartEventDetail, DropEventDetail, FocusShiftBind, FocusEventBind, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT, KeyEventDetail, MouseDownEventBind, MouseEnterEventBind, MouseLeaveEventBind, MouseMoveEventBind, MouseUpEventBind, MouseWheelDetail, named_key_to_str, TouchCancelEventBind, TouchEndEventBind, TouchMoveEventBind, TouchStartEventBind};
 use crate::event_loop::{run_with_event_loop, send_event};
 use crate::ext::common::create_event_handler;
-use crate::ext::ext_frame::{FrameAttrs, FRAMES, FRAME_TYPE_MENU, FRAME_TYPE_NORMAL};
+use crate::ext::ext_frame::{FrameAttrs, FRAMES, FRAME_TYPE_MENU, FRAME_TYPE_NORMAL, MODAL_TO_OWNERS, WINDOW_TO_FRAME};
 use crate::js::js_value_util::{FromJsValue, ToJsValue};
 use crate::mrc::{Mrc, MrcWeak};
 use crate::renderer::CpuRenderer;
 use crate::timer::{set_timeout, TimerHandle};
 use crate as lento;
+use crate::js::JsError;
 
 #[derive(Clone)]
 struct MouseDownInfo {
@@ -91,6 +92,7 @@ thread_local! {
     pub static NEXT_FRAME_ID: Cell<i32> = Cell::new(1);
 }
 
+#[js_methods]
 impl FrameRef {
     pub fn create(attrs: FrameAttrs) -> Self {
         let id = NEXT_FRAME_ID.get();
@@ -201,16 +203,37 @@ impl FrameRef {
         self.window.id()
     }
 
-    pub fn set_modal(&mut self, owner: &Self) -> Result<(), Error> {
+    #[js_func]
+    pub fn set_modal(&mut self, owner: FrameRef) -> Result<(), JsError> {
         self.window.set_modal(&owner.window);
+        let frame_id = self.get_window_id();
+        MODAL_TO_OWNERS.with_borrow_mut(|m| m.insert(frame_id, owner.get_window_id()));
         Ok(())
     }
 
-    pub fn bind_event(&mut self, event_name: String, callback: JsValue) -> Result<i32, Error> {
+    #[js_func]
+    pub fn close(&mut self) -> Result<(), JsError> {
+        let window_id = self.get_window_id();
+        if self.allow_close() {
+            WINDOW_TO_FRAME.with_borrow_mut(|m| m.remove(&window_id));
+            MODAL_TO_OWNERS.with_borrow_mut(|m| m.remove(&window_id));
+            FRAMES.with_borrow_mut(|m| {
+                m.remove(&self.get_id());
+                if m.is_empty() {
+                    let _ = exit_app(0);
+                }
+            });
+        }
+        Ok(())
+    }
+
+    #[js_func]
+    pub fn bind_event(&mut self, event_name: String, callback: JsValue) -> Result<i32, JsError> {
         Ok(self.event_registration.add_js_event_listener(&event_name, callback))
     }
 
-    pub fn set_visible(&mut self, visible: bool) -> Result<(), Error> {
+    #[js_func]
+    pub fn set_visible(&mut self, visible: bool) -> Result<(), JsError> {
         self.window.set_visible(visible);
         Ok(())
     }
@@ -363,6 +386,7 @@ impl FrameRef {
         self.event_registration.bind_event_listener(event_type, handler)
     }
 
+    #[js_func]
     pub fn remove_event_listener(&mut self, event_type: String, id: u32) {
         self.event_registration.remove_event_listener(&event_type, id)
     }
@@ -659,10 +683,12 @@ impl FrameRef {
         self.mark_dirty(true);
     }
 
+    #[js_func]
     pub fn set_title(&mut self, title: String) {
         self.window.set_title(&title);
     }
 
+    #[js_func]
     pub fn resize(&mut self, size: crate::base::Size) {
         let _ = self.window.request_inner_size(LogicalSize {
             width: size.width,

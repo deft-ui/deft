@@ -2,12 +2,13 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::str::FromStr;
 use anyhow::Error;
-use quick_js::JsValue;
+use quick_js::{JsValue, ValueError};
 use serde::{Deserialize, Serialize};
 use skia_safe::Path;
 use yoga::Layout;
 use crate::element::{ElementRef};
 use crate::ext::common::create_event_handler;
+use crate::js::FromJsValue;
 use crate::js::js_serde::JsValueSerializer;
 use crate::js::js_value_util::ToJsValue;
 use crate::number::DeNan;
@@ -175,6 +176,13 @@ pub struct ScrollEventDetail {
 pub struct Size {
     pub width: f32,
     pub height: f32,
+}
+
+//TODO use macro?
+impl FromJsValue for Size {
+    fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
+        Ok(<Size as crate::js::js_value_util::DeserializeFromJsValue>::from_js_value(value).unwrap())
+    }
 }
 
 impl CaretDetail {

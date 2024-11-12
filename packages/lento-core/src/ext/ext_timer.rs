@@ -1,15 +1,19 @@
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use anyhow::Error;
+use lento_macros::js_func;
 use quick_js::{JsValue};
 use crate::timer::{set_interval, set_timeout, TimerHandle};
+use crate as lento;
+use crate::js::JsError;
 
 thread_local! {
     pub static NEXT_TIMER_ID: Cell<i32> = Cell::new(1);
     pub static TIMERS: RefCell<HashMap<i32, TimerHandle>> = RefCell::new(HashMap::new());
 }
 
-pub fn timer_set_timeout(callback: JsValue, timeout: Option<i32>) -> Result<i32, Error> {
+#[js_func]
+pub fn timer_set_timeout(callback: JsValue, timeout: Option<i32>) -> Result<i32, JsError> {
     let id = NEXT_TIMER_ID.get();
     NEXT_TIMER_ID.set(id + 1);
 
@@ -30,12 +34,14 @@ pub fn timer_set_timeout(callback: JsValue, timeout: Option<i32>) -> Result<i32,
 }
 
 //TODO no return?
-pub fn timer_clear_timeout(id: i32) -> Result<(), Error> {
+#[js_func]
+pub fn timer_clear_timeout(id: i32) -> Result<(), JsError> {
     TIMERS.with_borrow_mut(|m| m.remove(&id));
     Ok(())
 }
 
-pub fn timer_set_interval(callback: JsValue, interval: i32) -> Result<i32, Error> {
+#[js_func]
+pub fn timer_set_interval(callback: JsValue, interval: i32) -> Result<i32, JsError> {
     let id = NEXT_TIMER_ID.get();
     NEXT_TIMER_ID.set(id + 1);
 
@@ -47,7 +53,8 @@ pub fn timer_set_interval(callback: JsValue, interval: i32) -> Result<i32, Error
     Ok(id)
 }
 
-pub fn timer_clear_interval(id: i32) -> Result<(), Error> {
+#[js_func]
+pub fn timer_clear_interval(id: i32) -> Result<(), JsError> {
     TIMERS.with_borrow_mut(|m| m.remove(&id));
     Ok(())
 }

@@ -1,8 +1,11 @@
 use std::io;
 use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
+use lento_macros::js_func;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
+use crate as lento;
+use crate::js::JsPo;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Stat {
@@ -11,6 +14,7 @@ pub struct Stat {
     is_file: bool,
 }
 
+#[js_func]
 pub async fn fs_read_dir(path: String) -> io::Result<Vec<String>> {
     let mut dirs = fs::read_dir(&path).await?;
     let mut result = Vec::new();
@@ -20,41 +24,49 @@ pub async fn fs_read_dir(path: String) -> io::Result<Vec<String>> {
     Ok(result)
 }
 
+#[js_func]
 pub async fn fs_exists(path: String) -> io::Result<bool> {
     let path = PathBuf::from(path);
     Ok(path.exists())
 }
 
+#[js_func]
 pub async fn fs_rename(path: String, dest: String) -> io::Result<()> {
     fs::rename(path, dest).await
 }
 
+#[js_func]
 pub async fn fs_delete_file(path: String) -> io::Result<()> {
     let path = PathBuf::from(path);
     fs::remove_file(&path).await
 }
 
-pub async fn fs_stat(path: String) -> io::Result<Stat> {
+#[js_func]
+pub async fn fs_stat(path: String) -> io::Result<JsPo<Stat>> {
     let meta = fs::metadata(&path).await?;
-    Ok(Stat {
+    Ok(JsPo::new(Stat {
         size: meta.size(),
         is_dir: meta.is_dir(),
         is_file: meta.is_file(),
-    })
+    }))
 }
 
+#[js_func]
 pub async fn fs_create_dir(path: String) -> io::Result<()> {
     fs::create_dir(&path).await
 }
 
+#[js_func]
 pub async fn fs_create_dir_all(path: String) -> io::Result<()> {
     fs::create_dir_all(&path).await
 }
 
+#[js_func]
 pub async fn fs_remove_dir(path: String) -> io::Result<()> {
     fs::remove_dir(&path).await
 }
 
+#[js_func]
 pub async fn fs_remove_dir_all(path: String) -> io::Result<()> {
     fs::remove_dir_all(&path).await
 }

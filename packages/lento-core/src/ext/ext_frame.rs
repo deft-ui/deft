@@ -1,12 +1,10 @@
+use crate as lento;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
 
 use anyhow::{anyhow, Error};
-use quick_js::{JsValue, ResourceValue};
+use quick_js::{JsValue, ResourceValue, ValueError};
 use serde::{Deserialize, Serialize};
-use winit::dpi::{LogicalPosition, LogicalSize, Size};
-use winit::dpi::Position::Logical;
 use winit::event::WindowEvent;
 #[cfg(feature = "x11")]
 use winit::platform::x11::WindowAttributesExtX11;
@@ -64,31 +62,6 @@ pub fn create_frame(attrs: FrameAttrs) -> Result<FrameWeak, Error> {
     Ok(frame_weak)
 }
 
-pub fn frame_set_modal(mut frame: FrameWeak, owner: FrameWeak) -> Result<(), Error> {
-    let mut f = frame.upgrade()?;
-    let o = owner.upgrade()?;
-    let _ = f.set_modal(&o);
-    let frame_id = f.get_window_id();
-    MODAL_TO_OWNERS.with_borrow_mut(|m| m.insert(frame_id, o.get_window_id()));
-    Ok(())
-}
-
-pub fn frame_close(frame: FrameWeak) -> Result<(), Error> {
-    let mut frame = frame.upgrade()?;
-    let window_id = frame.get_window_id();
-    if frame.allow_close() {
-        WINDOW_TO_FRAME.with_borrow_mut(|m| m.remove(&window_id));
-        MODAL_TO_OWNERS.with_borrow_mut(|m| m.remove(&window_id));
-        FRAMES.with_borrow_mut(|m| {
-            m.remove(&frame.get_id());
-            if m.is_empty() {
-                let _ = exit_app(0);
-            }
-        });
-    }
-    Ok(())
-}
-
 pub fn handle_window_event(window_id: WindowId, event: WindowEvent) {
     match &event {
         WindowEvent::Resized(_) => {}
@@ -116,7 +89,9 @@ pub fn handle_window_event(window_id: WindowId, event: WindowEvent) {
     });
     if let Some(frame) = &mut frame {
         if &WindowEvent::CloseRequested == &event {
-            let _ = frame_close(frame.clone());
+            if let Ok(mut f) = frame.upgrade() {
+                let _ = f.close();
+            }
         } else {
             frame.upgrade_mut(|frame| {
                 frame.handle_event(event);
@@ -126,39 +101,10 @@ pub fn handle_window_event(window_id: WindowId, event: WindowEvent) {
 }
 
 impl FrameWeak {
+
     pub fn set_body(&mut self, body: ElementRef) {
         self.upgrade_mut(|f| {
             f.set_body(body)
-        });
-    }
-
-    pub fn set_title(&mut self, title: String) {
-        self.upgrade_mut(|f| {
-            f.set_title(title)
-        });
-    }
-
-    pub fn resize(&mut self, size: crate::base::Size) {
-        self.upgrade_mut(|f| {
-            f.resize(size);
-        });
-    }
-
-    pub fn bind_event(&mut self, name: String, callback: JsValue) {
-        self.upgrade_mut(|f| {
-            f.bind_event(name, callback)
-        });
-    }
-
-    pub fn set_visible(&mut self, visible: bool) {
-        self.upgrade_mut(|f| {
-            f.set_visible(visible)
-        });
-    }
-
-    pub fn remove_event_listener(&mut self, name: String, eid: u32) {
-        self.upgrade_mut(|f| {
-            f.remove_event_listener(name, eid)
         });
     }
 
@@ -167,3 +113,18 @@ impl FrameWeak {
 // Js Api
 
 define_resource!(FrameWeak);
+
+impl lento::js::FromJsValue for FrameRef {
+    fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
+        match FrameWeak::from_js_value(value) {
+            Ok(fw) => {
+                if let Ok(frame) = fw.upgrade() {
+                    Ok(frame)
+                } else {
+                    Err(ValueError::Internal("failed to upgrade weak reference".to_string()))
+                }
+            }
+            Err(e) => Err(ValueError::UnexpectedType),
+        }
+    }
+}

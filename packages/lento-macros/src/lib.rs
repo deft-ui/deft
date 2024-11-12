@@ -1,6 +1,8 @@
 use proc_macro::TokenStream;
-use quote::{format_ident, quote};
-use syn::{parse_macro_input, FnArg, ItemFn, ItemStruct};
+use quote::{format_ident, quote, ToTokens};
+use syn::{parse_macro_input, FnArg, Ident, ImplItem, ItemFn, ItemImpl, ItemStruct, ReturnType, Visibility};
+use syn::__private::TokenStream2;
+use syn::token::{Async};
 
 #[proc_macro_attribute]
 pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
@@ -88,81 +90,206 @@ pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn js_func(_attr: TokenStream, func: TokenStream) -> TokenStream {
-    let func = parse_macro_input!(func as ItemFn);
-    let vis = func.vis;
-    let func_name = &func.sig.ident;
-    let asyncness = func.sig.asyncness;
-    let func_name_str = func_name.to_string();
-    let func_inputs = func.sig.inputs;
-    let func_block = func.block;
-    let params: Vec<_> = func_inputs.iter().map(|i| {
-        match i {
-            FnArg::Receiver(_) => unreachable!(),
-            FnArg::Typed(ref val) => {
-                &val.ty
+pub fn js_methods(_attr: TokenStream, impl_item: TokenStream) -> TokenStream {
+    let item = parse_macro_input!(impl_item as ItemImpl);
+    // item.self_ty.into_token_stream();
+    let ItemImpl {
+        mut attrs,
+        defaultness,
+        unsafety,
+        impl_token,
+        generics,
+        trait_,
+        self_ty,
+        mut items,
+        ..
+    } = item;
+
+    let mut api_bridges = Vec::new();
+    let mut api_create_expr_list = Vec::new();
+    let type_name_str = self_ty.clone().into_token_stream().to_string();
+    let type_name_ident = format_ident!("{}", type_name_str);
+
+
+    for item in &mut items {
+        match item {
+            ImplItem::Fn(item) => {
+                item.attrs.retain(|it| {
+                    if !it.path().is_ident("js_func") {
+                        return true;
+                    }
+
+                    let vis = item.vis.clone();
+
+                    let api_name_ident = format_ident!("{}_{}", type_name_str, item.sig.ident);
+
+                    let args_count = item.sig.inputs.len();
+                    let args = item.sig.inputs.iter().map(|it| it.clone()).collect::<Vec<_>>();
+
+                    let bridge_body = build_bridge_body(
+                        args,
+                        item.sig.asyncness,
+                        type_name_ident.clone(),
+                        item.sig.ident.clone()
+                    );
+
+                    let bridge = build_bridge_struct(
+                        vis,
+                        api_name_ident.clone(),
+                        args_count,
+                        bridge_body,
+                    );
+
+                    api_bridges.push(bridge);
+                    api_create_expr_list.push(quote! {
+                        #api_name_ident::new()
+                    });
+                    false
+                });
             }
+            _ => {}
         }
-    }).collect();
-    let mut param_expand_stmts = Vec::new();
-    let mut param_list = Vec::new();
-    let mut idx = 0usize;
-    for p in params {
-        let p_name = format_ident!("_p{}", idx);
-        param_expand_stmts.push(quote! {
-            let #p_name = #p::from_js_value(args.get(#idx).unwrap().clone())?;
-        });
-        param_list.push(p_name);
-        idx += 1;
     }
+    let q = quote! {
+        #(#attrs)*
+        #impl_token #generics #self_ty {
+            #(#items)*
 
-    let return_type = func.sig.output;
+            pub fn create_js_apis() -> Vec<Box<dyn lento::js::JsFunc + std::panic::RefUnwindSafe + 'static>> {
+                vec![#(Box::new(#api_create_expr_list), )*]
+            }
 
-    let call_stmt = if asyncness.is_none() {
-        quote! {
-            let r = Self::#func_name( #(#param_list, )* );
         }
-    } else {
-        quote! {
-            let r = js_context.create_async_task2(async move {
-                Self::#func_name( #(#param_list, )* ).await
-            });
-        }
+
+        #(#api_bridges)*
     };
 
-    let expanded = quote! {
+    q.into()
+}
 
+fn build_bridge_struct(vis: Visibility, func_name: Ident, args_count: usize, bridge_body: TokenStream2) -> TokenStream2 {
+    let func_name_str = func_name.to_string();
+    quote! {
         #[doc(hidden)]
         #[allow(nonstandard_style)]
         #vis struct #func_name  {}
 
         impl #func_name {
-
-            #asyncness fn #func_name(#func_inputs) #return_type #func_block
-
             pub fn new() -> Self {
                 Self {}
             }
-
         }
 
         impl lento::js::JsFunc for #func_name {
+
             fn name(&self) -> &str {
                 #func_name_str
             }
 
             fn args_count(&self) -> usize {
-                #idx
+                #args_count
             }
 
             fn call(&self, js_context: &mut lento::mrc::Mrc<lento::js::JsContext>, args: Vec<lento::js::JsValue>) -> Result<lento::js::JsValue, lento::js::JsCallError> {
-                use lento::js::FromJsValue;
-                use lento::js::ToJsValue;
-                use lento::js::ToJsCallResult;
-                #(#param_expand_stmts)*
-                #call_stmt
-                r.to_js_call_result()
+                #bridge_body
             }
+        }
+    }
+}
+
+fn build_bridge_body(func_inputs: Vec<FnArg>, asyncness: Option<Async>, struct_name: Ident, func_name: Ident) -> TokenStream2 {
+    let mut receiver = None;
+    let mut params = Vec::new();
+    func_inputs.iter().for_each(|i| {
+        match i {
+            FnArg::Receiver(r) => receiver = Some(r.ty.clone()),
+            FnArg::Typed(ref val) => {
+                params.push(val.ty.clone())
+            }
+        }
+    });
+    let mut param_expand_stmts = Vec::new();
+    let mut param_list = Vec::new();
+    let mut idx = if receiver.is_some() { 1usize } else { 0usize };
+    for p in params {
+        let p_name = format_ident!("_p{}", idx);
+        param_expand_stmts.push(quote! {
+            let #p_name = <#p as lento::js::FromJsValue>::from_js_value(args.get(#idx).unwrap().clone())?;
+        });
+        param_list.push(p_name);
+        idx += 1;
+    }
+
+    // let return_type = func.sig.output;
+
+    let call_stmt = if asyncness.is_none() {
+        if receiver.is_some() {
+            quote! {
+                let mut inst = <#struct_name as lento::js::FromJsValue>::from_js_value(args.get(0).unwrap().clone())?;
+                let r = inst.#func_name( #(#param_list, )* );
+            }
+        } else {
+            quote! {
+                let r = Self::#func_name( #(#param_list, )* );
+            }
+        }
+    } else {
+        if receiver.is_some() {
+            quote! {
+                let inst = <#struct_name as lento::js::FromJsValue>::from_js_value(args.get(0).unwrap().clone())?;
+                let r = js_context.create_async_task2(async move {
+                    inst.#func_name( #(#param_list, )* ).await
+                });
+            }
+        } else {
+            quote! {
+                let r = js_context.create_async_task2(async move {
+                    Self::#func_name( #(#param_list, )* ).await
+                });
+            }
+        }
+    };
+    let result = quote! {
+        use lento::js::FromJsValue;
+        use lento::js::ToJsValue;
+        use lento::js::ToJsCallResult;
+        #(#param_expand_stmts)*
+        #call_stmt
+        r.to_js_call_result()
+    };
+    result
+}
+
+#[proc_macro_attribute]
+pub fn js_func(_attr: TokenStream, func: TokenStream) -> TokenStream {
+    let func = parse_macro_input!(func as ItemFn);
+    let vis = func.vis;
+    let func_name = &func.sig.ident;
+    let asyncness = func.sig.asyncness;
+    let func_inputs = func.sig.inputs;
+    let func_block = func.block;
+
+    let args_count = func_inputs.len();
+    let args = func_inputs.iter().map(|it| it.clone()).collect::<Vec<_>>();
+    let bridge_body = build_bridge_body(
+        args,
+        asyncness,
+        format_ident!("Self"),
+        func_name.clone()
+    );
+
+    let return_type = func.sig.output;
+
+    let bridge = build_bridge_struct(vis, func_name.clone(), args_count, bridge_body);
+
+    let expanded = quote! {
+
+        #bridge
+
+        impl #func_name {
+
+            #asyncness fn #func_name(#func_inputs) #return_type #func_block
+
         }
 
     };

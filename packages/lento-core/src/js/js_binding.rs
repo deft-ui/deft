@@ -2,9 +2,11 @@ use std::error::Error;
 use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
 use quick_js::{JsValue, ValueError};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use crate::js::js_deserialze::JsDeserializer;
-use crate::js::js_runtime::JsContext;
+use crate::js::js_runtime::{JsContext, JsValueView};
+use crate::js::js_serde::JsValueSerializer;
+use crate::js::js_value_util::JsValueHelper;
 use crate::mrc::Mrc;
 
 #[derive(Clone, Debug)]
@@ -79,9 +81,41 @@ impl FromJsValue for String {
     }
 }
 
+impl FromJsValue for i32 {
+    fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
+        value.as_number()
+            .map(|f| f as i32)
+            .ok_or(ValueError::UnexpectedType)
+    }
+}
+
+impl FromJsValue for u32 {
+    fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
+        value.as_number()
+        .map(|f| f as u32)
+            .ok_or(ValueError::UnexpectedType)
+    }
+}
+
+impl FromJsValue for bool {
+    fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
+        value.as_bool().ok_or(ValueError::UnexpectedType)
+    }
+}
+
 impl FromJsValue for JsValue {
     fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
         Ok(value)
+    }
+}
+
+impl<T: FromJsValue> FromJsValue for Option<T> {
+    fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
+        if let Ok(v) = T::from_js_value(value) {
+            Ok(Some(v))
+        } else {
+            Err(ValueError::UnexpectedType)
+        }
     }
 }
 
@@ -97,9 +131,31 @@ impl ToJsValue for String {
     }
 }
 
+impl ToJsValue for i32 {
+    fn to_js_value(self) -> Result<JsValue, ValueError> {
+        Ok(JsValue::Int(self))
+    }
+}
+
+impl ToJsValue for bool {
+    fn to_js_value(self) -> Result<JsValue, ValueError> {
+        Ok(JsValue::Bool(self))
+    }
+}
+
 impl ToJsValue for JsValue {
     fn to_js_value(self) -> Result<JsValue, ValueError> {
         Ok(self)
+    }
+}
+
+impl<T: ToJsValue> ToJsValue for Vec<T> {
+    fn to_js_value(self) -> Result<JsValue, ValueError> {
+        let mut values = Vec::new();
+        for v in self {
+            values.push(v.to_js_value()?);
+        }
+        Ok(JsValue::Array(values))
     }
 }
 
@@ -112,13 +168,14 @@ impl<T: ToJsValue> ToJsCallResult for T {
     }
 }
 
-impl<T: ToJsValue> ToJsCallResult for Result<T, JsError> {
+impl<T: ToJsValue, E: ToString> ToJsCallResult for Result<T, E> {
     fn to_js_call_result(self) -> Result<JsValue, JsCallError> {
         match self {
             Ok(v) => {
                 v.to_js_call_result()
             }
             Err(e) => {
+                let e = JsError::from_str(&e.to_string());
                 Err(JsCallError::ExecutionError(e))
             }
         }
@@ -131,6 +188,9 @@ pub struct JsPo<T> {
 }
 
 impl<T> JsPo<T> {
+    pub fn new(value: T) -> Self {
+        Self { value }
+    }
     pub fn take(self) -> T {
         self.value
     }
@@ -159,6 +219,13 @@ where
             Ok(v) => Ok(JsPo { value: v }),
             Err(e) => Err(ValueError::Internal(e.to_string())),
         }
+    }
+}
+
+impl<T> ToJsValue for JsPo<T>
+where T: Serialize {
+    fn to_js_value(self) -> Result<JsValue, ValueError> {
+        T::serialize(&self.value, JsValueSerializer {}).map_err(|e| ValueError::UnexpectedType)
     }
 }
 

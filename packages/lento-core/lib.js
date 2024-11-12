@@ -55,7 +55,7 @@ export class Frame {
      */
     constructor(attrs) {
         this.#frameId = frame_create(attrs || {});
-        this.#eventRegistry = new EventRegistry(this.#frameId, frame_bind_event, frame_remove_event_listener, this);
+        this.#eventRegistry = new EventRegistry(this.#frameId, FrameRef_bind_event, FrameRef_remove_event_listener, this);
     }
 
     /**
@@ -71,7 +71,7 @@ export class Frame {
      * @param title {string}
      */
     setTitle(title) {
-        frame_set_title(this.#frameId, title);
+        FrameRef_set_title(this.#frameId, title);
     }
 
     /**
@@ -79,7 +79,7 @@ export class Frame {
      * @param size {Size}
      */
     resize(size) {
-        frame_resize(this.#frameId, size);
+        FrameRef_resize(this.#frameId, size);
     }
 
     /**
@@ -87,11 +87,11 @@ export class Frame {
      * @param owner {Frame}
      */
     setModal(owner) {
-        frame_set_modal(this.#frameId, owner.#frameId)
+        FrameRef_set_modal(this.#frameId, owner.#frameId)
     }
 
     close() {
-        frame_close(this.#frameId);
+        FrameRef_close(this.#frameId);
     }
 
     /**
@@ -99,7 +99,7 @@ export class Frame {
      * @param visible {boolean}
      */
     setVisible(visible) {
-        frame_set_visible(this.#frameId, visible);
+        FrameRef_set_visible(this.#frameId, visible);
     }
 
     /**
@@ -1050,6 +1050,10 @@ globalThis.ButtonElement = ButtonElement;
 globalThis.ImageElement  = ImageElement;
 globalThis.Audio = Audio;
 globalThis.WebSocket = WebSocket;
+globalThis.setTimeout = globalThis.timer_set_timeout;
+globalThis.clearTimeout = globalThis.timer_clear_timeout;
+globalThis.setInterval = globalThis.timer_set_interval;
+globalThis.clearInterval = globalThis.timer_clear_interval;
 globalThis.KEY_MOD_CTRL = 0x1;
 globalThis.KEY_MOD_ALT = 0x1 << 1;
 globalThis.KEY_MOD_META = 0x1 << 2;

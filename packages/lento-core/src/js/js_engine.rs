@@ -21,7 +21,7 @@ use crate::ext::ext_base64::base64_encode_str;
 use crate::ext::ext_dialog::{dialog_show_file_dialog, FileDialogOptions};
 use crate::ext::ext_env::{env_exe_dir, env_exe_path};
 use crate::ext::ext_fetch::{fetch_create, fetch_response_body_string, fetch_response_headers, fetch_response_save, fetch_response_status, FetchOptions, FetchResponse};
-use crate::ext::ext_frame::{create_frame, frame_close, frame_set_modal, FrameAttrs, handle_window_event, FRAMES, FRAME_TYPE_MENU};
+use crate::ext::ext_frame::{create_frame, FrameAttrs, handle_window_event, FRAMES, FRAME_TYPE_MENU};
 use crate::ext::ext_fs::{fs_create_dir, fs_create_dir_all, fs_delete_file, fs_exists, fs_read_dir, fs_remove_dir, fs_remove_dir_all, fs_rename, fs_stat};
 use crate::ext::ext_http::{http_request, http_upload, UploadOptions};
 use crate::ext::ext_localstorage::{localstorage_get, localstorage_set};
@@ -92,14 +92,7 @@ impl JsEngine {
 
         // frame
         export_js_api!(js_context, "frame_create", create_frame, FrameAttrs);
-        export_js_api!(js_context, "frame_set_modal", frame_set_modal, FrameWeak, FrameWeak);
-        export_js_api!(js_context, "frame_close", frame_close, FrameWeak);
         export_js_object_api!(js_context, "frame_set_body", FrameWeak, set_body, ElementRef);
-        export_js_object_api!(js_context, "frame_set_title", FrameWeak, set_title, String);
-        export_js_object_api!(js_context, "frame_resize", FrameWeak, resize, Size);
-        export_js_object_api!(js_context, "frame_bind_event", FrameWeak, bind_event, String, JsValue);
-        export_js_object_api!(js_context, "frame_set_visible", FrameWeak, set_visible, bool);
-        export_js_object_api!(js_context, "frame_remove_event_listener", FrameWeak, remove_event_listener, String, u32);
 
         // view
         export_js_api!(js_context, "view_create", element_create, i32, JsValue);
@@ -114,23 +107,6 @@ impl JsEngine {
         export_js_object_api!(js_context, "view_get_bounding_client_rect", ElementRef, get_bounding_client_rect);
         export_js_object_api!(js_context, "view_bind_event",ElementRef, bind_event, String, JsValue);
         export_js_object_api!(js_context, "view_remove_event_listener",ElementRef, remove_event_listener, String, u32);
-
-        //timer
-        export_js_api!(js_context, "setTimeout", timer_set_timeout, JsValue, Option<i32>);
-        export_js_api!(js_context, "clearTimeout", timer_clear_timeout, i32);
-        export_js_api!(js_context, "setInterval", timer_set_interval, JsValue, i32);
-        export_js_api!(js_context, "clearInterval", timer_clear_interval, i32);
-
-        // fs
-        export_js_async_api!(js_context, "fs_read_dir", fs_read_dir, String);
-        export_js_async_api!(js_context, "fs_stat", fs_stat, String);
-        export_js_async_api!(js_context, "fs_exists", fs_exists, String);
-        export_js_async_api!(js_context, "fs_rename", fs_rename, String, String);
-        export_js_async_api!(js_context, "fs_delete_file", fs_delete_file, String);
-        export_js_async_api!(js_context, "fs_create_dir", fs_create_dir, String);
-        export_js_async_api!(js_context, "fs_create_dir_all", fs_create_dir_all, String);
-        export_js_async_api!(js_context, "fs_remove_dir", fs_remove_dir, String);
-        export_js_async_api!(js_context, "fs_remove_dir_all", fs_remove_dir_all, String);
 
         // dialog
         export_js_async_api!(js_context, "dialog_show_file_dialog", dialog_show_file_dialog, FileDialogOptions);
@@ -206,11 +182,38 @@ impl JsEngine {
         //process
         export_js_api!(js_context, "process_exit", exit_app, i32);
 
-        let libjs = String::from_utf8_lossy(include_bytes!("../../lib.js"));
-        js_context.eval_module(&libjs, "lib.js").unwrap();
-
-        Self {
+        let engine = Self {
             js_context,
+        };
+
+        engine.add_global_functions(FrameRef::create_js_apis());
+        engine.add_global_func(timer_set_timeout::new());
+        engine.add_global_func(timer_clear_timeout::new());
+        engine.add_global_func(timer_set_interval::new());
+        engine.add_global_func(timer_clear_interval::new());
+
+        engine.add_global_func(fs_read_dir::new());
+        engine.add_global_func(fs_stat::new());
+        engine.add_global_func(fs_exists::new());
+        engine.add_global_func(fs_rename::new());
+        engine.add_global_func(fs_delete_file::new());
+        engine.add_global_func(fs_create_dir::new());
+        engine.add_global_func(fs_create_dir_all::new());
+        engine.add_global_func(fs_remove_dir::new());
+        engine.add_global_func(fs_remove_dir_all::new());
+        let libjs = String::from_utf8_lossy(include_bytes!("../../lib.js"));
+        engine.js_context.eval_module(&libjs, "lib.js").unwrap();
+        engine
+    }
+
+    pub fn add_global_functions(&self, functions: Vec<Box<dyn JsFunc + RefUnwindSafe + 'static>>) {
+        for func in functions {
+            let name = func.name().to_string();
+            let js_context = self.js_context.clone();
+            self.js_context.add_callback(name.as_str(), JsFuncCallback {
+                js_func: func,
+                js_context,
+            }).unwrap();
         }
     }
 
@@ -262,7 +265,9 @@ impl JsEngine {
                 result
             });
             for frame in close_frames {
-                let _ = frame_close(frame);
+                if let Ok(mut f) = frame.upgrade() {
+                    let _ = f.close();
+                }
             }
         }
     }
