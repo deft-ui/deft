@@ -247,10 +247,7 @@ impl FrameRef {
         self.window.set_visible(visible);
         Ok(())
     }
-
-    fn from_inner(inner: Mrc<Frame>) -> Self {
-        Self { inner }
-    }
+    
     pub fn allow_close(&mut self) -> bool {
         let mut event = Event::new("close", (), self.as_weak());
         self.event_registration.emit_event(&mut event);

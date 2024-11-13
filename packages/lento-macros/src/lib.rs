@@ -35,7 +35,7 @@ pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
 
         impl #ref_name {
 
-            pub fn new(inner: lento::mrc::Mrc<#struct_name>) -> Self {
+            pub fn from_inner(inner: lento::mrc::Mrc<#struct_name>) -> Self {
                 Self { inner }
             }
 
@@ -81,7 +81,7 @@ pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
         impl #struct_name {
             pub fn to_ref(self) -> #ref_name {
                 let inner = lento::mrc::Mrc::new(self);
-                #ref_name::new(inner)
+                #ref_name::from_inner(inner)
             }
         }
 

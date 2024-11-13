@@ -219,6 +219,60 @@ impl<T: ToJsValue> ToJsValue for Option<T> {
     }
 }
 
+macro_rules! impl_tuple_to_js_value {
+    ($($idx: tt => $id: ident,)*) => {
+        impl<$( $id : ToJsValue,)*> ToJsValue for ($($id,)*) {
+            fn to_js_value(self) -> Result<JsValue, ValueError> {
+                let mut result = Vec::new();
+                $(
+                    result.push(self.$idx.to_js_value()?);
+                )*
+                Ok(JsValue::Array(result))
+            }
+        }
+    };
+}
+
+impl_tuple_to_js_value!(
+    0 => A,
+    1 => B,
+);
+impl_tuple_to_js_value!(
+    0 => A,
+    1 => B,
+    2 => C,
+);
+impl_tuple_to_js_value!(
+    0 => A,
+    1 => B,
+    2 => C,
+    3 => D,
+);
+impl_tuple_to_js_value!(
+    0 => A,
+    1 => B,
+    2 => C,
+    3 => D,
+    4 => E,
+);
+impl_tuple_to_js_value!(
+    0 => A,
+    1 => B,
+    2 => C,
+    3 => D,
+    4 => E,
+    5 => F,
+);
+impl_tuple_to_js_value!(
+    0 => A,
+    1 => B,
+    2 => C,
+    3 => D,
+    4 => E,
+    5 => F,
+    6 => G,
+);
+
 impl<T: ToJsValue> ToJsCallResult for T {
     fn to_js_call_result(self) -> Result<JsValue, JsCallError> {
         match self.to_js_value() {

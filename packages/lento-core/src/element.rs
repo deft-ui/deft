@@ -94,10 +94,6 @@ impl ElementRef {
         ele
     }
 
-    pub fn from_inner(inner: Mrc<Element>) -> Self {
-        Self { inner }
-    }
-
     pub fn create_shadow(&mut self) {
         self.layout = StyleNode::new_with_shadow();
     }
@@ -722,7 +718,7 @@ impl ElementRef {
         self.event_registration.remove_event_listener(&event_type, id)
     }
 
-    pub fn emit_event(&mut self, event_type: &str, mut event: ElementEvent) {
+    pub fn emit_event(&self, event_type: &str, mut event: ElementEvent) {
         let mut me = self.clone();
         let event_type = event_type.to_string();
         unsafe {

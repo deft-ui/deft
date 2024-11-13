@@ -543,7 +543,7 @@ impl StylePropertyValue {
             JsValue::Date(_) => Self::Invalid,
             JsValue::Resource(_) => Self::Invalid,
             // JsValue::BigInt(_) => Self::Invalid,
-            JsValue::__NonExhaustive => Self::Invalid,
+            _ => Self::Invalid,
         }
     }
 

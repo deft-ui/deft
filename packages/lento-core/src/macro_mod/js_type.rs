@@ -52,7 +52,7 @@ macro_rules! js_value {
 #[macro_export]
 macro_rules! js_weak_value {
     ($ref_type: ty, $weak_type: ty) => {
-        crate::js_value!($weak_type);
+        $crate::js_value!($weak_type);
         impl lento::js::ToJsValue for $ref_type {
             fn to_js_value(self) -> Result<lento::js::JsValue, quick_js::ValueError> {
                 let weak = self.as_weak();
