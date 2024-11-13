@@ -114,7 +114,7 @@ impl Text {
 
             let event = ElementEvent::new("textupdate", TextUpdateDetail {
                 value: text
-            }, self.element.clone());
+            }, self.element.as_weak());
             self.element.emit_event("textupdate", event);
         }
     }

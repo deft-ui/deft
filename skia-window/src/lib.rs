@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused)]
+#![allow(unexpected_cfgs)]
 pub mod skia_window;
 mod gl_renderer;
 mod gl_surface;

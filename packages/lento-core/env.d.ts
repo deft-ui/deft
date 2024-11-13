@@ -205,12 +205,12 @@ declare function fetch_response_headers(rsp): Promise<{name: string, value: stri
 declare function fetch_response_save(rsp, path: string): Promise<number>;
 declare function fetch_response_body_string(rsp): Promise<string>;
 
-declare function audio_create(path: string);
-declare function audio_destroy(id): void;
-declare function audio_position(id): number;
-declare function audio_duration(id): number;
+declare function AudioRef_create(path: string);
+declare function AudioRef_destroy(id): void;
+declare function AudioRef_position(id): number;
+declare function AudioRef_duration(id): number;
 
-declare function base64_encode_str(str: string): string;
+declare function Base64_encode_str(str: string): string;
 
 declare interface ShowFileDialogOptions {
     dialogType ?: "single" | "multiple" | "save" | "dir"

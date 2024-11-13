@@ -1,15 +1,16 @@
-use std::collections::{BTreeMap, HashMap};
-use std::ops::Bound::{Excluded, Included};
-use std::time::SystemTime;
-use ordered_float::OrderedFloat;
-use yoga::StyleUnit;
+use crate as lento;
 use crate::mrc::Mrc;
 use crate::style::{StyleProp, StylePropVal, StyleTransform, StyleTransformOp};
 use crate::timer::{set_timeout, set_timeout_nanos, TimerHandle};
-use std::cell::RefCell;
+use crate::{define_ref_and_resource, js_value};
 use anyhow::{anyhow, Error};
+use ordered_float::OrderedFloat;
 use quick_js::JsValue;
-use crate::define_ref_and_resource;
+use std::cell::RefCell;
+use std::collections::{BTreeMap, HashMap};
+use std::ops::Bound::{Excluded, Included};
+use std::time::SystemTime;
+use yoga::StyleUnit;
 
 macro_rules! interpolate_values {
     ($prev: expr, $next: expr, $percent: expr; $($ty: ident => $handler: ident,)* ) => {
@@ -45,6 +46,9 @@ macro_rules! match_both {
 }
 
 define_ref_and_resource!(AnimationResource, AnimationInstance);
+
+js_value!(AnimationResource);
+
 
 thread_local! {
     pub static  ANIMATIONS: RefCell<HashMap<String, Animation>> = RefCell::new(HashMap::new());
@@ -186,7 +190,7 @@ impl Animation {
         let position = f32::clamp(position, 0.0, 1.0);
         let mut result = Vec::new();
         let p = OrderedFloat(position);
-        for (k, v) in &self.styles {
+        for (_k, v) in &self.styles {
             let begin = OrderedFloat::from(0.0);
             let end = OrderedFloat::from(1.0);
             let prev = v.range((Included(begin), Included(p))).last();

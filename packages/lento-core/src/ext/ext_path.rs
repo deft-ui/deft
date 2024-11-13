@@ -1,12 +1,23 @@
+use crate as lento;
 use std::path::PathBuf;
 use anyhow::Error;
+use lento_macros::{js_func, js_methods};
 
-pub fn path_filename(path: String) -> Result<Option<String>, Error> {
-    let p = PathBuf::from(path);
-    Ok(p.file_name().map(|n| n.to_string_lossy().to_string()))
-}
+#[allow(nonstandard_style)]
+pub struct path;
 
-pub fn path_join(path: String, other: String) -> Result<String, Error> {
-    let p = PathBuf::from(path);
-    Ok(p.join(other).to_string_lossy().to_string())
+#[js_methods]
+impl path {
+
+    #[js_func]
+    pub fn filename(p: String) -> Result<Option<String>, Error> {
+        let p = PathBuf::from(p);
+        Ok(p.file_name().map(|n| n.to_string_lossy().to_string()))
+    }
+
+    #[js_func]
+    pub fn join(p: String, other: String) -> Result<String, Error> {
+        let p = PathBuf::from(p);
+        Ok(p.join(other).to_string_lossy().to_string())
+    }
 }

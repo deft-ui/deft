@@ -1,3 +1,26 @@
+use crate as lento;
+use crate::app::{exit_app, AppEvent};
+use crate::base::MouseEventType::{MouseClick, MouseUp};
+use crate::base::{ElementEvent, Event, EventContext, EventHandler, EventRegistration, MouseDetail, MouseEventType, Touch, TouchDetail, UnsafeFnOnce};
+use crate::canvas_util::CanvasHelper;
+use crate::cursor::search_cursor;
+use crate::element::ElementRef;
+use crate::event::{build_modifier, named_key_to_str, CaretEventBind, ClickEventBind, DragOverEventDetail, DragStartEventDetail, DropEventDetail, FocusEventBind, FocusShiftBind, KeyEventDetail, MouseDownEventBind, MouseEnterEventBind, MouseLeaveEventBind, MouseMoveEventBind, MouseUpEventBind, MouseWheelDetail, TouchCancelEventBind, TouchEndEventBind, TouchMoveEventBind, TouchStartEventBind, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT};
+use crate::event_loop::{run_with_event_loop, send_event};
+use crate::ext::common::create_event_handler;
+use crate::ext::ext_frame::{FrameAttrs, FRAMES, FRAME_TYPE_MENU, FRAME_TYPE_NORMAL, MODAL_TO_OWNERS, WINDOW_TO_FRAME};
+use crate::js::js_value_util::{FromJsValue, ToJsValue};
+use crate::js::JsError;
+use crate::mrc::{Mrc, MrcWeak};
+use crate::renderer::CpuRenderer;
+use crate::timer::{set_timeout, TimerHandle};
+use anyhow::{anyhow, Error};
+use lento_macros::{js_func, js_methods, mrc_object};
+use measure_time::print_time;
+use quick_js::{JsValue, ResourceValue};
+use skia_bindings::SkClipOp;
+use skia_safe::{Canvas, Color, ColorType, ImageInfo};
+use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::num::NonZeroU32;
@@ -6,37 +29,14 @@ use std::process::exit;
 use std::rc::Rc;
 use std::slice;
 use std::time::SystemTime;
-use anyhow::{anyhow, Error};
-use lento_macros::{js_func, js_methods, mrc_object};
-use measure_time::print_time;
-use quick_js::{JsValue, ResourceValue};
-use skia_bindings::SkClipOp;
-use skia_safe::{Canvas, Color, ColorType, ImageInfo};
-use skia_window::skia_window::{RenderBackendType, SkiaWindow};
-use winit::dpi::{LogicalPosition, LogicalSize, Position, Size};
 use winit::dpi::Position::Logical;
+use winit::dpi::{LogicalPosition, LogicalSize, Position, Size};
 use winit::error::ExternalError;
 use winit::event::{ElementState, Ime, Modifiers, MouseButton, MouseScrollDelta, TouchPhase, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use winit::keyboard::{Key, NamedKey};
 use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorGrabMode, CursorIcon, Window, WindowAttributes, WindowId};
-use crate::app::{exit_app, AppEvent};
-use crate::base::{ElementEvent, Event, EventContext, EventHandler, EventRegistration, MouseDetail, MouseEventType, Touch, TouchDetail, UnsafeFnOnce};
-use crate::base::MouseEventType::{MouseClick, MouseUp};
-use crate::canvas_util::CanvasHelper;
-use crate::cursor::search_cursor;
-use crate::element::ElementRef;
-use crate::event::{build_modifier, CaretEventBind, ClickEventBind, DragOverEventDetail, DragStartEventDetail, DropEventDetail, FocusShiftBind, FocusEventBind, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT, KeyEventDetail, MouseDownEventBind, MouseEnterEventBind, MouseLeaveEventBind, MouseMoveEventBind, MouseUpEventBind, MouseWheelDetail, named_key_to_str, TouchCancelEventBind, TouchEndEventBind, TouchMoveEventBind, TouchStartEventBind};
-use crate::event_loop::{run_with_event_loop, send_event};
-use crate::ext::common::create_event_handler;
-use crate::ext::ext_frame::{FrameAttrs, FRAMES, FRAME_TYPE_MENU, FRAME_TYPE_NORMAL, MODAL_TO_OWNERS, WINDOW_TO_FRAME};
-use crate::js::js_value_util::{FromJsValue, ToJsValue};
-use crate::mrc::{Mrc, MrcWeak};
-use crate::renderer::CpuRenderer;
-use crate::timer::{set_timeout, TimerHandle};
-use crate as lento;
-use crate::js::JsError;
 
 #[derive(Clone)]
 struct MouseDownInfo {
@@ -94,7 +94,17 @@ thread_local! {
 
 #[js_methods]
 impl FrameRef {
-    pub fn create(attrs: FrameAttrs) -> Self {
+
+    #[js_func]
+    pub fn create(attrs: FrameAttrs) -> Result<Self, Error> {
+        let frame = FrameRef::create_inner(attrs);
+        let window_id = frame.get_window_id();
+        FRAMES.with_borrow_mut(|m| m.insert(frame.get_id(), frame.clone()));
+        WINDOW_TO_FRAME.with_borrow_mut(|m| m.insert(window_id, frame.as_weak()));
+        Ok(frame)
+    }
+
+    fn create_inner(attrs: FrameAttrs) -> Self {
         let id = NEXT_FRAME_ID.get();
         NEXT_FRAME_ID.set(id + 1);
 
@@ -185,7 +195,7 @@ impl FrameRef {
         self.layout_dirty |= layout_dirty;
         if !self.dirty {
             self.dirty = true;
-            let mut el = self.as_weak();
+            let el = self.as_weak();
             let callback = unsafe {
                 UnsafeFnOnce::new(move || {
                     el.upgrade_mut(|el| el.update());
@@ -305,7 +315,7 @@ impl FrameRef {
                 if pressed && named_key == Some(NamedKey::Alt) {
                     modifiers |= KEY_MOD_ALT;
                 }
-                let mut detail = KeyEventDetail {
+                let detail = KeyEventDetail {
                     modifiers ,
                     ctrl_key: modifiers & KEY_MOD_CTRL != 0 ,
                     alt_key:  modifiers & KEY_MOD_ALT != 0,
@@ -320,7 +330,7 @@ impl FrameRef {
 
                 if let Some(focusing) = &mut self.focusing {
                     let event_type = if detail.pressed { "keydown" } else { "keyup" };
-                    let event = ElementEvent::new(event_type, detail, focusing.clone());
+                    let event = ElementEvent::new(event_type, detail, focusing.as_weak());
                     focusing.emit_event(event_type, event);
                 }
             }
@@ -393,7 +403,7 @@ impl FrameRef {
 
     fn handle_mouse_wheel(&mut self, delta: (f32, f32)) {
         if let Some(mut target_node) = self.get_node_by_point() {
-            let mut event = ElementEvent::new("mousewheel", MouseWheelDetail {cols: delta.0, rows: delta.1}, target_node.clone());
+            let event = ElementEvent::new("mousewheel", MouseWheelDetail {cols: delta.0, rows: delta.1}, target_node.as_weak());
             target_node.emit_event("mousewheel",event);
         }
 
@@ -410,7 +420,7 @@ impl FrameRef {
             if dragging {
                 if let Some(target) = &mut target_node {
                     if target != pressing {
-                        let mut event = ElementEvent::new("dragover", DragOverEventDetail {}, target.clone());
+                        let event = ElementEvent::new("dragover", DragOverEventDetail {}, target.as_weak());
                         target.emit_event("dragover", event);
                         self.last_drag_over = Some(target.clone());
                     }
@@ -420,7 +430,7 @@ impl FrameRef {
                     f32::abs(frame_x - down_info.frame_x) > 3.0
                     || f32::abs(frame_y - down_info.frame_y) > 3.0
                 ) {
-                    let event = ElementEvent::new("dragstart", DragStartEventDetail {}, pressing.clone());
+                    let event = ElementEvent::new("dragstart", DragStartEventDetail {}, pressing.as_weak());
                     pressing.emit_event("dragstart", event);
                     //TODO check preventDefault?
                     self.window.set_cursor(Cursor::Icon(CursorIcon::Grabbing));
@@ -514,7 +524,7 @@ impl FrameRef {
 
     pub fn emit_touch_event(&mut self, identifier: u64, phase: TouchPhase, frame_x: f32, frame_y: f32) {
         if let Some(mut node) = self.get_node_by_pos(frame_x, frame_y) {
-            let (e_type) = match phase {
+            let _e_type = match phase {
                 TouchPhase::Started => "touchstart",
                 TouchPhase::Ended => "touchend",
                 TouchPhase::Moved => "touchmove",
@@ -575,7 +585,6 @@ impl FrameRef {
                 TouchPhase::Ended => {
                     println!("touch end:{:?}", &touch_detail);
                     node.emit_touch_end(touch_detail);
-                    let touching = &self.touching;
                     if self.touching.max_identifiers == 1
                         && self.touching.times == 1
                         && SystemTime::now().duration_since(self.touching.start_time).unwrap().as_millis() < 1000
@@ -600,7 +609,7 @@ impl FrameRef {
         let focusing = Some(node.clone());
         if self.focusing != focusing {
             if let Some(old_focusing) = &mut self.focusing {
-                let blur_event = ElementEvent::new("blur", (), old_focusing.clone());
+                let blur_event = ElementEvent::new("blur", (), old_focusing.as_weak());
                 old_focusing.emit_event("blur", blur_event);
 
                 old_focusing.emit_focus_shift(());
@@ -617,7 +626,7 @@ impl FrameRef {
                 self.dragging = false;
                 self.window.set_cursor(Cursor::Icon(CursorIcon::Default));
                 if let Some(last_drag_over) = &mut self.last_drag_over {
-                    let event = ElementEvent::new("drop", DropEventDetail{}, last_drag_over.clone());
+                    let event = ElementEvent::new("drop", DropEventDetail{}, last_drag_over.as_weak());
                     last_drag_over.emit_event("drop", event);
                 }
             }
@@ -659,6 +668,7 @@ impl FrameRef {
         self.dirty = false;
     }
 
+    #[js_func]
     pub fn set_body(&mut self, mut body: ElementRef) {
         body.set_window(Some(self.as_weak()));
         self.focusing = Some(body.clone());
@@ -667,7 +677,7 @@ impl FrameRef {
         let myself = self.as_weak();
         body.bind_caret_change(move |e, detail| {
             myself.upgrade_mut(|myself| {
-                if myself.focusing == Some(e.target.clone()) {
+                if myself.focusing == e.target.upgrade().ok() {
                     let origin_ime_rect = &detail.origin_bounds;
                     myself.window.set_ime_cursor_area(Position::Logical(LogicalPosition {
                         x: origin_ime_rect.x as f64,
@@ -859,7 +869,7 @@ fn print_tree(node: &ElementRef, padding: &str) {
     }
 }
 
-fn emit_mouse_event(node: &mut ElementRef, event_type: &str, event_type_enum: MouseEventType, button: i32, frame_x: f32, frame_y: f32, screen_x: f32, screen_y: f32) {
+fn emit_mouse_event(node: &mut ElementRef, _event_type: &str, event_type_enum: MouseEventType, button: i32, frame_x: f32, frame_y: f32, screen_x: f32, screen_y: f32) {
     let node_bounds = node.get_origin_bounds();
     let (border_top, _, _, border_left) = node.get_border_width();
 

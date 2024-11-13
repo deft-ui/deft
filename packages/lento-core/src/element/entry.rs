@@ -349,13 +349,13 @@ impl Entry {
         // emit text update
         let mut event = ElementEvent::new("textupdate", TextUpdateDetail {
             value: self.base.get_text().to_string()
-        }, self.element.clone());
+        }, self.element.as_weak());
         self.element.emit_event("textupdate", event);
 
         // emit text change
         let mut event = ElementEvent::new("textchange",TextChangeDetail {
             value: self.base.get_text().to_string(),
-        }, self.element.clone());
+        }, self.element.as_weak());
         self.element.emit_event("textchange", event);
     }
 

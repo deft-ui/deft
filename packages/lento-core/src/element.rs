@@ -1,20 +1,20 @@
-use std::cell::{Cell};
+use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 use std::default::Default;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 
 use anyhow::{anyhow, Error};
-use lento_macros::mrc_object;
+use lento_macros::{js_methods, mrc_object};
 use ordered_float::Float;
-use quick_js::{JsValue};
+use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
 use skia_bindings::{SkPaint_Style, SkPathOp};
 use skia_safe::{Canvas, Color, Paint, Path, Rect};
 use winit::window::CursorIcon;
 use yoga::{Direction, Edge, StyleUnit};
 
-use crate::{base, define_resource, js_call, js_call_rust, js_get_prop};
+use crate::animation::AnimationResource;
 use crate::base::{ElementEvent, ElementEventContext, ElementEventHandler, EventRegistration, ScrollEventDetail};
 use crate::border::build_rect_with_radius;
 use crate::element::button::Button;
@@ -25,8 +25,7 @@ use crate::element::scroll::Scroll;
 use crate::element::text::Text;
 use crate::element::textedit::TextEdit;
 use crate::event::{BoundsChangeBind, BoundsChangeEventDetail, ClickEventBind};
-use crate::animation::AnimationResource;
-use crate::event_loop::{schedule_macro_task_unsafe};
+use crate::event_loop::schedule_macro_task_unsafe;
 use crate::ext::ext_frame::{VIEW_TYPE_BUTTON, VIEW_TYPE_CONTAINER, VIEW_TYPE_ENTRY, VIEW_TYPE_IMAGE, VIEW_TYPE_LABEL, VIEW_TYPE_SCROLL, VIEW_TYPE_TEXT_EDIT};
 use crate::frame::{FrameRef, FrameWeak};
 use crate::img_manager::IMG_MANAGER;
@@ -35,7 +34,8 @@ use crate::js::js_value_util::{FromJsValue, SerializeToJsValue, ToJsValue};
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::resource_table::ResourceTable;
-use crate::style::{ColorHelper, parse_style_obj, StyleNode, StyleProp};
+use crate::style::{parse_style_obj, ColorHelper, StyleNode, StyleProp};
+use crate::{base, define_resource, js_call, js_call_rust, js_get_prop, js_weak_value};
 
 pub mod container;
 pub mod entry;
@@ -65,6 +65,7 @@ pub struct ScrollByOption {
     y: f32,
 }
 
+#[js_methods]
 impl ElementRef {
     pub fn create<T: ElementBackend + 'static, F: FnOnce(ElementRef) -> T>(backend: F) -> Self {
         let empty_backend = EmptyElementBackend{};
@@ -113,6 +114,33 @@ impl ElementRef {
         self.draggable
     }
 
+    #[js_func]
+    pub fn create_by_type(view_type: i32, context: JsValue) -> Result<ElementRef, Error> {
+        let mut view = match view_type {
+            VIEW_TYPE_CONTAINER => ElementRef::create(Container::create),
+            VIEW_TYPE_SCROLL => ElementRef::create(Scroll::create),
+            VIEW_TYPE_LABEL => ElementRef::create(Text::create),
+            VIEW_TYPE_ENTRY => ElementRef::create(Entry::create),
+            VIEW_TYPE_BUTTON => ElementRef::create(Button::create),
+            VIEW_TYPE_TEXT_EDIT => ElementRef::create(TextEdit::create),
+            VIEW_TYPE_IMAGE => ElementRef::create(Image::create),
+            _ => return Err(anyhow!("invalid view_type")),
+        };
+        view.resource_table.put(ElementJsContext { context });
+
+        Ok(view)
+    }
+
+
+    #[js_func]
+    pub fn get_js_context(&self) -> Result<JsValue, Error> {
+        let e = self.resource_table.get::<ElementJsContext>()
+            .map(|e| e.context.clone())
+            .unwrap_or(JsValue::Undefined);
+        Ok(e)
+    }
+
+    #[js_func]
     pub fn set_property(&mut self, property_name: String, value: JsValue) -> Result<(), Error> {
         js_call!("scrollTop", f32, self, set_scroll_top, property_name, value, Ok(()));
         js_call!("scrollLeft", f32, self, set_scroll_left, property_name, value, Ok(()));
@@ -123,6 +151,7 @@ impl ElementRef {
         Ok(())
     }
 
+    #[js_func]
     pub fn get_property(&mut self, property_name: String) -> Result<JsValue, Error> {
         js_get_prop!("scroll_top", self, get_scroll_top, property_name);
         js_get_prop!("scroll_left", self, get_scroll_left, property_name);
@@ -139,17 +168,20 @@ impl ElementRef {
         }
     }
 
+    #[js_func]
     pub fn add_child(&mut self, child: ElementRef, position: i32) -> Result<(), Error> {
         let position = if position < 0 { None } else { Some(position as u32) };
         self.backend.add_child_view(child, position);
         Ok(())
     }
 
+    #[js_func]
     pub fn remove_child(&mut self, position: u32) -> Result<(), Error> {
         self.get_backend_mut().remove_child_view(position);
         Ok(())
     }
 
+    #[js_func]
     pub fn bind_event(&mut self, e: String, callback: JsValue) -> Result<i32, Error> {
         Ok(self.event_registration.add_js_event_listener(&e, callback))
     }
@@ -229,7 +261,7 @@ impl ElementRef {
         let mut event = ElementEvent::new("scroll", ScrollEventDetail {
             scroll_top: self.scroll_top,
             scroll_left: self.scroll_left,
-        }, self.clone());
+        }, self.as_weak());
         self.emit_event("scroll", event);
     }
 
@@ -483,6 +515,7 @@ impl ElementRef {
         self.mark_dirty(true);
     }
 
+    #[js_func]
     pub fn set_style(&mut self, style: JsValue) {
         self.set_style_props(parse_style_obj(style))
     }
@@ -492,6 +525,7 @@ impl ElementRef {
         self.apply_style();
     }
 
+    #[js_func]
     pub fn set_hover_style(&mut self, style: JsValue) {
         self.hover_style_props = parse_style_obj(style);
         if self.hover {
@@ -499,6 +533,7 @@ impl ElementRef {
         }
     }
 
+    #[js_func]
     pub fn set_animation(&self, mut animation_res: AnimationResource) {
         let mut ele = self.clone();
         println!("running animation");
@@ -510,6 +545,7 @@ impl ElementRef {
         }));
     }
 
+    #[js_func]
     pub fn get_bounding_client_rect(&self) -> base::Rect {
         self.get_origin_bounds()
     }
@@ -536,6 +572,7 @@ impl ElementRef {
         }
         for k in keys {
             let old_value = old_style_map.get(k);
+            #[allow(suspicious_double_ref_op)]
             let new_value = match new_style_map.get(k) {
                 Some(t) => t.clone().clone(),
                 None => old_value.unwrap().clone().clone().unset(),
@@ -572,7 +609,7 @@ impl ElementRef {
         self.applied_style = new_style;
     }
 
-    pub fn set_style_property(&mut self, name: &str, value: &str) {
+    pub fn set_style_property(&mut self, _name: &str, _value: &str) {
         //FIXME remove
         /*
         let mut repaint = true;
@@ -680,6 +717,7 @@ impl ElementRef {
         self.event_registration.bind_event_listener(event_type, handler)
     }
 
+    #[js_func]
     pub fn remove_event_listener(&mut self, event_type: String, id: u32) {
         self.event_registration.remove_event_listener(&event_type, id)
     }
@@ -759,7 +797,7 @@ impl ElementRef {
             let detail = BoundsChangeEventDetail {
                 origin_bounds: origin_bounds.clone(),
             };
-            let mut event = ElementEvent::new("boundschange", detail, self.clone());
+            let mut event = ElementEvent::new("boundschange", detail, self.as_weak());
             // Disable bubble
             event.context.propagation_cancelled = true;
             self.event_registration.emit_event(&mut event);
@@ -810,7 +848,7 @@ pub struct Element {
     backend: Box<dyn ElementBackend>,
     parent: Option<MrcWeak<Element>>,
     window: Option<FrameWeak>,
-    event_registration: EventRegistration<ElementRef>,
+    event_registration: EventRegistration<ElementWeak>,
     pub layout: StyleNode,
     pub style_props: Vec<StyleProp>,
     pub hover_style_props: Vec<StyleProp>,
@@ -828,6 +866,8 @@ pub struct Element {
     rect: base::Rect,
     resource_table: ResourceTable,
 }
+
+js_weak_value!(ElementRef, ElementWeak);
 
 
 impl Element {
@@ -880,7 +920,9 @@ pub trait ElementBackend {
 
     fn get_name(&self) -> &str;
 
-    fn handle_style_changed(&mut self, key: &str) {}
+    fn handle_style_changed(&mut self, key: &str) {
+        let _ = key;
+    }
 
     fn draw(&self, _canvas: &Canvas) {
 
@@ -907,10 +949,12 @@ pub trait ElementBackend {
 
     fn handle_origin_bounds_change(&mut self, _bounds: &base::Rect) {}
 
-    fn handle_event(&mut self, _event_type: &str, _event: &mut ElementEvent) {}
+    fn handle_event(&mut self, event_type: &str, event: &mut ElementEvent) {
+        let _ = (event_type, event);
+    }
 
     fn add_child_view(&mut self, child: ElementRef, position: Option<u32>) {
-        //panic!("unsupported")
+        let _ = (child, position);
     }
     fn remove_child_view(&mut self, position: u32) {
         //panic!("unsupported")
@@ -920,25 +964,3 @@ pub trait ElementBackend {
     }
 }
 
-pub fn element_create(view_type: i32, context: JsValue) -> Result<ElementRef, Error> {
-    let mut view = match view_type {
-        VIEW_TYPE_CONTAINER => ElementRef::create(Container::create),
-        VIEW_TYPE_SCROLL => ElementRef::create(Scroll::create),
-        VIEW_TYPE_LABEL => ElementRef::create(Text::create),
-        VIEW_TYPE_ENTRY => ElementRef::create(Entry::create),
-        VIEW_TYPE_BUTTON => ElementRef::create(Button::create),
-        VIEW_TYPE_TEXT_EDIT => ElementRef::create(TextEdit::create),
-        VIEW_TYPE_IMAGE => ElementRef::create(Image::create),
-        _ => return Err(anyhow!("invalid view_type")),
-    };
-    view.resource_table.put(ElementJsContext { context });
-
-    Ok(view)
-}
-
-pub fn element_get_js_context(mut element: ElementRef) -> Result<JsValue, Error> {
-    let e = element.resource_table.get::<ElementJsContext>()
-        .map(|e| e.context.clone())
-        .unwrap_or(JsValue::Undefined);
-    Ok(e)
-}

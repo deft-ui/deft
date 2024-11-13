@@ -1,8 +1,10 @@
+use crate as lento;
 use anyhow::Error;
 use quick_js::{JsValue, ValueError};
 use serde::{Deserialize, Serialize};
 use crate::js::js_deserialze::JsDeserializer;
 use crate::js::js_serde::JsValueSerializer;
+use crate::js_deserialize;
 
 pub struct JsParam {
     pub value: JsValue
@@ -97,6 +99,7 @@ pub struct EventResult {
     pub propagation_cancelled: bool,
     pub prevent_default: bool,
 }
+js_deserialize!(EventResult);
 
 pub trait JsValueHelper {
     fn as_number(&self) -> Option<f64>;

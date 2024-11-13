@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote, ToTokens};
-use syn::{parse_macro_input, FnArg, Ident, ImplItem, ItemFn, ItemImpl, ItemStruct, ReturnType, Visibility};
+use syn::{parse_macro_input, FnArg, Ident, ImplItem, ItemFn, ItemImpl, ItemStruct, Visibility};
 use syn::__private::TokenStream2;
 use syn::token::{Async};
 
@@ -94,12 +94,9 @@ pub fn js_methods(_attr: TokenStream, impl_item: TokenStream) -> TokenStream {
     let item = parse_macro_input!(impl_item as ItemImpl);
     // item.self_ty.into_token_stream();
     let ItemImpl {
-        mut attrs,
-        defaultness,
-        unsafety,
+        attrs,
         impl_token,
         generics,
-        trait_,
         self_ty,
         mut items,
         ..
@@ -230,7 +227,7 @@ fn build_bridge_body(func_inputs: Vec<FnArg>, asyncness: Option<Async>, struct_n
             }
         } else {
             quote! {
-                let r = Self::#func_name( #(#param_list, )* );
+                let r = #struct_name::#func_name( #(#param_list, )* );
             }
         }
     } else {
@@ -244,7 +241,7 @@ fn build_bridge_body(func_inputs: Vec<FnArg>, asyncness: Option<Async>, struct_n
         } else {
             quote! {
                 let r = js_context.create_async_task2(async move {
-                    Self::#func_name( #(#param_list, )* ).await
+                    #struct_name::#func_name( #(#param_list, )* ).await
                 });
             }
         }

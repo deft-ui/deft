@@ -1,37 +1,37 @@
 use std::fmt::Debug;
-use std::panic::{RefUnwindSafe};
+use std::panic::RefUnwindSafe;
 
-use anyhow::{anyhow};
-use quick_js::{Callback, Context, JsValue, ValueError};
+use anyhow::anyhow;
 use quick_js::loader::JsModuleLoader;
+use quick_js::{Callback, Context, JsValue, ValueError};
 use tokio::runtime::Builder;
 use winit::event::{DeviceEvent, DeviceId, WindowEvent};
 use winit::window::{CursorGrabMode, WindowId};
 
-use crate::{export_js_api, export_js_async_api, export_js_object_api};
 use crate::app::exit_app;
-use crate::base::Size;
 use crate::console::Console;
-use crate::element::{element_create, element_get_js_context, ElementRef};
-use crate::animation::{AnimationResource};
+use crate::element::ElementRef;
 use crate::event_loop::run_with_event_loop;
-use crate::ext::ext_appfs::{appfs_create_dir, appfs_create_dir_all, appfs_data_path, appfs_delete_file, appfs_exists, appfs_read, appfs_readdir, appfs_remove_dir, appfs_remove_dir_all, appfs_write, appfs_write_new};
-use crate::ext::ext_audio::{audio_add_event_listener, audio_create, audio_stop, audio_remove_event_listener, AudioResource, audio_play, audio_pause, AudioOptions};
-use crate::ext::ext_base64::base64_encode_str;
-use crate::ext::ext_dialog::{dialog_show_file_dialog, FileDialogOptions};
-use crate::ext::ext_env::{env_exe_dir, env_exe_path};
-use crate::ext::ext_fetch::{fetch_create, fetch_response_body_string, fetch_response_headers, fetch_response_save, fetch_response_status, FetchOptions, FetchResponse};
-use crate::ext::ext_frame::{create_frame, FrameAttrs, handle_window_event, FRAMES, FRAME_TYPE_MENU};
+use crate::export_js_api;
+use crate::ext::ext_appfs::appfs;
+use crate::ext::ext_audio::AudioRef;
+use crate::ext::ext_base64::Base64;
+use crate::ext::ext_console::Console as ExtConsole;
+use crate::ext::ext_dialog::dialog;
+use crate::ext::ext_env::env;
+use crate::ext::ext_fetch::fetch;
+use crate::ext::ext_frame::{handle_window_event, FRAMES};
 use crate::ext::ext_fs::{fs_create_dir, fs_create_dir_all, fs_delete_file, fs_exists, fs_read_dir, fs_remove_dir, fs_remove_dir_all, fs_rename, fs_stat};
-use crate::ext::ext_http::{http_request, http_upload, UploadOptions};
-use crate::ext::ext_localstorage::{localstorage_get, localstorage_set};
-use crate::ext::ext_path::{path_filename, path_join};
-use crate::ext::ext_shell::shell_spawn;
+use crate::ext::ext_http::http;
+use crate::ext::ext_localstorage::localstorage;
+use crate::ext::ext_path::path;
+use crate::ext::ext_process::process;
+use crate::ext::ext_shell::shell;
 use crate::ext::ext_timer::{timer_clear_interval, timer_clear_timeout, timer_set_interval, timer_set_timeout};
 #[cfg(feature = "tray")]
-use crate::ext::ext_tray::{SystemTrayResource, tray_create, TrayMenu};
-use crate::ext::ext_websocket::{WsConnectionResource, ws_connect, ws_read, ws_send_str};
-use crate::frame::{FrameRef, FrameType, FrameWeak};
+use crate::ext::ext_tray::SystemTrayRef;
+use crate::ext::ext_websocket::WsConnectionRef;
+use crate::frame::{FrameRef, FrameType};
 use crate::js::js_binding::{JsCallError, JsFunc};
 use crate::js::js_runtime::JsContext;
 use crate::js::js_value_util::DeserializeFromJsValue;
@@ -85,106 +85,29 @@ impl JsEngine {
             .build().unwrap();
         let js_context = Mrc::new(JsContext::new(js_context, runtime));
 
-        js_context.add_callback("console_print", move |str: String| {
-            print!("{}", str);
-            0
-        }).unwrap();
-
-        // frame
-        export_js_api!(js_context, "frame_create", create_frame, FrameAttrs);
-        export_js_object_api!(js_context, "frame_set_body", FrameWeak, set_body, ElementRef);
-
-        // view
-        export_js_api!(js_context, "view_create", element_create, i32, JsValue);
-        export_js_api!(js_context, "view_get_js_context", element_get_js_context, ElementRef);
-        export_js_object_api!(js_context, "view_set_property",  ElementRef, set_property, String, JsValue);
-        export_js_object_api!(js_context, "view_get_property", ElementRef, get_property, String);
-        export_js_object_api!(js_context, "view_add_child", ElementRef, add_child, ElementRef, i32);
-        export_js_object_api!(js_context, "view_remove_child", ElementRef, remove_child, u32);
-        export_js_object_api!(js_context, "view_set_style", ElementRef, set_style, JsValue);
-        export_js_object_api!(js_context, "view_set_hover_style", ElementRef, set_hover_style, JsValue);
-        export_js_object_api!(js_context, "view_set_animation", ElementRef, set_animation, AnimationResource);
-        export_js_object_api!(js_context, "view_get_bounding_client_rect", ElementRef, get_bounding_client_rect);
-        export_js_object_api!(js_context, "view_bind_event",ElementRef, bind_event, String, JsValue);
-        export_js_object_api!(js_context, "view_remove_event_listener",ElementRef, remove_event_listener, String, u32);
-
-        // dialog
-        export_js_async_api!(js_context, "dialog_show_file_dialog", dialog_show_file_dialog, FileDialogOptions);
-
-        // http
-        export_js_async_api!(js_context, "http_request", http_request, String);
-        export_js_async_api!(js_context, "http_upload", http_upload, String, UploadOptions);
-        export_js_async_api!(js_context, "fetch_create", fetch_create, String, Option<FetchOptions>);
-        export_js_async_api!(js_context, "fetch_response_status", fetch_response_status, FetchResponse);
-        export_js_async_api!(js_context, "fetch_response_headers", fetch_response_headers, FetchResponse);
-        export_js_async_api!(js_context, "fetch_response_body_string", fetch_response_body_string, FetchResponse);
-        export_js_async_api!(js_context, "fetch_response_save", fetch_response_save, FetchResponse, String);
-
-
-        // websocket
-        export_js_async_api!(js_context, "ws_connect", ws_connect, String);
-        export_js_async_api!(js_context, "ws_read", ws_read, WsConnectionResource);
-        export_js_async_api!(js_context, "ws_send_str", ws_send_str, WsConnectionResource, String);
-
-        // tray
-        #[cfg(feature = "tray")]
-        {
-            export_js_api!(js_context, "tray_create",     tray_create, String);
-            export_js_object_api!(js_context, "tray_set_menus",  SystemTrayResource, set_menus, Vec::<TrayMenu>);
-            export_js_object_api!(js_context, "tray_set_icon",   SystemTrayResource, set_icon, String);
-            export_js_object_api!(js_context, "tray_set_title",  SystemTrayResource, set_title, String);
-            export_js_object_api!(js_context, "tray_remove_event_listener", SystemTrayResource, remove_event_listener, String, i32);
-            export_js_object_api!(js_context, "tray_bind_event", SystemTrayResource, bind_event, String, JsValue);
-        }
-
-        // env
-        export_js_api!(js_context, "env_exe_dir", env_exe_dir);
-        export_js_api!(js_context, "env_exe_path", env_exe_path);
-
-        // appfs
-        export_js_api!(js_context, "appfs_data_path", appfs_data_path, Option<String>);
-        export_js_async_api!(js_context, "appfs_exists", appfs_exists, String);
-        export_js_async_api!(js_context, "appfs_readdir", appfs_readdir, String);
-        export_js_async_api!(js_context, "appfs_read", appfs_read, String);
-        export_js_async_api!(js_context, "appfs_write", appfs_write, String, String);
-        export_js_async_api!(js_context, "appfs_write_new", appfs_write_new, String, String);
-        export_js_async_api!(js_context, "appfs_delete_file", appfs_delete_file, String);
-        export_js_async_api!(js_context, "appfs_create_dir", appfs_create_dir, String);
-        export_js_async_api!(js_context, "appfs_create_dir_all", appfs_create_dir_all, String);
-        export_js_async_api!(js_context, "appfs_remove_dir", appfs_remove_dir, String);
-        export_js_async_api!(js_context, "appfs_remove_dir_all", appfs_remove_dir_all, String);
-
-        // localstorage
-        export_js_api!(js_context, "localstorage_get", localstorage_get, String);
-        export_js_api!(js_context, "localstorage_set", localstorage_set, String, String);
-
-        // path
-        export_js_api!(js_context, "path_filename", path_filename, String);
-        export_js_api!(js_context, "path_join", path_join, String, String);
-
-        //audio
-        export_js_api!(js_context, "audio_create", audio_create, AudioOptions);
-        export_js_api!(js_context, "audio_play", audio_play, AudioResource);
-        export_js_api!(js_context, "audio_pause", audio_pause, AudioResource);
-        export_js_api!(js_context, "audio_stop", audio_stop, AudioResource);
-        export_js_api!(js_context, "audio_add_event_listener", audio_add_event_listener, AudioResource, String, JsValue);
-        export_js_api!(js_context, "audio_remove_event_listener", audio_remove_event_listener, AudioResource, String, u32);
-
-        //animation
-        // export_js_api!(js_context, "animation_create", animation_create, String, JsValue);
-
-        // base64
-        export_js_api!(js_context, "base64_encode_str", base64_encode_str, String);
-
-        // shell
-        export_js_api!(js_context, "shell_spawn", shell_spawn, String, Option::<Vec<String>>);
-
-        //process
-        export_js_api!(js_context, "process_exit", exit_app, i32);
-
         let engine = Self {
             js_context,
         };
+
+        engine.add_global_functions(ExtConsole::create_js_apis());
+        engine.add_global_functions(ElementRef::create_js_apis());
+        #[cfg(feature = "tray")]
+        {
+            engine.add_global_functions(SystemTrayRef::create_js_apis());
+        }
+        engine.add_global_functions(process::create_js_apis());
+        engine.add_global_functions(dialog::create_js_apis());
+        engine.add_global_functions(Base64::create_js_apis());
+        engine.add_global_functions(shell::create_js_apis());
+        engine.add_global_functions(AudioRef::create_js_apis());
+        engine.add_global_functions(path::create_js_apis());
+        engine.add_global_functions(env::create_js_apis());
+        engine.add_global_functions(http::create_js_apis());
+        engine.add_global_functions(appfs::create_js_apis());
+        engine.add_global_functions(localstorage::create_js_apis());
+        // websocket
+        engine.add_global_functions(WsConnectionRef::create_js_apis());
+        engine.add_global_functions(fetch::create_js_apis());
 
         engine.add_global_functions(FrameRef::create_js_apis());
         engine.add_global_func(timer_set_timeout::new());

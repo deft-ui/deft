@@ -1,11 +1,10 @@
 use std::ops::Deref;
 
-use glutin::prelude::*;
 use skia_safe::Canvas;
 use winit::event_loop::ActiveEventLoop;
 #[cfg(target_os = "android")]
 use winit::platform::android::activity::AndroidApp;
-use winit::window::{Window, WindowAttributes, WindowId};
+use winit::window::{Window, WindowAttributes};
 
 use crate::gl_surface::SurfaceState;
 use crate::soft_surface::SoftSurface;

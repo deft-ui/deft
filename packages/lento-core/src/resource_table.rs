@@ -50,7 +50,7 @@ impl ResourceTableInner {
         self.type_resources.insert(value.type_id(), Box::new(value));
     }
 
-    pub fn get<T: 'static>(&mut self) -> Option<&T> {
+    pub fn get<T: 'static>(&self) -> Option<&T> {
         if let Some(v) = self.type_resources.get(&TypeId::of::<T>()) {
             v.downcast_ref::<T>()
         } else {

@@ -1,3 +1,4 @@
+use crate as lento;
 use std::any::Any;
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -6,11 +7,11 @@ use quick_js::{JsValue, ValueError};
 use serde::{Deserialize, Serialize};
 use skia_safe::Path;
 use yoga::Layout;
-use crate::element::{ElementRef};
+use crate::element::{ElementRef, ElementWeak};
 use crate::ext::common::create_event_handler;
-use crate::js::FromJsValue;
+use crate::js::{FromJsValue, ToJsValue};
 use crate::js::js_serde::JsValueSerializer;
-use crate::js::js_value_util::ToJsValue;
+use crate::{js_deserialize, js_serialize};
 use crate::number::DeNan;
 
 pub enum TextAlign {
@@ -32,6 +33,9 @@ pub struct Rect {
     pub width: f32,
     pub height: f32,
 }
+
+js_deserialize!(Rect);
+js_serialize!(Rect);
 
 #[derive(Debug, Copy, Clone, Serialize)]
 pub enum MouseEventType {
@@ -121,9 +125,9 @@ pub struct Event<T> {
     pub context: EventContext<T>,
 }
 
-pub type ElementEvent = Event<ElementRef>;
+pub type ElementEvent = Event<ElementWeak>;
 
-pub type ElementEventContext = EventContext<ElementRef>;
+pub type ElementEventContext = EventContext<ElementWeak>;
 
 impl<E> Event<E> {
 
@@ -195,7 +199,7 @@ impl CaretDetail {
 
 pub type EventHandler<E> = dyn FnMut(&mut Event<E>);
 
-pub type ElementEventHandler = EventHandler<ElementRef>;
+pub type ElementEventHandler = EventHandler<ElementWeak>;
 
 pub struct EventRegistration<E> {
     listeners: HashMap<String, Vec<(u32, Box<EventHandler<E>>)>>,

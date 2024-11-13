@@ -17,3 +17,5 @@ pub mod ext_base64;
 pub mod ext_shell;
 pub mod ext_dialog;
 pub mod promise;
+pub mod ext_process;
+pub mod ext_console;

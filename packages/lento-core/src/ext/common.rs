@@ -1,6 +1,7 @@
 use quick_js::JsValue;
 use crate::base::EventContext;
-use crate::js::js_value_util::{DeserializeFromJsValue, EventResult, ToJsValue};
+use crate::js::js_value_util::{EventResult};
+use crate::js::{ToJsValue, FromJsValue};
 
 pub fn create_event_handler<T: ToJsValue + Clone>(event_name: &str, callback: JsValue) -> Box<dyn Fn(&mut EventContext<T>, JsValue)> {
     let en = event_name.to_string();

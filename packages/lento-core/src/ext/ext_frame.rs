@@ -12,7 +12,7 @@ use winit::window::{Window, WindowId};
 
 use crate::app::{exit_app};
 use crate::element::{ElementBackend, ElementRef};
-use crate::{define_resource};
+use crate::{define_resource, js_deserialize, js_weak_value};
 use crate::frame::{FrameRef, FrameWeak};
 use crate::js::js_value_util::{FromJsValue, ToJsValue};
 
@@ -52,15 +52,7 @@ pub struct FrameAttrs {
     pub frame_type: Option<String>,
 }
 
-
-pub fn create_frame(attrs: FrameAttrs) -> Result<FrameWeak, Error> {
-    let frame = FrameRef::create(attrs);
-    let window_id = frame.get_window_id();
-    let frame_weak = frame.as_weak();
-    FRAMES.with_borrow_mut(|m| m.insert(frame.get_id(), frame));
-    WINDOW_TO_FRAME.with_borrow_mut(|m| m.insert(window_id, frame_weak.clone()));
-    Ok(frame_weak)
-}
+js_deserialize!(FrameAttrs);
 
 pub fn handle_window_event(window_id: WindowId, event: WindowEvent) {
     match &event {
@@ -111,20 +103,7 @@ impl FrameWeak {
 }
 
 // Js Api
-
+//TODO remove
 define_resource!(FrameWeak);
 
-impl lento::js::FromJsValue for FrameRef {
-    fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
-        match FrameWeak::from_js_value(value) {
-            Ok(fw) => {
-                if let Ok(frame) = fw.upgrade() {
-                    Ok(frame)
-                } else {
-                    Err(ValueError::Internal("failed to upgrade weak reference".to_string()))
-                }
-            }
-            Err(e) => Err(ValueError::UnexpectedType),
-        }
-    }
-}
+js_weak_value!(FrameRef, FrameWeak);

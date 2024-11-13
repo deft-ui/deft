@@ -1,17 +1,17 @@
-use std::collections::HashMap;
-use std::fs::File;
-use std::io::{BufReader, Write};
-use std::sync::{Arc, mpsc, Mutex};
-use std::sync::mpsc::Sender;
-use std::{fs, thread};
-use std::thread::JoinHandle;
-use std::time::Duration;
+use crate::data_dir::get_data_path;
+use crate::ext::audio_player::AudioNotify::{End, Finish, Load, TimeUpdate};
 use anyhow::Error;
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink, Source};
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
-use crate::data_dir::get_data_path;
-use crate::ext::audio_player::AudioNotify::{End, Finish, Load, TimeUpdate};
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufReader, Write};
+use std::sync::mpsc::Sender;
+use std::sync::{mpsc, Arc, Mutex};
+use std::thread::JoinHandle;
+use std::time::Duration;
+use std::{fs, thread};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AudioCurrentChangeInfo {
@@ -43,7 +43,7 @@ pub struct AudioSources {
     pub download_handle: Option<JoinHandle<(usize, String)>>,
 }
 
-enum SourceResult {
+pub enum SourceResult {
     Some((usize, Decoder<BufReader<File>>)),
     None,
     Pending,

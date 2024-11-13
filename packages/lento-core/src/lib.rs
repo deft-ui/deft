@@ -1,36 +1,38 @@
+#![allow(unused)]
 #![allow(dead_code)]
+#![allow(unused_variables)]
 
-use std::collections::HashMap;
-use std::env;
-use std::str::FromStr;
-use std::time::{SystemTime};
+use crate::app::{App, AppEvent, LentoApp};
+use crate::data_dir::get_data_path;
+use crate::element::label::{AttributeText, Label, DEFAULT_TYPE_FACE};
+use crate::element::text::text_paragraph::TextParams;
+use crate::element::text::Text;
+use crate::element::ScrollByOption;
+use crate::event_loop::set_event_proxy;
+use crate::js::js_deserialze::JsDeserializer;
+use crate::loader::{DefaultModuleLoader, RemoteModuleLoader, StaticModuleLoader};
+use crate::performance::MemoryUsage;
+use crate::renderer::CpuRenderer;
+use crate::websocket::WebSocketManager;
 use futures_util::StreamExt;
 use measure_time::{info, print_time};
 use memory_stats::memory_stats;
 use quick_js::loader::FsJsModuleLoader;
 use serde::{Deserialize, Serialize};
-use skia_safe::{Font, Paint};
 use skia_safe::textlayout::{paragraph, TextAlign};
+use skia_safe::{Font, Paint};
 use skia_window::skia_window::{RenderBackendType, SkiaWindow};
+use std::collections::HashMap;
+use std::env;
+use std::str::FromStr;
+use std::time::SystemTime;
 use tokio_tungstenite::connect_async;
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
-use yoga::Node;
-use crate::app::{App, AppEvent, LentoApp};
-use crate::element::ScrollByOption;
-use crate::event_loop::set_event_proxy;
-use crate::js::js_deserialze::JsDeserializer;
-use crate::element::label::{AttributeText, DEFAULT_TYPE_FACE, Label};
-use crate::element::text::Text;
-use crate::element::text::text_paragraph::TextParams;
-use crate::loader::{DefaultModuleLoader, RemoteModuleLoader, StaticModuleLoader};
-use crate::performance::MemoryUsage;
-use crate::renderer::CpuRenderer;
-use crate::websocket::WebSocketManager;
 #[cfg(target_os = "android")]
 use winit::platform::android::activity::AndroidApp;
 use winit::window::{WindowAttributes, WindowId};
-use crate::data_dir::get_data_path;
+use yoga::Node;
 
 pub use quick_js::JsValue;
 pub use winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopBuilder, EventLoopProxy};

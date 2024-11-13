@@ -81,21 +81,30 @@ impl FromJsValue for String {
     }
 }
 
-impl FromJsValue for i32 {
-    fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
-        value.as_number()
-            .map(|f| f as i32)
-            .ok_or(ValueError::UnexpectedType)
-    }
+macro_rules! impl_number_from_js_value {
+    ($ty: ty) => {
+        impl FromJsValue for $ty {
+            fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
+                value.as_number()
+                    .map(|f| f as $ty)
+                    .ok_or(ValueError::UnexpectedType)
+            }
+        }
+    };
 }
 
-impl FromJsValue for u32 {
-    fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
-        value.as_number()
-        .map(|f| f as u32)
-            .ok_or(ValueError::UnexpectedType)
-    }
-}
+impl_number_from_js_value!(u8);
+impl_number_from_js_value!(u16);
+impl_number_from_js_value!(u32);
+impl_number_from_js_value!(u64);
+impl_number_from_js_value!(usize);
+impl_number_from_js_value!(i8);
+impl_number_from_js_value!(i16);
+impl_number_from_js_value!(i32);
+impl_number_from_js_value!(i64);
+impl_number_from_js_value!(isize);
+impl_number_from_js_value!(f32);
+impl_number_from_js_value!(f64);
 
 impl FromJsValue for bool {
     fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
@@ -119,6 +128,21 @@ impl<T: FromJsValue> FromJsValue for Option<T> {
     }
 }
 
+impl<T: FromJsValue> FromJsValue for Vec<T> {
+    fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
+        match value {
+            JsValue::Array(items) => {
+                let mut result = Vec::with_capacity(items.len());
+                for item in items {
+                    result.push(FromJsValue::from_js_value(item)?);
+                }
+                Ok(result)
+            }
+            _ => {Err(ValueError::UnexpectedType)}
+        }
+    }
+}
+
 impl ToJsValue for () {
     fn to_js_value(self) -> Result<JsValue, ValueError> {
         Ok(JsValue::Undefined)
@@ -131,11 +155,38 @@ impl ToJsValue for String {
     }
 }
 
-impl ToJsValue for i32 {
-    fn to_js_value(self) -> Result<JsValue, ValueError> {
-        Ok(JsValue::Int(self))
-    }
+macro_rules! impl_int_to_js_value {
+    ($ty: ty) => {
+        impl ToJsValue for $ty {
+            fn to_js_value(self) -> Result<JsValue, ValueError> {
+                Ok(JsValue::Int(self as i32))
+            }
+        }
+    };
 }
+
+impl_int_to_js_value!(u8);
+impl_int_to_js_value!(u16);
+impl_int_to_js_value!(i8);
+impl_int_to_js_value!(i16);
+impl_int_to_js_value!(i32);
+
+macro_rules! impl_float_to_js_value {
+    ($ty: ty) => {
+        impl ToJsValue for $ty {
+            fn to_js_value(self) -> Result<JsValue, ValueError> {
+                Ok(JsValue::Float(self as f64))
+            }
+        }
+    };
+}
+
+impl_float_to_js_value!(u32);
+impl_float_to_js_value!(u64);
+impl_float_to_js_value!(usize);
+impl_float_to_js_value!(i64);
+impl_float_to_js_value!(f32);
+impl_float_to_js_value!(f64);
 
 impl ToJsValue for bool {
     fn to_js_value(self) -> Result<JsValue, ValueError> {
@@ -156,6 +207,15 @@ impl<T: ToJsValue> ToJsValue for Vec<T> {
             values.push(v.to_js_value()?);
         }
         Ok(JsValue::Array(values))
+    }
+}
+
+impl<T: ToJsValue> ToJsValue for Option<T> {
+    fn to_js_value(self) -> Result<JsValue, ValueError> {
+        match self {
+            None => {Ok(JsValue::Undefined)}
+            Some(e) => {Ok(e.to_js_value()?)}
+        }
     }
 }
 

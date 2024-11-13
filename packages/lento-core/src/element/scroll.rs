@@ -332,7 +332,7 @@ impl ElementBackend for Scroll {
     }
 
     fn handle_event_default_behavior(&mut self, _event_type: &str, event: &mut ElementEvent) -> bool {
-        let is_target_self = &event.context.target == &self.element;
+        let is_target_self = event.context.target.upgrade().ok().as_ref() == Some(&self.element);
         event.accept_touch_start(|d| {
             let touch = unsafe { d.touches.get_unchecked(0) };
             self.begin_scroll_x(-touch.frame_x);

@@ -21,7 +21,7 @@ macro_rules! define_event {
                 false
             }
 
-            pub fn try_match_mut<F: FnMut(&mut crate::base::EventContext<crate::element::ElementRef>, &mut $ty)>(key: &str, event: &mut crate::base::ElementEvent, mut callback: F) -> bool {
+            pub fn try_match_mut<F: FnMut(&mut crate::base::EventContext<crate::element::ElementWeak>, &mut $ty)>(key: &str, event: &mut crate::base::ElementEvent, mut callback: F) -> bool {
                 if key == Self::key() {
                    if let Some(detail) = event.detail.raw_mut().downcast_mut::<$ty>() {
                        callback(&mut event.context, detail);
@@ -51,12 +51,12 @@ macro_rules! define_event {
             }
             fn $emit_func(&mut self, detail: $ty) {
                 use crate::base::ElementEvent;
-                let mut event = ElementEvent::new($key, detail, self.clone());
+                let mut event = ElementEvent::new($key, detail, self.as_weak());
                 self.emit_event($key, event);
             }
         }
 
-        impl $event_trait for crate::base::Event<crate::element::ElementRef> {
+        impl $event_trait for crate::base::Event<crate::element::ElementWeak> {
             fn $as_func<F: FnMut(&$ty)>(&mut self, mut callback: F) -> bool {
                 if self.event_type == $key {
                     if let Some(detail) = self.detail.raw().downcast_ref::<$ty>() {

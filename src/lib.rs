@@ -3,20 +3,18 @@ pub use lento_macros::*;
 pub mod ext_animation;
 pub mod ext_clipboard;
 
-use std::str::FromStr;
-use std::{env, thread};
-use std::time::Duration;
+use crate::app::{App, AppEvent, LentoApp};
+use crate::event_loop::set_event_proxy;
+use crate::ext_animation::animation_create;
+use crate::ext_clipboard::{clipboard_read_text, clipboard_write_text};
+#[cfg(not(feature = "production"))]
+use crate::loader::DefaultModuleLoader;
 #[cfg(feature = "production")]
 use lento_core::loader::StaticModuleLoader;
 use quick_js::loader::JsModuleLoader;
-use crate::app::{App, AppEvent, LentoApp};
-use crate::event_loop::set_event_proxy;
-#[cfg(not(feature = "production"))]
-use crate::loader::{DefaultModuleLoader};
+use std::env;
 #[cfg(target_os = "android")]
 use winit::platform::android::activity::AndroidApp;
-use crate::ext_animation::animation_create;
-use crate::ext_clipboard::{clipboard_read_text, clipboard_write_text};
 
 #[cfg(not(feature = "production"))]
 fn create_module_loader() -> DefaultModuleLoader {
@@ -24,11 +22,11 @@ fn create_module_loader() -> DefaultModuleLoader {
     loader.set_fs_base(".");
     let module_name = env::var("LENTO_ENTRY").unwrap_or("index.js".to_string());
     let start_time = std::time::Instant::now();
-    while start_time.elapsed() < Duration::from_secs(60) {
+    while start_time.elapsed() < std::time::Duration::from_secs(60) {
         if loader.load(&module_name).is_ok() {
             break;
         }
-        thread::sleep(Duration::from_millis(1000));
+        std::thread::sleep(std::time::Duration::from_millis(1000));
         eprintln!("Failed to load {}, retrying...", module_name);
     }
     loader
@@ -49,7 +47,7 @@ fn init_app(app: &mut App) {
     app.js_engine.add_global_func(clipboard_read_text::new());
 }
 
-fn run_event_loop(mut event_loop: EventLoop<AppEvent>, lento_app: Box<dyn LentoApp>) {
+fn run_event_loop(event_loop: EventLoop<AppEvent>, lento_app: Box<dyn LentoApp>) {
     let el_proxy = event_loop.create_proxy();
     set_event_proxy(el_proxy.clone());
     let mut app = App::new(create_module_loader(), lento_app);

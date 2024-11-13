@@ -1,7 +1,17 @@
+use crate as lento;
 use anyhow::Error;
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
+use lento_macros::{js_func, js_methods};
 
-pub fn base64_encode_str(value: String) -> Result<String, Error> {
-    Ok(BASE64_STANDARD.encode(value.as_bytes()))
+#[allow(nonstandard_style)]
+pub struct Base64;
+
+#[js_methods]
+impl Base64 {
+
+    #[js_func]
+    pub fn encode_str(value: String) -> Result<String, Error> {
+        Ok(BASE64_STANDARD.encode(value.as_bytes()))
+    }
 }
