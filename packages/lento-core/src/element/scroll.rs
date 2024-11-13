@@ -7,7 +7,7 @@ use yoga::Direction::LTR;
 use crate::{backend_as_api, js_call};
 use crate::base::{CaretDetail, ElementEvent, Rect};
 use crate::color::parse_hex_color;
-use crate::element::{ElementBackend, ElementRef};
+use crate::element::{ElementBackend, Element};
 use crate::element::container::Container;
 use crate::element::scroll::ScrollBarStrategy::{Always, Auto, Never};
 use crate::event::{AcceptCaretEvent, AcceptMouseDownEvent, AcceptMouseMoveEvent, AcceptMouseUpEvent, AcceptTouchCancelEvent, AcceptTouchEndEvent, AcceptTouchMoveEvent, AcceptTouchStartEvent, MouseDownEvent, MouseWheelDetail};
@@ -49,7 +49,7 @@ backend_as_api!(ScrollBackend, Scroll, as_scroll, as_scroll_mut);
 
 pub struct Scroll {
     scroll_bar_size: f32,
-    element: ElementRef,
+    element: Element,
     base: Container,
     vertical_bar_strategy: ScrollBarStrategy,
     horizontal_bar_strategy: ScrollBarStrategy,
@@ -241,7 +241,7 @@ impl Scroll {
 }
 
 impl ElementBackend for Scroll {
-    fn create(mut ele: ElementRef) -> Self {
+    fn create(mut ele: Element) -> Self {
         ele.create_shadow();
         let mut base = Container::create(ele.clone());
 
@@ -314,7 +314,7 @@ impl ElementBackend for Scroll {
         self.real_content_height = real_content_height;
     }
 
-    fn add_child_view(&mut self, child: ElementRef, position: Option<u32>) {
+    fn add_child_view(&mut self, child: Element, position: Option<u32>) {
         self.base.add_child_view(child, position);
     }
 
@@ -322,7 +322,7 @@ impl ElementBackend for Scroll {
         self.base.remove_child_view(position)
     }
 
-    fn get_children(&self) -> Vec<ElementRef> {
+    fn get_children(&self) -> Vec<Element> {
         self.base.get_children()
     }
 

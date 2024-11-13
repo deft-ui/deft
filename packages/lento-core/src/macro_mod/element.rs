@@ -6,7 +6,7 @@ macro_rules! backend_as_api {
             fn $as_mut_name(&mut self) -> &mut $ty;
         }
 
-        impl $trait_name for ElementRef {
+        impl $trait_name for Element {
             fn $as_name(&self) -> &$ty {
                 self.get_backend_as::<$ty>()
             }
@@ -62,7 +62,7 @@ macro_rules! inherit_color_prop {
 macro_rules! create_element {
     ($ty: ty,  { $($key: expr => $value: expr,)* }) => {
         {
-            let mut element = ElementRef::create(<$ty>::create);
+            let mut element = Element::create(<$ty>::create);
             use crate::HashMap;
             let mut style = Vec::new();
             $(

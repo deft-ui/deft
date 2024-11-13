@@ -15,18 +15,18 @@ use serde::{Deserialize, Serialize};
 
 thread_local! {
     pub static NEXT_ID: Cell<u32> = Cell::new(1);
-    pub static PLAYING_MAP: RefCell<HashMap<u32, AudioRef >> = RefCell::new(HashMap::new());
+    pub static PLAYING_MAP: RefCell<HashMap<u32, Audio >> = RefCell::new(HashMap::new());
     pub static PLAYER: AudioServer = AudioServer::new(handle_play_notify);
 }
 
 #[mrc_object]
 pub struct Audio {
     id: u32,
-    event_registration: EventRegistration<AudioRef>,
+    event_registration: EventRegistration<Audio>,
     sources: Arc<Mutex<AudioSources>>,
 }
 
-impl Audio {
+impl AudioData {
     pub fn new(id: u32, sources: Arc<Mutex<AudioSources>>) -> Self {
         Self {
             id,
@@ -86,30 +86,30 @@ fn handle_play_notify(id: u32, msg: AudioNotify) {
     });
 }
 
-fn registry_playing(audio: &AudioRef) {
+fn registry_playing(audio: &Audio) {
     let audio = audio.clone();
     PLAYING_MAP.with_borrow_mut(move |m| {
         m.insert(audio.id, audio);
     })
 }
 
-fn unregistry_playing(audio: &AudioRef) {
+fn unregistry_playing(audio: &Audio) {
     let id = audio.id;
     PLAYING_MAP.with_borrow_mut(move |m| {
         m.remove(&id);
     })
 }
 
-define_resource!(AudioRef);
-js_value!(AudioRef);
+define_resource!(Audio);
+js_value!(Audio);
 js_deserialize!(AudioOptions);
 
 
 #[js_methods]
-impl AudioRef {
+impl Audio {
 
     #[js_func]
-    pub fn create(options: AudioOptions) -> Result<AudioRef, Error> {
+    pub fn create(options: AudioOptions) -> Result<Audio, Error> {
         let id = NEXT_ID.get();
         NEXT_ID.set(id + 1);
 
@@ -120,12 +120,12 @@ impl AudioRef {
             auto_loop: options.auto_loop.unwrap_or(false),
             download_handle: None,
         };
-        let audio = Audio::new(id, Arc::new(Mutex::new(sources)));
+        let audio = AudioData::new(id, Arc::new(Mutex::new(sources)));
         Ok(audio.to_ref())
     }
 
     #[js_func]
-    pub fn play(audio: AudioRef) -> Result<(), Error> {
+    pub fn play(audio: Audio) -> Result<(), Error> {
         registry_playing(&audio);
         PLAYER.with(move |p| {
             p.play(audio.id, audio.sources.clone())
@@ -134,7 +134,7 @@ impl AudioRef {
     }
 
     #[js_func]
-    pub fn pause(audio: AudioRef) -> Result<(), Error> {
+    pub fn pause(audio: Audio) -> Result<(), Error> {
         PLAYER.with(|p| {
             p.pause(audio.id)
         });

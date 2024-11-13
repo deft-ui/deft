@@ -3,12 +3,12 @@ use quick_js::JsValue;
 use skia_safe::{Canvas, Color};
 use yoga::{Edge, StyleUnit};
 use crate::base::PropertyValue;
-use crate::element::{ElementBackend, ElementRef};
+use crate::element::{ElementBackend, Element};
 use crate::element::label::Label;
 
 pub struct Button {
     label: Label,
-    element: Option<ElementRef>,
+    element: Option<Element>,
 }
 
 impl Button {
@@ -23,7 +23,7 @@ impl Button {
 }
 
 impl ElementBackend for Button {
-    fn create(mut context: ElementRef) -> Self {
+    fn create(mut context: Element) -> Self {
         let mut inst = Self {
             label: Label::create(context.clone()),
             element: None,

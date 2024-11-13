@@ -1,9 +1,9 @@
-use crate::element::{ElementBackend, ElementRef};
+use crate::element::{ElementBackend, Element};
 
 pub struct Container {
     dirty: bool,
-    children: Vec<ElementRef>,
-    element: ElementRef,
+    children: Vec<Element>,
+    element: Element,
 }
 
 impl Container {
@@ -11,7 +11,7 @@ impl Container {
 }
 
 impl ElementBackend for Container {
-    fn create(element: ElementRef) -> Self {
+    fn create(element: Element) -> Self {
         Self {
             dirty: false,
             children: Vec::new(),
@@ -23,7 +23,7 @@ impl ElementBackend for Container {
         "Container"
     }
 
-    fn add_child_view(&mut self, mut child: ElementRef, position: Option<u32>) {
+    fn add_child_view(&mut self, mut child: Element, position: Option<u32>) {
         if let Some(p) = child.get_parent() {
             panic!("child({}) has parent({}) already", child.get_id(), p.get_id());
         }
@@ -51,7 +51,7 @@ impl ElementBackend for Container {
         ele.mark_dirty(true);
     }
 
-    fn get_children(&self) -> Vec<ElementRef> {
+    fn get_children(&self) -> Vec<Element> {
         self.children.clone()
     }
 

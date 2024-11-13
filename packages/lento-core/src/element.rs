@@ -27,7 +27,7 @@ use crate::element::textedit::TextEdit;
 use crate::event::{BoundsChangeBind, BoundsChangeEventDetail, ClickEventBind};
 use crate::event_loop::schedule_macro_task_unsafe;
 use crate::ext::ext_frame::{VIEW_TYPE_BUTTON, VIEW_TYPE_CONTAINER, VIEW_TYPE_ENTRY, VIEW_TYPE_IMAGE, VIEW_TYPE_LABEL, VIEW_TYPE_SCROLL, VIEW_TYPE_TEXT_EDIT};
-use crate::frame::{FrameRef, FrameWeak};
+use crate::frame::{Frame, FrameWeak};
 use crate::img_manager::IMG_MANAGER;
 use crate::js::js_serde::JsValueSerializer;
 use crate::js::js_value_util::{FromJsValue, SerializeToJsValue, ToJsValue};
@@ -53,7 +53,7 @@ thread_local! {
     pub static NEXT_ELEMENT_ID: Cell<u32> = Cell::new(1);
 }
 
-define_resource!(ElementRef);
+define_resource!(Element);
 
 struct ElementJsContext {
     context: JsValue,
@@ -66,10 +66,10 @@ pub struct ScrollByOption {
 }
 
 #[js_methods]
-impl ElementRef {
-    pub fn create<T: ElementBackend + 'static, F: FnOnce(ElementRef) -> T>(backend: F) -> Self {
+impl Element {
+    pub fn create<T: ElementBackend + 'static, F: FnOnce(Element) -> T>(backend: F) -> Self {
         let empty_backend = EmptyElementBackend{};
-        let inner =  Mrc::new(Element::new(empty_backend));
+        let inner =  Mrc::new(ElementData::new(empty_backend));
         let mut ele = Self {
             inner,
         };
@@ -82,7 +82,7 @@ impl ElementRef {
         let ele_weak = ele.inner.as_weak();
         ele.inner.layout.animation_renderer = Some(Mrc::new(Box::new(move |styles| {
             if let Ok(inner) = ele_weak.upgrade() {
-                let mut el = ElementRef::from_inner(inner);
+                let mut el = Element::from_inner(inner);
                 el.animation_style_props = styles;
                 el.apply_style();
             }
@@ -111,15 +111,15 @@ impl ElementRef {
     }
 
     #[js_func]
-    pub fn create_by_type(view_type: i32, context: JsValue) -> Result<ElementRef, Error> {
+    pub fn create_by_type(view_type: i32, context: JsValue) -> Result<Element, Error> {
         let mut view = match view_type {
-            VIEW_TYPE_CONTAINER => ElementRef::create(Container::create),
-            VIEW_TYPE_SCROLL => ElementRef::create(Scroll::create),
-            VIEW_TYPE_LABEL => ElementRef::create(Text::create),
-            VIEW_TYPE_ENTRY => ElementRef::create(Entry::create),
-            VIEW_TYPE_BUTTON => ElementRef::create(Button::create),
-            VIEW_TYPE_TEXT_EDIT => ElementRef::create(TextEdit::create),
-            VIEW_TYPE_IMAGE => ElementRef::create(Image::create),
+            VIEW_TYPE_CONTAINER => Element::create(Container::create),
+            VIEW_TYPE_SCROLL => Element::create(Scroll::create),
+            VIEW_TYPE_LABEL => Element::create(Text::create),
+            VIEW_TYPE_ENTRY => Element::create(Entry::create),
+            VIEW_TYPE_BUTTON => Element::create(Button::create),
+            VIEW_TYPE_TEXT_EDIT => Element::create(TextEdit::create),
+            VIEW_TYPE_IMAGE => Element::create(Image::create),
             _ => return Err(anyhow!("invalid view_type")),
         };
         view.resource_table.put(ElementJsContext { context });
@@ -165,7 +165,7 @@ impl ElementRef {
     }
 
     #[js_func]
-    pub fn add_child(&mut self, child: ElementRef, position: i32) -> Result<(), Error> {
+    pub fn add_child(&mut self, child: Element, position: i32) -> Result<(), Error> {
         let position = if position < 0 { None } else { Some(position as u32) };
         self.backend.add_child_view(child, position);
         Ok(())
@@ -288,7 +288,7 @@ impl ElementRef {
         &self.backend
     }
 
-    pub fn set_parent(&mut self, parent: Option<ElementRef>) {
+    pub fn set_parent(&mut self, parent: Option<Element>) {
         self.parent = match parent {
             None => None,
             Some(p) => Some(p.inner.as_weak()),
@@ -301,7 +301,7 @@ impl ElementRef {
         self.window = window;
     }
 
-    pub fn with_window<F: FnOnce(&mut FrameRef)>(&self, callback: F) {
+    pub fn with_window<F: FnOnce(&mut Frame)>(&self, callback: F) {
         if let Some(p) = self.get_parent() {
             return p.with_window(callback);
         } else if let Some(ww) = &self.window {
@@ -320,7 +320,7 @@ impl ElementRef {
         None
     }
 
-    pub fn get_parent(&self) -> Option<ElementRef> {
+    pub fn get_parent(&self) -> Option<Element> {
         let p = match &self.parent {
             None => return None,
             Some(p) => p,
@@ -329,7 +329,7 @@ impl ElementRef {
             Err(_e) => return None,
             Ok(u) => u,
         };
-        Some(ElementRef {
+        Some(Element {
             inner,
         })
     }
@@ -443,7 +443,7 @@ impl ElementRef {
         }
     }
 
-    pub fn add_child_view(&mut self, mut child: ElementRef, position: Option<u32>) {
+    pub fn add_child_view(&mut self, mut child: Element, position: Option<u32>) {
         self.backend.add_child_view(child, position);
     }
 
@@ -451,7 +451,7 @@ impl ElementRef {
         self.backend.remove_child_view(position)
     }
 
-    pub fn get_children(&self) -> Vec<ElementRef> {
+    pub fn get_children(&self) -> Vec<Element> {
         self.backend.get_children()
     }
 
@@ -697,7 +697,7 @@ impl ElementRef {
         }*/
     }
 
-    fn inner_ele_or_self(&self) -> ElementRef {
+    fn inner_ele_or_self(&self) -> Element {
         if let Some(e) = self.backend.get_inner_element() {
             e
         } else {
@@ -842,7 +842,7 @@ impl ElementRef {
 pub struct Element {
     id: u32,
     backend: Box<dyn ElementBackend>,
-    parent: Option<MrcWeak<Element>>,
+    parent: Option<MrcWeak<ElementData>>,
     window: Option<FrameWeak>,
     event_registration: EventRegistration<ElementWeak>,
     pub layout: StyleNode,
@@ -863,10 +863,10 @@ pub struct Element {
     resource_table: ResourceTable,
 }
 
-js_weak_value!(ElementRef, ElementWeak);
+js_weak_value!(Element, ElementWeak);
 
 
-impl Element {
+impl ElementData {
 
     pub fn new<T: ElementBackend + 'static>(backend: T) -> Self {
         let id = NEXT_ELEMENT_ID.get();
@@ -900,7 +900,7 @@ pub struct EmptyElementBackend {
 }
 
 impl ElementBackend for EmptyElementBackend {
-    fn create(_ele: ElementRef) -> Self {
+    fn create(_ele: Element) -> Self {
         Self {}
     }
 
@@ -912,7 +912,7 @@ impl ElementBackend for EmptyElementBackend {
 
 pub trait ElementBackend {
 
-    fn create(element: ElementRef) -> Self where Self: Sized;
+    fn create(element: Element) -> Self where Self: Sized;
 
     fn get_name(&self) -> &str;
 
@@ -924,7 +924,7 @@ pub trait ElementBackend {
 
     }
 
-    fn get_inner_element(&self) -> Option<ElementRef> {
+    fn get_inner_element(&self) -> Option<Element> {
         None
     }
 
@@ -949,13 +949,13 @@ pub trait ElementBackend {
         let _ = (event_type, event);
     }
 
-    fn add_child_view(&mut self, child: ElementRef, position: Option<u32>) {
+    fn add_child_view(&mut self, child: Element, position: Option<u32>) {
         let _ = (child, position);
     }
     fn remove_child_view(&mut self, position: u32) {
         //panic!("unsupported")
     }
-    fn get_children(&self) -> Vec<ElementRef> {
+    fn get_children(&self) -> Vec<Element> {
         Vec::new()
     }
 }

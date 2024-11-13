@@ -41,7 +41,7 @@ macro_rules! define_event {
             fn $as_func<F: FnMut(&$ty)>(&mut self, callback: F) -> bool;
         }
 
-        impl $bind_trait for crate::element::ElementRef {
+        impl $bind_trait for crate::element::Element {
             fn $bind_func<F: FnMut(&mut crate::base::ElementEventContext, &mut $ty) + 'static>(&mut self, mut handler: F) -> u32 {
                 self.add_event_listener($key, Box::new(move |e| {
                     if let Some(me) = e.detail.raw_mut().downcast_mut::<$ty>() {

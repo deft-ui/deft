@@ -4,7 +4,7 @@ use crate::base::MouseEventType::{MouseClick, MouseUp};
 use crate::base::{ElementEvent, Event, EventContext, EventHandler, EventRegistration, MouseDetail, MouseEventType, Touch, TouchDetail, UnsafeFnOnce};
 use crate::canvas_util::CanvasHelper;
 use crate::cursor::search_cursor;
-use crate::element::ElementRef;
+use crate::element::Element;
 use crate::event::{build_modifier, named_key_to_str, CaretEventBind, ClickEventBind, DragOverEventDetail, DragStartEventDetail, DropEventDetail, FocusEventBind, FocusShiftBind, KeyEventDetail, MouseDownEventBind, MouseEnterEventBind, MouseLeaveEventBind, MouseMoveEventBind, MouseUpEventBind, MouseWheelDetail, TouchCancelEventBind, TouchEndEventBind, TouchMoveEventBind, TouchStartEventBind, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT};
 use crate::event_loop::{run_with_event_loop, send_event};
 use crate::ext::common::create_event_handler;
@@ -68,14 +68,14 @@ pub struct Frame {
     cursor_position: LogicalPosition<f64>,
     pub(crate) frame_type: FrameType,
     cursor_root_position: LogicalPosition<f64>,
-    body: Option<ElementRef>,
-    focusing: Option<ElementRef>,
+    body: Option<Element>,
+    focusing: Option<Element>,
     /// (element, button)
-    pressing: Option<(ElementRef, MouseDownInfo)>,
+    pressing: Option<(Element, MouseDownInfo)>,
     touching: TouchingInfo,
     dragging: bool,
-    last_drag_over: Option<ElementRef>,
-    hover: Option<ElementRef>,
+    last_drag_over: Option<Element>,
+    hover: Option<Element>,
     modifiers: Modifiers,
     layout_dirty: bool,
     dirty: bool,
@@ -93,11 +93,11 @@ thread_local! {
 }
 
 #[js_methods]
-impl FrameRef {
+impl Frame {
 
     #[js_func]
     pub fn create(attrs: FrameAttrs) -> Result<Self, Error> {
-        let frame = FrameRef::create_inner(attrs);
+        let frame = Frame::create_inner(attrs);
         let window_id = frame.get_window_id();
         FRAMES.with_borrow_mut(|m| m.insert(frame.get_id(), frame.clone()));
         WINDOW_TO_FRAME.with_borrow_mut(|m| m.insert(window_id, frame.as_weak()));
@@ -143,7 +143,7 @@ impl FrameRef {
         };
 
         let window = Self::create_window(attributes.clone());
-        let state = Frame {
+        let state = FrameData {
             id,
             window,
             cursor_position: LogicalPosition {
@@ -176,7 +176,7 @@ impl FrameRef {
             init_width: attrs.width,
             init_height: attrs.height,
         };
-        let mut handle = FrameRef {
+        let mut handle = Frame {
             inner: Mrc::new(state),
         };
         // handle.body.set_window(Some(win.clone()));
@@ -214,7 +214,7 @@ impl FrameRef {
     }
 
     #[js_func]
-    pub fn set_modal(&mut self, owner: FrameRef) -> Result<(), JsError> {
+    pub fn set_modal(&mut self, owner: Frame) -> Result<(), JsError> {
         self.window.set_modal(&owner.window);
         let frame_id = self.get_window_id();
         MODAL_TO_OWNERS.with_borrow_mut(|m| m.insert(frame_id, owner.get_window_id()));
@@ -453,18 +453,18 @@ impl FrameRef {
         }
     }
 
-    fn update_cursor(&mut self, node: &ElementRef) {
+    fn update_cursor(&mut self, node: &Element) {
         let cursor = search_cursor(node);
         //TODO cache?
         self.window.set_cursor(Cursor::Icon(cursor))
     }
 
-    fn mouse_enter_node(&mut self, mut node: ElementRef, offset_x: f32, offset_y: f32, screen_x: f32, screen_y: f32) {
+    fn mouse_enter_node(&mut self, mut node: Element, offset_x: f32, offset_y: f32, screen_x: f32, screen_y: f32) {
         emit_mouse_event(&mut node, "mouseenter", MouseEventType::MouseEnter, 0, offset_x, offset_y, screen_x, screen_y);
         self.hover = Some(node);
     }
 
-    fn is_pressing(&self, node: &ElementRef) -> bool {
+    fn is_pressing(&self, node: &Element) -> bool {
         match &self.pressing {
             None => false,
             Some((p,_)) => p == node
@@ -602,7 +602,7 @@ impl FrameRef {
         }
     }
 
-    fn focus(&mut self, mut node: ElementRef) {
+    fn focus(&mut self, mut node: Element) {
         let focusing = Some(node.clone());
         if self.focusing != focusing {
             if let Some(old_focusing) = &mut self.focusing {
@@ -666,7 +666,7 @@ impl FrameRef {
     }
 
     #[js_func]
-    pub fn set_body(&mut self, mut body: ElementRef) {
+    pub fn set_body(&mut self, mut body: Element) {
         body.set_window(Some(self.as_weak()));
         self.focusing = Some(body.clone());
 
@@ -742,7 +742,7 @@ impl FrameRef {
         physical_len * self.window.scale_factor() as f32
     }
 
-    fn get_node_by_point(&self) -> Option<ElementRef> {
+    fn get_node_by_point(&self) -> Option<Element> {
         let mut body = match self.body.clone() {
             None => return None,
             Some(body) => body
@@ -752,7 +752,7 @@ impl FrameRef {
         self.get_node_by_point_inner(&mut body, (x, y))
     }
 
-    fn get_node_by_pos(&self, x: f32, y: f32) -> Option<ElementRef> {
+    fn get_node_by_pos(&self, x: f32, y: f32) -> Option<Element> {
         let mut body = match self.body.clone() {
             None => return None,
             Some(body) => body
@@ -760,7 +760,7 @@ impl FrameRef {
         self.get_node_by_point_inner(&mut body, (x, y))
     }
 
-    fn get_node_by_point_inner(&self, node: &mut ElementRef, point: (f32, f32)) -> Option<ElementRef> {
+    fn get_node_by_point_inner(&self, node: &mut Element, point: (f32, f32)) -> Option<Element> {
         //TODO use clip path?
         let bounds = node.get_bounds();
         if bounds.contains_point(point.0, point.1){
@@ -788,23 +788,23 @@ impl FrameRef {
 }
 
 pub struct WeakWindowHandle {
-    inner: MrcWeak<Frame>,
+    inner: MrcWeak<FrameData>,
 }
 
 impl WeakWindowHandle {
-    pub fn upgrade(&self) -> Option<FrameRef> {
-        self.inner.upgrade().map(|i| FrameRef::from_inner(i)).ok()
+    pub fn upgrade(&self) -> Option<Frame> {
+        self.inner.upgrade().map(|i| Frame::from_inner(i)).ok()
     }
 }
 
-fn draw_root(canvas: &Canvas, body: &mut ElementRef) {
+fn draw_root(canvas: &Canvas, body: &mut Element) {
     // draw background
     canvas.clear(Color::from_rgb(255, 255, 255));
     draw_element(canvas, body);
     // print_tree(&body, "");
 }
 
-fn draw_element(canvas: &Canvas, element: &ElementRef) {
+fn draw_element(canvas: &Canvas, element: &Element) {
     let bounds = element.get_bounds();
     if let Some(lcb) = canvas.local_clip_bounds() {
         if !lcb.intersects(&bounds.to_skia_rect()) {
@@ -851,7 +851,7 @@ fn draw_element(canvas: &Canvas, element: &ElementRef) {
     });
 }
 
-fn print_tree(node: &ElementRef, padding: &str) {
+fn print_tree(node: &Element, padding: &str) {
     let name = node.get_backend().get_name();
     let children = node.get_children();
     if children.is_empty() {
@@ -866,7 +866,7 @@ fn print_tree(node: &ElementRef, padding: &str) {
     }
 }
 
-fn emit_mouse_event(node: &mut ElementRef, _event_type: &str, event_type_enum: MouseEventType, button: i32, frame_x: f32, frame_y: f32, screen_x: f32, screen_y: f32) {
+fn emit_mouse_event(node: &mut Element, _event_type: &str, event_type_enum: MouseEventType, button: i32, frame_x: f32, frame_y: f32, screen_x: f32, screen_y: f32) {
     let node_bounds = node.get_origin_bounds();
     let (border_top, _, _, border_left) = node.get_border_width();
 

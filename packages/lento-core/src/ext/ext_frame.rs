@@ -11,14 +11,14 @@ use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Window, WindowId};
 
 use crate::app::{exit_app};
-use crate::element::{ElementBackend, ElementRef};
+use crate::element::{ElementBackend, Element};
 use crate::{define_resource, js_deserialize, js_weak_value};
-use crate::frame::{FrameRef, FrameWeak};
+use crate::frame::{Frame, FrameWeak};
 use crate::js::js_value_util::{FromJsValue, ToJsValue};
 
 
 thread_local! {
-    pub static FRAMES: RefCell<HashMap<i32, FrameRef>> = RefCell::new(HashMap::new());
+    pub static FRAMES: RefCell<HashMap<i32, Frame>> = RefCell::new(HashMap::new());
     pub static WINDOW_TO_FRAME: RefCell<HashMap<WindowId, FrameWeak>> = RefCell::new(HashMap::new());
     pub static MODAL_TO_OWNERS: RefCell<HashMap<WindowId, WindowId>> = RefCell::new(HashMap::new());
 }
@@ -94,7 +94,7 @@ pub fn handle_window_event(window_id: WindowId, event: WindowEvent) {
 
 impl FrameWeak {
 
-    pub fn set_body(&mut self, body: ElementRef) {
+    pub fn set_body(&mut self, body: Element) {
         self.upgrade_mut(|f| {
             f.set_body(body)
         });
@@ -106,4 +106,4 @@ impl FrameWeak {
 //TODO remove
 define_resource!(FrameWeak);
 
-js_weak_value!(FrameRef, FrameWeak);
+js_weak_value!(Frame, FrameWeak);

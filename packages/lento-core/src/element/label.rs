@@ -8,7 +8,7 @@ use skia_safe::{Canvas, Color, Color4f, Font, FontMgr, FontStyle, Paint, Typefac
 use skia_safe::textlayout::{FontCollection, Paragraph, ParagraphBuilder, ParagraphStyle, StrutStyle, TextAlign, TextStyle};
 use crate::base::{ElementEvent, PropertyValue, Rect, TextUpdateDetail};
 use crate::color::parse_hex_color;
-use crate::element::{Element, ElementBackend, ElementRef};
+use crate::element::{ElementData, ElementBackend, Element};
 use crate::js_call;
 use crate::js::js_value_util::JsValueHelper;
 use crate::number::DeNan;
@@ -27,7 +27,7 @@ pub struct Label {
     paragraph_props: ParagraphProps,
     // Option<(start, end)>
     selection: Option<(usize, usize)>,
-    element: ElementRef,
+    element: Element,
     line_height: Option<f32>,
 }
 
@@ -101,7 +101,7 @@ extern "C" fn measure_label(node_ref: NodeRef, width: f32, _mode: MeasureMode, _
 
 impl Label {
 
-    fn new(element: ElementRef) -> Self {
+    fn new(element: Element) -> Self {
         let font = DEFAULT_TYPE_FACE.with(|tf| Font::from_typeface(tf, 14.0));
         let text = AttributeText {
             text: "".to_string(),
@@ -319,7 +319,7 @@ fn default_typeface() -> Typeface {
 }
 
 impl ElementBackend for Label {
-    fn create(mut ele: ElementRef) -> Self {
+    fn create(mut ele: Element) -> Self {
         let mut label = Self::new(ele.clone());
         ele.layout.set_context(Some(Context::new(label.paragraph_props.clone())));
         ele.layout.set_measure_func(Some(measure_label));

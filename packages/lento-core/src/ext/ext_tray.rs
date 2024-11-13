@@ -57,14 +57,14 @@ impl Tray for MyTray {
 #[mrc_object]
 pub struct SystemTray {
     event_loop_proxy: EventLoopProxy<AppEvent>,
-    event_registration: EventRegistration<SystemTrayRef>,
+    event_registration: EventRegistration<SystemTray>,
     id: u32,
     handle: Handle<MyTray>,
 }
 
-js_value!(SystemTrayRef);
+js_value!(SystemTray);
 //TODO remove
-define_resource!(SystemTrayRef);
+define_resource!(SystemTray);
 
 unsafe impl Send for MyTray {}
 
@@ -80,11 +80,11 @@ js_deserialize!(TrayMenu);
 
 
 #[js_methods]
-impl SystemTrayRef {
+impl SystemTray {
 
     #[js_func]
-    pub fn tray_create(id: String) -> Result<SystemTrayRef, Error> {
-        let tray = SystemTrayRef::create_tray(&id, get_event_proxy());
+    pub fn tray_create(id: String) -> Result<SystemTray, Error> {
+        let tray = SystemTray::create_tray(&id, get_event_proxy());
         Ok(tray)
     }
 
@@ -103,7 +103,7 @@ impl SystemTrayRef {
         let handle = service.handle();
         service.spawn();
 
-        let inner = Mrc::new(SystemTray {
+        let inner = Mrc::new(SystemTrayData {
             event_loop_proxy,
             event_registration: EventRegistration::new(),
             id: inner_id,
@@ -118,7 +118,7 @@ impl SystemTrayRef {
         inst.inner.handle.update(move |t| {
             t.activate_callback = Box::new(move || {
                 if let Ok(st) = inst_weak.upgrade() {
-                    let mut str = SystemTrayRef {
+                    let mut str = SystemTray {
                         inner: st,
                     };
                     str.activate_ts();
@@ -129,7 +129,7 @@ impl SystemTrayRef {
                 let id = id.to_string();
                 Box::new(move |_| {
                     if let Ok(st) = inst_weak2.upgrade() {
-                        let mut str = SystemTrayRef {
+                        let mut str = SystemTray {
                             inner: st,
                         };
                         str.emit_menu_click(id.to_string());
@@ -140,7 +140,7 @@ impl SystemTrayRef {
         inst
     }
 
-    pub fn add_event_listener(&mut self, event_type: String, handler: Box<EventHandler<SystemTrayRef>>) -> u32 {
+    pub fn add_event_listener(&mut self, event_type: String, handler: Box<EventHandler<SystemTray>>) -> u32 {
         self.inner.event_registration.add_event_listener(&event_type, handler)
     }
 

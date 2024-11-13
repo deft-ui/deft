@@ -8,16 +8,16 @@ use crate::base::{ElementEvent, MouseDetail, PropertyValue, Rect, TextAlign, Tex
 use crate::canvas_util::CanvasHelper;
 use crate::color::parse_hex_color;
 use crate::element::container::Container;
-use crate::element::{ElementBackend, ElementRef};
+use crate::element::{ElementBackend, Element};
 use crate::element::entry::Entry;
 use crate::event::{TextUpdateEventBind};
 use crate::{create_element, js_call_rust, set_style, tree};
 use crate::element::scroll::Scroll;
 
 pub struct TextEdit {
-    element: ElementRef,
-    container_element: ElementRef,
-    entry_element: ElementRef,
+    element: Element,
+    container_element: Element,
+    entry_element: Element,
     base: Scroll,
     line_number_font: Rc<RefCell<Font>>,
 }
@@ -35,7 +35,7 @@ impl TextEdit {
 }
 
 impl ElementBackend for TextEdit {
-    fn create(mut element: ElementRef) -> Self {
+    fn create(mut element: Element) -> Self {
         let mut base = Scroll::create(element.clone());
         let mut container_ele = create_element!(Container, {
             minHeight   =>  "100%",
@@ -152,11 +152,11 @@ impl ElementBackend for TextEdit {
         self.base.handle_event(_event_type, _event)
     }
 
-    fn add_child_view(&mut self, child: ElementRef, position: Option<u32>) {
+    fn add_child_view(&mut self, child: Element, position: Option<u32>) {
         self.base.add_child_view(child, position);
     }
 
-    fn get_children(&self) -> Vec<ElementRef> {
+    fn get_children(&self) -> Vec<Element> {
         self.base.get_children()
     }
 

@@ -7,7 +7,7 @@ use quick_js::{JsValue, ValueError};
 use serde::{Deserialize, Serialize};
 use skia_safe::Path;
 use yoga::Layout;
-use crate::element::{ElementRef, ElementWeak};
+use crate::element::{Element, ElementWeak};
 use crate::ext::common::create_event_handler;
 use crate::js::{FromJsValue, ToJsValue};
 use crate::js::js_serde::JsValueSerializer;
@@ -361,7 +361,7 @@ impl Rect {
         self.width == 0.0 || self.height == 0.0
     }
 
-    pub fn to_origin_bounds(&self, node: &ElementRef) -> Self {
+    pub fn to_origin_bounds(&self, node: &Element) -> Self {
         let origin_bounds = node.get_origin_bounds();
         self.translate(origin_bounds.x, origin_bounds.y)
     }

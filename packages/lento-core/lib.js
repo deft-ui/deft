@@ -54,8 +54,8 @@ export class Frame {
      * @param attrs {FrameAttrs}
      */
     constructor(attrs) {
-        this.#frameId = FrameRef_create(attrs || {});
-        this.#eventRegistry = new EventRegistry(this.#frameId, FrameRef_bind_event, FrameRef_remove_event_listener, this);
+        this.#frameId = Frame_create(attrs || {});
+        this.#eventRegistry = new EventRegistry(this.#frameId, Frame_bind_event, Frame_remove_event_listener, this);
     }
 
     /**
@@ -63,7 +63,7 @@ export class Frame {
      * @param view {View}
      */
     setBody(view) {
-        FrameRef_set_body(this.#frameId, view.el);
+        Frame_set_body(this.#frameId, view.el);
     }
 
     /**
@@ -71,7 +71,7 @@ export class Frame {
      * @param title {string}
      */
     setTitle(title) {
-        FrameRef_set_title(this.#frameId, title);
+        Frame_set_title(this.#frameId, title);
     }
 
     /**
@@ -79,7 +79,7 @@ export class Frame {
      * @param size {Size}
      */
     resize(size) {
-        FrameRef_resize(this.#frameId, size);
+        Frame_resize(this.#frameId, size);
     }
 
     /**
@@ -87,11 +87,11 @@ export class Frame {
      * @param owner {Frame}
      */
     setModal(owner) {
-        FrameRef_set_modal(this.#frameId, owner.#frameId)
+        Frame_set_modal(this.#frameId, owner.#frameId)
     }
 
     close() {
-        FrameRef_close(this.#frameId);
+        Frame_close(this.#frameId);
     }
 
     /**
@@ -99,7 +99,7 @@ export class Frame {
      * @param visible {boolean}
      */
     setVisible(visible) {
-        FrameRef_set_visible(this.#frameId, visible);
+        Frame_set_visible(this.#frameId, visible);
     }
 
     /**
@@ -242,20 +242,20 @@ export class SystemTray {
     #eventRegistry;
     tray;
     constructor() {
-        this.tray = SystemTrayRef_create("Test");
-        this.#eventRegistry = new EventRegistry(this.tray, SystemTrayRef_bind_event, SystemTrayRef_remove_event_listener, this);
+        this.tray = SystemTray_create("Test");
+        this.#eventRegistry = new EventRegistry(this.tray, SystemTray_bind_event, SystemTray_remove_event_listener, this);
     }
 
     setTitle(title) {
-        SystemTrayRef_set_title(this.tray, title);
+        SystemTray_set_title(this.tray, title);
     }
 
     setIcon(icon) {
-        SystemTrayRef_set_icon(this.tray, icon);
+        SystemTray_set_icon(this.tray, icon);
     }
 
     setMenus(menus) {
-        SystemTrayRef_set_menus(this.tray, menus);
+        SystemTray_set_menus(this.tray, menus);
     }
 
     bindActivate(callback) {
@@ -291,15 +291,15 @@ export class View {
         const myContext = context || {};
         CONTEXT2ELEMENT.set(myContext, this);
         if (typeof el === "number") {
-            this.el = ElementRef_create_by_type(el, myContext);
+            this.el = Element_create_by_type(el, myContext);
         } else {
             this.el = el;
         }
         if (!this.el) {
             throw new Error("Failed to create view:" + el)
         }
-        this.#eventRegistry = new EventRegistry(this.el, ElementRef_bind_event, ElementRef_remove_event_listener, this, (target) => {
-            const myContext = ElementRef_get_js_context(target);
+        this.#eventRegistry = new EventRegistry(this.el, Element_bind_event, Element_remove_event_listener, this, (target) => {
+            const myContext = Element_get_js_context(target);
             if (myContext) {
                 return CONTEXT2ELEMENT.get(myContext);
             }
@@ -311,11 +311,11 @@ export class View {
      * @param style {StyleProps}
      */
     setStyle(style) {
-        ElementRef_set_style(this.el, style);
+        Element_set_style(this.el, style);
     }
 
     setAnimation(animation) {
-        ElementRef_set_animation(this.el, animation);
+        Element_set_animation(this.el, animation);
     }
 
     /**
@@ -323,7 +323,7 @@ export class View {
      * @param style {StyleProps}
      */
     setHoverStyle(style) {
-        ElementRef_set_hover_style(this.el, style);
+        Element_set_hover_style(this.el, style);
     }
 
     /**
@@ -331,7 +331,7 @@ export class View {
      * @param value {number}
      */
     setScrollTop(value) {
-        ElementRef_set_property(this.el, "scrollTop", value);
+        Element_set_property(this.el, "scrollTop", value);
     }
 
     /**
@@ -339,7 +339,7 @@ export class View {
      * @param value {number}
      */
     setScrollLeft(value) {
-        ElementRef_set_property(this.el, "scrollLeft", value);
+        Element_set_property(this.el, "scrollLeft", value);
     }
 
 
@@ -348,7 +348,7 @@ export class View {
      * @param value {boolean}
      */
     setDraggable(value) {
-        ElementRef_set_property(this.el, "draggable", value);
+        Element_set_property(this.el, "draggable", value);
     }
 
     /**
@@ -356,7 +356,7 @@ export class View {
      * @param value {string}
      */
     setCursor(value) {
-        ElementRef_set_property(this.el, "cursor", value);
+        Element_set_property(this.el, "cursor", value);
     }
 
     /**
@@ -364,7 +364,7 @@ export class View {
      * @returns {[number, number]}
      */
     getSize() {
-        return ElementRef_get_property(this.el, "size");
+        return Element_get_property(this.el, "size");
     }
 
     /**
@@ -372,7 +372,7 @@ export class View {
      * @returns {[number, number]}
      */
     getContentSize() {
-        return ElementRef_get_property(this.el, "content_size");
+        return Element_get_property(this.el, "content_size");
     }
 
     /**
@@ -380,7 +380,7 @@ export class View {
      * @returns {ElementRect}
      */
     getBoundingClientRect() {
-        return ElementRef_get_bounding_client_rect(this.el);
+        return Element_get_bounding_client_rect(this.el);
     }
 
     /**
@@ -388,7 +388,7 @@ export class View {
      * @returns {number}
      */
     getScrollTop() {
-        return ElementRef_get_property(this.el, "scroll_top");
+        return Element_get_property(this.el, "scroll_top");
     }
 
     /**
@@ -396,7 +396,7 @@ export class View {
      * @returns {number}
      */
     getScrollLeft() {
-        return ElementRef_get_property(this.el, "scroll_left");
+        return Element_get_property(this.el, "scroll_left");
     }
 
     /**
@@ -404,7 +404,7 @@ export class View {
      * @returns {number}
      */
     getScrollHeight() {
-        return ElementRef_get_property(this.el, "scroll_height");
+        return Element_get_property(this.el, "scroll_height");
     }
 
     /**
@@ -412,7 +412,7 @@ export class View {
      * @returns {number}
      */
     getScrollWidth() {
-        return ElementRef_get_property(this.el, "scroll_width");
+        return Element_get_property(this.el, "scroll_width");
     }
 
     /**
@@ -534,20 +534,20 @@ export class Audio {
     #eventRegistry;
     id;
     constructor(config) {
-        this.id = AudioRef_create(config || {})
-        this.#eventRegistry = new EventRegistry(this.id, AudioRef_add_event_listener, AudioRef_remove_event_listener, this);
+        this.id = Audio_create(config || {})
+        this.#eventRegistry = new EventRegistry(this.id, Audio_add_event_listener, Audio_remove_event_listener, this);
     }
 
     play() {
-        AudioRef_play(this.id);
+        Audio_play(this.id);
     }
 
     pause() {
-        AudioRef_pause(this.id);
+        Audio_pause(this.id);
     }
 
     stop() {
-        AudioRef_stop(this.id);
+        Audio_stop(this.id);
     }
 
     bindLoad(callback) {
@@ -590,7 +590,7 @@ export class LabelElement extends View {
      * @param text {string}
      */
     setText(text) {
-        ElementRef_set_property(this.el, "text", text);
+        Element_set_property(this.el, "text", text);
     }
 
     /**
@@ -598,11 +598,11 @@ export class LabelElement extends View {
      * @param align {"left" | "right" | "center"}
      */
     setAlign(align) {
-        ElementRef_set_property(this.el, "align", align);
+        Element_set_property(this.el, "align", align);
     }
 
     setSelection(selection) {
-        ElementRef_set_property(this.el, "selection", selection);
+        Element_set_property(this.el, "selection", selection);
     }
 
 }
@@ -612,7 +612,7 @@ export class ImageElement extends View {
         super(VT_IMAGE);
     }
     setSrc(src) {
-        ElementRef_set_property(this.el, "src", src);
+        Element_set_property(this.el, "src", src);
     }
 }
 
@@ -626,7 +626,7 @@ export class ButtonElement extends View {
      * @param title {string}
      */
     setTitle(title) {
-        ElementRef_set_property(this.el, "title", title);
+        Element_set_property(this.el, "title", title);
     }
 
 }
@@ -641,7 +641,7 @@ export class EntryElement extends View {
      * @param align {"left"|"right"|"center"}
      */
     setAlign(align) {
-        ElementRef_set_property(this.el, "align", align);
+        Element_set_property(this.el, "align", align);
     }
 
     /**
@@ -649,7 +649,7 @@ export class EntryElement extends View {
      * @param text {string}
      */
     setText(text) {
-        ElementRef_set_property(this.el, "text", text);
+        Element_set_property(this.el, "text", text);
     }
 
     /**
@@ -657,7 +657,7 @@ export class EntryElement extends View {
      * @param multipleLine {boolean}
      */
     setMultipleLine(multipleLine) {
-        ElementRef_set_property(this.el, "multipleline", String(multipleLine));
+        Element_set_property(this.el, "multipleline", String(multipleLine));
     }
 
     /**
@@ -665,7 +665,7 @@ export class EntryElement extends View {
      * @returns {string}
      */
     getText() {
-        return ElementRef_get_property(this.el, "text");
+        return Element_get_property(this.el, "text");
     }
 
     bindTextChange(callback) {
@@ -684,7 +684,7 @@ export class TextEditElement extends View {
      * @param align {"left"|"right"|"center"}
      */
     setAlign(align) {
-        ElementRef_set_property(this.el, "align", align);
+        Element_set_property(this.el, "align", align);
     }
 
     /**
@@ -692,7 +692,7 @@ export class TextEditElement extends View {
      * @param text {string}
      */
     setText(text) {
-        ElementRef_set_property(this.el, "text", text);
+        Element_set_property(this.el, "text", text);
     }
 
     /**
@@ -700,7 +700,7 @@ export class TextEditElement extends View {
      * @returns {string}
      */
     getText() {
-        return ElementRef_get_property(this.el, "text");
+        return Element_get_property(this.el, "text");
     }
 
     /**
@@ -708,7 +708,7 @@ export class TextEditElement extends View {
      * @param selection {[number, number]}
      */
     setSelection(selection) {
-        ElementRef_set_property(this.el, "selection", selection);
+        Element_set_property(this.el, "selection", selection);
     }
 
     /**
@@ -716,7 +716,7 @@ export class TextEditElement extends View {
      * @param caret {number}
      */
     setCaret(caret) {
-        ElementRef_set_property(this.el, "caret", caret);
+        Element_set_property(this.el, "caret", caret);
     }
 
     /**
@@ -724,7 +724,7 @@ export class TextEditElement extends View {
      * @param top {number}
      */
     scrollToTop(top) {
-        ElementRef_set_property(this.el, "scroll_to_top", top);
+        Element_set_property(this.el, "scroll_to_top", top);
     }
 
     bindTextChange(callback) {
@@ -761,10 +761,10 @@ class ContainerBasedElement extends View {
         }
         child.parent = this;
         if (typeof index === "number" && index >= 0 && index < this.#children.length) {
-            ElementRef_add_child(this.el, child.el, index);
+            Element_add_child(this.el, child.el, index);
             this.#children.splice(index, 0, child);
         } else {
-            ElementRef_add_child(this.el, child.el, -1);
+            Element_add_child(this.el, child.el, -1);
             this.#children.push(child);
         }
     }
@@ -801,7 +801,7 @@ class ContainerBasedElement extends View {
         const index = this.#children.indexOf(child);
         if (index >= 0) {
             child.parent = null;
-            ElementRef_remove_child(this.el, index);
+            Element_remove_child(this.el, index);
             this.#children.splice(index, 1);
         } else {
             console.log("remove child failed")
@@ -825,7 +825,7 @@ export class ScrollElement extends ContainerBasedElement {
      * @param value {"auto"|"always"|"never"}
      */
     setScrollX(value) {
-        ElementRef_set_property(this.el, "scroll_x", value);
+        Element_set_property(this.el, "scroll_x", value);
     }
 
     /**
@@ -833,13 +833,13 @@ export class ScrollElement extends ContainerBasedElement {
      * @param value {"auto"|"always"|"never"}
      */
     setScrollY(value) {
-        ElementRef_set_property(this.el, "scroll_y", value);
+        Element_set_property(this.el, "scroll_y", value);
     }
 
     scrollBy(value) {
         value.x = value.x || 0;
         value.y = value.y || 0;
-        ElementRef_set_property(this.el, "scroll_by", value);
+        Element_set_property(this.el, "scroll_by", value);
     }
 
 }
@@ -873,7 +873,7 @@ export class WebSocket {
 
     send(data) {
         //TODO check status
-        WsConnectionRef_send_str(this.client, data + "").catch(error => {
+        WsConnection_send_str(this.client, data + "").catch(error => {
             this.#emit('error', error);
         });
     }
@@ -882,7 +882,7 @@ export class WebSocket {
 
     async #connect(url) {
         try {
-            this.client = await WsConnectionRef_connect(url);
+            this.client = await WsConnection_connect(url);
             this.#emit("open");
             this.#doRead();
         } catch (error) {
@@ -894,7 +894,7 @@ export class WebSocket {
     async #doRead() {
         try {
             for (;;) {
-                let msg = await WsConnectionRef_read(this.client);
+                let msg = await WsConnection_read(this.client);
                 if (msg === false) {
                     this.#emit("close");
                     break;
@@ -1041,7 +1041,7 @@ const localStorage = {
 
 globalThis.navigator = new Navigator();
 globalThis.Frame = Frame;
-if (globalThis.SystemTrayRef_create) {
+if (globalThis.SystemTray_create) {
     globalThis.SystemTray = SystemTray;
 }
 globalThis.View = View;

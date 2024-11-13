@@ -10,7 +10,7 @@ use skia_safe::svg::Dom;
 use skia_safe::wrapper::PointerWrapper;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 
-use crate::element::{ElementBackend, ElementRef};
+use crate::element::{ElementBackend, Element};
 use crate::element::label::FONT_MGR;
 use crate::img_manager::IMG_MANAGER;
 use crate::js_call;
@@ -58,7 +58,7 @@ impl ImageData {
 }
 
 pub struct Image {
-    element: ElementRef,
+    element: Element,
     src: String,
     img: ImageData,
 }
@@ -106,7 +106,7 @@ impl Image {
 }
 
 impl ElementBackend for Image {
-    fn create(mut element: ElementRef) -> Self {
+    fn create(mut element: Element) -> Self {
         element.layout.set_measure_func(Some(measure_image));
         Self {
             element,

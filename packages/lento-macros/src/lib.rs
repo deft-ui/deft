@@ -8,8 +8,8 @@ use syn::token::{Async};
 pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
     let struct_def = parse_macro_input!(struct_def as ItemStruct);
     let weak_name = format_ident!("{}Weak", struct_def.ident);
-    let ref_name = format_ident!("{}Ref", struct_def.ident);
-    let struct_name = struct_def.ident;
+    let struct_name = format_ident!("{}Data", struct_def.ident);
+    let ref_name = struct_def.ident;
     let fields = struct_def.fields;
 
     let expanded = quote! {

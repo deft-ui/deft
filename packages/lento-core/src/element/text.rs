@@ -13,7 +13,7 @@ use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 
 use crate::base::{ElementEvent, MouseDetail, MouseEventType, Rect, TextUpdateDetail};
 use crate::color::parse_hex_color;
-use crate::element::{ElementBackend, ElementRef};
+use crate::element::{ElementBackend, Element};
 use crate::element::text::skia_text_paragraph::{SkiaTextParagraph};
 use crate::element::text::text_paragraph::{ParagraphData, Line, ParagraphRef, TextParams};
 use crate::{js_call, match_event_type};
@@ -37,7 +37,7 @@ pub struct Text {
     last_width: f32,
     /// Option<(start atom offset, end atom offset)>
     selection: Option<(AtomOffset, AtomOffset)>,
-    element: ElementRef,
+    element: Element,
     selecting_begin: Option<AtomOffset>,
 }
 
@@ -74,7 +74,7 @@ extern "C" fn measure_label(node_ref: NodeRef, width: f32, width_mode: MeasureMo
 
 
 impl Text {
-    fn new(element: ElementRef) -> Self {
+    fn new(element: Element) -> Self {
         let text_params = TextParams {
             font: DEFAULT_TYPE_FACE.with(|tf| Font::from_typeface(tf, 14.0)),
             align: TextAlign::Left,
@@ -520,7 +520,7 @@ fn intersect_range(range1: (AtomOffset, AtomOffset), range2: (AtomOffset, AtomOf
 }
 
 impl ElementBackend for Text {
-    fn create(mut ele: ElementRef) -> Self {
+    fn create(mut ele: Element) -> Self {
         let mut label = Self::new(ele.clone());
         ele.layout.set_context(Some(Context::new(label.paragraph_ref.clone())));
         ele.layout.set_measure_func(Some(measure_label));
@@ -635,7 +635,7 @@ pub fn parse_align(align: &str) -> TextAlign {
 
 #[test]
 pub fn test_get_caret_at_offset_coordinate() {
-    let mut el = ElementRef::create(Text::create);
+    let mut el = Element::create(Text::create);
     let text = el.get_backend_mut_as::<Text>();
     let (row, col) = text.get_caret_at_offset_coordinate((100.0, 100.0));
     assert_eq!(0, row);
@@ -645,7 +645,7 @@ pub fn test_get_caret_at_offset_coordinate() {
 
 #[test]
 pub fn test_get_caret_by_char_offset() {
-    let mut el = ElementRef::create(Text::create);
+    let mut el = Element::create(Text::create);
     let text = el.get_backend_mut_as::<Text>();
     text.set_text("abc".to_string());
     assert_eq!((0, 2), text.get_location_by_atom_offset(2));

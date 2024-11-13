@@ -10,11 +10,11 @@ use winit::window::{CursorGrabMode, WindowId};
 
 use crate::app::exit_app;
 use crate::console::Console;
-use crate::element::ElementRef;
+use crate::element::Element;
 use crate::event_loop::run_with_event_loop;
 use crate::export_js_api;
 use crate::ext::ext_appfs::appfs;
-use crate::ext::ext_audio::AudioRef;
+use crate::ext::ext_audio::Audio;
 use crate::ext::ext_base64::Base64;
 use crate::ext::ext_console::Console as ExtConsole;
 use crate::ext::ext_dialog::dialog;
@@ -29,9 +29,9 @@ use crate::ext::ext_process::process;
 use crate::ext::ext_shell::shell;
 use crate::ext::ext_timer::{timer_clear_interval, timer_clear_timeout, timer_set_interval, timer_set_timeout};
 #[cfg(feature = "tray")]
-use crate::ext::ext_tray::SystemTrayRef;
-use crate::ext::ext_websocket::WsConnectionRef;
-use crate::frame::{FrameRef, FrameType};
+use crate::ext::ext_tray::SystemTray;
+use crate::ext::ext_websocket::WsConnection;
+use crate::frame::{Frame, FrameType};
 use crate::js::js_binding::{JsCallError, JsFunc};
 use crate::js::js_runtime::JsContext;
 use crate::js::js_value_util::DeserializeFromJsValue;
@@ -90,26 +90,26 @@ impl JsEngine {
         };
 
         engine.add_global_functions(ExtConsole::create_js_apis());
-        engine.add_global_functions(ElementRef::create_js_apis());
+        engine.add_global_functions(Element::create_js_apis());
         #[cfg(feature = "tray")]
         {
-            engine.add_global_functions(SystemTrayRef::create_js_apis());
+            engine.add_global_functions(SystemTray::create_js_apis());
         }
         engine.add_global_functions(process::create_js_apis());
         engine.add_global_functions(dialog::create_js_apis());
         engine.add_global_functions(Base64::create_js_apis());
         engine.add_global_functions(shell::create_js_apis());
-        engine.add_global_functions(AudioRef::create_js_apis());
+        engine.add_global_functions(Audio::create_js_apis());
         engine.add_global_functions(path::create_js_apis());
         engine.add_global_functions(env::create_js_apis());
         engine.add_global_functions(http::create_js_apis());
         engine.add_global_functions(appfs::create_js_apis());
         engine.add_global_functions(localstorage::create_js_apis());
         // websocket
-        engine.add_global_functions(WsConnectionRef::create_js_apis());
+        engine.add_global_functions(WsConnection::create_js_apis());
         engine.add_global_functions(fetch::create_js_apis());
 
-        engine.add_global_functions(FrameRef::create_js_apis());
+        engine.add_global_functions(Frame::create_js_apis());
         engine.add_global_func(timer_set_timeout::new());
         engine.add_global_func(timer_clear_timeout::new());
         engine.add_global_func(timer_set_interval::new());
@@ -161,7 +161,7 @@ impl JsEngine {
         if let DeviceEvent::Button {..} = event {
             let close_frames = FRAMES.with_borrow(|frames| {
                 let mut result = Vec::new();
-                let menu_frames: Vec<&FrameRef> = frames.iter()
+                let menu_frames: Vec<&Frame> = frames.iter()
                     .filter(|(_, f)| f.frame_type == FrameType::Menu)
                     .map(|(_, f)| f)
                     .collect();

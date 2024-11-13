@@ -9,7 +9,7 @@ use skia_safe::textlayout::{TextAlign};
 use winit::keyboard::NamedKey;
 use winit::window::CursorIcon;
 use crate::base::{CaretDetail, ElementEvent, MouseDetail, MouseEventType, Rect, TextChangeDetail, TextUpdateDetail};
-use crate::element::{ElementBackend, ElementRef};
+use crate::element::{ElementBackend, Element};
 use crate::element::text::{AtomOffset, Text as Label};
 use crate::number::DeNan;
 use crate::{js_call, match_event, match_event_type, timer};
@@ -38,7 +38,7 @@ pub struct Entry {
     focusing: bool,
     align: TextAlign,
     multiple_line: bool,
-    element: ElementRef,
+    element: Element,
     vertical_caret_moving_coord_x: f32,
     edit_history: EditHistory,
 }
@@ -167,7 +167,7 @@ impl Entry {
         ele.emit_caret_change(CaretDetail::new(caret, origin_bounds, bounds));
     }
 
-    fn caret_tick(caret_visible: Rc<Cell<bool>>, mut context: ElementRef) {
+    fn caret_tick(caret_visible: Rc<Cell<bool>>, mut context: Element) {
         let visible = caret_visible.get();
         caret_visible.set(!visible);
         context.mark_dirty(false);
@@ -363,7 +363,7 @@ impl Entry {
 
 impl ElementBackend for Entry {
 
-    fn create(mut ele: ElementRef) -> Self {
+    fn create(mut ele: Element) -> Self {
         let mut base = Label::create(ele.clone());
         base.set_text_wrap(false);
         ele.set_cursor(CursorIcon::Text);
@@ -450,7 +450,7 @@ impl ElementBackend for Entry {
 
 #[test]
 pub fn test_edit_history() {
-    let mut el = ElementRef::create(Entry::create);
+    let mut el = Element::create(Entry::create);
     let entry = el.get_backend_mut_as::<Entry>();
     let text1 = "hello";
     let text2 = "world";

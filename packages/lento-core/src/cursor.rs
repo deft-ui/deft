@@ -1,6 +1,6 @@
 use winit::window::CursorIcon;
 use winit::window::CursorIcon::*;
-use crate::element::ElementRef;
+use crate::element::Element;
 
 pub fn parse_cursor(str: &str) -> Option<CursorIcon> {
     let icon = match str {
@@ -44,7 +44,7 @@ pub fn parse_cursor(str: &str) -> Option<CursorIcon> {
 }
 
 
-pub fn search_cursor(element: &ElementRef) -> CursorIcon {
+pub fn search_cursor(element: &Element) -> CursorIcon {
     let cursor = element.get_cursor();
     if cursor != Default {
         return cursor

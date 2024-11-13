@@ -1,7 +1,7 @@
 use crate::backend_as_api;
 use crate::base::{ElementEvent, MouseDetail, ScrollEventDetail};
 use crate::element::container::Container;
-use crate::element::{ElementBackend, ElementRef};
+use crate::element::{ElementBackend, Element};
 
 const BACKGROUND_COLOR: &str = "#1E1F22";
 
@@ -11,12 +11,12 @@ backend_as_api!(ScrollBarBackend, ScrollBar, as_scroll_bar, as_scroll_bar_mut);
 
 pub struct ScrollBar {
     base: Container,
-    element: ElementRef,
+    element: Element,
     ///(frame position, scroll_position)
     start_scroll_info: Option<(f32, f32)>,
-    indicator_ele: ElementRef,
+    indicator_ele: Element,
     // content_length: f32,
-    content_container: Option<ElementRef>,
+    content_container: Option<Element>,
     vertical: bool,
     scroll_bar_width: f32,
     indicator_length: i32,
@@ -24,10 +24,10 @@ pub struct ScrollBar {
 }
 
 impl ElementBackend for ScrollBar {
-    fn create(mut element: ElementRef) -> Self {
+    fn create(mut element: Element) -> Self {
         let mut base = Container::create(element.clone());
         element.set_style_property("background", BACKGROUND_COLOR);
-        let mut indicator_ele = ElementRef::create(Container::create);
+        let mut indicator_ele = Element::create(Container::create);
         indicator_ele.set_style_property("background", INDICATOR_COLOR);
         indicator_ele.set_style_property("borderradius", "4");
         base.add_child_view(indicator_ele.clone(), None);
@@ -69,7 +69,7 @@ impl ElementBackend for ScrollBar {
         }
     }
 
-    fn get_children(&self) -> Vec<ElementRef> {
+    fn get_children(&self) -> Vec<Element> {
         self.base.get_children()
     }
 
@@ -77,7 +77,7 @@ impl ElementBackend for ScrollBar {
 
 impl ScrollBar {
 
-    pub fn set_content_container(&mut self, content_container: Option<ElementRef>) {
+    pub fn set_content_container(&mut self, content_container: Option<Element>) {
         self.content_container = content_container;
     }
 

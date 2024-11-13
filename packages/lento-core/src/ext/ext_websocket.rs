@@ -23,20 +23,20 @@ pub struct WsConnection {
 }
 
 
-unsafe impl Send for WsConnectionRef {}
-unsafe impl Sync for WsConnectionRef {}
+unsafe impl Send for WsConnection {}
+unsafe impl Sync for WsConnection {}
 
-js_value!(WsConnectionRef);
+js_value!(WsConnection);
 
 #[js_methods]
-impl WsConnectionRef {
+impl WsConnection {
 
     #[js_func]
-    pub async fn connect(url: String) -> Result<WsConnectionRef, JsError> {
+    pub async fn connect(url: String) -> Result<WsConnection, JsError> {
         let (mut socket, _) = connect_async(url).await
             .map_err(|e| io::Error::new(ErrorKind::Other, e))?;
         let (writer, reader) = socket.split();
-        let ws_conn = WsConnection {
+        let ws_conn = WsConnectionData {
             reader: Arc::new(Mutex::new(reader)),
             writer: Arc::new(Mutex::new(writer)),
         };
