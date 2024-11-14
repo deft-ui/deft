@@ -103,3 +103,23 @@ macro_rules! js_deserialize {
         }
     };
 }
+
+#[macro_export]
+macro_rules! js_element_event {
+    ($event_type: expr, $ty: ty) => {
+        impl $ty {
+             pub fn emit(self, element: lento::element::Element) {
+                let event = lento::base::Event::<ElementWeak>::new($event_type, self, element.as_weak());
+                element.emit_event($event_type, event);
+            }
+            pub fn emit_weak(self, element: lento::element::ElementWeak) -> bool {
+                if let Ok(el) = element.upgrade() {
+                    self.emit(el);
+                    true
+                } else {
+                    false
+                }
+            }
+        }
+    };
+}
