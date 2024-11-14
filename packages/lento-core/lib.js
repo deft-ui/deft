@@ -878,7 +878,9 @@ export class WebSocket {
         });
     }
 
-    //TODO support close
+    close() {
+        WsConnection_close(this.client);
+    }
 
     async #connect(url) {
         try {
