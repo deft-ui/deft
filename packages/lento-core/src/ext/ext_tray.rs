@@ -83,7 +83,7 @@ js_deserialize!(TrayMenu);
 impl SystemTray {
 
     #[js_func]
-    pub fn tray_create(id: String) -> Result<SystemTray, Error> {
+    pub fn create(id: String) -> Result<SystemTray, Error> {
         let tray = SystemTray::create_tray(&id, get_event_proxy());
         Ok(tray)
     }
