@@ -89,6 +89,51 @@ pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
     expanded.into()
 }
 
+
+#[proc_macro_attribute]
+pub fn event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
+    let struct_def = parse_macro_input!(struct_def as ItemStruct);
+    let listener_name = format_ident!("{}Listener", struct_def.ident);
+    let event_name = struct_def.ident;
+    let fields = struct_def.fields;
+
+    let expanded = quote! {
+
+        pub struct #listener_name(Box<dyn FnMut(&mut #event_name, &mut lento::base::EventContext<lento::element::ElementWeak>)>);
+
+        impl #listener_name {
+            pub fn new<F: FnMut(&mut #event_name, &mut lento::base::EventContext<lento::element::ElementWeak>) + 'static>(f: F) -> Self {
+                Self(Box::new(f))
+            }
+        }
+
+        impl EventListener<#event_name, lento::element::ElementWeak> for #listener_name {
+            fn handle_event(&mut self, event: &mut #event_name, ctx: &mut lento::base::EventContext<lento::element::ElementWeak>) {
+                (self.0)(event, ctx)
+            }
+        }
+
+        impl FromJsValue for #listener_name {
+            fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
+                let listener = Self::new(move |e, ctx| {
+                    if let Ok(e) = e.to_js_value() {
+                        value.call_as_function(vec![e]);
+                        //TODO handle ctx
+                    } else {
+                        println!("invalid event");
+                    }
+                });
+                Ok(listener)
+            }
+        }
+
+        #[derive(serde::Serialize)]
+        pub struct #event_name #fields;
+
+    };
+    expanded.into()
+}
+
 #[proc_macro_attribute]
 pub fn js_methods(_attr: TokenStream, impl_item: TokenStream) -> TokenStream {
     let item = parse_macro_input!(impl_item as ItemImpl);

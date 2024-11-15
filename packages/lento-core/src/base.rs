@@ -1,7 +1,10 @@
 use crate as lento;
-use std::any::Any;
+use std::any::{Any, TypeId};
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::str::FromStr;
+use std::sync::Mutex;
 use anyhow::Error;
 use quick_js::{JsValue, ValueError};
 use serde::{Deserialize, Serialize};
@@ -119,6 +122,7 @@ pub struct EventContext<T> {
     pub propagation_cancelled: bool,
     pub prevent_default: bool,
 }
+
 pub struct Event<T> {
     pub event_type: String,
     pub detail: Box<dyn EventDetail>,
@@ -201,9 +205,15 @@ pub type EventHandler<E> = dyn FnMut(&mut Event<E>);
 
 pub type ElementEventHandler = EventHandler<ElementWeak>;
 
+pub trait EventListener<T, E> {
+    fn handle_event(&mut self, event: &mut T, ctx: &mut EventContext<E>);
+}
+
 pub struct EventRegistration<E> {
     listeners: HashMap<String, Vec<(u32, Box<EventHandler<E>>)>>,
     next_listener_id: u32,
+    typed_listeners: HashMap<TypeId, Vec<(u32, Box<dyn FnMut(&mut Box<dyn Any>, &mut EventContext<E>)>)>>,
+    listener_types: HashMap<u32, TypeId>,
 }
 
 impl<E> EventRegistration<E> {
@@ -211,8 +221,56 @@ impl<E> EventRegistration<E> {
         Self {
             next_listener_id: 1,
             listeners: HashMap::new(),
+            typed_listeners: HashMap::new(),
+            listener_types: HashMap::new(),
         }
     }
+
+    pub fn register_event_listener<T: 'static, H: EventListener<T, E> + 'static>(&mut self, mut listener: H) -> u32 {
+        let id = self.next_listener_id;
+        self.next_listener_id += 1;
+        let event_type_id = TypeId::of::<T>();
+        if !self.typed_listeners.contains_key(&event_type_id) {
+            let lst = Vec::new();
+            self.typed_listeners.insert(event_type_id, lst);
+        }
+        let listeners = self.typed_listeners.get_mut(&event_type_id).unwrap();
+        let wrapper_listener = Box::new(move |d: &mut Box<dyn Any>, ctx: &mut EventContext<E>| {
+            if let Some(t) = d.downcast_mut::<T>() {
+                listener.handle_event(t, ctx);
+            }
+        });
+        listeners.push((id, wrapper_listener));
+        self.listener_types.insert(id, event_type_id);
+        id
+    }
+
+    pub fn unregister_event_listener(&mut self, id: u32) {
+        let event_type_id = match self.listener_types.get(&id) {
+            Some(type_id) => *type_id,
+            None => return,
+        };
+        if let Some(listeners) = self.typed_listeners.get_mut(&event_type_id) {
+            listeners.retain(|(i, _)| *i != id);
+        }
+    }
+
+    pub fn emit<T: 'static>(&mut self, event: T, target: E) {
+        let event_type_id = TypeId::of::<T>();
+        if let Some(listeners) = self.typed_listeners.get_mut(&event_type_id) {
+            let mut ctx = EventContext {
+                target,
+                propagation_cancelled: false,
+                prevent_default: false,
+            };
+            let mut event = Box::new(event) as Box<dyn Any>;
+            for it in listeners {
+                (it.1)(&mut event, &mut ctx);
+            }
+        }
+
+    }
+
     pub fn add_event_listener(&mut self, event_type: &str, handler: Box<EventHandler<E>>) -> u32 {
         let id = self.next_listener_id;
         self.next_listener_id += 1;
@@ -431,3 +489,27 @@ pub struct UnsafeFnMut<P> {
 
 unsafe impl<P> Send for UnsafeFnMut<P> {}
 unsafe impl<P> Sync for UnsafeFnMut<P> {}
+
+#[test]
+fn test_event_registration() {
+    #[derive(Debug)]
+    struct MyEvent {
+        value: Rc<RefCell<i32>>,
+    };
+    struct MyEventListener {
+
+    }
+    impl EventListener<MyEvent, ()> for MyEventListener {
+        fn handle_event(&mut self, event: &mut MyEvent, ctx: &mut EventContext<()>) {
+            println!("handling {:?}", event);
+            let mut v = event.value.borrow_mut();
+            *v = 1;
+        }
+    }
+    let value = Rc::new(RefCell::new(0));
+    let mut er: EventRegistration<()> = EventRegistration::new();
+    er.register_event_listener(MyEventListener {});
+    er.emit(MyEvent { value: Rc::clone(&value) }, ());
+
+    assert_eq!(1, *value.borrow());
+}

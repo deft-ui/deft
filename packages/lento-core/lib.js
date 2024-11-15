@@ -235,6 +235,62 @@ export class EventRegistry {
     }
 }
 
+export class EventBinder {
+    #eventListeners = Object.create(null);
+    #target;
+    #removeEventListenerApi;
+    #addEventListenerApi;
+    #contextGetter;
+    #self;
+
+    constructor(target, addApi, removeApi, self, contextGetter) {
+        this.#target = target;
+        this.#addEventListenerApi = addApi;
+        this.#removeEventListenerApi = removeApi;
+        this.#contextGetter = contextGetter;
+        this.#self = self;
+    }
+
+    bindEvent(type, callback) {
+        type = type.toLowerCase();
+        if (typeof callback !== "function") {
+            throw new Error("invalid callback");
+        }
+        let oldListenerId = this.#eventListeners[type];
+        if (oldListenerId) {
+            this.#removeEventListenerApi(this.#target, type, oldListenerId);
+        }
+
+        const getJsContext = (target) => {
+            if (target && this.#contextGetter) {
+                return this.#contextGetter(target);
+            }
+            return target;
+        }
+
+        const self = this.#self;
+
+        /**
+         *
+         * @param detail {object}
+         * @param target {unknown}
+         * @returns {{propagationCancelled: boolean, preventDefault: boolean}}
+         * @private
+         */
+        function eventCallback(detail, target) {
+            const event = new EventObject(type, detail, getJsContext(target), self);
+            try {
+                callback && callback(event);
+                return event.result();
+            } catch (error) {
+                console.error('event handling error', error);
+            }
+        }
+
+        this.#eventListeners[type] = this.#addEventListenerApi(this.#target, type, eventCallback);
+    }
+}
+
 export class SystemTray {
     /**
      * @type EventRegistry
@@ -299,6 +355,20 @@ export class View {
             throw new Error("Failed to create view:" + el)
         }
         this.#eventRegistry = new EventRegistry(this.el, Element_bind_event, Element_remove_event_listener, this, (target) => {
+            const myContext = Element_get_js_context(target);
+            if (myContext) {
+                return CONTEXT2ELEMENT.get(myContext);
+            }
+        });
+    }
+
+    createEventBinder(target, addEventListenerApi, removeEventListenerApi) {
+        if (!removeEventListenerApi) {
+            removeEventListenerApi = (_t, listenerId) => {
+                Element_remove_js_event_listener(this.el, listenerId);
+            }
+        }
+        return new EventBinder(target, addEventListenerApi, removeEventListenerApi, this, (target) => {
             const myContext = Element_get_js_context(target);
             if (myContext) {
                 return CONTEXT2ELEMENT.get(myContext);

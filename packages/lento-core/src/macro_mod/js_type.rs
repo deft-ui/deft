@@ -123,3 +123,19 @@ macro_rules! js_element_event {
         }
     };
 }
+
+#[macro_export]
+macro_rules! bind_js_event_listener {
+    ($target: expr, $actual_type: expr, $listener: expr; $($event_type: expr => $listener_type: ty, )* ) => {
+        match $actual_type {
+            $(
+                $event_type => {
+                    $target.register_event_listener(<$listener_type>::from_js_value($listener)?)
+                }
+            )*
+            _ => {
+                return Err(JsError::from_str("unknown event_type"))
+            }
+        }
+    };
+}

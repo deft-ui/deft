@@ -15,7 +15,7 @@ use winit::window::CursorIcon;
 use yoga::{Direction, Edge, StyleUnit};
 
 use crate::animation::AnimationResource;
-use crate::base::{ElementEvent, ElementEventContext, ElementEventHandler, EventRegistration, ScrollEventDetail};
+use crate::base::{ElementEvent, ElementEventContext, ElementEventHandler, EventListener, EventRegistration, ScrollEventDetail};
 use crate::border::build_rect_with_radius;
 use crate::element::button::Button;
 use crate::element::container::Container;
@@ -705,6 +705,24 @@ impl Element {
         }
     }
 
+    pub fn register_event_listener<T: 'static, H: EventListener<T, ElementWeak> + 'static>(&mut self, mut listener: H) -> u32 {
+        self.event_registration.register_event_listener(listener)
+    }
+
+    pub fn unregister_event_listener(&mut self, id: u32) {
+        self.event_registration.unregister_event_listener(id)
+    }
+
+    #[js_func]
+    pub fn remove_js_event_listener(&mut self, id: u32) {
+        self.unregister_event_listener(id);
+    }
+
+    pub fn emit<T: 'static>(&mut self, event: T) {
+        let weak = self.as_weak();
+        self.event_registration.emit(event, weak);
+    }
+
     pub fn add_event_listener(&mut self, event_type: &str, handler: Box<ElementEventHandler>) -> u32 {
         self.event_registration.add_event_listener(event_type, handler)
     }
@@ -836,6 +854,14 @@ impl Element {
         clip_path
     }
 
+}
+
+impl ElementWeak {
+    pub fn emit<T: 'static>(&self, event: T) {
+        if let Ok(mut el) = self.upgrade() {
+            el.emit(event);
+        }
+    }
 }
 
 #[mrc_object]
