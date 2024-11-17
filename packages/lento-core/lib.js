@@ -47,6 +47,11 @@ export class Frame {
      */
     #eventRegistry;
 
+    /**
+     * @type EventBinder
+     */
+    #eventBinder;
+
     #frameId;
 
     /**
@@ -55,7 +60,7 @@ export class Frame {
      */
     constructor(attrs) {
         this.#frameId = Frame_create(attrs || {});
-        this.#eventRegistry = new EventRegistry(this.#frameId, Frame_bind_event, Frame_remove_event_listener, this);
+        this.#eventBinder = new EventBinder(this.#frameId, Frame_bind_js_event_listener, Frame_unbind_js_event_listener, this);
     }
 
     /**
@@ -102,6 +107,10 @@ export class Frame {
         Frame_set_visible(this.#frameId, visible);
     }
 
+    bindResize(callback) {
+        this.#eventBinder.bindEvent("resize", callback);
+    }
+
     /**
      *
      * @param callback {(event: IVoidEvent) => void}
@@ -127,7 +136,7 @@ export class Frame {
     }
 
     bindEvent(type, callback) {
-        this.#eventRegistry.bindEvent(type, callback);
+        this.#eventBinder.bindEvent(type, callback);
     }
 
 }

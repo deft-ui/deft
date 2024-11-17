@@ -99,6 +99,15 @@ pub struct ResizeEvent {
     pub height: u32,
 }
 
+#[frame_event]
+pub struct CloseEvent;
+
+#[frame_event]
+pub struct FocusEvent;
+
+#[frame_event]
+pub struct BlurEvent;
+
 #[js_methods]
 impl Frame {
 
@@ -245,20 +254,14 @@ impl Frame {
     }
 
     #[js_func]
-    pub fn bind_event(&mut self, event_name: String, callback: JsValue) -> Result<i32, JsError> {
-        Ok(self.event_registration.add_js_event_listener(&event_name, callback))
-    }
-
-    #[js_func]
     pub fn set_visible(&mut self, visible: bool) -> Result<(), JsError> {
         self.window.set_visible(visible);
         Ok(())
     }
     
     pub fn allow_close(&mut self) -> bool {
-        let mut event = Event::new("close", (), self.as_weak());
-        self.event_registration.emit_event(&mut event);
-        return !event.context.prevent_default;
+        let ctx = self.emit(CloseEvent);
+        !ctx.prevent_default
     }
 
     pub fn handle_input(&mut self, content: &str) {
@@ -381,11 +384,9 @@ impl Frame {
             WindowEvent::Focused(focus) => {
                 let target = self.as_weak();
                 if focus {
-                    let mut event = Event::new("focus", (), target);
-                    self.event_registration.emit_event(&mut event);
+                    self.emit(FocusEvent);
                 } else {
-                    let mut event = Event::new("blur", (), target);
-                    self.event_registration.emit_event(&mut event);
+                    self.emit(BlurEvent);
                 }
             }
             _ => (),
@@ -405,8 +406,16 @@ impl Frame {
         let id = bind_js_event_listener!(
             self, event_type.as_str(), listener;
             "resize" => ResizeEventListener,
+            "close"  => CloseEventListener,
+            "focus"  => FocusEventListener,
+            "blur"   => BlurEventListener,
         );
         Ok(id)
+    }
+
+    #[js_func]
+    pub fn unbind_js_event_listener(&mut self, id: u32) {
+        self.event_registration.unregister_event_listener(id)
     }
 
     pub fn register_event_listener<T: 'static, H: EventListener<T, FrameWeak> + 'static>(&mut self, mut listener: H) -> u32 {
@@ -741,13 +750,14 @@ impl Frame {
         });
     }
 
-    pub fn emit<T: 'static>(&mut self, mut event: T) {
+    pub fn emit<T: 'static>(&mut self, mut event: T) -> EventContext<FrameWeak> {
         let mut ctx = EventContext {
             target: self.as_weak(),
             propagation_cancelled: false,
             prevent_default: false,
         };
         self.event_registration.emit(&mut event, &mut ctx);
+        ctx
     }
 
     fn paint(&mut self) {

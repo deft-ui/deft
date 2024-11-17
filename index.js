@@ -2,6 +2,9 @@ function main() {
     console.log("begin create frame");
     const frame = new Frame();
     frame.setTitle("LentoDemo");
+    frame.bindResize((e) => {
+        console.log("frame resized", e);
+    })
     console.log("frame created", frame);
 
     const container = new ScrollElement();

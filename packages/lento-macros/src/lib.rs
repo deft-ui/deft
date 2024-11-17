@@ -137,8 +137,17 @@ fn create_event(_attr: TokenStream, struct_def: TokenStream, target_type: TokenS
                         use lento::js::js_value_util::ToJsValue;
                         use lento::js::js_value_util::SerializeToJsValue;
                         if let Ok(e) = e.to_js_value() {
-                            value.call_as_function(vec![e, d]);
-                            //TODO handle result
+                            let callback_result = value.call_as_function(vec![e, d]);
+                            if let Ok(cb_result) = callback_result {
+                                if let Ok(res) = lento::js::js_value_util::EventResult::from_js_value(cb_result) {
+                                    if res.propagation_cancelled {
+                                        ctx.propagation_cancelled = true;
+                                    }
+                                    if res.prevent_default {
+                                        ctx.prevent_default = true;
+                                    }
+                                }
+                            }
                         } else {
                             println!("invalid event");
                         }
