@@ -104,6 +104,6 @@ impl FrameWeak {
 
 // Js Api
 //TODO remove
-define_resource!(FrameWeak);
+// define_resource!(FrameWeak);
 
 js_weak_value!(Frame, FrameWeak);

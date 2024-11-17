@@ -1,10 +1,10 @@
 use crate as lento;
 use crate::app::{exit_app, AppEvent};
 use crate::base::MouseEventType::{MouseClick, MouseUp};
-use crate::base::{ElementEvent, Event, EventContext, EventHandler, EventRegistration, MouseDetail, MouseEventType, Touch, TouchDetail, UnsafeFnOnce};
+use crate::base::{ElementEvent, Event, EventContext, EventHandler, EventListener, EventRegistration, MouseDetail, MouseEventType, Touch, TouchDetail, UnsafeFnOnce};
 use crate::canvas_util::CanvasHelper;
 use crate::cursor::search_cursor;
-use crate::element::Element;
+use crate::element::{Element, ElementWeak};
 use crate::event::{build_modifier, named_key_to_str, CaretEventBind, ClickEventBind, DragOverEventDetail, DragStartEventDetail, DropEventDetail, FocusEventBind, FocusShiftBind, KeyEventDetail, MouseDownEventBind, MouseEnterEventBind, MouseLeaveEventBind, MouseMoveEventBind, MouseUpEventBind, MouseWheelDetail, TouchCancelEventBind, TouchEndEventBind, TouchMoveEventBind, TouchStartEventBind, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT};
 use crate::event_loop::{run_with_event_loop, send_event};
 use crate::ext::common::create_event_handler;
@@ -15,7 +15,7 @@ use crate::mrc::{Mrc, MrcWeak};
 use crate::renderer::CpuRenderer;
 use crate::timer::{set_timeout, TimerHandle};
 use anyhow::{anyhow, Error};
-use lento_macros::{js_func, js_methods, mrc_object};
+use lento_macros::{event, frame_event, js_func, js_methods, mrc_object};
 use measure_time::print_time;
 use quick_js::{JsValue, ResourceValue};
 use skia_bindings::SkClipOp;
@@ -37,6 +37,7 @@ use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use winit::keyboard::{Key, NamedKey};
 use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorGrabMode, CursorIcon, Window, WindowAttributes, WindowId};
+use crate::bind_js_event_listener;
 
 #[derive(Clone)]
 struct MouseDownInfo {
@@ -90,6 +91,12 @@ pub type FrameEventContext = EventContext<FrameWeak>;
 
 thread_local! {
     pub static NEXT_FRAME_ID: Cell<i32> = Cell::new(1);
+}
+
+#[frame_event]
+pub struct ResizeEvent {
+    pub width: u32,
+    pub height: u32,
 }
 
 #[js_methods]
@@ -391,6 +398,23 @@ impl Frame {
 
     pub fn bind_event_listener<T: 'static, F: FnMut(&mut FrameEventContext, &mut T) + 'static>(&mut self, event_type: &str, handler: F) -> u32 {
         self.event_registration.bind_event_listener(event_type, handler)
+    }
+
+    #[js_func]
+    pub fn bind_js_event_listener(&mut self, event_type: String, listener: JsValue) -> Result<u32, JsError> {
+        let id = bind_js_event_listener!(
+            self, event_type.as_str(), listener;
+            "resize" => ResizeEventListener,
+        );
+        Ok(id)
+    }
+
+    pub fn register_event_listener<T: 'static, H: EventListener<T, FrameWeak> + 'static>(&mut self, mut listener: H) -> u32 {
+        self.event_registration.register_event_listener(listener)
+    }
+
+    pub fn unregister_event_listener(&mut self, id: u32) {
+        self.event_registration.unregister_event_listener(id)
     }
 
     #[js_func]
@@ -711,6 +735,19 @@ impl Frame {
         }
         self.window.resize_surface(width, height);
         self.mark_dirty(true);
+        self.emit(ResizeEvent {
+            width,
+            height,
+        });
+    }
+
+    pub fn emit<T: 'static>(&mut self, mut event: T) {
+        let mut ctx = EventContext {
+            target: self.as_weak(),
+            propagation_cancelled: false,
+            prevent_default: false,
+        };
+        self.event_registration.emit(&mut event, &mut ctx);
     }
 
     fn paint(&mut self) {

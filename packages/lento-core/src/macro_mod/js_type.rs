@@ -130,6 +130,7 @@ macro_rules! bind_js_event_listener {
         match $actual_type {
             $(
                 $event_type => {
+                    use lento::js::FromJsValue;
                     $target.register_event_listener(<$listener_type>::from_js_value($listener)?)
                 }
             )*
