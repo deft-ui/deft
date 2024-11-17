@@ -349,6 +349,7 @@ export class View {
         if (typeof el === "number") {
             this.el = Element_create_by_type(el, myContext);
         } else {
+            Element_set_js_context(el, myContext);
             this.el = el;
         }
         if (!this.el) {

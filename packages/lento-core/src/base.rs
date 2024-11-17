@@ -212,7 +212,7 @@ pub trait EventListener<T, E> {
 pub struct EventRegistration<E> {
     listeners: HashMap<String, Vec<(u32, Box<EventHandler<E>>)>>,
     next_listener_id: u32,
-    typed_listeners: HashMap<TypeId, Vec<(u32, Box<dyn FnMut(&mut Box<dyn Any>, &mut EventContext<E>)>)>>,
+    typed_listeners: HashMap<TypeId, Vec<(u32, Box<dyn FnMut(&mut Box<&mut dyn Any>, &mut EventContext<E>)>)>>,
     listener_types: HashMap<u32, TypeId>,
 }
 
@@ -235,7 +235,7 @@ impl<E> EventRegistration<E> {
             self.typed_listeners.insert(event_type_id, lst);
         }
         let listeners = self.typed_listeners.get_mut(&event_type_id).unwrap();
-        let wrapper_listener = Box::new(move |d: &mut Box<dyn Any>, ctx: &mut EventContext<E>| {
+        let wrapper_listener = Box::new(move |d: &mut Box<&mut dyn Any>, ctx: &mut EventContext<E>| {
             if let Some(t) = d.downcast_mut::<T>() {
                 listener.handle_event(t, ctx);
             }
@@ -255,17 +255,12 @@ impl<E> EventRegistration<E> {
         }
     }
 
-    pub fn emit<T: 'static>(&mut self, event: T, target: E) {
+    pub fn emit<T: 'static>(&mut self, event: &mut T, ctx: &mut EventContext<E>) {
         let event_type_id = TypeId::of::<T>();
         if let Some(listeners) = self.typed_listeners.get_mut(&event_type_id) {
-            let mut ctx = EventContext {
-                target,
-                propagation_cancelled: false,
-                prevent_default: false,
-            };
-            let mut event = Box::new(event) as Box<dyn Any>;
+            let mut event = Box::new(event as &mut dyn Any);
             for it in listeners {
-                (it.1)(&mut event, &mut ctx);
+                (it.1)(&mut event, ctx);
             }
         }
 
@@ -509,7 +504,11 @@ fn test_event_registration() {
     let value = Rc::new(RefCell::new(0));
     let mut er: EventRegistration<()> = EventRegistration::new();
     er.register_event_listener(MyEventListener {});
-    er.emit(MyEvent { value: Rc::clone(&value) }, ());
+    er.emit(&mut MyEvent { value: Rc::clone(&value) }, &mut EventContext {
+        target: (),
+        propagation_cancelled: false,
+        prevent_default: false,
+    });
 
     assert_eq!(1, *value.borrow());
 }

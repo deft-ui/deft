@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote, ToTokens};
-use syn::{parse_macro_input, FnArg, Ident, ImplItem, ItemFn, ItemImpl, ItemStruct, Visibility};
+use syn::{parse_macro_input, Fields, FnArg, Ident, ImplItem, ItemFn, ItemImpl, ItemStruct, Visibility};
 use syn::__private::TokenStream2;
 use syn::token::{Async};
 
@@ -92,33 +92,56 @@ pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
+    create_event(_attr, struct_def, quote! {lento::element::ElementWeak})
+}
+
+#[proc_macro_attribute]
+pub fn frame_event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
+    create_event(_attr, struct_def, quote! {lento::frame::FrameWeak})
+}
+
+fn create_event(_attr: TokenStream, struct_def: TokenStream, target_type: TokenStream2) -> TokenStream {
     let struct_def = parse_macro_input!(struct_def as ItemStruct);
     let listener_name = format_ident!("{}Listener", struct_def.ident);
     let event_name = struct_def.ident;
     let fields = struct_def.fields;
 
+    let fields_ts = match fields {
+        Fields::Named(nf) => { quote! {#nf} }
+        Fields::Unnamed(uf) => { quote! {#uf;} }
+        Fields::Unit => {quote! {#fields;} }
+    };
+
     let expanded = quote! {
 
-        pub struct #listener_name(Box<dyn FnMut(&mut #event_name, &mut lento::base::EventContext<lento::element::ElementWeak>)>);
+        pub struct #listener_name(Box<dyn FnMut(&mut #event_name, &mut lento::base::EventContext<#target_type>)>);
 
         impl #listener_name {
-            pub fn new<F: FnMut(&mut #event_name, &mut lento::base::EventContext<lento::element::ElementWeak>) + 'static>(f: F) -> Self {
+            pub fn new<F: FnMut(&mut #event_name, &mut lento::base::EventContext<#target_type>) + 'static>(f: F) -> Self {
                 Self(Box::new(f))
             }
         }
 
-        impl EventListener<#event_name, lento::element::ElementWeak> for #listener_name {
-            fn handle_event(&mut self, event: &mut #event_name, ctx: &mut lento::base::EventContext<lento::element::ElementWeak>) {
+        impl lento::base::EventListener<#event_name, #target_type> for #listener_name {
+            fn handle_event(&mut self, event: &mut #event_name, ctx: &mut lento::base::EventContext<#target_type>) {
                 (self.0)(event, ctx)
             }
         }
 
-        impl FromJsValue for #listener_name {
-            fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
+        impl lento::js::FromJsValue for #listener_name {
+            fn from_js_value(value: JsValue) -> Result<Self, quick_js::ValueError> {
                 let listener = Self::new(move |e, ctx| {
-                    if let Ok(e) = e.to_js_value() {
-                        value.call_as_function(vec![e]);
-                        //TODO handle ctx
+                    let target = ctx.target.clone();
+                    use lento::js::ToJsValue;
+                    if let Ok(d) = target.to_js_value() {
+                        use lento::js::js_value_util::ToJsValue;
+                        use lento::js::js_value_util::SerializeToJsValue;
+                        if let Ok(e) = e.to_js_value() {
+                            value.call_as_function(vec![e, d]);
+                            //TODO handle result
+                        } else {
+                            println!("invalid event");
+                        }
                     } else {
                         println!("invalid event");
                     }
@@ -128,7 +151,14 @@ pub fn event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
         }
 
         #[derive(serde::Serialize)]
-        pub struct #event_name #fields;
+        pub struct #event_name
+            #fields_ts
+
+        impl lento::element::ViewEvent for #event_name {
+            fn allow_bubbles(&self) -> bool {
+                false
+            }
+        }
 
     };
     expanded.into()

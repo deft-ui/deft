@@ -15,7 +15,7 @@ use winit::window::CursorIcon;
 use yoga::{Direction, Edge, StyleUnit};
 
 use crate::animation::AnimationResource;
-use crate::base::{ElementEvent, ElementEventContext, ElementEventHandler, EventListener, EventRegistration, ScrollEventDetail};
+use crate::base::{ElementEvent, ElementEventContext, ElementEventHandler, EventContext, EventListener, EventRegistration, ScrollEventDetail};
 use crate::border::build_rect_with_radius;
 use crate::element::button::Button;
 use crate::element::container::Container;
@@ -63,6 +63,11 @@ struct ElementJsContext {
 pub struct ScrollByOption {
     x: f32,
     y: f32,
+}
+
+//TODO rename
+pub trait ViewEvent {
+    fn allow_bubbles(&self) -> bool;
 }
 
 #[js_methods]
@@ -125,6 +130,11 @@ impl Element {
         view.resource_table.put(ElementJsContext { context });
 
         Ok(view)
+    }
+
+    #[js_func]
+    pub fn set_js_context(&mut self, context: JsValue) {
+        self.resource_table.put(ElementJsContext { context });
     }
 
 
@@ -291,7 +301,7 @@ impl Element {
     pub fn set_parent(&mut self, parent: Option<Element>) {
         self.parent = match parent {
             None => None,
-            Some(p) => Some(p.inner.as_weak()),
+            Some(p) => Some(p.as_weak()),
         };
         self.layout.compute_color();
         self.layout.compute_background_color();
@@ -325,13 +335,11 @@ impl Element {
             None => return None,
             Some(p) => p,
         };
-        let inner = match p.upgrade() {
+        let p = match p.upgrade() {
             Err(_e) => return None,
             Ok(u) => u,
         };
-        Some(Element {
-            inner,
-        })
+        Some(p)
     }
 
     pub fn contains_point(&self, x: f32, y: f32) -> bool {
@@ -718,9 +726,22 @@ impl Element {
         self.unregister_event_listener(id);
     }
 
-    pub fn emit<T: 'static>(&mut self, event: T) {
-        let weak = self.as_weak();
-        self.event_registration.emit(event, weak);
+    pub fn emit<T: ViewEvent + 'static>(&mut self, mut event: T) {
+        let mut ctx = EventContext {
+            target: self.as_weak(),
+            propagation_cancelled: false,
+            prevent_default: false,
+        };
+        self.handle_event(&mut event, &mut ctx);
+    }
+
+    fn handle_event<T: ViewEvent + 'static>(&mut self, event: &mut T, ctx: &mut EventContext<ElementWeak>) {
+        self.event_registration.emit(event, ctx);
+        if event.allow_bubbles() && !ctx.propagation_cancelled {
+            if let Some(mut p) = self.get_parent() {
+                p.handle_event(event, ctx);
+            }
+        }
     }
 
     pub fn add_event_listener(&mut self, event_type: &str, handler: Box<ElementEventHandler>) -> u32 {
@@ -857,7 +878,7 @@ impl Element {
 }
 
 impl ElementWeak {
-    pub fn emit<T: 'static>(&self, event: T) {
+    pub fn emit<T: ViewEvent + 'static>(&self, event: T) {
         if let Ok(mut el) = self.upgrade() {
             el.emit(event);
         }
@@ -868,7 +889,7 @@ impl ElementWeak {
 pub struct Element {
     id: u32,
     backend: Box<dyn ElementBackend>,
-    parent: Option<MrcWeak<ElementData>>,
+    parent: Option<ElementWeak>,
     window: Option<FrameWeak>,
     event_registration: EventRegistration<ElementWeak>,
     pub layout: StyleNode,
