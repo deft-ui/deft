@@ -1,4 +1,17 @@
+function createSystemTray() {
+    const tray = new SystemTray();
+    tray.setTitle("LentoTest");
+    tray.setMenus([{
+        id: "test",
+        label: "test",
+        handler() {
+            console.log("clicked test menu");
+        }
+    }]);
+}
+
 function main() {
+    createSystemTray();
     console.log("begin create frame");
     const frame = new Frame();
     frame.setTitle("LentoDemo");

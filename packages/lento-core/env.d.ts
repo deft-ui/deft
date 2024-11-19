@@ -172,8 +172,12 @@ declare interface LocalStorage {
 declare const localStorage: LocalStorage;
 
 declare interface TrayMenu {
-    id: string,
-    label: string,
+    kind ?: "standard" | "checkmark" | "separator"
+    id ?: string,
+    label ?: string,
+    checked ?: boolean,
+    enabled ?: boolean,
+    handler ?: () => void,
 }
 
 declare function process_exit(code: number);
