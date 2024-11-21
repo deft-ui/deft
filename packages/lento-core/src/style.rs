@@ -385,6 +385,7 @@ macro_rules! define_style_props {
 define_style_props!(
     Color => StyleColor,
     BackgroundColor => StyleColor,
+    FontSize        => f32,
 
     BorderTop => StyleBorder,
     BorderRight => StyleBorder,
@@ -684,6 +685,7 @@ pub struct StyleNodeInner {
     pub border_color: [Color;4],
     pub background_color: ColorPropValue,
     pub background_image: Option<Image>,
+    pub font_size: f32,
     pub transform: Option<Matrix>,
     pub computed_style: ComputedStyle,
     animation_params: AnimationParams,
@@ -752,6 +754,7 @@ impl StyleNode {
             computed_style: ComputedStyle::default(),
             on_changed: None,
             animation_renderer: None,
+            font_size: 12.0,
             border_paths: CacheValue::new(|p: &BorderParams| {
                 build_border_paths(p.border_width, p.border_radius, p.width, p.height)
             }),
@@ -791,6 +794,9 @@ impl StyleNode {
                 self.background_color = value.resolve(&ColorPropValue::Color(Color::TRANSPARENT));
                 self.compute_background_color();
                 need_layout = false;
+            }
+            StyleProp::FontSize(value) => {
+                self.font_size = value.resolve(&12.0);
             }
             StyleProp::BorderTop (value) =>   {
                 self.set_border(&value, &vec![0])

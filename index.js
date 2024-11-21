@@ -34,6 +34,7 @@ function main() {
     label.setAlign("center")
     label.setText("测试test");
     label.setStyle({
+        fontSize: 24,
         "border-top": "#F00 3",
         "border-right": "#0F0 3",
         "border-bottom": "#00F 3",

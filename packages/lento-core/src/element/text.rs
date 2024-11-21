@@ -532,11 +532,21 @@ impl ElementBackend for Text {
     }
 
     fn handle_style_changed(&mut self, key: &str) {
-        if key == "color" {
-            let color = self.element.layout.computed_style.color;
-            self.text_params.paint.set_color(color);
-            self.refresh_lines();
-            self.mark_dirty(false);
+        let key = key.to_lowercase();
+        match key.as_str() {
+            "color" => {
+                let color = self.element.layout.computed_style.color;
+                self.text_params.paint.set_color(color);
+                self.refresh_lines();
+                self.mark_dirty(false);
+            },
+            "fontsize" => {
+                let font_size = self.element.layout.font_size;
+                self.text_params.font.set_size(font_size);
+                self.refresh_lines();
+                self.mark_dirty(true);
+            }
+            _ => {}
         }
     }
 
