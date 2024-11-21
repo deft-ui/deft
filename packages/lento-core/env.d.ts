@@ -99,6 +99,7 @@ declare type Align =
 declare interface StyleProps extends Record<string, number | string>{
     color?: string,
     backgroundColor?: string;
+    fontSize?: number;
 
     borderTop?: string;
     borderRight?: string;
