@@ -234,10 +234,10 @@ export class EventRegistry {
             const event = new EventObject(type, detail, getJsContext(target), self);
             try {
                 callback && callback(event);
-                return event.result();
             } catch (error) {
-                console.error('event handling error', error);
+                console.error('event handling error', error?.message);
             }
+            return event.result();
         }
 
         this.eventListeners[type] = this._add_api(this._id, type, eventCallback);
