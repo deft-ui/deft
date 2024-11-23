@@ -1,4 +1,5 @@
 function main() {
+    Worker_create("./worker-index.js");
     console.log("begin create frame");
     const frame = new Frame();
     frame.setTitle("LentoDemo");

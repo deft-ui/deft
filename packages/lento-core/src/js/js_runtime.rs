@@ -76,6 +76,10 @@ impl JsContext {
         self.context.execute_module(&module_name).unwrap();
     }
 
+    pub fn execute_module(&mut self, module_name: &str) -> Result<(), ExecutionError> {
+        self.context.execute_module(&module_name)
+    }
+
     pub fn execute_pending_job(&self) -> Result<bool, ExecutionError> {
         self.context.execute_pending_job()
     }

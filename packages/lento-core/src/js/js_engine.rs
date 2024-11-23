@@ -3,7 +3,7 @@ use std::panic::RefUnwindSafe;
 
 use anyhow::anyhow;
 use quick_js::loader::JsModuleLoader;
-use quick_js::{Callback, Context, JsValue, ValueError};
+use quick_js::{Callback, Context, ExecutionError, JsValue, ValueError};
 use tokio::runtime::Builder;
 use winit::event::{DeviceEvent, DeviceId, WindowEvent};
 use winit::window::{CursorGrabMode, WindowId};
@@ -151,6 +151,10 @@ impl JsEngine {
 
     pub fn execute_main(&mut self) {
         self.js_context.execute_main();
+    }
+
+    pub fn execute_module(&mut self, module_name: &str) -> Result<(), ExecutionError> {
+        self.js_context.execute_module(module_name)
     }
 
     pub fn handle_window_event(&mut self, window_id: WindowId, event: WindowEvent) {

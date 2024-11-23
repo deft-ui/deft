@@ -46,7 +46,7 @@ impl JsEventLoopProxy {
 }
 
 pub enum JsEvent {
-    MacroTask(Box<dyn FnOnce()>),
+    MacroTask(Box<dyn FnOnce() + Send + Sync + 'static>),
 }
 
 #[derive(Debug)]
