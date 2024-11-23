@@ -234,10 +234,10 @@ export class EventRegistry {
             const event = new EventObject(type, detail, getJsContext(target), self);
             try {
                 callback && callback(event);
-                return event.result();
             } catch (error) {
-                console.error('event handling error', error);
+                console.error('event handling error', error?.message);
             }
+            return event.result();
         }
 
         this.eventListeners[type] = this._add_api(this._id, type, eventCallback);
@@ -305,6 +305,9 @@ export class SystemTray {
      * @type EventRegistry
      */
     #eventRegistry;
+
+    #menuUserCallback;
+
     tray;
     constructor() {
         this.tray = SystemTray_create("Test");
@@ -319,8 +322,33 @@ export class SystemTray {
         SystemTray_set_icon(this.tray, icon);
     }
 
+    /**
+     *
+     * @param menus {TrayMenu[]}
+     */
     setMenus(menus) {
-        SystemTray_set_menus(this.tray, menus);
+        const list = [];
+        const menuHandlers = new Map();
+        for (const m of menus) {
+            const {id, label, checked, enabled} = m;
+            const kind = m.kind || "standard";
+            if (m.handler) {
+                menuHandlers.set(m.id, m.handler);
+            }
+            list.push({id, label, kind, checked, enabled});
+        }
+        const menuHandler = (e) => {
+            const id = e.detail;
+            const handler = menuHandlers.get(id);
+            if (handler) {
+                handler();
+            }
+            if (this.#menuUserCallback) {
+                this.#menuUserCallback(e);
+            }
+        }
+        SystemTray_set_menus(this.tray, list);
+        this.#eventRegistry.bindEvent("menuclick", menuHandler)
     }
 
     bindActivate(callback) {
@@ -328,7 +356,7 @@ export class SystemTray {
     }
 
     bindMenuClick(callback) {
-        this.#eventRegistry.bindEvent("menuclick", callback);
+        this.#menuUserCallback = callback;
     }
 
 }

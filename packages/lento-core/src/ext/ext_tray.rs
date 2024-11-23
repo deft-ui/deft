@@ -4,12 +4,13 @@ use crate::base::{Event, EventHandler, EventRegistration};
 use crate::event_loop::get_event_proxy;
 use crate::mrc::Mrc;
 use anyhow::Error;
-use ksni::menu::StandardItem;
+use ksni::menu::{CheckmarkItem, StandardItem};
 use ksni::{Handle, Tray};
 use lento_macros::{js_func, js_methods, mrc_object};
 use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
 use std::cell::Cell;
+use ksni::MenuItem::{Checkmark, Separator};
 use winit::event_loop::EventLoopProxy;
 use crate::{define_resource, js_deserialize, js_value};
 
@@ -44,13 +45,37 @@ impl Tray for MyTray {
     fn menu(&self) -> Vec<ksni::MenuItem<Self>> {
         let mut list: Vec<ksni::MenuItem<MyTray>> = Vec::new();
         for m in &self.menus {
-            list.push(StandardItem {
-                label: m.label.to_string(),
-                activate: (self.menu_active_cb_generator)(&m.id),
-                ..Default::default()
-            }.into());
+            let activate = (self.menu_active_cb_generator)(m.id.as_ref().unwrap_or(&"".to_string()));
+            let enabled = m.enabled.unwrap_or(true);
+            let checked = m.checked.unwrap_or(false);
+            let label = m.label.clone().unwrap_or("".to_string());
+            match m.kind.as_str() {
+                "standard" => {
+                    list.push(StandardItem {
+                        label,
+                        activate,
+                        enabled,
+                        ..Default::default()
+                    }.into());
+                }
+                "checkmark" => {
+                    list.push(Checkmark(CheckmarkItem {
+                        label,
+                        activate,
+                        enabled,
+                        checked,
+                        ..Default::default()
+                    }))
+                }
+                "separator" => {
+                    list.push(Separator);
+                }
+                _ => {
+                    println!("invalid menu kind: {}", m.kind)
+                }
+            }
         }
-        return list;
+        list
     }
 }
 
@@ -71,9 +96,13 @@ unsafe impl Send for MyTray {}
 unsafe impl Sync for MyTray {}
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TrayMenu {
-    pub id: String,
-    pub label: String,
+    pub id: Option<String>,
+    pub label: Option<String>,
+    pub kind: String,
+    pub checked: Option<bool>,
+    pub enabled: Option<bool>,
 }
 
 js_deserialize!(TrayMenu);
