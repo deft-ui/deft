@@ -1,5 +1,5 @@
 use std::fmt::{Debug, Formatter};
-
+use std::thread;
 use anyhow::Error;
 use jni::objects::JValue;
 use jni::sys::{jboolean, jlong};
@@ -13,11 +13,12 @@ use winit::platform::android::ActiveEventLoopExtAndroid;
 use winit::platform::android::activity::AndroidApp;
 use winit::window::WindowId;
 
-use crate::event_loop::{get_event_proxy, run_event_loop_task};
+use crate::event_loop::{get_event_proxy, run_event_loop_task, send_event};
 use crate::ext::ext_frame::FRAMES;
 use crate::ext::ext_localstorage::localstorage_flush;
 use crate::frame::frame_input;
 use crate::js::js_engine::JsEngine;
+use crate::js::js_event_loop::{js_init_event_loop, JsEvent, JsEventLoopClosedError};
 use crate::js::js_runtime::JsContext;
 use crate::mrc::Mrc;
 use crate::timer;
@@ -25,7 +26,7 @@ use crate::timer;
 pub enum AppEvent {
     Callback(Box<dyn FnOnce() + Send + Sync>),
     CallbackWithEventLoop(Box<dyn FnOnce(&ActiveEventLoop)>),
-    CheckTimer,
+    JsEvent(JsEvent),
     ShowSoftInput(i32),
     HideSoftInput(i32),
     CommitInput(i32, String),
@@ -54,6 +55,9 @@ pub struct App {
 impl App {
     pub fn new<L: JsModuleLoader>(module_loader: L, mut lento_app: Box<dyn LentoApp>) -> Self {
         let mut js_engine = JsEngine::new(module_loader);
+        let js_event_loop = js_init_event_loop(|js_event| {
+            send_event(AppEvent::JsEvent(js_event)).map_err(|_| JsEventLoopClosedError {})
+        });
         lento_app.init_js_engine(&mut js_engine);
         Self {
             js_engine,
@@ -87,9 +91,13 @@ impl ApplicationHandler<AppEvent> for App {
                 AppEvent::CallbackWithEventLoop(callback) => {
                     callback(event_loop);
                 },
-                AppEvent::CheckTimer => {
-                    timer::check_task();
-                },
+                AppEvent::JsEvent(js_event) => {
+                    match js_event {
+                        JsEvent::MacroTask(callback) => {
+                            callback();
+                        }
+                    }
+                }
                 AppEvent::ShowSoftInput(frame_id) => {
                     println!("show soft input");
                     #[cfg(target_os = "android")]

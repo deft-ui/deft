@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 use skia_safe::wrapper::NativeTransmutableWrapper;
 use crate::app::AppEvent;
 use crate::event_loop::send_event;
+use crate::js::js_event_loop::{js_create_event_loop_proxy, JsEvent};
 
 thread_local! {
     pub static TIMER: RefCell<Timer> = RefCell::new(Timer::new());
@@ -96,6 +97,7 @@ impl Timer {
         let (sender, receiver) = channel();
         let tasks = Arc::new(Mutex::new(BTreeSet::<TimeTask>::new()));
         let tasks_arc = tasks.clone();
+        let js_event_loop_proxy = js_create_event_loop_proxy();
         thread::spawn(move || {
             let mut sleep_time = Duration::from_millis(DEFAULT_SLEEP_TIME);
             loop {
@@ -108,10 +110,12 @@ impl Timer {
                         sleep_time = new_sleep_time;
                     } else {
                         sleep_time = Duration::from_millis(DEFAULT_SLEEP_TIME);
-                        send_event(AppEvent::CheckTimer).unwrap();
+                        if let Err(_) = js_event_loop_proxy.schedule_macro_task(check_task) {
+                            break;
+                        }
                     }
                 } else {
-                    if let Err(_) = send_event(AppEvent::CheckTimer) {
+                    if let Err(_) = js_event_loop_proxy.schedule_macro_task(check_task) {
                         break;
                     }
                 }
@@ -175,7 +179,7 @@ fn remove_time_task(id: u64) {
     wakeup_sleep();
 }
 
-pub fn check_task() {
+fn check_task() {
     let task = TIMER.with_borrow_mut(move |t| {
         let now = get_now_time();
         let mut tasks = t.tasks.lock().unwrap();

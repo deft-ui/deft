@@ -4,6 +4,7 @@ pub mod js_serde;
 pub mod js_deserialze;
 pub mod js_engine;
 pub mod js_binding;
+pub mod js_event_loop;
 
 pub use js_binding::*;
 pub use js_runtime::JsContext;
