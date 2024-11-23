@@ -8,7 +8,6 @@ use crate::element::label::{AttributeText, Label, DEFAULT_TYPE_FACE};
 use crate::element::text::text_paragraph::TextParams;
 use crate::element::text::Text;
 use crate::element::ScrollByOption;
-use crate::event_loop::set_event_proxy;
 use crate::js::js_deserialze::JsDeserializer;
 use crate::loader::{DefaultModuleLoader, RemoteModuleLoader, StaticModuleLoader};
 use crate::performance::MemoryUsage;

@@ -1,7 +1,7 @@
 use crate as lento;
 use crate::app::AppEvent;
 use crate::base::{Event, EventHandler, EventRegistration};
-use crate::event_loop::get_event_proxy;
+use crate::event_loop::{create_event_loop_fn_mut, create_event_loop_proxy};
 use crate::mrc::Mrc;
 use anyhow::Error;
 use ksni::menu::StandardItem;
@@ -84,7 +84,7 @@ impl SystemTray {
 
     #[js_func]
     pub fn create(id: String) -> Result<SystemTray, Error> {
-        let tray = SystemTray::create_tray(&id, get_event_proxy());
+        let tray = SystemTray::create_tray(&id, create_event_loop_proxy());
         Ok(tray)
     }
 
@@ -92,6 +92,7 @@ impl SystemTray {
         let inner_id = NEXT_TRAY_ID.get();
         NEXT_TRAY_ID.set(inner_id + 1);
 
+        let elp = event_loop_proxy.clone();
         let service = ksni::TrayService::new(MyTray {
             tray_id: tray_id.to_string(),
             activate_callback: Box::new(|| {}),
@@ -115,24 +116,38 @@ impl SystemTray {
 
         let inst_weak = inst.inner.as_weak();
         let inst_weak2 = inst.inner.as_weak();
+        let mut sr = inst.clone();
+        let mut menu_active_callback = create_event_loop_fn_mut(move |menu_id: String| {
+            let mut event = Event::new("menuclick", menu_id, sr.clone());
+            sr.inner.event_registration.emit_event(&mut event);
+        });
+
+        let mut sr = inst.clone();
+        let mut activate_callback = create_event_loop_fn_mut(move |()| {
+            let mut event = Event::new("activate", (), sr.clone());
+            sr.inner.event_registration.emit_event(&mut event);
+        });
+
         inst.inner.handle.update(move |t| {
             t.activate_callback = Box::new(move || {
                 if let Ok(st) = inst_weak.upgrade() {
                     let mut str = SystemTray {
                         inner: st,
                     };
-                    str.activate_ts();
+                    activate_callback.call(());
                 }
             });
             t.menu_active_cb_generator = Box::new(move |id| {
                 let inst_weak2 = inst_weak2.clone();
                 let id = id.to_string();
+                let mut menu_active_callback = menu_active_callback.clone();
                 Box::new(move |_| {
                     if let Ok(st) = inst_weak2.upgrade() {
                         let mut str = SystemTray {
                             inner: st,
                         };
-                        str.emit_menu_click(id.to_string());
+                        let mut menu_active_callback = menu_active_callback.clone();
+                        menu_active_callback.call(id.to_string());
                     }
                 })
             });
@@ -181,20 +196,5 @@ impl SystemTray {
         });
     }
 
-    fn emit_menu_click(&mut self, menu_id: String) {
-        let mut sr = self.clone();
-        self.inner.event_loop_proxy.send_event(AppEvent::CallbackWithEventLoop(Box::new(move |_| {
-            let mut event = Event::new("menuclick", menu_id, sr.clone());
-            sr.inner.event_registration.emit_event(&mut event);
-        }))).unwrap();
-    }
-
-    fn activate_ts(&mut self) {
-        let mut sr = self.clone();
-        self.inner.event_loop_proxy.send_event(AppEvent::CallbackWithEventLoop(Box::new(move |_| {
-            let mut event = Event::new("activate", (), sr.clone());
-            sr.inner.event_registration.emit_event(&mut event);
-        }))).unwrap();
-    }
 }
 

@@ -4,6 +4,7 @@ use std::ops::{Deref, DerefMut};
 use anyhow::Error;
 use quick_js::{Context, ExecutionError, JsPromise, JsValue, ValueError};
 use skia_safe::textlayout::TextAlign;
+use skia_safe::wrapper::NativeTransmutableWrapper;
 use tokio::runtime::Runtime;
 use winit::event_loop::EventLoopProxy;
 use winit::window::CursorIcon;
@@ -12,8 +13,8 @@ use crate::base::UnsafeFnOnce;
 use crate::cursor::parse_cursor;
 use crate::js::js_value_util::JsValueHelper;
 use crate::element::label::parse_align;
-use crate::event_loop::{get_event_proxy,run_on_event_loop};
 use crate::js::{ToJsCallResult};
+use crate::js::js_event_loop::{js_create_event_loop_proxy, JsEvent, JsEventLoopProxy};
 use crate::resource_table::ResourceTable;
 
 pub struct JsContext {
@@ -32,7 +33,8 @@ impl JsContext {
     pub fn create_promise(&mut self) -> (JsValue, PromiseResolver) {
         let promise = JsPromise::new(&mut self.context);
         let result = promise.js_value();
-        let resolver = PromiseResolver::new(promise, get_event_proxy());
+        let elp = js_create_event_loop_proxy();
+        let resolver = PromiseResolver::new(promise, elp);
         (result, resolver)
     }
 
@@ -103,11 +105,11 @@ impl DerefMut for JsContext {
 
 pub struct PromiseResolver {
     promise: Option<*mut JsPromise>,
-    event_loop_proxy: EventLoopProxy<AppEvent>,
+    event_loop_proxy: JsEventLoopProxy,
 }
 
 impl PromiseResolver {
-    pub fn new(promise: JsPromise, event_loop_proxy: EventLoopProxy<AppEvent>) -> Self {
+    pub fn new(promise: JsPromise, event_loop_proxy: JsEventLoopProxy) -> Self {
         Self {
             promise: Some(Box::into_raw(Box::new(promise))),
             event_loop_proxy,
@@ -120,7 +122,7 @@ impl PromiseResolver {
                 let mut promise = Box::from_raw(p);
                 promise.resolve(value)
             });
-            self.event_loop_proxy.send_event(AppEvent::Callback(callback.into_box())).unwrap();
+            self.event_loop_proxy.schedule_macro_task(callback.into_box()).unwrap();
         }
     }
 
@@ -131,7 +133,7 @@ impl PromiseResolver {
                 let mut promise = Box::from_raw(p);
                 promise.reject(value)
             });
-            self.event_loop_proxy.send_event(AppEvent::Callback(callback.into_box())).unwrap();
+            self.event_loop_proxy.schedule_macro_task(callback.into_box()).unwrap();
         }
     }
 
@@ -149,7 +151,7 @@ impl Drop for PromiseResolver {
                     let _ = Box::from_raw(p);
                 })
             };
-            run_on_event_loop(|| callback.call())
+            self.event_loop_proxy.schedule_macro_task(callback.into_box()).unwrap();
         }
     }
 }

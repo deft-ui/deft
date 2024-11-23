@@ -28,7 +28,7 @@ impl Worker {
         let id = NEXT_WORKER_ID.get();
         NEXT_WORKER_ID.set(id + 1);
 
-        thread::spawn(move || {
+        let _ = thread::Builder::new().name("js-worker".to_string()).spawn(move || {
             let mut js_engine = JsEngine::new(create_module_loader());
             let (sender, receiver) = std::sync::mpsc::channel();
             js_init_event_loop(move |js_event| {

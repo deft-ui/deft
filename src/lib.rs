@@ -6,7 +6,6 @@ pub mod thread_executor;
 pub mod ext_worker;
 
 use crate::app::{App, AppEvent, LentoApp};
-use crate::event_loop::set_event_proxy;
 use crate::ext_animation::animation_create;
 use crate::ext_clipboard::{clipboard_read_text, clipboard_write_text};
 #[cfg(not(feature = "production"))]
@@ -53,8 +52,7 @@ fn init_app(app: &mut App) {
 
 fn run_event_loop(event_loop: EventLoop<AppEvent>, lento_app: Box<dyn LentoApp>) {
     let el_proxy = event_loop.create_proxy();
-    set_event_proxy(el_proxy.clone());
-    let mut app = App::new(create_module_loader(), lento_app);
+    let mut app = App::new(create_module_loader(), lento_app, el_proxy);
     init_app(&mut app);
     event_loop.run_app(&mut app).unwrap();
 }

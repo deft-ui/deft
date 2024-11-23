@@ -6,7 +6,7 @@ use crate::canvas_util::CanvasHelper;
 use crate::cursor::search_cursor;
 use crate::element::{Element, ElementWeak};
 use crate::event::{build_modifier, named_key_to_str, CaretEventBind, ClickEventBind, DragOverEventDetail, DragStartEventDetail, DropEventDetail, FocusEventBind, FocusShiftBind, KeyEventDetail, MouseDownEventBind, MouseEnterEventBind, MouseLeaveEventBind, MouseMoveEventBind, MouseUpEventBind, MouseWheelDetail, TouchCancelEventBind, TouchEndEventBind, TouchMoveEventBind, TouchStartEventBind, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT};
-use crate::event_loop::{run_with_event_loop, send_event};
+use crate::event_loop::{create_event_loop_proxy, run_with_event_loop};
 use crate::ext::common::create_event_handler;
 use crate::ext::ext_frame::{FrameAttrs, FRAMES, FRAME_TYPE_MENU, FRAME_TYPE_NORMAL, MODAL_TO_OWNERS, WINDOW_TO_FRAME};
 use crate::js::js_value_util::{FromJsValue, ToJsValue};
@@ -217,7 +217,8 @@ impl Frame {
                     el.upgrade_mut(|el| el.update());
                 }).into_box()
             };
-            send_event(AppEvent::Callback(callback)).unwrap();
+            let elp = create_event_loop_proxy();
+            elp.send_event(AppEvent::Callback(callback)).unwrap();
         }
     }
 

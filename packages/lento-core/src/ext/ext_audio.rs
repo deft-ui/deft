@@ -5,18 +5,24 @@ use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 
 use crate::base::{Event, EventRegistration};
-use crate::event_loop::run_on_event_loop;
 use crate::ext::audio_player::{AudioNotify, AudioServer, AudioSources};
 use crate::{define_resource, js_deserialize, js_value};
 use anyhow::{anyhow, Error};
 use lento_macros::{js_methods, mrc_object};
 use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
+use crate::js::js_event_loop::{js_create_event_loop_proxy, JsEventLoopProxy};
 
 thread_local! {
     pub static NEXT_ID: Cell<u32> = Cell::new(1);
     pub static PLAYING_MAP: RefCell<HashMap<u32, Audio >> = RefCell::new(HashMap::new());
-    pub static PLAYER: AudioServer = AudioServer::new(handle_play_notify);
+    pub static PLAYER: AudioServer = AudioServer::new({
+        let elp = js_create_event_loop_proxy();
+        move |id, msg| {
+            let elp = elp.clone();
+            handle_play_notify(elp, id, msg)
+        }
+    });
 }
 
 #[mrc_object]
@@ -46,8 +52,8 @@ pub struct AudioOptions {
     auto_loop: Option<bool>,
 }
 
-fn handle_play_notify(id: u32, msg: AudioNotify) {
-    run_on_event_loop(move || {
+fn handle_play_notify(elp: JsEventLoopProxy, id: u32, msg: AudioNotify) {
+    elp.schedule_macro_task(move || {
         let mut audio = PLAYING_MAP.with_borrow_mut(|m| m.get(&id).cloned());
         if let Some(a) = &mut audio {
             let target = a.clone();
