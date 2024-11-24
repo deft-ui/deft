@@ -19,7 +19,7 @@ use quick_js::loader::JsModuleLoader;
 
 thread_local! {
     pub static JS_WORKDERS: RefCell<HashMap<u32, Worker >> = RefCell::new(HashMap::new());
-    pub static JS_WORKER_CONTEXTS: RefCell<HashMap<u32, WorkerContext>> = RefCell::new(HashMap::new());
+    pub static JS_WORKER_CONTEXTS: RefCell<Option<WorkerContext>> = RefCell::new(None);
     pub static NEXT_WORKER_ID: Cell<u32> = Cell::new(1);
     static WORKER_INIT_PARAMS: RefCell<Option<WorkerInitParams>> = RefCell::new(None);
 }
@@ -69,6 +69,70 @@ impl JsModuleLoader for SharedModuleLoader {
     }
 }
 
+pub struct Service {
+    sender: Sender<JsEvent>,
+}
+
+impl Service {
+
+    pub fn new(module_loader: Box<dyn JsModuleLoader + Send + Sync + 'static>, module_name: String) -> Self {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let shared_module_loader = SharedModuleLoader::new(module_loader);
+
+        let sender2 = sender.clone();
+
+        let module_loader = shared_module_loader.clone();
+        let _ = thread::Builder::new().name("js-worker".to_string()).spawn(move || {
+            let mut js_engine = JsEngine::new(module_loader);
+
+            js_init_event_loop(move |js_event| {
+                sender.send(js_event).map_err(|_| JsEventLoopClosedError {})
+            });
+
+            let worker_context = WorkerContext::create(Box::new(move |msg| {
+                //TODO receive msg
+                // if let Some(message_emitter) = &mut message_emitter {
+                //     message_emitter.call(msg);
+                // }
+            }));
+            JS_WORKER_CONTEXTS.with_borrow_mut(|ctxs| {
+                ctxs.replace(worker_context);
+            });
+
+            let _ = js_engine.js_context.add_callback("WorkerContext_get", move || {
+                let ctx = WorkerContext::get();
+                ctx.unwrap().to_js_value().unwrap()
+            });
+            js_engine.add_global_functions(WorkerContext::create_js_apis());
+
+
+            js_engine.init_api();
+            let r = js_engine.execute_module(module_name.as_str());
+            if let Err(err) = r {
+                println!("Error executing module: {}", err);
+                return;
+            }
+            js_engine.execute_pending_jobs();
+            loop {
+                let Ok(event) = receiver.recv() else {
+                    break;
+                };
+                match event {
+                    JsEvent::MacroTask(task) => {
+                        task();
+                    }
+                }
+                js_engine.execute_pending_jobs();
+            }
+        });
+        Self {
+            sender: sender2,
+        }
+    }
+
+
+}
+
 #[js_methods]
 impl Worker {
 
@@ -98,12 +162,12 @@ impl Worker {
         let id = NEXT_WORKER_ID.get();
         NEXT_WORKER_ID.set(id + 1);
 
-        let (sender, receiver) = std::sync::mpsc::channel();
+        let service = Service::new(module_loader, module_name);
 
         let js_worker = WorkerData {
             id,
             event_registration: EventRegistration::new(),
-            worker_event_sender: sender.clone(),
+            worker_event_sender: service.sender.clone(),
         }.to_ref();
 
         let mut message_emitter = {
@@ -118,53 +182,6 @@ impl Worker {
                 None
             }
         };
-
-
-        let shared_module_loader = SharedModuleLoader::new(module_loader);
-
-        let module_loader = shared_module_loader.clone();
-        let _ = thread::Builder::new().name("js-worker".to_string()).spawn(move || {
-            let mut js_engine = JsEngine::new(module_loader);
-
-            js_init_event_loop(move |js_event| {
-                sender.send(js_event).map_err(|_| JsEventLoopClosedError {})
-            });
-
-            let worker_context = WorkerContext::create(Box::new(move |msg| {
-                if let Some(message_emitter) = &mut message_emitter {
-                    message_emitter.call(msg);
-                }
-            }));
-            JS_WORKER_CONTEXTS.with_borrow_mut(|ctxs| {
-                ctxs.insert(id, worker_context.clone());
-            });
-
-            let _ = js_engine.js_context.add_callback("WorkerContext_get", move || {
-                let ctx = WorkerContext::get(id);
-                ctx.unwrap().to_js_value().unwrap()
-            });
-            js_engine.add_global_functions(WorkerContext::create_js_apis());
-
-
-            js_engine.init_api();
-            let r = js_engine.execute_module(module_name.as_str());
-            if let Err(err) = r {
-                println!("Error executing module: {}", err);
-                return;
-            }
-            js_engine.execute_pending_jobs();
-            loop {
-                let Ok(event) = receiver.recv() else {
-                    break;
-                };
-                match event {
-                    JsEvent::MacroTask(task) => {
-                        task();
-                    }
-                }
-                js_engine.execute_pending_jobs();
-            }
-        });
 
         {
             let js_worker = js_worker.clone();
@@ -198,9 +215,8 @@ impl Worker {
 
     #[js_func]
     pub fn post_message(&mut self, message: MessageData) -> Result<(), JsError> {
-        let id = self.id;
         self.worker_event_sender.send(JsEvent::MacroTask(Box::new(move || {
-            if let Some(mut ctx) = WorkerContext::get(id) {
+            if let Some(mut ctx) = WorkerContext::get() {
                 ctx.receive_message(message);
             }
         }))).map_err(|e| JsError::new(format!("fail to send message:{}", e)))
@@ -231,8 +247,8 @@ js_weak_value!(WorkerContext, WorkerContextWeak);
 #[js_methods]
 impl WorkerContext {
 
-    pub fn get(id: u32) -> Option<Self> {
-        JS_WORKER_CONTEXTS.with_borrow(|m| m.get(&id).cloned())
+    pub fn get() -> Option<Self> {
+        JS_WORKER_CONTEXTS.with_borrow(|m| m.as_ref().map(|it| it.clone()))
     }
 
     pub fn create(message_emitter: Box<dyn FnMut(MessageData)>) -> Self {
