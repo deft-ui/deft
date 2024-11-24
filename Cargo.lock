@@ -1789,6 +1789,7 @@ dependencies = [
  "lento-core",
  "lento-macros",
  "quick-js",
+ "serde",
 ]
 
 [[package]]

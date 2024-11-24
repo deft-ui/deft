@@ -55,6 +55,7 @@ pub struct App {
 impl App {
     pub fn new<L: JsModuleLoader>(module_loader: L, mut lento_app: Box<dyn LentoApp>, event_loop_proxy: EventLoopProxy<AppEvent>) -> Self {
         let mut js_engine = JsEngine::new(module_loader);
+        js_engine.init_api();
         init_event_loop_proxy(event_loop_proxy.clone());
         let js_event_loop = js_init_event_loop(move |js_event| {
             event_loop_proxy.send_event(AppEvent::JsEvent(js_event)).map_err(|_| JsEventLoopClosedError {})

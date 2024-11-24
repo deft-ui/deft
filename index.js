@@ -1,5 +1,13 @@
+function runWorker() {
+    const worker = new Worker("./worker-index.js");
+    worker.bindMessage(data => {
+        console.log("receive worker msg", data);
+        worker.postMessage("Hello, worker");
+    });
+}
+
 function main() {
-    Worker_create("./worker-index.js");
+    runWorker();
     console.log("begin create frame");
     const frame = new Frame();
     frame.setTitle("LentoDemo");

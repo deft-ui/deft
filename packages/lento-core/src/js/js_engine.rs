@@ -124,9 +124,12 @@ impl JsEngine {
         engine.add_global_func(fs_create_dir_all::new());
         engine.add_global_func(fs_remove_dir::new());
         engine.add_global_func(fs_remove_dir_all::new());
-        let libjs = String::from_utf8_lossy(include_bytes!("../../lib.js"));
-        engine.js_context.eval_module(&libjs, "lib.js").unwrap();
         engine
+    }
+
+    pub fn init_api(&self) {
+        let libjs = String::from_utf8_lossy(include_bytes!("../../lib.js"));
+        self.js_context.eval_module(&libjs, "lib.js").unwrap();
     }
 
     pub fn add_global_functions(&self, functions: Vec<Box<dyn JsFunc + RefUnwindSafe + 'static>>) {

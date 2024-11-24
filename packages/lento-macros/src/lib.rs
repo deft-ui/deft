@@ -100,6 +100,16 @@ pub fn frame_event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
     create_event(_attr, struct_def, quote! {lento::frame::FrameWeak})
 }
 
+#[proc_macro_attribute]
+pub fn worker_event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
+    create_event(_attr, struct_def, quote! {lento::ext_worker::WorkerWeak})
+}
+
+#[proc_macro_attribute]
+pub fn worker_context_event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
+    create_event(_attr, struct_def, quote! {lento::ext_worker::WorkerContextWeak})
+}
+
 fn create_event(_attr: TokenStream, struct_def: TokenStream, target_type: TokenStream2) -> TokenStream {
     let struct_def = parse_macro_input!(struct_def as ItemStruct);
     let listener_name = format_ident!("{}Listener", struct_def.ident);

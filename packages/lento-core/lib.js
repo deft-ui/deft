@@ -234,10 +234,10 @@ export class EventRegistry {
             const event = new EventObject(type, detail, getJsContext(target), self);
             try {
                 callback && callback(event);
-                return event.result();
             } catch (error) {
-                console.error('event handling error', error);
+                console.error(`${type} event handling error, detail=`, detail ,error.message || error);
             }
+            return event.result();
         }
 
         this.eventListeners[type] = this._add_api(this._id, type, eventCallback);
@@ -290,10 +290,10 @@ export class EventBinder {
             const event = new EventObject(type, detail, getJsContext(target), self);
             try {
                 callback && callback(event);
-                return event.result();
             } catch (error) {
-                console.error('event handling error', error);
+                console.error(`${type} event handling error, detail=`, detail ,error.message || error);
             }
+            return event.result();
         }
 
         this.#eventListeners[type] = this.#addEventListenerApi(this.#target, type, eventCallback);
@@ -1033,6 +1033,71 @@ export class WebSocket {
 
 }
 
+export class Worker {
+
+    #worker
+
+    /**
+     * @type EventBinder
+     */
+    #eventBinder;
+
+    constructor(url) {
+        this.#worker = Worker_create(url);
+        this.#eventBinder = new EventBinder(
+            this.#worker,
+            Worker_bind_js_event_listener,
+            Worker_remove_js_event_listener,
+            this
+        );
+    }
+
+    postMessage(data) {
+        Worker_post_message(this.#worker, JSON.stringify(data));
+    }
+
+    bindMessage(callback) {
+        this.#eventBinder.bindEvent('message', e => {
+            e.data = JSON.parse(e.detail.data);
+            callback(e);
+        });
+    }
+
+}
+
+export class WorkerContext {
+    #workerContext;
+    /**
+     * @type {EventBinder}
+     */
+    #eventBinder;
+    constructor() {
+        this.#workerContext = WorkerContext_get();
+        this.#eventBinder = new EventBinder(
+            this.#workerContext,
+            WorkerContext_bind_js_event_listener,
+            WorkerContext_remove_js_event_listener,
+            this
+        )
+    }
+    postMessage(data) {
+        WorkerContext_post_message(this.#workerContext, JSON.stringify(data));
+    }
+    bindMessage(callback) {
+        this.#eventBinder.bindEvent('message', e => {
+            e.data = JSON.parse(e.detail.data);
+            callback(e);
+        });
+    }
+
+    static create() {
+        if (globalThis.WorkerContext_get) {
+            return new WorkerContext();
+        }
+        return null;
+    }
+}
+
 
 function collectCircleRefInfo(value, visited, circleRefList, level) {
     if (level >= 3) {
@@ -1121,7 +1186,14 @@ const localStorage = {
     }
 }
 
+export const workerContext = WorkerContext.create();
+if (workerContext) {
+    globalThis.workerContext = workerContext;
+}
+
 globalThis.navigator = new Navigator();
+globalThis.Worker = Worker;
+globalThis.WorkerContext = WorkerContext;
 globalThis.Frame = Frame;
 if (globalThis.SystemTray_create) {
     globalThis.SystemTray = SystemTray;
