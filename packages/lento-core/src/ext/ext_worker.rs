@@ -1,23 +1,27 @@
 use crate as lento;
 use crate::js::js_engine::JsEngine;
 use crate::js::JsError;
-use crate::{create_module_loader, js_weak_value};
-use lento_core::js::js_event_loop::{js_create_event_loop_fn_mut, js_init_event_loop, JsEvent, JsEventLoopClosedError};
+use crate::{js_weak_value};
+use crate::js::js_event_loop::{js_create_event_loop_fn_mut, js_init_event_loop, js_is_in_event_loop, JsEvent, JsEventLoopClosedError};
 use lento_macros::{js_methods, mrc_object, worker_context_event, worker_event};
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::io::Error;
+use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Sender;
 use std::thread;
-use lento_core::base::{EventContext, EventListener, EventRegistration};
-use lento_core::{bind_js_event_listener};
-use lento_core::js::ToJsValue;
-use quick_js::JsValue;
+use crate::base::{EventContext, EventListener, EventRegistration};
+use crate::{bind_js_event_listener};
+use crate::js::ToJsValue;
+use quick_js::{Callback, JsValue};
+use quick_js::loader::JsModuleLoader;
 
 thread_local! {
     pub static JS_WORKDERS: RefCell<HashMap<u32, Worker >> = RefCell::new(HashMap::new());
     pub static JS_WORKER_CONTEXTS: RefCell<HashMap<u32, WorkerContext>> = RefCell::new(HashMap::new());
     pub static NEXT_WORKER_ID: Cell<u32> = Cell::new(1);
+    static WORKER_INIT_PARAMS: RefCell<Option<WorkerInitParams>> = RefCell::new(None);
 }
 
 #[mrc_object]
@@ -41,10 +45,56 @@ pub struct WorkerContextMessageEvent {
     data: MessageData,
 }
 
+pub struct WorkerInitParams {
+    pub module_loader_creator: Box<dyn FnMut() -> Box<dyn JsModuleLoader + Send + Sync + 'static>>,
+}
+
+#[derive(Clone)]
+pub struct SharedModuleLoader {
+    module_loader: Arc<Mutex<Box<dyn JsModuleLoader + Send + Sync>>>,
+}
+
+impl SharedModuleLoader {
+    pub fn new(module_loader: Box<dyn JsModuleLoader + Send + Sync + 'static>) -> Self {
+        Self {
+            module_loader: Arc::new(Mutex::new(module_loader)),
+        }
+    }
+}
+
+impl JsModuleLoader for SharedModuleLoader {
+    fn load(&self, module_name: &str) -> Result<String, Error> {
+        let loader = self.module_loader.lock().unwrap();
+        loader.load(module_name)
+    }
+}
+
 #[js_methods]
 impl Worker {
+
+    pub fn init_js_api(init_params: WorkerInitParams) {
+        WORKER_INIT_PARAMS.with_borrow_mut(|m| {
+            m.replace(init_params);
+        });
+    }
+
     #[js_func]
     pub fn create(module_name: String) -> Result<Self, JsError> {
+        let loader = WORKER_INIT_PARAMS.with_borrow_mut(|p| {
+            p.as_mut().map(|p| (p.module_loader_creator)())
+        });
+        if let Some(loader) = loader {
+            Self::build(loader, module_name)
+        } else {
+            Err(JsError::from_str("No worker loader found"))
+        }
+    }
+
+    pub fn new<L: JsModuleLoader + Send + Sync + 'static>(module_loader: L, module_name: String) -> Result<Self, JsError> {
+        Self::build(Box::new(module_loader), module_name)
+    }
+
+    fn build(module_loader: Box<dyn JsModuleLoader + Send + Sync + 'static>, module_name: String) -> Result<Self, JsError>{
         let id = NEXT_WORKER_ID.get();
         NEXT_WORKER_ID.set(id + 1);
 
@@ -57,23 +107,33 @@ impl Worker {
         }.to_ref();
 
         let mut message_emitter = {
-            let js_worker = js_worker.clone();
-            js_create_event_loop_fn_mut(move |msg: MessageData| {
-                let mut js_worker = js_worker.clone();
-                js_worker.receive_message(msg).unwrap();
-            })
+            if js_is_in_event_loop() {
+                let js_worker = js_worker.clone();
+                let cb = js_create_event_loop_fn_mut(move |msg: MessageData| {
+                    let mut js_worker = js_worker.clone();
+                    js_worker.receive_message(msg).unwrap();
+                });
+                Some(cb)
+            } else {
+                None
+            }
         };
 
 
+        let shared_module_loader = SharedModuleLoader::new(module_loader);
+
+        let module_loader = shared_module_loader.clone();
         let _ = thread::Builder::new().name("js-worker".to_string()).spawn(move || {
-            let mut js_engine = JsEngine::new(create_module_loader());
+            let mut js_engine = JsEngine::new(module_loader);
 
             js_init_event_loop(move |js_event| {
                 sender.send(js_event).map_err(|_| JsEventLoopClosedError {})
             });
 
             let worker_context = WorkerContext::create(Box::new(move |msg| {
-                message_emitter.call(msg);
+                if let Some(message_emitter) = &mut message_emitter {
+                    message_emitter.call(msg);
+                }
             }));
             JS_WORKER_CONTEXTS.with_borrow_mut(|ctxs| {
                 ctxs.insert(id, worker_context.clone());

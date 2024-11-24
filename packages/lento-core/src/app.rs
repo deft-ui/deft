@@ -52,7 +52,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new<L: JsModuleLoader>(module_loader: L, mut lento_app: Box<dyn LentoApp>, event_loop_proxy: EventLoopProxy<AppEvent>) -> Self {
+    pub fn new<L: JsModuleLoader + Send + Sync>(module_loader: L, mut lento_app: Box<dyn LentoApp>, event_loop_proxy: EventLoopProxy<AppEvent>) -> Self {
         let mut js_engine = JsEngine::new(module_loader);
         js_engine.init_api();
         init_event_loop_proxy(event_loop_proxy.clone());

@@ -102,12 +102,12 @@ pub fn frame_event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn worker_event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
-    create_event(_attr, struct_def, quote! {lento::ext_worker::WorkerWeak})
+    create_event(_attr, struct_def, quote! {lento::ext::ext_worker::WorkerWeak})
 }
 
 #[proc_macro_attribute]
 pub fn worker_context_event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
-    create_event(_attr, struct_def, quote! {lento::ext_worker::WorkerContextWeak})
+    create_event(_attr, struct_def, quote! {lento::ext::ext_worker::WorkerContextWeak})
 }
 
 fn create_event(_attr: TokenStream, struct_def: TokenStream, target_type: TokenStream2) -> TokenStream {

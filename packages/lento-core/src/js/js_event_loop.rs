@@ -100,6 +100,10 @@ pub fn js_init_event_loop<
     js_event_loop
 }
 
+pub fn js_is_in_event_loop() -> bool {
+    JS_EVENT_LOOP_PROXY.with_borrow(|cell| cell.is_some())
+}
+
 pub fn js_create_event_loop_proxy() -> JsEventLoopProxy {
     JS_EVENT_LOOP_PROXY.with_borrow(|cell| {
         let el = cell
