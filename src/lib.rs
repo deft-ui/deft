@@ -2,7 +2,6 @@ pub use lento_core::*;
 pub use lento_macros::*;
 pub mod ext_animation;
 pub mod ext_clipboard;
-pub mod thread_executor;
 pub mod ext_worker;
 
 use crate::app::{App, AppEvent, LentoApp};

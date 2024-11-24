@@ -25,7 +25,6 @@ use crate::timer;
 
 pub enum AppEvent {
     Callback(Box<dyn FnOnce() + Send + Sync>),
-    CallbackWithEventLoop(Box<dyn FnOnce(&ActiveEventLoop) + Send + Sync + 'static>),
     JsEvent(JsEvent),
     ShowSoftInput(i32),
     HideSoftInput(i32),
@@ -89,9 +88,6 @@ impl ApplicationHandler<AppEvent> for App {
             match event {
                 AppEvent::Callback(callback) => {
                     callback();
-                },
-                AppEvent::CallbackWithEventLoop(callback) => {
-                    callback(event_loop);
                 },
                 AppEvent::JsEvent(js_event) => {
                     match js_event {
