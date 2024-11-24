@@ -9,7 +9,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::Error;
 use std::sync::{Arc, Mutex};
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 use crate::base::{EventContext, EventListener, EventRegistration};
 use crate::{bind_js_event_listener};
@@ -71,6 +71,7 @@ impl JsModuleLoader for SharedModuleLoader {
 
 pub struct Service {
     sender: Sender<JsEvent>,
+    receivers: Arc<Mutex<Vec<Box<dyn FnMut(MessageData) + Send>>>>,
 }
 
 impl Service {
@@ -79,7 +80,11 @@ impl Service {
         let (sender, receiver) = std::sync::mpsc::channel();
         let shared_module_loader = SharedModuleLoader::new(module_loader);
 
-        let sender2 = sender.clone();
+        let receivers = Arc::new(Mutex::new(Vec::new()));
+        let service = Self {
+            sender: sender.clone(),
+            receivers: receivers.clone(),
+        };
 
         let module_loader = shared_module_loader.clone();
         let _ = thread::Builder::new().name("js-worker".to_string()).spawn(move || {
@@ -90,10 +95,10 @@ impl Service {
             });
 
             let worker_context = WorkerContext::create(Box::new(move |msg| {
-                //TODO receive msg
-                // if let Some(message_emitter) = &mut message_emitter {
-                //     message_emitter.call(msg);
-                // }
+                let mut receivers = receivers.lock().unwrap();
+                for receiver in receivers.iter_mut() {
+                    receiver(msg.clone());
+                }
             }));
             JS_WORKER_CONTEXTS.with_borrow_mut(|ctxs| {
                 ctxs.replace(worker_context);
@@ -125,11 +130,13 @@ impl Service {
                 js_engine.execute_pending_jobs();
             }
         });
-        Self {
-            sender: sender2,
-        }
+        service
     }
 
+    pub fn add_receiver(&self, receiver: Box<dyn FnMut(MessageData) + Send>) {
+        let mut receivers = self.receivers.lock().unwrap();
+        receivers.push(receiver);
+    }
 
 }
 
@@ -170,18 +177,16 @@ impl Worker {
             worker_event_sender: service.sender.clone(),
         }.to_ref();
 
-        let mut message_emitter = {
-            if js_is_in_event_loop() {
-                let js_worker = js_worker.clone();
-                let cb = js_create_event_loop_fn_mut(move |msg: MessageData| {
-                    let mut js_worker = js_worker.clone();
-                    js_worker.receive_message(msg).unwrap();
-                });
-                Some(cb)
-            } else {
-                None
-            }
-        };
+        if js_is_in_event_loop() {
+            let js_worker = js_worker.clone();
+            let mut cb = js_create_event_loop_fn_mut(move |msg: MessageData| {
+                let mut js_worker = js_worker.clone();
+                js_worker.receive_message(msg).unwrap();
+            });
+            service.add_receiver(Box::new(move |msg| {
+                cb.call(msg);
+            }));
+        }
 
         {
             let js_worker = js_worker.clone();
