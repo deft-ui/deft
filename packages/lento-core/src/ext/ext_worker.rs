@@ -97,12 +97,9 @@ impl Worker {
         Self::bind_service(service)
     }
 
-    pub fn new<L: JsModuleLoader + Send + Sync + 'static>(module_loader: L, module_name: String) -> Result<Self, JsError> {
-        Self::build(Box::new(module_loader), module_name)
-    }
-
     fn build(module_loader: Box<dyn JsModuleLoader + Send + Sync + 'static>, module_name: String) -> Result<Self, JsError>{
-        let service = Service::new(module_loader, module_name);
+        let mut service = Service::new();
+        service.start(module_loader, module_name);
         Self::bind_service(service)
     }
 

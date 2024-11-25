@@ -27,7 +27,7 @@ static SERVICES: LazyLock<Arc<Mutex<ServiceHolder>>> = LazyLock::new(|| {
 #[derive(Clone)]
 pub struct Service {
     id: u32,
-    sender: Sender<JsEvent>,
+    sender: Arc<Mutex<Option<Sender<JsEvent>>>>,
     msg_handlers: Arc<Mutex<IdHashMap<Box<dyn FnMut(crate::ext::ext_worker::MessageData) + Send>>>>,
 }
 
@@ -38,22 +38,16 @@ impl Service {
         services.services.get(&id).cloned()
     }
 
-    pub fn new(
-        module_loader: Box<dyn JsModuleLoader + Send + Sync + 'static>,
-        module_name: String,
-    ) -> Self {
+    pub fn new() -> Self {
         let id = {
             let mut service_holder = SERVICES.lock().unwrap();
             service_holder.id_generator.generate_id()
         };
 
-        let (sender, receiver) = std::sync::mpsc::channel();
-        let shared_module_loader = SharedModuleLoader::new(module_loader);
-
         let msg_handlers = Arc::new(Mutex::new(IdHashMap::new()));
         let service = Self {
             id,
-            sender: sender.clone(),
+            sender: Arc::new(Mutex::new(None)),
             msg_handlers: msg_handlers.clone(),
         };
         {
@@ -61,6 +55,17 @@ impl Service {
             services.services.insert(id, service.clone());
         }
 
+        service
+    }
+
+    pub fn start(&mut self, module_loader: Box<dyn JsModuleLoader + Send + Sync + 'static>, module_name: String) {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        {
+            let mut sender_holder = self.sender.lock().unwrap();
+            sender_holder.replace(sender.clone());
+        }
+        let msg_handlers = self.msg_handlers.clone();
+        let shared_module_loader = SharedModuleLoader::new(module_loader);
         let module_loader = shared_module_loader.clone();
         let _ = thread::Builder::new()
             .name("js-worker".to_string())
@@ -108,7 +113,6 @@ impl Service {
                     js_engine.execute_pending_jobs();
                 }
             });
-        service
     }
 
     pub fn get_id(&self) -> u32 {
@@ -116,7 +120,12 @@ impl Service {
     }
 
     pub fn send_event(&self, event: JsEvent) -> Result<(), SendError<JsEvent>> {
-        self.sender.send(event)
+        let sender = self.sender.lock().unwrap();
+        if let Some(sender) = sender.as_ref() {
+            sender.send(event)
+        } else {
+            Err(SendError(event))
+        }
     }
 
     pub fn add_msg_handler(
