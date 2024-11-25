@@ -173,7 +173,11 @@ fn test_border_performance_gl() {
 
     impl ApplicationHandler for TestApp {
         fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-            let mut skia_window = SkiaWindow::new(event_loop, WindowAttributes::default(), RenderBackendType::SoftBuffer);
+            #[cfg(not(target_os = "android"))]
+            let backend_type = RenderBackendType::SoftBuffer;
+            #[cfg(target_os = "android")]
+            let backend_type = RenderBackendType::GL;
+            let mut skia_window = SkiaWindow::new(event_loop, WindowAttributes::default(), backend_type);
             skia_window.render(|canvas| {
                 crate::renderer::test_border(canvas);
             });

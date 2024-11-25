@@ -5,7 +5,7 @@ edition = "2021"
 
 
 [features]
-default = ["egl", "glx", "x11", "wayland", "wgl"]
+default = ["egl", "wayland", "wgl"]
 
 desktop = []
 
@@ -23,11 +23,11 @@ glutin = "0.31"
 raw-window-handle = "0.5.0"
 skia-safe = { version = "0.75.0", features = ["gl"] }
 gl = "0.14.0"
-softbuffer = "0.4.6"
 
 
 [target.'cfg(not(target_os = "android"))'.dependencies]
 env_logger = "0.10"
+softbuffer = "0.4.6"
 
 [target.'cfg(target_os = "android")'.dependencies]
 android_logger = "0.11.0"

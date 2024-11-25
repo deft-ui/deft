@@ -15,6 +15,7 @@ pub mod ext_fetch;
 mod audio_player;
 pub mod ext_base64;
 pub mod ext_shell;
+#[cfg(not(target_os = "android"))]
 pub mod ext_dialog;
 pub mod promise;
 pub mod ext_process;

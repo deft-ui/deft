@@ -5,6 +5,7 @@ use glutin::display::{Display, DisplayApiPreference};
 use glutin::surface::{SurfaceAttributesBuilder, WindowSurface};
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle, RawDisplayHandle, RawWindowHandle};
 use winit::event_loop::ActiveEventLoop;
+#[cfg(feature = "x11")]
 use winit::platform::x11;
 use winit::window::{Window};
 use crate::gl_renderer::GlRenderer;

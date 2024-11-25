@@ -45,7 +45,6 @@ base16ct = { version = "0.2.0", features = ["alloc"] }
 jni = "0.21.1"
 tokio-util = { version = "0.7.12", features = ["codec"] }
 maplit = "1.0.2"
-native-dialog = "0.7.0"
 
 [features]
 default=[]
@@ -53,8 +52,11 @@ tray=["ksni"]
 x11=[]
 production=[]
 
+[target.'cfg(not(target_os = "android"))'.dependencies]
+native-dialog = "0.7.0"
+
 [target.'cfg(target_os = "android")'.dependencies]
-skia-safe = {version = "0.75.0", features = ["textlayout", "svg"]}
+skia-safe = {version = "0.75.0", features = ["textlayout", "svg", "x11"]}
 android_logger = "0.11.0"
 [target.'cfg(target_os = "linux")'.dependencies]
 skia-safe = {version = "0.75.0", features = ["textlayout", "svg", "x11"]}
