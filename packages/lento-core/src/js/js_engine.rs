@@ -19,6 +19,7 @@ use crate::ext::ext_audio::Audio;
 use crate::ext::ext_base64::Base64;
 use crate::ext::ext_clipboard::{clipboard_read_text, clipboard_write_text};
 use crate::ext::ext_console::Console as ExtConsole;
+#[cfg(all(target_os = "windows", target_os = "linux"))]
 use crate::ext::ext_dialog::dialog;
 use crate::ext::ext_env::env;
 use crate::ext::ext_fetch::fetch;
@@ -100,6 +101,7 @@ impl JsEngine {
             engine.add_global_functions(SystemTray::create_js_apis());
         }
         engine.add_global_functions(process::create_js_apis());
+        #[cfg(all(target_os = "windows", target_os = "linux"))]
         engine.add_global_functions(dialog::create_js_apis());
         engine.add_global_functions(Base64::create_js_apis());
         engine.add_global_functions(shell::create_js_apis());

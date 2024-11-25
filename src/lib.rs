@@ -29,7 +29,7 @@ pub fn android_bootstrap(app: AndroidApp, lento_app: Box<dyn LentoApp>) {
         let data_path = p.into_os_string().to_string_lossy().to_string();
         println!("internal data_path:{}", data_path);
         unsafe {
-            env::set_var(data_dir::ENV_KEY, data_path);
+            std::env::set_var(data_dir::ENV_KEY, data_path);
         }
     }
     println!("data path: {:?}", data_dir::get_data_path(""));
