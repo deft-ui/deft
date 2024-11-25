@@ -50,7 +50,7 @@ native-dialog = "0.7.0"
 [features]
 default=[]
 tray=["ksni"]
-x11=["tray"]
+x11=[]
 production=[]
 
 [target.'cfg(target_os = "android")'.dependencies]
