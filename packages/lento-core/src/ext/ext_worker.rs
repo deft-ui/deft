@@ -16,6 +16,7 @@ use crate::{bind_js_event_listener};
 use crate::js::ToJsValue;
 use quick_js::{Callback, JsValue};
 use quick_js::loader::JsModuleLoader;
+use crate::ext::service::Service;
 
 thread_local! {
     pub static JS_WORKDERS: RefCell<HashMap<u32, Worker >> = RefCell::new(HashMap::new());
@@ -31,7 +32,7 @@ pub struct Worker {
     worker_event_sender: Sender<JsEvent>,
 }
 
-type MessageData = String;
+pub type MessageData = String;
 
 #[worker_event]
 pub struct MessageEvent {
@@ -69,77 +70,6 @@ impl JsModuleLoader for SharedModuleLoader {
     }
 }
 
-pub struct Service {
-    sender: Sender<JsEvent>,
-    receivers: Arc<Mutex<Vec<Box<dyn FnMut(MessageData) + Send>>>>,
-}
-
-impl Service {
-
-    pub fn new(module_loader: Box<dyn JsModuleLoader + Send + Sync + 'static>, module_name: String) -> Self {
-        let (sender, receiver) = std::sync::mpsc::channel();
-        let shared_module_loader = SharedModuleLoader::new(module_loader);
-
-        let receivers = Arc::new(Mutex::new(Vec::new()));
-        let service = Self {
-            sender: sender.clone(),
-            receivers: receivers.clone(),
-        };
-
-        let module_loader = shared_module_loader.clone();
-        let _ = thread::Builder::new().name("js-worker".to_string()).spawn(move || {
-            let mut js_engine = JsEngine::new(module_loader);
-
-            js_init_event_loop(move |js_event| {
-                sender.send(js_event).map_err(|_| JsEventLoopClosedError {})
-            });
-
-            let worker_context = WorkerContext::create(Box::new(move |msg| {
-                let mut receivers = receivers.lock().unwrap();
-                for receiver in receivers.iter_mut() {
-                    receiver(msg.clone());
-                }
-            }));
-            JS_WORKER_CONTEXTS.with_borrow_mut(|ctxs| {
-                ctxs.replace(worker_context);
-            });
-
-            let _ = js_engine.js_context.add_callback("WorkerContext_get", move || {
-                let ctx = WorkerContext::get();
-                ctx.unwrap().to_js_value().unwrap()
-            });
-            js_engine.add_global_functions(WorkerContext::create_js_apis());
-
-
-            js_engine.init_api();
-            let r = js_engine.execute_module(module_name.as_str());
-            if let Err(err) = r {
-                println!("Error executing module: {}", err);
-                return;
-            }
-            js_engine.execute_pending_jobs();
-            loop {
-                let Ok(event) = receiver.recv() else {
-                    break;
-                };
-                match event {
-                    JsEvent::MacroTask(task) => {
-                        task();
-                    }
-                }
-                js_engine.execute_pending_jobs();
-            }
-        });
-        service
-    }
-
-    pub fn add_receiver(&self, receiver: Box<dyn FnMut(MessageData) + Send>) {
-        let mut receivers = self.receivers.lock().unwrap();
-        receivers.push(receiver);
-    }
-
-}
-
 #[js_methods]
 impl Worker {
 
@@ -161,15 +91,24 @@ impl Worker {
         }
     }
 
+    #[js_func]
+    pub fn bind(service_id: u32) -> Result<Self, JsError> {
+        let service = Service::get(service_id).ok_or(JsError::from_str("No service found"))?;
+        Self::bind_service(service)
+    }
+
     pub fn new<L: JsModuleLoader + Send + Sync + 'static>(module_loader: L, module_name: String) -> Result<Self, JsError> {
         Self::build(Box::new(module_loader), module_name)
     }
 
     fn build(module_loader: Box<dyn JsModuleLoader + Send + Sync + 'static>, module_name: String) -> Result<Self, JsError>{
+        let service = Service::new(module_loader, module_name);
+        Self::bind_service(service)
+    }
+
+    fn bind_service(service: Service) -> Result<Self, JsError>{
         let id = NEXT_WORKER_ID.get();
         NEXT_WORKER_ID.set(id + 1);
-
-        let service = Service::new(module_loader, module_name);
 
         let js_worker = WorkerData {
             id,
