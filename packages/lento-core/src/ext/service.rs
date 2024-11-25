@@ -24,7 +24,7 @@ static SERVICES: LazyLock<Arc<Mutex<ServiceHolder>>> = LazyLock::new(|| {
 
 #[derive(Clone)]
 pub struct Service {
-    id: u32,
+    pub id: u32,
     pub sender: Sender<JsEvent>,
     pub receivers: Arc<Mutex<Vec<Box<dyn FnMut(crate::ext::ext_worker::MessageData) + Send>>>>,
 }

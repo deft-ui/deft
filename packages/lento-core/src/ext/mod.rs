@@ -22,4 +22,4 @@ pub mod ext_console;
 pub mod ext_animation;
 pub mod ext_clipboard;
 pub mod ext_worker;
-mod service;
+pub mod service;

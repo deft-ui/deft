@@ -1042,8 +1042,12 @@ export class Worker {
      */
     #eventBinder;
 
-    constructor(url) {
-        this.#worker = Worker_create(url);
+    /**
+     *
+     * @param source {number | string}
+     */
+    constructor(source) {
+        this.#worker = typeof source === "string" ? Worker_create(source) : Worker_bind(source);
         this.#eventBinder = new EventBinder(
             this.#worker,
             Worker_bind_js_event_listener,
