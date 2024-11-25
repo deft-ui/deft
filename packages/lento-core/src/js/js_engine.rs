@@ -76,8 +76,8 @@ impl Callback<()> for JsFuncCallback {
 
 impl JsEngine {
 
-    pub fn new<L: JsModuleLoader + Send + Sync>(loader: L) -> Self {
-        let loader = SharedModuleLoader::new(Box::new(loader));
+    pub fn new(loader: Box<dyn JsModuleLoader + Send + Sync + 'static>) -> Self {
+        let loader = SharedModuleLoader::new(loader);
         let runtime = Builder::new_multi_thread()
             .worker_threads(4)
             .enable_all()

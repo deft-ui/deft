@@ -9,7 +9,7 @@ use crate::element::text::text_paragraph::TextParams;
 use crate::element::text::Text;
 use crate::element::ScrollByOption;
 use crate::js::js_deserialze::JsDeserializer;
-use crate::loader::{DefaultModuleLoader, RemoteModuleLoader, StaticModuleLoader};
+use crate::loader::{RemoteModuleLoader, StaticModuleLoader};
 use crate::performance::MemoryUsage;
 use crate::renderer::CpuRenderer;
 use crate::websocket::WebSocketManager;

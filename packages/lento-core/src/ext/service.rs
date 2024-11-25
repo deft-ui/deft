@@ -70,7 +70,7 @@ impl Service {
         let _ = thread::Builder::new()
             .name("js-worker".to_string())
             .spawn(move || {
-                let mut js_engine = JsEngine::new(module_loader);
+                let mut js_engine = JsEngine::new(Box::new(module_loader));
 
                 js_init_event_loop(move |js_event| {
                     sender.send(js_event).map_err(|_| JsEventLoopClosedError {})

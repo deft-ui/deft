@@ -2,42 +2,13 @@ pub use lento_core::*;
 pub use lento_macros::*;
 
 use crate::app::{App, AppEvent, LentoApp};
-#[cfg(not(feature = "production"))]
-use crate::loader::DefaultModuleLoader;
-#[cfg(feature = "production")]
-use lento_core::loader::StaticModuleLoader;
-use quick_js::loader::JsModuleLoader;
-use std::env;
 #[cfg(target_os = "android")]
 use winit::platform::android::activity::AndroidApp;
 
-#[cfg(not(feature = "production"))]
-pub fn create_module_loader() -> DefaultModuleLoader {
-    let mut loader = DefaultModuleLoader::new(true);
-    loader.set_fs_base(".");
-    let module_name = env::var("LENTO_ENTRY").unwrap_or("index.js".to_string());
-    let start_time = std::time::Instant::now();
-    while start_time.elapsed() < std::time::Duration::from_secs(60) {
-        if loader.load(&module_name).is_ok() {
-            break;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(1000));
-        eprintln!("Failed to load {}, retrying...", module_name);
-    }
-    loader
-}
-
-#[cfg(feature = "production")]
-pub fn create_module_loader() -> StaticModuleLoader {
-    let mut loader = StaticModuleLoader::new();
-    let source = String::from_utf8_lossy(include_bytes!(env!("LENTO_JS_BUNDLE"))).to_string();
-    loader.add_module("index.js".to_string(), source);
-    loader
-}
 
 fn run_event_loop(event_loop: EventLoop<AppEvent>, lento_app: Box<dyn LentoApp>) {
     let el_proxy = event_loop.create_proxy();
-    let mut app = App::new(create_module_loader(), lento_app, el_proxy);
+    let mut app = App::new(lento_app, el_proxy);
     event_loop.run_app(&mut app).unwrap();
 }
 

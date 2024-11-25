@@ -64,8 +64,8 @@ impl SharedModuleLoader {
 }
 
 impl JsModuleLoader for SharedModuleLoader {
-    fn load(&self, module_name: &str) -> Result<String, Error> {
-        let loader = self.module_loader.lock().unwrap();
+    fn load(&mut self, module_name: &str) -> Result<String, Error> {
+        let mut loader = self.module_loader.lock().unwrap();
         loader.load(module_name)
     }
 }
