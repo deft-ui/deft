@@ -70,7 +70,8 @@ pub mod cache;
 pub mod animation;
 #[cfg(target_os = "android")]
 mod android;
-
+mod id_hash_map;
+mod id_generator;
 
 fn main_js_deserializer() {
     let mut map = HashMap::new();

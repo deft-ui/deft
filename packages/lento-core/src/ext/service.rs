@@ -5,18 +5,20 @@ use crate::js::js_event_loop::{js_init_event_loop, JsEvent, JsEventLoopClosedErr
 use crate::js::ToJsValue;
 use quick_js::loader::JsModuleLoader;
 use std::collections::HashMap;
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{SendError, Sender};
 use std::sync::{Arc, LazyLock, Mutex, OnceLock};
 use std::thread;
+use crate::id_generator::IdGenerator;
+use crate::id_hash_map::IdHashMap;
 
 struct ServiceHolder {
-    next_id: u32,
+    id_generator: IdGenerator,
     services: HashMap<u32, Service>,
 }
 
 static SERVICES: LazyLock<Arc<Mutex<ServiceHolder>>> = LazyLock::new(|| {
     let holder = ServiceHolder {
-        next_id: 1,
+        id_generator: IdGenerator::new(),
         services: HashMap::new(),
     };
     Arc::new(Mutex::new(holder))
@@ -24,9 +26,9 @@ static SERVICES: LazyLock<Arc<Mutex<ServiceHolder>>> = LazyLock::new(|| {
 
 #[derive(Clone)]
 pub struct Service {
-    pub id: u32,
-    pub sender: Sender<JsEvent>,
-    pub receivers: Arc<Mutex<Vec<Box<dyn FnMut(crate::ext::ext_worker::MessageData) + Send>>>>,
+    id: u32,
+    sender: Sender<JsEvent>,
+    msg_handlers: Arc<Mutex<IdHashMap<Box<dyn FnMut(crate::ext::ext_worker::MessageData) + Send>>>>,
 }
 
 impl Service {
@@ -41,20 +43,18 @@ impl Service {
         module_name: String,
     ) -> Self {
         let id = {
-            let mut services = SERVICES.lock().unwrap();
-            let id = services.next_id;
-            services.next_id += 1;
-            id
+            let mut service_holder = SERVICES.lock().unwrap();
+            service_holder.id_generator.generate_id()
         };
 
         let (sender, receiver) = std::sync::mpsc::channel();
         let shared_module_loader = SharedModuleLoader::new(module_loader);
 
-        let receivers = Arc::new(Mutex::new(Vec::new()));
+        let msg_handlers = Arc::new(Mutex::new(IdHashMap::new()));
         let service = Self {
             id,
             sender: sender.clone(),
-            receivers: receivers.clone(),
+            msg_handlers: msg_handlers.clone(),
         };
         {
             let mut services = SERVICES.lock().unwrap();
@@ -72,10 +72,10 @@ impl Service {
                 });
 
                 let worker_context = WorkerContext::create(Box::new(move |msg| {
-                    let mut receivers = receivers.lock().unwrap();
-                    for receiver in receivers.iter_mut() {
-                        receiver(msg.clone());
-                    }
+                    let mut msg_handlers = msg_handlers.lock().unwrap();
+                    msg_handlers.for_each_mut(|_, handler| {
+                        handler(msg.clone());
+                    });
                 }));
                 JS_WORKER_CONTEXTS.with_borrow_mut(|ctxs| {
                     ctxs.replace(worker_context);
@@ -111,11 +111,25 @@ impl Service {
         service
     }
 
-    pub fn add_receiver(
-        &self,
-        receiver: Box<dyn FnMut(crate::ext::ext_worker::MessageData) + Send>,
-    ) {
-        let mut receivers = self.receivers.lock().unwrap();
-        receivers.push(receiver);
+    pub fn get_id(&self) -> u32 {
+        self.id
     }
+
+    pub fn send_event(&self, event: JsEvent) -> Result<(), SendError<JsEvent>> {
+        self.sender.send(event)
+    }
+
+    pub fn add_msg_handler(
+        &self,
+        handler: Box<dyn FnMut(crate::ext::ext_worker::MessageData) + Send>,
+    ) {
+        let mut handlers = self.msg_handlers.lock().unwrap();
+        handlers.insert(handler);
+    }
+
+    pub fn remove_msg_handler(&self, id: u32) {
+        let mut handlers = self.msg_handlers.lock().unwrap();
+        handlers.remove(id);
+    }
+
 }

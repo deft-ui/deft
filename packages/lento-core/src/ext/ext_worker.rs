@@ -29,7 +29,7 @@ thread_local! {
 pub struct Worker {
     id: u32,
     event_registration: EventRegistration<WorkerWeak>,
-    worker_event_sender: Sender<JsEvent>,
+    service: Service,
 }
 
 pub type MessageData = String;
@@ -113,16 +113,16 @@ impl Worker {
         let js_worker = WorkerData {
             id,
             event_registration: EventRegistration::new(),
-            worker_event_sender: service.sender.clone(),
+            service: service.clone(),
         }.to_ref();
 
         if js_is_in_event_loop() {
             let js_worker = js_worker.clone();
             let mut cb = js_create_event_loop_fn_mut(move |msg: MessageData| {
                 let mut js_worker = js_worker.clone();
-                js_worker.receive_message(msg).unwrap();
+                let _ = js_worker.receive_message(msg);
             });
-            service.add_receiver(Box::new(move |msg| {
+            service.add_msg_handler(Box::new(move |msg| {
                 cb.call(msg);
             }));
         }
@@ -159,7 +159,7 @@ impl Worker {
 
     #[js_func]
     pub fn post_message(&mut self, message: MessageData) -> Result<(), JsError> {
-        self.worker_event_sender.send(JsEvent::MacroTask(Box::new(move || {
+        self.service.send_event(JsEvent::MacroTask(Box::new(move || {
             if let Some(mut ctx) = WorkerContext::get() {
                 ctx.receive_message(message);
             }
