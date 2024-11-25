@@ -681,6 +681,10 @@ export class LabelElement extends View {
         Element_set_property(this.el, "align", align);
     }
 
+    /**
+     *
+     * @param selection {number[]}
+     */
     setSelection(selection) {
         Element_set_property(this.el, "selection", selection);
     }

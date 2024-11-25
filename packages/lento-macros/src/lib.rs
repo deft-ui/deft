@@ -327,7 +327,7 @@ fn build_bridge_body(func_inputs: Vec<FnArg>, asyncness: Option<Async>, struct_n
     } else {
         if receiver.is_some() {
             quote! {
-                let inst = <#struct_name as lento::js::FromJsValue>::from_js_value(args.get(0).unwrap().clone())?;
+                let mut inst = <#struct_name as lento::js::FromJsValue>::from_js_value(args.get(0).unwrap().clone())?;
                 let r = js_context.create_async_task2(async move {
                     inst.#func_name( #(#param_list, )* ).await
                 });
