@@ -667,6 +667,14 @@ export class LabelElement extends View {
 
     /**
      *
+     * @param wrap {boolean}
+     */
+    setTextWrap(wrap) {
+        Text_set_text_wrap(this.el, wrap);
+    }
+
+    /**
+     *
      * @param text {string}
      */
     setText(text) {
@@ -686,7 +694,61 @@ export class LabelElement extends View {
      * @param selection {number[]}
      */
     setSelection(selection) {
-        Element_set_property(this.el, "selection", selection);
+        Text_set_selection(this.el, selection);
+    }
+
+    /**
+     *
+     * @param startCaretOffset {number}
+     * @param endCaretOffset {number}
+     */
+    selectByCaretOffset(startCaretOffset, endCaretOffset) {
+        this.setSelection([startCaretOffset, endCaretOffset])
+    }
+
+    /**
+     *
+     * @param line {number}
+     * @returns {number}
+     */
+    getLineBeginOffset(line) {
+        return Text_get_line_begin_offset(this.el, line);
+    }
+
+    /**
+     *
+     * @param line {number}
+     * @param text {string}
+     */
+    insertLine(line, text) {
+        Text_insert_line(this.el, line, text);
+    }
+
+    /**
+     *
+     * @param line {number}
+     * @param newText {string}
+     */
+    updateLine(line, newText) {
+        Text_update_line(this.el, line, newText);
+    }
+
+    /**
+     *
+     * @param line {number}
+     */
+    deleteLine(line) {
+        Text_delete_line(this.el, line);
+    }
+
+    /**
+     *
+     * @param row {number}
+     * @param col {number}
+     * @return {number}
+     */
+    getCaretOffsetByCursor(row, col) {
+        return Text_get_atom_offset_by_location(this.el, [row, col]);
     }
 
 }

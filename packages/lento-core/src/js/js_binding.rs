@@ -143,6 +143,34 @@ impl<T: FromJsValue> FromJsValue for Vec<T> {
     }
 }
 
+macro_rules! impl_tuple_from_js_value {
+    ($($id: ident,)*) => {
+        impl<$( $id : FromJsValue,)*> FromJsValue for ($($id,)*) {
+            fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
+                if let JsValue::Array(items) = value {
+                    let mut iter = items.into_iter();
+                    let result = (
+                        $(
+                          $id::from_js_value(iter.next().ok_or(ValueError::UnexpectedType)?)?,
+                        )*
+                    );
+                    Ok(result)
+                } else {
+                    Err(ValueError::UnexpectedType)
+                }
+            }
+        }
+    };
+}
+
+impl_tuple_from_js_value!(A, B,);
+impl_tuple_from_js_value!(A, B, C,);
+impl_tuple_from_js_value!(A, B, C, D,);
+impl_tuple_from_js_value!(A, B, C, D, E,);
+impl_tuple_from_js_value!(A, B, C, D, E, F,);
+impl_tuple_from_js_value!(A, B, C, D, E, F, G,);
+
+
 impl ToJsValue for () {
     fn to_js_value(self) -> Result<JsValue, ValueError> {
         Ok(JsValue::Undefined)

@@ -11,6 +11,7 @@ use winit::window::{CursorGrabMode, WindowId};
 use crate::app::exit_app;
 use crate::console::Console;
 use crate::element::Element;
+use crate::element::text::Text;
 use crate::event_loop::run_with_event_loop;
 use crate::export_js_api;
 use crate::ext::ext_animation::animation_create;
@@ -95,6 +96,7 @@ impl JsEngine {
 
         engine.add_global_functions(ExtConsole::create_js_apis());
         engine.add_global_functions(Element::create_js_apis());
+        engine.add_global_functions(Text::create_js_apis());
         #[cfg(feature = "tray")]
         {
             engine.add_global_functions(SystemTray::create_js_apis());

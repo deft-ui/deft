@@ -2,15 +2,16 @@ pub mod skia_text_paragraph;
 pub mod text_paragraph;
 mod simple_text_paragraph;
 
+use crate as lento;
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use anyhow::Error;
-use quick_js::JsValue;
+use quick_js::{JsValue, ValueError};
 use skia_safe::{Canvas, Color, Font, FontMgr, FontStyle, Paint, Typeface};
 use skia_safe::textlayout::{FontCollection, TextAlign};
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
-
+use lento_macros::{js_methods, mrc_object};
 use crate::base::{ElementEvent, MouseDetail, MouseEventType, Rect, TextUpdateDetail};
 use crate::color::parse_hex_color;
 use crate::element::{ElementBackend, Element};
@@ -30,6 +31,7 @@ pub type ColOffset = usize;
 
 
 #[repr(C)]
+#[mrc_object]
 pub struct Text {
     text_params: TextParams,
     selection_paint: Paint,
@@ -72,7 +74,15 @@ extern "C" fn measure_label(node_ref: NodeRef, width: f32, width_mode: MeasureMo
     };
 }
 
+impl crate::js::FromJsValue for Text {
+    fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
+        let element = Element::from_js_value(value)?;
+        Ok(element.get_backend_as::<Text>().clone())
+    }
+}
 
+
+#[js_methods]
 impl Text {
     fn new(element: Element) -> Self {
         let text_params = TextParams {
@@ -93,7 +103,7 @@ impl Text {
         };
         let mut selection_paint = Paint::default();
         selection_paint.set_color(parse_hex_color("214283").unwrap());
-        Self {
+        TextData {
             paragraph_ref: paragraph_props,
             selection_paint,
             selection: None,
@@ -101,7 +111,7 @@ impl Text {
             last_width: 0.0,
             text_params,
             selecting_begin: None,
-        }
+        }.to_ref()
     }
 
     pub fn set_text(&mut self, text: String) {
@@ -132,6 +142,40 @@ impl Text {
         };
         self.rebuild_line(caret_row, new_text);
     }
+
+    #[js_func]
+    pub fn get_line_begin_offset(&self, line: RowOffset) -> AtomOffset {
+        let pi = self.paragraph_ref.data.borrow();
+        let mut offset = 0;
+        let mut i = 0;
+        for p in &pi.lines {
+            if i >= line {
+                break;
+            }
+            offset += p.atom_count;
+            i += 1;
+        }
+        offset
+    }
+
+    #[js_func]
+    pub fn insert_line(&mut self, line: RowOffset, text: String) {
+        let offset = self.get_line_begin_offset(line);
+        self.insert_text(offset, &format!("{}\n", text));
+    }
+
+    #[js_func]
+    pub fn update_line(&mut self, line: RowOffset, text: String) {
+        self.rebuild_line(line, text);
+    }
+
+    #[js_func]
+    pub fn delete_line(&mut self, line: RowOffset) {
+        let start = self.get_line_begin_offset(line);
+        let end = self.get_line_begin_offset(line + 1);
+        self.delete_text(start, end);
+    }
+
 
     pub fn delete_text(&mut self, begin: AtomOffset, end: AtomOffset) {
         let (begin_row, begin_col) = self.get_location_by_atom_offset(begin);
@@ -190,6 +234,7 @@ impl Text {
         }
     }
 
+    #[js_func]
     pub fn set_selection(&mut self, selection: (usize, usize)) {
         //TODO validate params
         let (start, end) = selection;
@@ -282,6 +327,7 @@ impl Text {
         &self.text_params.paint
     }
 
+    #[js_func]
     pub fn set_text_wrap(&mut self, text_wrap: bool) {
         {
             let mut p = self.paragraph_ref.data.borrow_mut();
@@ -349,6 +395,7 @@ impl Text {
         }).unwrap_or(self.get_max_caret())
     }
 
+    #[js_func]
     pub fn get_atom_offset_by_location(&self, location: (RowOffset, ColOffset)) -> AtomOffset {
         self.with_lines_mut(|ps| {
             let (caret_row, caret_col) = location;
@@ -619,13 +666,18 @@ impl ElementBackend for Text {
     }
 
     fn handle_origin_bounds_change(&mut self, bounds: &Rect) {
-        let mut pi = self.paragraph_ref.data.borrow_mut();
         //TODO check font/color changed?
-        if bounds.width != self.last_width {
+        let last_width = if bounds.width != self.last_width {
+            let mut pi = self.paragraph_ref.data.borrow_mut();
             pi.lines.iter_mut().for_each(|p| {
                 p.paragraph_dirty = true;
             });
-            self.last_width = bounds.width;
+            Some(bounds.width)
+        } else {
+            None
+        };
+        if let Some(last_width) = last_width {
+            self.last_width = last_width;
         }
     }
 
