@@ -940,7 +940,13 @@ export class WebSocket {
 
     onmessage;
 
+    onping;
+
+    onpong;
+
     onerror;
+
+    #closed = false;
 
     constructor(url) {
         this.listeners = Object.create(null);
@@ -955,15 +961,21 @@ export class WebSocket {
         listeners.push(callback);
     }
 
-    send(data) {
+    async send(data) {
         //TODO check status
-        WsConnection_send_str(this.client, data + "").catch(error => {
+        try {
+            await WsConnection_send_str(this.client, data + "");
+        } catch (error) {
             this.#emit('error', error);
-        });
+        }
     }
 
     close() {
-        WsConnection_close(this.client);
+        if (!this.#closed) {
+            this.#closed = true;
+            this.#emit("close");
+            WsConnection_close(this.client);
+        }
     }
 
     async #connect(url) {
@@ -979,27 +991,41 @@ export class WebSocket {
 
     async #doRead() {
         try {
+            loop:
             for (;;) {
-                let msg = await WsConnection_read(this.client);
-                if (msg === false) {
-                    this.#emit("close");
-                    break;
-                }
-                let type = typeof msg;
-                if (type === "undefined") {
-                    continue;
-                } else if (type === "string") {
-                    this.#emit("message", {data: msg});
+                let [type, data] = await WsConnection_read(this.client);
+                // console.log("read message", type, data);
+                switch (type) {
+                    case "text":
+                        this.#emit("message", data);
+                        break;
+                    case "binary":
+                        this.#emit("message", ArrayBuffer.from(data));
+                        break;
+                    case "ping":
+                        this.#emit("ping", data);
+                        break;
+                    case "pong":
+                        this.#emit("pong", data);
+                        break;
+                    case "close":
+                        break loop;
+                    case "frame":
+                        this.#emit("frame", data);
+                        break;
                 }
             }
+            //TODO maybe half-close?
+            this.close();
         } catch (error) {
             console.error(error);
-            this.#emit("close");
+            this.#emit("error");
+            this.close();
         }
     }
 
     #emit(name, data) {
-        console.log("emit", name, data);
+        // console.log("emit", name, data);
         /**
          * @type {Event}
          */
@@ -1016,7 +1042,7 @@ export class WebSocket {
             target: null,
             timeStamp: new Date().getTime(),
             type: name,
-            ...data,
+            data,
         };
         const key = `on${name}`;
         if (this[key]) {
@@ -1139,7 +1165,12 @@ function log(...values) {
 
 function printObj(value, padding, circleRefList, printedList, level) {
     let type = typeof value;
-    if (type === "object" && value != null) {
+    if (value instanceof Error) {
+        console.log(`[Error(${value.name})]` + value.message);
+        if (value.stack) {
+            console.log(value.stack);
+        }
+    } else if (type === "object" && value != null) {
         const refIdx = circleRefList.indexOf(value);
         if (refIdx >= 0 && printedList.includes(value)) {
             Console_print("[Circular *" + refIdx + "]");
