@@ -115,6 +115,21 @@ function main() {
     });
 
     container.addChild(textEdit);
+
+    const paragraph = new ParagraphElement();
+    paragraph.addUnit({
+        text: "Normal",
+        fontFamilies: [],
+        fontSize: 20,
+        backgroundColor: "#666",
+    });
+    paragraph.addUnit({
+        text: "Small red",
+        fontFamilies: [],
+        fontSize: 10,
+        color: "#F00",
+    });
+    container.addChild(paragraph);
     //
     // //container.removeChild(label2);
     //

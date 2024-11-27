@@ -1316,13 +1316,25 @@ pub fn parse_style_unit(value: &str) -> Option<StyleUnit> {
 }
 
 pub fn parse_color(value: &str) -> ColorPropValue {
+    parse_color_str(value)
+        .map(|c| ColorPropValue::Color(c))
+        .unwrap_or(ColorPropValue::Inherit)
+}
+
+pub fn parse_color_str(value: &str) -> Option<Color> {
+    //TODO support white,black and so on
     if let Some(hex) = value.strip_prefix("#") {
-        match parse_hex_color(hex) {
-            None => ColorPropValue::Inherit,
-            Some(c) => ColorPropValue::Color(c),
-        }
+        parse_hex_color(hex)
     } else {
-        ColorPropValue::Inherit
+        None
+    }
+}
+
+pub fn parse_optional_color_str(value: Option<&String>) -> Option<Color> {
+    if let Some(str) = value {
+        parse_color_str(str)
+    } else {
+        None
     }
 }
 

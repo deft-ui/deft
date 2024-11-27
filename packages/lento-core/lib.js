@@ -753,6 +753,66 @@ export class LabelElement extends View {
 
 }
 
+/**
+ * @typedef {{
+ *   text: string,
+ *   weight ?: string,
+ *   textDecorationLine ?: string,
+ *   fontFamilies ?: string[],
+ *   fontSize ?: number,
+ *   color ?: string,
+ *   backgroundColor ?: string
+ * }} ParagraphUnit
+ */
+export class ParagraphElement extends View {
+    #paragraph;
+    constructor() {
+        const p = Paragraph_new_element();
+        super(p, {});
+        this.#paragraph = p;
+    }
+
+    /**
+     *
+     * @param unit {ParagraphUnit}
+     */
+    addUnit(unit) {
+        Paragraph_add_unit(this.#paragraph, unit);
+    }
+
+    /**
+     *
+     * @param index {number}
+     * @param unit {ParagraphUnit}
+     */
+    insertUnit(index, unit) {
+        Paragraph_insert_unit(this.#paragraph, index, unit);
+    }
+
+
+    /**
+     *
+     * @param index {number}
+     */
+    deleteUnit(index) {
+        Paragraph_delete_unit(this.#paragraph, index);
+    }
+
+    /**
+     *
+     * @param index {number}
+     * @param unit {ParagraphUnit}
+     */
+    updateUnit(index, unit) {
+        Paragraph_update_unit(this.#paragraph, index, unit);
+    }
+
+    clear() {
+        Paragraph_clear(this.#paragraph);
+    }
+
+}
+
 export class ImageElement extends View {
     constructor() {
         super(VT_IMAGE);
@@ -1276,6 +1336,7 @@ globalThis.EntryElement = EntryElement;
 globalThis.TextEditElement = TextEditElement;
 globalThis.ButtonElement = ButtonElement;
 globalThis.ImageElement  = ImageElement;
+globalThis.ParagraphElement = ParagraphElement;
 globalThis.Audio = Audio;
 globalThis.WebSocket = WebSocket;
 globalThis.setTimeout = globalThis.timer_set_timeout;

@@ -47,6 +47,8 @@ pub mod image;
 pub mod label;
 mod edit_history;
 pub mod text;
+pub mod paragraph;
+
 use crate as lento;
 
 thread_local! {
@@ -966,8 +968,9 @@ pub trait ElementBackend {
         let _ = key;
     }
 
-    fn draw(&self, _canvas: &Canvas) {
-
+    //TODO use &mut self
+    fn draw(&self, canvas: &Canvas) {
+        let _ = canvas;
     }
 
     fn get_inner_element(&self) -> Option<Element> {
