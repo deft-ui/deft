@@ -24,3 +24,4 @@ pub mod ext_animation;
 pub mod ext_clipboard;
 pub mod ext_worker;
 pub mod service;
+pub mod ext_sqlite;

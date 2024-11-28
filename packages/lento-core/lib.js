@@ -1132,6 +1132,54 @@ export class WorkerContext {
     }
 }
 
+export class SqliteConn {
+    #conn;
+    constructor(conn) {
+        this.#conn = conn;
+    }
+
+    /**
+     *
+     * @param sql {string}
+     * @param params {*[]}
+     * @returns {Promise<number>}
+     */
+    async execute(sql, params= []) {
+        return await SqliteConn_execute(this.#conn, sql, params);
+    }
+
+    /**
+     *
+     * @param sql {string}
+     * @param params {*[]}
+     * @returns {Promise<Object[]>}
+     */
+    async query(sql, params = []) {
+        const [columnNames, rows] = await SqliteConn_query(this.#conn, sql, params);
+        return rows.map(it => {
+            const map = {};
+            for (let i = 0; i < columnNames.length; i++) {
+                map[columnNames[i]] = it[i];
+            }
+            return map;
+        });
+    }
+
+}
+
+export class Sqlite {
+
+    /**
+     *
+     * @param path {string}
+     * @returns {Promise<SqliteConn>}
+     */
+    static async open(path) {
+        const conn = await SqliteConn_open(path);
+        return new SqliteConn(conn);
+    }
+
+}
 
 function collectCircleRefInfo(value, visited, circleRefList, level) {
     if (level >= 3) {
@@ -1247,6 +1295,8 @@ globalThis.ButtonElement = ButtonElement;
 globalThis.ImageElement  = ImageElement;
 globalThis.Audio = Audio;
 globalThis.WebSocket = WebSocket;
+globalThis.Sqlite = Sqlite;
+
 globalThis.setTimeout = globalThis.timer_set_timeout;
 globalThis.clearTimeout = globalThis.timer_clear_timeout;
 globalThis.setInterval = globalThis.timer_set_interval;

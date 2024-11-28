@@ -30,6 +30,7 @@ use crate::ext::ext_localstorage::localstorage;
 use crate::ext::ext_path::path;
 use crate::ext::ext_process::process;
 use crate::ext::ext_shell::shell;
+use crate::ext::ext_sqlite::SqliteConn;
 use crate::ext::ext_timer::{timer_clear_interval, timer_clear_timeout, timer_set_interval, timer_set_timeout};
 #[cfg(feature = "tray")]
 use crate::ext::ext_tray::SystemTray;
@@ -96,6 +97,7 @@ impl JsEngine {
 
         engine.add_global_functions(ExtConsole::create_js_apis());
         engine.add_global_functions(Element::create_js_apis());
+        engine.add_global_functions(SqliteConn::create_js_apis());
         #[cfg(feature = "tray")]
         {
             engine.add_global_functions(SystemTray::create_js_apis());
