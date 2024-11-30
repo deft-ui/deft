@@ -847,7 +847,7 @@ export class ParagraphElement extends View {
      * @return {[number, number]}
      */
     measureLine(units) {
-        Paragraph_measure_line(this.#paragraph, units);
+        return Paragraph_measure_line(this.#paragraph, units);
     }
 
 }
