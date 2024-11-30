@@ -139,6 +139,19 @@ export class Frame {
         this.#eventBinder.bindEvent(type, callback);
     }
 
+    /**
+     * @typedef {("resize", event)} addEventListener
+     * @param type
+     * @param callback
+     */
+    addEventListener(type, callback) {
+        this.#eventBinder.addEventListener(type, callback);
+    }
+
+    removeEventListener(type, callback) {
+        this.#eventBinder.removeEventListener(type, callback);
+    }
+
 }
 
 /**
@@ -251,6 +264,7 @@ export class EventBinder {
     #addEventListenerApi;
     #contextGetter;
     #self;
+    #allEventListeners = Object.create(null);
 
     constructor(target, addApi, removeApi, self, contextGetter) {
         this.#target = target;
@@ -269,7 +283,9 @@ export class EventBinder {
         if (oldListenerId) {
             this.#removeEventListenerApi(this.#target, type, oldListenerId);
         }
-
+        this.#eventListeners[type] = this.addEventListener(type, callback);
+    }
+    addEventListener(type, callback) {
         const getJsContext = (target) => {
             if (target && this.#contextGetter) {
                 return this.#contextGetter(target);
@@ -295,9 +311,22 @@ export class EventBinder {
             }
             return event.result();
         }
-
-        this.#eventListeners[type] = this.#addEventListenerApi(this.#target, type, eventCallback);
+        if (!this.#allEventListeners[type]) {
+            this.#allEventListeners[type] = new Map();
+        }
+        const id = this.#addEventListenerApi(this.#target, type, eventCallback);
+        this.#allEventListeners[type].set(callback, id);
+        return id;
     }
+
+    removeEventListener(type, callback) {
+        const map = this.#eventListeners[type];
+        const id = map.delete(callback);
+        if (id) {
+            this.#removeEventListenerApi(this.#target, type, id);
+        }
+    }
+
 }
 
 export class SystemTray {
