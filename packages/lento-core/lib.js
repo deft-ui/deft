@@ -755,6 +755,7 @@ export class LabelElement extends View {
 
 /**
  * @typedef {{
+ *   type: "text",
  *   text: string,
  *   weight ?: string,
  *   textDecorationLine ?: string,
@@ -774,19 +775,19 @@ export class ParagraphElement extends View {
 
     /**
      *
-     * @param unit {ParagraphUnit}
+     * @param units {ParagraphUnit[]}
      */
-    addUnit(unit) {
-        Paragraph_add_unit(this.#paragraph, unit);
+    addLine(units) {
+        Paragraph_add_line(this.#paragraph, units);
     }
 
     /**
      *
      * @param index {number}
-     * @param unit {ParagraphUnit}
+     * @param units {ParagraphUnit[]}
      */
-    insertUnit(index, unit) {
-        Paragraph_insert_unit(this.#paragraph, index, unit);
+    insertLine(index, units) {
+        Paragraph_insert_line(this.#paragraph, index, units);
     }
 
 
@@ -794,17 +795,17 @@ export class ParagraphElement extends View {
      *
      * @param index {number}
      */
-    deleteUnit(index) {
-        Paragraph_delete_unit(this.#paragraph, index);
+    deleteLine(index) {
+        Paragraph_delete_line(this.#paragraph, index);
     }
 
     /**
      *
      * @param index {number}
-     * @param unit {ParagraphUnit}
+     * @param units {ParagraphUnit[]}
      */
-    updateUnit(index, unit) {
-        Paragraph_update_unit(this.#paragraph, index, unit);
+    updateLine(index, units) {
+        Paragraph_update_line(this.#paragraph, index, units);
     }
 
     clear() {
