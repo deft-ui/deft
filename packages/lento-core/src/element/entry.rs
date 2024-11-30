@@ -19,6 +19,7 @@ use crate::element::text::text_paragraph::Line;
 use crate::event::{CaretEventBind, KEY_MOD_CTRL, KEY_MOD_SHIFT, KeyDownEvent, KeyEventDetail};
 use crate::event_loop::create_event_loop_proxy;
 use crate::string::StringUtils;
+use crate::style::StylePropKey;
 use crate::timer::TimerHandle;
 
 const COPY_KEY: &str = "\x03";
@@ -392,7 +393,7 @@ impl ElementBackend for Entry {
         "Entry"
     }
 
-    fn handle_style_changed(&mut self, key: &str) {
+    fn handle_style_changed(&mut self, key: StylePropKey) {
         self.base.handle_style_changed(key)
     }
 

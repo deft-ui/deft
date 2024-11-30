@@ -5,6 +5,7 @@ use yoga::{Edge, StyleUnit};
 use crate::base::PropertyValue;
 use crate::element::{ElementBackend, Element};
 use crate::element::label::Label;
+use crate::style::StylePropKey;
 
 pub struct Button {
     label: Label,
@@ -64,7 +65,7 @@ impl ElementBackend for Button {
 
     }
 
-    fn handle_style_changed(&mut self, key: &str) {
+    fn handle_style_changed(&mut self, key: StylePropKey) {
         self.label.handle_style_changed(key)
     }
 

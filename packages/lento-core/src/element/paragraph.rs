@@ -6,7 +6,7 @@ use crate::element::{Element, ElementBackend};
 use crate::js::JsError;
 use crate::number::DeNan;
 use crate::string::StringUtils;
-use crate::style::{parse_color, parse_color_str, parse_optional_color_str};
+use crate::style::{parse_color, parse_color_str, parse_optional_color_str, StylePropKey};
 use crate::{js_deserialize, js_serialize};
 use lento_macros::{element_backend, js_methods, mrc_object};
 use rodio::cpal::available_hosts;
@@ -299,17 +299,24 @@ impl ElementBackend for Paragraph {
         "Paragraph"
     }
 
-    fn handle_style_changed(&mut self, key: &str) {
-        match key.to_lowercase().as_str() {
-            "color" => {
+    fn handle_style_changed(&mut self, key: StylePropKey) {
+        let mut rebuild = true;
+        match key {
+            StylePropKey::Color => {
                 self.params.color = self.element.layout.computed_style.color;
-                self.rebuild_paragraph();
             }
-            "fontsize" => {
+            StylePropKey::FontSize => {
                 self.params.font_size = self.element.layout.font_size;
-                self.rebuild_paragraph();
             }
-            _ => {}
+            StylePropKey::LineHeight => {
+                self.params.line_height = self.element.layout.line_height;
+            }
+            _ => {
+                rebuild = false;
+            }
+        }
+        if rebuild {
+            self.rebuild_paragraph();
         }
     }
 

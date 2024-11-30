@@ -21,6 +21,7 @@ use crate::{js_call, match_event_type};
 use crate::event::{AcceptFocusShiftEvent, FocusShiftBind};
 use crate::number::DeNan;
 use crate::string::StringUtils;
+use crate::style::StylePropKey;
 
 // zero-width space for caret
 const ZERO_WIDTH_WHITESPACE: &str = "\u{200B}";
@@ -578,16 +579,15 @@ impl ElementBackend for Text {
         "Text"
     }
 
-    fn handle_style_changed(&mut self, key: &str) {
-        let key = key.to_lowercase();
-        match key.as_str() {
-            "color" => {
+    fn handle_style_changed(&mut self, key: StylePropKey) {
+        match key {
+            StylePropKey::Color => {
                 let color = self.element.layout.computed_style.color;
                 self.text_params.paint.set_color(color);
                 self.refresh_lines();
                 self.mark_dirty(false);
             },
-            "fontsize" => {
+            StylePropKey::FontSize => {
                 let font_size = self.element.layout.font_size;
                 self.text_params.font.set_size(font_size);
                 self.refresh_lines();

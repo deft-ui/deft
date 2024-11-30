@@ -13,6 +13,7 @@ use crate::element::entry::Entry;
 use crate::event::{TextUpdateEventBind};
 use crate::{create_element, js_call_rust, set_style, tree};
 use crate::element::scroll::Scroll;
+use crate::style::StylePropKey;
 
 pub struct TextEdit {
     element: Element,
@@ -93,7 +94,7 @@ impl ElementBackend for TextEdit {
         "TextEdit"
     }
 
-    fn handle_style_changed(&mut self, key: &str) {
+    fn handle_style_changed(&mut self, key: StylePropKey) {
         self.get_entry_mut().handle_style_changed(key);
     }
 
