@@ -10,15 +10,12 @@ use lento_macros::{element_backend, js_methods, mrc_object};
 use serde::{Deserialize, Serialize};
 use skia_bindings::SkFontStyle_Weight;
 use skia_safe::font_style::{Slant, Weight, Width};
-use skia_safe::textlayout::{
-    Decoration, FontFamilies, Paragraph as SkParagraph, ParagraphBuilder, ParagraphStyle,
-    PlaceholderStyle, StrutStyle, TextAlign, TextDecoration, TextDirection, TextStyle,
-};
-use skia_safe::{Canvas, Color, Font, FontStyle, Paint, Point, Rect};
+use skia_safe::textlayout::{Decoration, FontFamilies, Paragraph as SkParagraph, ParagraphBuilder, ParagraphStyle, PlaceholderStyle, StrutStyle, TextAlign, TextDecoration, TextDirection, TextStyle, TypefaceFontProvider};
+use skia_safe::{Canvas, Color, Font, FontMgr, FontStyle, Paint, Point, Rect};
 use std::str::FromStr;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 
-const DEFAULT_FONT_NAME: &str = "Noto Mono";
+const DEFAULT_FONT_NAME: &str = "monospace";
 
 #[derive(Clone)]
 pub struct ParagraphParams {
@@ -246,7 +243,7 @@ impl ElementBackend for Paragraph {
             line_height: None,
             align: TextAlign::Left,
             color: Color::default(),
-            font_size: 16.0,
+            font_size: 12.0,
             font_families: vec![DEFAULT_FONT_NAME.to_string()],
         };
         let units = Vec::new();
