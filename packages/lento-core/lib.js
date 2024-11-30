@@ -841,6 +841,15 @@ export class ParagraphElement extends View {
         Paragraph_clear(this.#paragraph);
     }
 
+    /**
+     *
+     * @param units {ParagraphUnit[]}
+     * @return {[number, number]}
+     */
+    measureLine(units) {
+        Paragraph_measure_line(this.#paragraph, units);
+    }
+
 }
 
 export class ImageElement extends View {

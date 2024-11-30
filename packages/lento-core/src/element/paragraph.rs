@@ -163,6 +163,13 @@ impl Paragraph {
         self.mark_dirty();
     }
 
+    #[js_func]
+    pub fn measure_line(&self, units: Vec<ParagraphUnit>) -> (f32, f32) {
+        let mut sk_paragraph = Self::build_paragraph(&self.params, &units);
+        sk_paragraph.layout(f32::NAN);
+        (sk_paragraph.max_intrinsic_width(), sk_paragraph.height())
+    }
+
     fn layout(&mut self, available_width: Option<f32>) {
         let layout_width = self.element.layout.get_layout_width();
         for ln in &mut self.lines {
