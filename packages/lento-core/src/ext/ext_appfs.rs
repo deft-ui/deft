@@ -14,7 +14,7 @@ pub struct appfs{}
 impl appfs {
 
     #[js_func]
-    pub fn appfs_data_path(name: Option<String>) -> io::Result<String> {
+    pub fn data_path(name: Option<String>) -> io::Result<String> {
         let p = if let Some(name) = name {
             get_data_path(&name)
         } else {
@@ -24,13 +24,13 @@ impl appfs {
     }
 
     #[js_func]
-    pub async fn appfs_exists(path: String) -> io::Result<bool> {
+    pub async fn exists(path: String) -> io::Result<bool> {
         let path = get_data_path(&path);
         Ok(path.exists())
     }
 
     #[js_func]
-    pub async fn appfs_readdir(path: String) -> io::Result<Vec<String>> {
+    pub async fn readdir(path: String) -> io::Result<Vec<String>> {
         let root = get_data_path(path.as_str());
         let mut dirs = fs::read_dir(&root).await?;
         let mut result = Vec::new();
@@ -42,21 +42,21 @@ impl appfs {
     }
 
     #[js_func]
-    pub async fn appfs_write(path: String, content: String) -> io::Result<()> {
+    pub async fn write(path: String, content: String) -> io::Result<()> {
         let path = get_data_path(&path);
         let mut file = File::create(&path).await?;
         file.write_all(content.as_bytes()).await
     }
 
     #[js_func]
-    pub async fn appfs_write_new(path: String, content: String) -> io::Result<()> {
+    pub async fn write_new(path: String, content: String) -> io::Result<()> {
         let path = get_data_path(&path);
         let mut file = File::create_new(&path).await?;
         file.write_all(content.as_bytes()).await
     }
 
     #[js_func]
-    pub async fn appfs_read(path: String) -> io::Result<String> {
+    pub async fn read(path: String) -> io::Result<String> {
         let path = get_data_path(&path);
         let mut file = File::open(&path).await?;
         let mut result = String::new();
@@ -65,31 +65,31 @@ impl appfs {
     }
 
     #[js_func]
-    pub async fn appfs_delete_file(path: String) -> io::Result<()> {
+    pub async fn delete_file(path: String) -> io::Result<()> {
         let path = get_data_path(&path);
         fs::remove_file(&path).await
     }
 
     #[js_func]
-    pub async fn appfs_create_dir(path: String) -> io::Result<()> {
+    pub async fn create_dir(path: String) -> io::Result<()> {
         let path = get_data_path(&path);
         fs::create_dir(&path).await
     }
 
     #[js_func]
-    pub async fn appfs_create_dir_all(path: String) -> io::Result<()> {
+    pub async fn create_dir_all(path: String) -> io::Result<()> {
         let path = get_data_path(&path);
         fs::create_dir_all(&path).await
     }
 
     #[js_func]
-    pub async fn appfs_remove_dir(path: String) -> io::Result<()> {
+    pub async fn remove_dir(path: String) -> io::Result<()> {
         let path = get_data_path(&path);
         fs::remove_dir(&path).await
     }
 
     #[js_func]
-    pub async fn appfs_remove_dir_all(path: String) -> io::Result<()> {
+    pub async fn remove_dir_all(path: String) -> io::Result<()> {
         let path = get_data_path(&path);
         fs::remove_dir_all(&path).await
     }

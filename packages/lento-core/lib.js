@@ -139,6 +139,19 @@ export class Frame {
         this.#eventBinder.bindEvent(type, callback);
     }
 
+    /**
+     * @typedef {("resize", event)} addEventListener
+     * @param type
+     * @param callback
+     */
+    addEventListener(type, callback) {
+        this.#eventBinder.addEventListener(type, callback);
+    }
+
+    removeEventListener(type, callback) {
+        this.#eventBinder.removeEventListener(type, callback);
+    }
+
 }
 
 /**
@@ -235,7 +248,7 @@ export class EventRegistry {
             try {
                 callback && callback(event);
             } catch (error) {
-                console.error('event handling error', error?.message);
+                console.error(`${type} event handling error, detail=`, detail ,error.message || error);
             }
             return event.result();
         }
@@ -251,6 +264,7 @@ export class EventBinder {
     #addEventListenerApi;
     #contextGetter;
     #self;
+    #allEventListeners = Object.create(null);
 
     constructor(target, addApi, removeApi, self, contextGetter) {
         this.#target = target;
@@ -269,7 +283,9 @@ export class EventBinder {
         if (oldListenerId) {
             this.#removeEventListenerApi(this.#target, type, oldListenerId);
         }
-
+        this.#eventListeners[type] = this.addEventListener(type, callback);
+    }
+    addEventListener(type, callback) {
         const getJsContext = (target) => {
             if (target && this.#contextGetter) {
                 return this.#contextGetter(target);
@@ -290,14 +306,27 @@ export class EventBinder {
             const event = new EventObject(type, detail, getJsContext(target), self);
             try {
                 callback && callback(event);
-                return event.result();
             } catch (error) {
-                console.error('event handling error', error);
+                console.error(`${type} event handling error, detail=`, detail ,error.message || error);
             }
+            return event.result();
         }
-
-        this.#eventListeners[type] = this.#addEventListenerApi(this.#target, type, eventCallback);
+        if (!this.#allEventListeners[type]) {
+            this.#allEventListeners[type] = new Map();
+        }
+        const id = this.#addEventListenerApi(this.#target, type, eventCallback);
+        this.#allEventListeners[type].set(callback, id);
+        return id;
     }
+
+    removeEventListener(type, callback) {
+        const map = this.#eventListeners[type];
+        const id = map.delete(callback);
+        if (id) {
+            this.#removeEventListenerApi(this.#target, type, id);
+        }
+    }
+
 }
 
 export class SystemTray {
@@ -695,6 +724,14 @@ export class LabelElement extends View {
 
     /**
      *
+     * @param wrap {boolean}
+     */
+    setTextWrap(wrap) {
+        Text_set_text_wrap(this.el, wrap);
+    }
+
+    /**
+     *
      * @param text {string}
      */
     setText(text) {
@@ -709,8 +746,136 @@ export class LabelElement extends View {
         Element_set_property(this.el, "align", align);
     }
 
+    /**
+     *
+     * @param selection {number[]}
+     */
     setSelection(selection) {
-        Element_set_property(this.el, "selection", selection);
+        Text_set_selection(this.el, selection);
+    }
+
+    /**
+     *
+     * @param startCaretOffset {number}
+     * @param endCaretOffset {number}
+     */
+    selectByCaretOffset(startCaretOffset, endCaretOffset) {
+        this.setSelection([startCaretOffset, endCaretOffset])
+    }
+
+    /**
+     *
+     * @param line {number}
+     * @returns {number}
+     */
+    getLineBeginOffset(line) {
+        return Text_get_line_begin_offset(this.el, line);
+    }
+
+    /**
+     *
+     * @param line {number}
+     * @param text {string}
+     */
+    insertLine(line, text) {
+        Text_insert_line(this.el, line, text);
+    }
+
+    /**
+     *
+     * @param line {number}
+     * @param newText {string}
+     */
+    updateLine(line, newText) {
+        Text_update_line(this.el, line, newText);
+    }
+
+    /**
+     *
+     * @param line {number}
+     */
+    deleteLine(line) {
+        Text_delete_line(this.el, line);
+    }
+
+    /**
+     *
+     * @param row {number}
+     * @param col {number}
+     * @return {number}
+     */
+    getCaretOffsetByCursor(row, col) {
+        return Text_get_atom_offset_by_location(this.el, [row, col]);
+    }
+
+}
+
+/**
+ * @typedef {{
+ *   type: "text",
+ *   text: string,
+ *   weight ?: string,
+ *   textDecorationLine ?: string,
+ *   fontFamilies ?: string[],
+ *   fontSize ?: number,
+ *   color ?: string,
+ *   backgroundColor ?: string
+ * }} ParagraphUnit
+ */
+export class ParagraphElement extends View {
+    #paragraph;
+    constructor() {
+        const p = Paragraph_new_element();
+        super(p, {});
+        this.#paragraph = p;
+    }
+
+    /**
+     *
+     * @param units {ParagraphUnit[]}
+     */
+    addLine(units) {
+        Paragraph_add_line(this.#paragraph, units);
+    }
+
+    /**
+     *
+     * @param index {number}
+     * @param units {ParagraphUnit[]}
+     */
+    insertLine(index, units) {
+        Paragraph_insert_line(this.#paragraph, index, units);
+    }
+
+
+    /**
+     *
+     * @param index {number}
+     */
+    deleteLine(index) {
+        Paragraph_delete_line(this.#paragraph, index);
+    }
+
+    /**
+     *
+     * @param index {number}
+     * @param units {ParagraphUnit[]}
+     */
+    updateLine(index, units) {
+        Paragraph_update_line(this.#paragraph, index, units);
+    }
+
+    clear() {
+        Paragraph_clear(this.#paragraph);
+    }
+
+    /**
+     *
+     * @param units {ParagraphUnit[]}
+     * @return {[number, number]}
+     */
+    measureLine(units) {
+        return Paragraph_measure_line(this.#paragraph, units);
     }
 
 }
@@ -964,7 +1129,13 @@ export class WebSocket {
 
     onmessage;
 
+    onping;
+
+    onpong;
+
     onerror;
+
+    #closed = false;
 
     constructor(url) {
         this.listeners = Object.create(null);
@@ -979,15 +1150,21 @@ export class WebSocket {
         listeners.push(callback);
     }
 
-    send(data) {
+    async send(data) {
         //TODO check status
-        WsConnection_send_str(this.client, data + "").catch(error => {
+        try {
+            await WsConnection_send_str(this.client, data + "");
+        } catch (error) {
             this.#emit('error', error);
-        });
+        }
     }
 
     close() {
-        WsConnection_close(this.client);
+        if (!this.#closed) {
+            this.#closed = true;
+            this.#emit("close");
+            WsConnection_close(this.client);
+        }
     }
 
     async #connect(url) {
@@ -1003,27 +1180,41 @@ export class WebSocket {
 
     async #doRead() {
         try {
+            loop:
             for (;;) {
-                let msg = await WsConnection_read(this.client);
-                if (msg === false) {
-                    this.#emit("close");
-                    break;
-                }
-                let type = typeof msg;
-                if (type === "undefined") {
-                    continue;
-                } else if (type === "string") {
-                    this.#emit("message", {data: msg});
+                let [type, data] = await WsConnection_read(this.client);
+                // console.log("read message", type, data);
+                switch (type) {
+                    case "text":
+                        this.#emit("message", data);
+                        break;
+                    case "binary":
+                        this.#emit("message", ArrayBuffer.from(data));
+                        break;
+                    case "ping":
+                        this.#emit("ping", data);
+                        break;
+                    case "pong":
+                        this.#emit("pong", data);
+                        break;
+                    case "close":
+                        break loop;
+                    case "frame":
+                        this.#emit("frame", data);
+                        break;
                 }
             }
+            //TODO maybe half-close?
+            this.close();
         } catch (error) {
             console.error(error);
-            this.#emit("close");
+            this.#emit("error");
+            this.close();
         }
     }
 
     #emit(name, data) {
-        console.log("emit", name, data);
+        // console.log("emit", name, data);
         /**
          * @type {Event}
          */
@@ -1040,7 +1231,7 @@ export class WebSocket {
             target: null,
             timeStamp: new Date().getTime(),
             type: name,
-            ...data,
+            data,
         };
         const key = `on${name}`;
         if (this[key]) {
@@ -1061,6 +1252,123 @@ export class WebSocket {
 
 }
 
+export class Worker {
+
+    #worker
+
+    /**
+     * @type EventBinder
+     */
+    #eventBinder;
+
+    /**
+     *
+     * @param source {number | string}
+     */
+    constructor(source) {
+        this.#worker = typeof source === "string" ? Worker_create(source) : Worker_bind(source);
+        this.#eventBinder = new EventBinder(
+            this.#worker,
+            Worker_bind_js_event_listener,
+            Worker_remove_js_event_listener,
+            this
+        );
+    }
+
+    postMessage(data) {
+        Worker_post_message(this.#worker, JSON.stringify(data));
+    }
+
+    bindMessage(callback) {
+        this.#eventBinder.bindEvent('message', e => {
+            e.data = JSON.parse(e.detail.data);
+            callback(e);
+        });
+    }
+
+}
+
+export class WorkerContext {
+    #workerContext;
+    /**
+     * @type {EventBinder}
+     */
+    #eventBinder;
+    constructor() {
+        this.#workerContext = WorkerContext_get();
+        this.#eventBinder = new EventBinder(
+            this.#workerContext,
+            WorkerContext_bind_js_event_listener,
+            WorkerContext_remove_js_event_listener,
+            this
+        )
+    }
+    postMessage(data) {
+        WorkerContext_post_message(this.#workerContext, JSON.stringify(data));
+    }
+    bindMessage(callback) {
+        this.#eventBinder.bindEvent('message', e => {
+            e.data = JSON.parse(e.detail.data);
+            callback(e);
+        });
+    }
+
+    static create() {
+        if (globalThis.WorkerContext_get) {
+            return new WorkerContext();
+        }
+        return null;
+    }
+}
+
+export class SqliteConn {
+    #conn;
+    constructor(conn) {
+        this.#conn = conn;
+    }
+
+    /**
+     *
+     * @param sql {string}
+     * @param params {*[]}
+     * @returns {Promise<number>}
+     */
+    async execute(sql, params= []) {
+        return await SqliteConn_execute(this.#conn, sql, params);
+    }
+
+    /**
+     *
+     * @param sql {string}
+     * @param params {*[]}
+     * @returns {Promise<Object[]>}
+     */
+    async query(sql, params = []) {
+        const [columnNames, rows] = await SqliteConn_query(this.#conn, sql, params);
+        return rows.map(it => {
+            const map = {};
+            for (let i = 0; i < columnNames.length; i++) {
+                map[columnNames[i]] = it[i];
+            }
+            return map;
+        });
+    }
+
+}
+
+export class Sqlite {
+
+    /**
+     *
+     * @param path {string}
+     * @returns {Promise<SqliteConn>}
+     */
+    static async open(path) {
+        const conn = await SqliteConn_open(path);
+        return new SqliteConn(conn);
+    }
+
+}
 
 function collectCircleRefInfo(value, visited, circleRefList, level) {
     if (level >= 3) {
@@ -1094,7 +1402,12 @@ function log(...values) {
 
 function printObj(value, padding, circleRefList, printedList, level) {
     let type = typeof value;
-    if (type === "object" && value != null) {
+    if (value instanceof Error) {
+        console.log(`[Error(${value.name})]` + value.message);
+        if (value.stack) {
+            console.log(value.stack);
+        }
+    } else if (type === "object" && value != null) {
         const refIdx = circleRefList.indexOf(value);
         if (refIdx >= 0 && printedList.includes(value)) {
             Console_print("[Circular *" + refIdx + "]");
@@ -1149,7 +1462,14 @@ const localStorage = {
     }
 }
 
+export const workerContext = WorkerContext.create();
+if (workerContext) {
+    globalThis.workerContext = workerContext;
+}
+
 globalThis.navigator = new Navigator();
+globalThis.Worker = Worker;
+globalThis.WorkerContext = WorkerContext;
 globalThis.Frame = Frame;
 if (globalThis.SystemTray_create) {
     globalThis.SystemTray = SystemTray;
@@ -1162,8 +1482,11 @@ globalThis.EntryElement = EntryElement;
 globalThis.TextEditElement = TextEditElement;
 globalThis.ButtonElement = ButtonElement;
 globalThis.ImageElement  = ImageElement;
+globalThis.ParagraphElement = ParagraphElement;
 globalThis.Audio = Audio;
 globalThis.WebSocket = WebSocket;
+globalThis.Sqlite = Sqlite;
+
 globalThis.setTimeout = globalThis.timer_set_timeout;
 globalThis.clearTimeout = globalThis.timer_clear_timeout;
 globalThis.setInterval = globalThis.timer_set_interval;

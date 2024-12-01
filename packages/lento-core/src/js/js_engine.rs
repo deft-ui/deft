@@ -3,7 +3,7 @@ use std::panic::RefUnwindSafe;
 
 use anyhow::anyhow;
 use quick_js::loader::JsModuleLoader;
-use quick_js::{Callback, Context, JsValue, ValueError};
+use quick_js::{Callback, Context, ExecutionError, JsValue, ValueError};
 use tokio::runtime::Builder;
 use winit::event::{DeviceEvent, DeviceId, WindowEvent};
 use winit::window::{CursorGrabMode, WindowId};
@@ -11,12 +11,17 @@ use winit::window::{CursorGrabMode, WindowId};
 use crate::app::exit_app;
 use crate::console::Console;
 use crate::element::Element;
+use crate::element::paragraph::Paragraph;
+use crate::element::text::Text;
 use crate::event_loop::run_with_event_loop;
 use crate::export_js_api;
+use crate::ext::ext_animation::animation_create;
 use crate::ext::ext_appfs::appfs;
 use crate::ext::ext_audio::Audio;
 use crate::ext::ext_base64::Base64;
+use crate::ext::ext_clipboard::{clipboard_read_text, clipboard_write_text};
 use crate::ext::ext_console::Console as ExtConsole;
+#[cfg(all(target_os = "windows", target_os = "linux"))]
 use crate::ext::ext_dialog::dialog;
 use crate::ext::ext_env::env;
 use crate::ext::ext_fetch::fetch;
@@ -27,10 +32,12 @@ use crate::ext::ext_localstorage::localstorage;
 use crate::ext::ext_path::path;
 use crate::ext::ext_process::process;
 use crate::ext::ext_shell::shell;
+use crate::ext::ext_sqlite::SqliteConn;
 use crate::ext::ext_timer::{timer_clear_interval, timer_clear_timeout, timer_set_interval, timer_set_timeout};
 #[cfg(feature = "tray")]
 use crate::ext::ext_tray::SystemTray;
 use crate::ext::ext_websocket::WsConnection;
+use crate::ext::ext_worker::{SharedModuleLoader, Worker, WorkerInitParams};
 use crate::frame::{Frame, FrameType};
 use crate::js::js_binding::{JsCallError, JsFunc};
 use crate::js::js_runtime::JsContext;
@@ -73,7 +80,8 @@ impl Callback<()> for JsFuncCallback {
 
 impl JsEngine {
 
-    pub fn new<L: JsModuleLoader>(loader: L) -> Self {
+    pub fn new(loader: Box<dyn JsModuleLoader + Send + Sync + 'static>) -> Self {
+        let loader = SharedModuleLoader::new(loader);
         let runtime = Builder::new_multi_thread()
             .worker_threads(4)
             .enable_all()
@@ -81,7 +89,7 @@ impl JsEngine {
             .unwrap();
         let js_context = Context::builder()
             .console(Console::new())
-            .module_loader(loader)
+            .module_loader(loader.clone())
             .build().unwrap();
         let js_context = Mrc::new(JsContext::new(js_context, runtime));
 
@@ -91,11 +99,15 @@ impl JsEngine {
 
         engine.add_global_functions(ExtConsole::create_js_apis());
         engine.add_global_functions(Element::create_js_apis());
+        engine.add_global_functions(Paragraph::create_js_apis());
+        engine.add_global_functions(Text::create_js_apis());
+        engine.add_global_functions(SqliteConn::create_js_apis());
         #[cfg(feature = "tray")]
         {
             engine.add_global_functions(SystemTray::create_js_apis());
         }
         engine.add_global_functions(process::create_js_apis());
+        #[cfg(all(target_os = "windows", target_os = "linux"))]
         engine.add_global_functions(dialog::create_js_apis());
         engine.add_global_functions(Base64::create_js_apis());
         engine.add_global_functions(shell::create_js_apis());
@@ -124,9 +136,24 @@ impl JsEngine {
         engine.add_global_func(fs_create_dir_all::new());
         engine.add_global_func(fs_remove_dir::new());
         engine.add_global_func(fs_remove_dir_all::new());
-        let libjs = String::from_utf8_lossy(include_bytes!("../../lib.js"));
-        engine.js_context.eval_module(&libjs, "lib.js").unwrap();
+
+        engine.add_global_func(animation_create::new());
+
+        engine.add_global_func(clipboard_write_text::new());
+        engine.add_global_func(clipboard_read_text::new());
+
+        Worker::init_js_api(WorkerInitParams {
+            module_loader_creator: Box::new(move || {
+                Box::new(loader.clone())
+            })
+        });
+        engine.add_global_functions(Worker::create_js_apis());
         engine
+    }
+
+    pub fn init_api(&self) {
+        let libjs = String::from_utf8_lossy(include_bytes!("../../lib.js"));
+        self.js_context.eval_module(&libjs, "lib.js").unwrap();
     }
 
     pub fn add_global_functions(&self, functions: Vec<Box<dyn JsFunc + RefUnwindSafe + 'static>>) {
@@ -151,6 +178,10 @@ impl JsEngine {
 
     pub fn execute_main(&mut self) {
         self.js_context.execute_main();
+    }
+
+    pub fn execute_module(&mut self, module_name: &str) -> Result<(), ExecutionError> {
+        self.js_context.execute_module(module_name)
     }
 
     pub fn handle_window_event(&mut self, window_id: WindowId, event: WindowEvent) {

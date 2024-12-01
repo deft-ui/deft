@@ -8,7 +8,6 @@ use std::thread;
 use std::time::{Duration, Instant};
 use skia_safe::wrapper::NativeTransmutableWrapper;
 use crate::app::AppEvent;
-use crate::event_loop::send_event;
 use crate::js::js_event_loop::{js_create_event_loop_proxy, JsEvent};
 
 thread_local! {

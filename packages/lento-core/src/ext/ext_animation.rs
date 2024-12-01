@@ -1,9 +1,9 @@
 use std::str::FromStr;
-use lento_core::animation::{AnimationDef};
-use lento_core::animation::ANIMATIONS;
-use lento_core::style::parse_style_obj;
-use lento_core as lento;
-use lento_core::js::js_binding::JsError;
+use crate::animation::{AnimationDef};
+use crate::animation::ANIMATIONS;
+use crate::style::parse_style_obj;
+use crate as lento;
+use crate::js::js_binding::JsError;
 
 
 #[lento_macros::js_func]

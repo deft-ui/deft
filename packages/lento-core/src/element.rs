@@ -25,7 +25,7 @@ use crate::element::scroll::Scroll;
 use crate::element::text::Text;
 use crate::element::textedit::TextEdit;
 use crate::event::{BoundsChangeBind, BoundsChangeEventDetail, ClickEventBind};
-use crate::event_loop::schedule_macro_task_unsafe;
+use crate::event_loop::{create_event_loop_callback};
 use crate::ext::ext_frame::{VIEW_TYPE_BUTTON, VIEW_TYPE_CONTAINER, VIEW_TYPE_ENTRY, VIEW_TYPE_IMAGE, VIEW_TYPE_LABEL, VIEW_TYPE_SCROLL, VIEW_TYPE_TEXT_EDIT};
 use crate::frame::{Frame, FrameWeak};
 use crate::img_manager::IMG_MANAGER;
@@ -34,7 +34,7 @@ use crate::js::js_value_util::{FromJsValue, SerializeToJsValue, ToJsValue};
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::resource_table::ResourceTable;
-use crate::style::{parse_style_obj, ColorHelper, StyleNode, StyleProp};
+use crate::style::{parse_style_obj, ColorHelper, StyleNode, StyleProp, StylePropKey};
 use crate::{base, define_resource, js_call, js_call_rust, js_get_prop, js_weak_value};
 
 pub mod container;
@@ -47,6 +47,8 @@ pub mod image;
 pub mod label;
 mod edit_history;
 pub mod text;
+pub mod paragraph;
+
 use crate as lento;
 
 thread_local! {
@@ -760,14 +762,13 @@ impl Element {
     pub fn emit_event(&self, event_type: &str, mut event: ElementEvent) {
         let mut me = self.clone();
         let event_type = event_type.to_string();
-        unsafe {
-            schedule_macro_task_unsafe(move || {
-                me.emit_event_internal(&event_type, &mut event);
-                if !event.context.prevent_default {
-                    me.handle_event_default_behavior(&event_type, &mut event);
-                }
-            });
-        }
+        let callback = create_event_loop_callback(move || {
+            me.emit_event_internal(&event_type, &mut event);
+            if !event.context.prevent_default {
+                me.handle_event_default_behavior(&event_type, &mut event);
+            }
+        });
+        callback.call();
     }
 
     fn emit_event_internal(&mut self, event_type: &str, event: &mut ElementEvent) {
@@ -963,12 +964,13 @@ pub trait ElementBackend {
 
     fn get_name(&self) -> &str;
 
-    fn handle_style_changed(&mut self, key: &str) {
+    fn handle_style_changed(&mut self, key: StylePropKey) {
         let _ = key;
     }
 
-    fn draw(&self, _canvas: &Canvas) {
-
+    //TODO use &mut self
+    fn draw(&self, canvas: &Canvas) {
+        let _ = canvas;
     }
 
     fn get_inner_element(&self) -> Option<Element> {

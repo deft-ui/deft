@@ -11,12 +11,17 @@ edition = "2021"
 lento-core = { path = "packages/lento-core" }
 lento-macros = { path = "packages/lento-macros" }
 
+winit = { path = "third_party/winit" }
 quick-js = { path = "third_party/quickjs-rs" }
 
 clipboard = "0.5.0"
+serde = { version = "1.0.213", features = ["derive"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger = "0.11.0"
 
 [features]
-default = ["x11"]
+default = []
 tray = ["lento-core/tray"]
 x11 = ["lento-core/x11"]
 production = ["lento-core/production"]

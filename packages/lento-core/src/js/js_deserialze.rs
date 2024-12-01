@@ -84,8 +84,8 @@ impl<'de> Deserializer<'de> for JsDeserializer {
             JsValue::Float(f) => {self.deserialize_f64(visitor)}
             JsValue::String(s) => {self.deserialize_string(visitor)}
             JsValue::Array(a) => {self.deserialize_seq(visitor)}
+            JsValue::Raw(obj) => { self.deserialize_map(visitor) }
             _ => unimplemented!()
-            // JsValue::Object(_) => {}
             // JsValue::Raw(_) => {}
             // JsValue::Date(_) => {}
             // JsValue::BigInt(_) => {}

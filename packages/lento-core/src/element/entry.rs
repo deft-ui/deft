@@ -17,8 +17,9 @@ use crate::app::AppEvent;
 use crate::element::edit_history::{EditHistory, EditOpType};
 use crate::element::text::text_paragraph::Line;
 use crate::event::{CaretEventBind, KEY_MOD_CTRL, KEY_MOD_SHIFT, KeyDownEvent, KeyEventDetail};
-use crate::event_loop::send_event;
+use crate::event_loop::create_event_loop_proxy;
 use crate::string::StringUtils;
+use crate::style::StylePropKey;
 use crate::timer::TimerHandle;
 
 const COPY_KEY: &str = "\x03";
@@ -177,7 +178,7 @@ impl Entry {
         let ele = self.element.clone();
         let padding_left = ele.layout.get_layout_padding_left().de_nan(0.0);
         let padding_top = ele.layout.get_layout_padding_top().de_nan(0.0);
-        return (position.0 - padding_left, position.1 - padding_top)
+        (position.0 - padding_left, position.1 - padding_top)
     }
 
     fn handle_blur(&mut self) {
@@ -187,7 +188,8 @@ impl Entry {
         self.element.mark_dirty(false);
         if let Some(frame) = self.element.get_frame() {
             frame.upgrade_mut(|f| {
-                send_event(AppEvent::HideSoftInput(f.get_id())).unwrap();
+                let elp = create_event_loop_proxy();
+                elp.send_event(AppEvent::HideSoftInput(f.get_id())).unwrap();
             });
         }
     }
@@ -324,7 +326,8 @@ impl Entry {
         });
         if let Some(frame) = self.element.get_frame() {
             frame.upgrade_mut(|f| {
-                send_event(AppEvent::ShowSoftInput(f.get_id())).unwrap();
+                let elp = create_event_loop_proxy();
+                elp.send_event(AppEvent::ShowSoftInput(f.get_id())).unwrap();
             });
         }
     }
@@ -390,7 +393,7 @@ impl ElementBackend for Entry {
         "Entry"
     }
 
-    fn handle_style_changed(&mut self, key: &str) {
+    fn handle_style_changed(&mut self, key: StylePropKey) {
         self.base.handle_style_changed(key)
     }
 

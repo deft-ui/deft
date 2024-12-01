@@ -1,3 +1,11 @@
+function runWorker() {
+    const worker = new Worker("./worker-index.js");
+    worker.bindMessage(data => {
+        console.log("receive worker msg", data);
+        worker.postMessage("Hello, worker");
+    });
+}
+
 function createSystemTray() {
     const tray = new SystemTray();
     tray.setTitle("LentoTest");
@@ -11,6 +19,7 @@ function createSystemTray() {
 }
 
 function main() {
+    runWorker();
     createSystemTray();
     console.log("begin create frame");
     const frame = new Frame();
@@ -119,6 +128,22 @@ function main() {
     });
 
     container.addChild(textEdit);
+
+    const paragraph = new ParagraphElement();
+    paragraph.addLine([
+        {
+            type: "text",
+            text: "Normal",
+            fontSize: 20,
+            backgroundColor: "#666",
+        }, {
+            type: "text",
+            text: "Small red",
+            fontSize: 10,
+            color: "#F00",
+        }
+    ]);
+    container.addChild(paragraph);
     //
     // //container.removeChild(label2);
     //

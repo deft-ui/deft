@@ -100,6 +100,7 @@ declare interface StyleProps extends Record<string, number | string>{
     color?: string,
     backgroundColor?: string;
     fontSize?: number;
+    lineHeight?: number;
 
     borderTop?: string;
     borderRight?: string;

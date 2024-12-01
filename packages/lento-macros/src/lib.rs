@@ -89,6 +89,26 @@ pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
     expanded.into()
 }
 
+#[proc_macro_attribute]
+pub fn element_backend(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
+    let struct_def = parse_macro_input!(struct_def as ItemStruct);
+    let struct_name = struct_def.ident.clone();
+    let visibility = struct_def.vis.clone();
+    let struct_fields = struct_def.fields;
+    let q = quote! {
+
+        #[lento_macros::mrc_object]
+        #visibility struct #struct_name #struct_fields
+
+        impl lento::js::FromJsValue for #struct_name {
+            fn from_js_value(value: lento::js::JsValue) -> Result<Self, quick_js::ValueError> {
+                let element = lento::element::Element::from_js_value(value)?;
+                Ok(element.get_backend_as::<#struct_name>().clone())
+            }
+        }
+    };
+    q.into()
+}
 
 #[proc_macro_attribute]
 pub fn event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
@@ -98,6 +118,16 @@ pub fn event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn frame_event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
     create_event(_attr, struct_def, quote! {lento::frame::FrameWeak})
+}
+
+#[proc_macro_attribute]
+pub fn worker_event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
+    create_event(_attr, struct_def, quote! {lento::ext::ext_worker::WorkerWeak})
+}
+
+#[proc_macro_attribute]
+pub fn worker_context_event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
+    create_event(_attr, struct_def, quote! {lento::ext::ext_worker::WorkerContextWeak})
 }
 
 fn create_event(_attr: TokenStream, struct_def: TokenStream, target_type: TokenStream2) -> TokenStream {
@@ -317,7 +347,7 @@ fn build_bridge_body(func_inputs: Vec<FnArg>, asyncness: Option<Async>, struct_n
     } else {
         if receiver.is_some() {
             quote! {
-                let inst = <#struct_name as lento::js::FromJsValue>::from_js_value(args.get(0).unwrap().clone())?;
+                let mut inst = <#struct_name as lento::js::FromJsValue>::from_js_value(args.get(0).unwrap().clone())?;
                 let r = js_context.create_async_task2(async move {
                     inst.#func_name( #(#param_list, )* ).await
                 });

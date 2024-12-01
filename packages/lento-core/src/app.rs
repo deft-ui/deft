@@ -13,7 +13,7 @@ use winit::platform::android::ActiveEventLoopExtAndroid;
 use winit::platform::android::activity::AndroidApp;
 use winit::window::WindowId;
 
-use crate::event_loop::{get_event_proxy, run_event_loop_task, send_event};
+use crate::event_loop::{init_event_loop_proxy, run_event_loop_task, run_with_event_loop};
 use crate::ext::ext_frame::FRAMES;
 use crate::ext::ext_localstorage::localstorage_flush;
 use crate::frame::frame_input;
@@ -25,7 +25,6 @@ use crate::timer;
 
 pub enum AppEvent {
     Callback(Box<dyn FnOnce() + Send + Sync>),
-    CallbackWithEventLoop(Box<dyn FnOnce(&ActiveEventLoop)>),
     JsEvent(JsEvent),
     ShowSoftInput(i32),
     HideSoftInput(i32),
@@ -44,6 +43,7 @@ pub trait LentoApp {
     fn init_js_engine(&mut self, js_engine: &mut JsEngine) {
         let _ = js_engine;
     }
+    fn create_module_loader(&mut self) -> Box<dyn JsModuleLoader + Send + Sync + 'static>;
 }
 
 
@@ -53,10 +53,13 @@ pub struct App {
 }
 
 impl App {
-    pub fn new<L: JsModuleLoader>(module_loader: L, mut lento_app: Box<dyn LentoApp>) -> Self {
+    pub fn new(mut lento_app: Box<dyn LentoApp>, event_loop_proxy: EventLoopProxy<AppEvent>) -> Self {
+        let module_loader = lento_app.create_module_loader();
         let mut js_engine = JsEngine::new(module_loader);
-        let js_event_loop = js_init_event_loop(|js_event| {
-            send_event(AppEvent::JsEvent(js_event)).map_err(|_| JsEventLoopClosedError {})
+        js_engine.init_api();
+        init_event_loop_proxy(event_loop_proxy.clone());
+        let js_event_loop = js_init_event_loop(move |js_event| {
+            event_loop_proxy.send_event(AppEvent::JsEvent(js_event)).map_err(|_| JsEventLoopClosedError {})
         });
         lento_app.init_js_engine(&mut js_engine);
         Self {
@@ -87,9 +90,6 @@ impl ApplicationHandler<AppEvent> for App {
             match event {
                 AppEvent::Callback(callback) => {
                     callback();
-                },
-                AppEvent::CallbackWithEventLoop(callback) => {
-                    callback(event_loop);
                 },
                 AppEvent::JsEvent(js_event) => {
                     match js_event {
@@ -136,10 +136,10 @@ impl ApplicationHandler<AppEvent> for App {
 }
 
 pub fn exit_app(code: i32) -> Result<(), Error> {
-    localstorage_flush().unwrap();
-    get_event_proxy().send_event(AppEvent::CallbackWithEventLoop(Box::new(|el| {
+    localstorage_flush()?;
+    run_with_event_loop(|el| {
         el.exit();
-    }))).unwrap();
+    });
     Ok(())
 }
 

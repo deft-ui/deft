@@ -13,8 +13,9 @@ use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 use tokio_tungstenite::tungstenite::Message;
 use tokio::sync::Mutex;
 use lento_macros::{js_methods, mrc_object};
+use serde::Serialize;
 use crate::{js_value, js_weak_value};
-use crate::js::JsError;
+use crate::js::{JsError, ToJsValue};
 
 thread_local! {
     pub static NEXT_ID: RefCell<u64> = RefCell::new(0);
@@ -60,6 +61,7 @@ impl WsConnection {
         Ok(ws_conn)
     }
 
+    #[js_func]
     pub fn close(&self) {
         CONNECTIONS.with_borrow_mut(|map| {
             map.remove(&self.id);
@@ -67,21 +69,19 @@ impl WsConnection {
     }
 
     #[js_func]
-    pub async fn read(&self) -> Result<JsValue, JsError> {
+    pub async fn read(&self) -> Result<(String, JsValue), JsError> {
         let mut reader = self.inner.reader.lock().await;
         if let Some(result) = reader.next().await {
             let msg = result?;
-            let value = match msg {
-                Message::Text(v) => JsValue::String(v),
-                Message::Binary(v) => {
-                    JsValue::Array(v.into_iter().map(|e| JsValue::Int(e as i32)).collect())
-                }
-                Message::Ping(_) => JsValue::Undefined,
-                Message::Pong(_) => JsValue::Undefined,
-                Message::Close(_) => JsValue::Bool(false),
-                Message::Frame(_frame) => JsValue::Undefined, //TODO handling Frame?
+            let (ty, data) = match msg {
+                Message::Text(v) => ("text", v.to_js_value()?),
+                Message::Binary(v) => ("binary", v.to_js_value()?),
+                Message::Ping(v) => ("ping", v.to_js_value()?),
+                Message::Pong(v) => ("pong", v.to_js_value()?),
+                Message::Close(_) => ("close", JsValue::Undefined),
+                Message::Frame(_frame) => ("frame", _frame.into_data().to_js_value()?),
             };
-            Ok(value)
+            Ok((ty.to_string(), data))
         } else {
             Err(JsError::from_str("connection closed"))
         }

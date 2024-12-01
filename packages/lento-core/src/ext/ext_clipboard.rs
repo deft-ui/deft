@@ -1,7 +1,7 @@
 use std::error::Error;
 use clipboard::{ClipboardContext, ClipboardProvider};
-use lento_core as lento;
-use lento_core::js::JsError;
+use crate as lento;
+use crate::js::JsError;
 
 fn to_js_error(error: Box<dyn Error>) -> JsError {
     JsError::new(error.to_string())

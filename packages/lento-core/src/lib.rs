@@ -8,9 +8,8 @@ use crate::element::label::{AttributeText, Label, DEFAULT_TYPE_FACE};
 use crate::element::text::text_paragraph::TextParams;
 use crate::element::text::Text;
 use crate::element::ScrollByOption;
-use crate::event_loop::set_event_proxy;
 use crate::js::js_deserialze::JsDeserializer;
-use crate::loader::{DefaultModuleLoader, RemoteModuleLoader, StaticModuleLoader};
+use crate::loader::{RemoteModuleLoader, StaticModuleLoader};
 use crate::performance::MemoryUsage;
 use crate::renderer::CpuRenderer;
 use crate::websocket::WebSocketManager;
@@ -71,7 +70,8 @@ pub mod cache;
 pub mod animation;
 #[cfg(target_os = "android")]
 mod android;
-
+mod id_hash_map;
+mod id_generator;
 
 fn main_js_deserializer() {
     let mut map = HashMap::new();
@@ -173,7 +173,11 @@ fn test_border_performance_gl() {
 
     impl ApplicationHandler for TestApp {
         fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-            let mut skia_window = SkiaWindow::new(event_loop, WindowAttributes::default(), RenderBackendType::SoftBuffer);
+            #[cfg(not(target_os = "android"))]
+            let backend_type = RenderBackendType::SoftBuffer;
+            #[cfg(target_os = "android")]
+            let backend_type = RenderBackendType::GL;
+            let mut skia_window = SkiaWindow::new(event_loop, WindowAttributes::default(), backend_type);
             skia_window.render(|canvas| {
                 crate::renderer::test_border(canvas);
             });
