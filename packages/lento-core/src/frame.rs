@@ -746,9 +746,10 @@ impl Frame {
         }
         self.window.resize_surface(width, height);
         self.mark_dirty(true);
+        let scale_factor = self.window.scale_factor();
         self.emit(ResizeEvent {
-            width,
-            height,
+            width: (width as f64 / scale_factor) as u32,
+            height: (height as f64 / scale_factor) as u32,
         });
     }
 

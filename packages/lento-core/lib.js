@@ -40,6 +40,9 @@ class Navigator {
     }
 }
 
+/**
+ * @typedef {IEvent<ResizeDetail>} IResizeEvent
+ */
 export class Frame {
 
     /**
@@ -107,6 +110,10 @@ export class Frame {
         Frame_set_visible(this.#frameId, visible);
     }
 
+    /**
+     *
+     * @param callback {(event: IResizeEvent) => void}
+     */
     bindResize(callback) {
         this.#eventBinder.bindEvent("resize", callback);
     }

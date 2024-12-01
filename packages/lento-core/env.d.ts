@@ -11,6 +11,11 @@ declare interface FrameAttrs {
     frameType ?: FrameType,
 }
 
+declare interface ResizeDetail {
+    width: number;
+    height: number;
+}
+
 declare interface ElementRect {
     x: number;
     y: number;
