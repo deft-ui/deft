@@ -22,7 +22,7 @@ use skia_safe::{Canvas, Color, Font, FontMgr, FontStyle, Paint, Point, Rect};
 use std::str::FromStr;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 
-const DEFAULT_FONT_NAME: &str = "monospace";
+const DEFAULT_FONT_NAME: &str = "monospace,FreeMono";
 
 #[derive(Clone)]
 pub struct ParagraphParams {
@@ -217,9 +217,10 @@ impl Paragraph {
         let mut paragraph_style = ParagraphStyle::new();
         paragraph_style.set_text_align(paragraph_params.align);
 
+        let default_font_families:Vec<&str> = DEFAULT_FONT_NAME.split(",").collect();
         if let Some(line_height) = paragraph_params.line_height {
             let mut strut_style = StrutStyle::default();
-            strut_style.set_font_families(&[DEFAULT_FONT_NAME]);
+            strut_style.set_font_families(default_font_families.as_slice());
             strut_style.set_strut_enabled(true);
             strut_style.set_font_size(line_height);
             strut_style.set_force_strut_height(true);
@@ -280,12 +281,14 @@ impl ElementBackend for Paragraph {
     where
         Self: Sized,
     {
+        let font_families:Vec<String> = DEFAULT_FONT_NAME.split(",").map(|i| i.to_string()).collect();
+
         let params = ParagraphParams {
             line_height: None,
             align: TextAlign::Left,
             color: Color::default(),
             font_size: 12.0,
-            font_families: vec![DEFAULT_FONT_NAME.to_string()],
+            font_families,
         };
         let units = Vec::new();
         let paragraph = Self::build_paragraph(&params, &units);

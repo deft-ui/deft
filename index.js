@@ -7,6 +7,9 @@ function runWorker() {
 }
 
 function createSystemTray() {
+    if (!globalThis.SystemTray) {
+        return;
+    }
     const tray = new SystemTray();
     tray.setTitle("LentoTest");
     tray.setMenus([{
