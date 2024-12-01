@@ -115,6 +115,22 @@ function main() {
     });
 
     container.addChild(textEdit);
+
+    const paragraph = new ParagraphElement();
+    paragraph.addLine([
+        {
+            type: "text",
+            text: "Normal",
+            fontSize: 20,
+            backgroundColor: "#666",
+        }, {
+            type: "text",
+            text: "Small red",
+            fontSize: 10,
+            color: "#F00",
+        }
+    ]);
+    container.addChild(paragraph);
     //
     // //container.removeChild(label2);
     //

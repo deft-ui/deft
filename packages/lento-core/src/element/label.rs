@@ -13,6 +13,8 @@ use crate::js_call;
 use crate::js::js_value_util::JsValueHelper;
 use crate::number::DeNan;
 use crate::string::StringUtils;
+use crate::style::StylePropKey;
+
 pub struct AttributeText {
     pub text: String,
     pub font: Font,
@@ -330,8 +332,8 @@ impl ElementBackend for Label {
         "Label"
     }
 
-    fn handle_style_changed(&mut self, key: &str) {
-        if key == "color" {
+    fn handle_style_changed(&mut self, key: StylePropKey) {
+        if key == StylePropKey::Color {
             let color = self.element.layout.computed_style.color;
             self.paint.set_color(color);
             self.rebuild_paragraph();

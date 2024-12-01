@@ -34,7 +34,7 @@ use crate::js::js_value_util::{FromJsValue, SerializeToJsValue, ToJsValue};
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::resource_table::ResourceTable;
-use crate::style::{parse_style_obj, ColorHelper, StyleNode, StyleProp};
+use crate::style::{parse_style_obj, ColorHelper, StyleNode, StyleProp, StylePropKey};
 use crate::{base, define_resource, js_call, js_call_rust, js_get_prop, js_weak_value};
 
 pub mod container;
@@ -47,6 +47,8 @@ pub mod image;
 pub mod label;
 mod edit_history;
 pub mod text;
+pub mod paragraph;
+
 use crate as lento;
 
 thread_local! {
@@ -962,12 +964,13 @@ pub trait ElementBackend {
 
     fn get_name(&self) -> &str;
 
-    fn handle_style_changed(&mut self, key: &str) {
+    fn handle_style_changed(&mut self, key: StylePropKey) {
         let _ = key;
     }
 
-    fn draw(&self, _canvas: &Canvas) {
-
+    //TODO use &mut self
+    fn draw(&self, canvas: &Canvas) {
+        let _ = canvas;
     }
 
     fn get_inner_element(&self) -> Option<Element> {

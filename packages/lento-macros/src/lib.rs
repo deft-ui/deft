@@ -89,6 +89,26 @@ pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
     expanded.into()
 }
 
+#[proc_macro_attribute]
+pub fn element_backend(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
+    let struct_def = parse_macro_input!(struct_def as ItemStruct);
+    let struct_name = struct_def.ident.clone();
+    let visibility = struct_def.vis.clone();
+    let struct_fields = struct_def.fields;
+    let q = quote! {
+
+        #[lento_macros::mrc_object]
+        #visibility struct #struct_name #struct_fields
+
+        impl lento::js::FromJsValue for #struct_name {
+            fn from_js_value(value: lento::js::JsValue) -> Result<Self, quick_js::ValueError> {
+                let element = lento::element::Element::from_js_value(value)?;
+                Ok(element.get_backend_as::<#struct_name>().clone())
+            }
+        }
+    };
+    q.into()
+}
 
 #[proc_macro_attribute]
 pub fn event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {

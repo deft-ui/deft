@@ -139,6 +139,19 @@ export class Frame {
         this.#eventBinder.bindEvent(type, callback);
     }
 
+    /**
+     * @typedef {("resize", event)} addEventListener
+     * @param type
+     * @param callback
+     */
+    addEventListener(type, callback) {
+        this.#eventBinder.addEventListener(type, callback);
+    }
+
+    removeEventListener(type, callback) {
+        this.#eventBinder.removeEventListener(type, callback);
+    }
+
 }
 
 /**
@@ -251,6 +264,7 @@ export class EventBinder {
     #addEventListenerApi;
     #contextGetter;
     #self;
+    #allEventListeners = Object.create(null);
 
     constructor(target, addApi, removeApi, self, contextGetter) {
         this.#target = target;
@@ -269,7 +283,9 @@ export class EventBinder {
         if (oldListenerId) {
             this.#removeEventListenerApi(this.#target, type, oldListenerId);
         }
-
+        this.#eventListeners[type] = this.addEventListener(type, callback);
+    }
+    addEventListener(type, callback) {
         const getJsContext = (target) => {
             if (target && this.#contextGetter) {
                 return this.#contextGetter(target);
@@ -295,9 +311,22 @@ export class EventBinder {
             }
             return event.result();
         }
-
-        this.#eventListeners[type] = this.#addEventListenerApi(this.#target, type, eventCallback);
+        if (!this.#allEventListeners[type]) {
+            this.#allEventListeners[type] = new Map();
+        }
+        const id = this.#addEventListenerApi(this.#target, type, eventCallback);
+        this.#allEventListeners[type].set(callback, id);
+        return id;
     }
+
+    removeEventListener(type, callback) {
+        const map = this.#eventListeners[type];
+        const id = map.delete(callback);
+        if (id) {
+            this.#removeEventListenerApi(this.#target, type, id);
+        }
+    }
+
 }
 
 export class SystemTray {
@@ -667,6 +696,14 @@ export class LabelElement extends View {
 
     /**
      *
+     * @param wrap {boolean}
+     */
+    setTextWrap(wrap) {
+        Text_set_text_wrap(this.el, wrap);
+    }
+
+    /**
+     *
      * @param text {string}
      */
     setText(text) {
@@ -686,7 +723,131 @@ export class LabelElement extends View {
      * @param selection {number[]}
      */
     setSelection(selection) {
-        Element_set_property(this.el, "selection", selection);
+        Text_set_selection(this.el, selection);
+    }
+
+    /**
+     *
+     * @param startCaretOffset {number}
+     * @param endCaretOffset {number}
+     */
+    selectByCaretOffset(startCaretOffset, endCaretOffset) {
+        this.setSelection([startCaretOffset, endCaretOffset])
+    }
+
+    /**
+     *
+     * @param line {number}
+     * @returns {number}
+     */
+    getLineBeginOffset(line) {
+        return Text_get_line_begin_offset(this.el, line);
+    }
+
+    /**
+     *
+     * @param line {number}
+     * @param text {string}
+     */
+    insertLine(line, text) {
+        Text_insert_line(this.el, line, text);
+    }
+
+    /**
+     *
+     * @param line {number}
+     * @param newText {string}
+     */
+    updateLine(line, newText) {
+        Text_update_line(this.el, line, newText);
+    }
+
+    /**
+     *
+     * @param line {number}
+     */
+    deleteLine(line) {
+        Text_delete_line(this.el, line);
+    }
+
+    /**
+     *
+     * @param row {number}
+     * @param col {number}
+     * @return {number}
+     */
+    getCaretOffsetByCursor(row, col) {
+        return Text_get_atom_offset_by_location(this.el, [row, col]);
+    }
+
+}
+
+/**
+ * @typedef {{
+ *   type: "text",
+ *   text: string,
+ *   weight ?: string,
+ *   textDecorationLine ?: string,
+ *   fontFamilies ?: string[],
+ *   fontSize ?: number,
+ *   color ?: string,
+ *   backgroundColor ?: string
+ * }} ParagraphUnit
+ */
+export class ParagraphElement extends View {
+    #paragraph;
+    constructor() {
+        const p = Paragraph_new_element();
+        super(p, {});
+        this.#paragraph = p;
+    }
+
+    /**
+     *
+     * @param units {ParagraphUnit[]}
+     */
+    addLine(units) {
+        Paragraph_add_line(this.#paragraph, units);
+    }
+
+    /**
+     *
+     * @param index {number}
+     * @param units {ParagraphUnit[]}
+     */
+    insertLine(index, units) {
+        Paragraph_insert_line(this.#paragraph, index, units);
+    }
+
+
+    /**
+     *
+     * @param index {number}
+     */
+    deleteLine(index) {
+        Paragraph_delete_line(this.#paragraph, index);
+    }
+
+    /**
+     *
+     * @param index {number}
+     * @param units {ParagraphUnit[]}
+     */
+    updateLine(index, units) {
+        Paragraph_update_line(this.#paragraph, index, units);
+    }
+
+    clear() {
+        Paragraph_clear(this.#paragraph);
+    }
+
+    /**
+     *
+     * @param units {ParagraphUnit[]}
+     * @return {[number, number]}
+     */
+    measureLine(units) {
+        return Paragraph_measure_line(this.#paragraph, units);
     }
 
 }
@@ -1293,6 +1454,7 @@ globalThis.EntryElement = EntryElement;
 globalThis.TextEditElement = TextEditElement;
 globalThis.ButtonElement = ButtonElement;
 globalThis.ImageElement  = ImageElement;
+globalThis.ParagraphElement = ParagraphElement;
 globalThis.Audio = Audio;
 globalThis.WebSocket = WebSocket;
 globalThis.Sqlite = Sqlite;

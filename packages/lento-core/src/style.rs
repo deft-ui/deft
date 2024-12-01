@@ -353,6 +353,13 @@ macro_rules! define_style_props {
             )*
         }
 
+        #[derive(PartialEq, Eq)]
+        pub enum StylePropKey {
+            $(
+                $name,
+            )*
+        }
+
         impl StyleProp {
             pub fn parse(key: &str, value: &str) -> Option<StyleProp> {
                 let key = key.to_lowercase();
@@ -371,6 +378,13 @@ macro_rules! define_style_props {
                     )*
                 }
             }
+            pub fn key(&self) -> StylePropKey {
+                match self {
+                    $(
+                        Self::$name(_) => StylePropKey::$name,
+                    )*
+                }
+            }
             pub fn unset(&self) -> Self {
                 match self {
                     $(
@@ -386,6 +400,7 @@ define_style_props!(
     Color => StyleColor,
     BackgroundColor => StyleColor,
     FontSize        => f32,
+    LineHeight      => f32,
 
     BorderTop => StyleBorder,
     BorderRight => StyleBorder,
@@ -685,12 +700,13 @@ pub struct StyleNodeInner {
     pub border_color: [Color;4],
     pub background_color: ColorPropValue,
     pub background_image: Option<Image>,
+    pub line_height: Option<f32>,
     pub font_size: f32,
     pub transform: Option<Matrix>,
     pub computed_style: ComputedStyle,
     animation_params: AnimationParams,
     animation_instance: Option<AnimationInstance>,
-    pub on_changed: Option<Box<dyn FnMut(&str)>>,
+    pub on_changed: Option<Box<dyn FnMut(StylePropKey)>>,
     pub animation_renderer: Option<Mrc<Box<dyn FnMut(Vec<StyleProp>)>>>,
 }
 
@@ -747,6 +763,7 @@ impl StyleNode {
             border_color: [transparent, transparent, transparent, transparent],
             background_color: ColorPropValue::Color(Color::TRANSPARENT),
             color: ColorPropValue::Inherit,
+            line_height: None,
             background_image: None,
             transform: None,
             animation_instance: None,
@@ -797,6 +814,9 @@ impl StyleNode {
             }
             StyleProp::FontSize(value) => {
                 self.font_size = value.resolve(&12.0);
+            }
+            StyleProp::LineHeight(value) => {
+                self.line_height = Some(value.resolve(&12.0));
             }
             StyleProp::BorderTop (value) =>   {
                 self.set_border(&value, &vec![0])
@@ -979,7 +999,7 @@ impl StyleNode {
             //TODO aspectratio
         }
         if let Some(on_changed) = &mut self.on_changed {
-            on_changed(p.name());
+            on_changed(p.key());
         }
 
         return (repaint, need_layout)
@@ -1011,10 +1031,10 @@ impl StyleNode {
     }
 
     inherit_color_prop!(
-        compute_color, compute_children_color, color, "color", Color::from_rgb(0, 0, 0)
+        compute_color, compute_children_color, color, StylePropKey::Color, Color::from_rgb(0, 0, 0)
     );
     inherit_color_prop!(
-        compute_background_color, compute_children_background_color, background_color, "backgroundcolor", Color::from_argb(0, 0, 0, 0)
+        compute_background_color, compute_children_background_color, background_color, StylePropKey::BackgroundColor, Color::from_argb(0, 0, 0, 0)
     );
 
     pub fn get_border_paths(&self) -> [Path; 4] {
@@ -1316,13 +1336,25 @@ pub fn parse_style_unit(value: &str) -> Option<StyleUnit> {
 }
 
 pub fn parse_color(value: &str) -> ColorPropValue {
+    parse_color_str(value)
+        .map(|c| ColorPropValue::Color(c))
+        .unwrap_or(ColorPropValue::Inherit)
+}
+
+pub fn parse_color_str(value: &str) -> Option<Color> {
+    //TODO support white,black and so on
     if let Some(hex) = value.strip_prefix("#") {
-        match parse_hex_color(hex) {
-            None => ColorPropValue::Inherit,
-            Some(c) => ColorPropValue::Color(c),
-        }
+        parse_hex_color(hex)
     } else {
-        ColorPropValue::Inherit
+        None
+    }
+}
+
+pub fn parse_optional_color_str(value: Option<&String>) -> Option<Color> {
+    if let Some(str) = value {
+        parse_color_str(str)
+    } else {
+        None
     }
 }
 
