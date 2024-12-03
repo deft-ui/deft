@@ -557,9 +557,9 @@ fn default_typeface() -> Typeface {
     font_mgr.legacy_make_typeface(None, FontStyle::default()).unwrap()
 }
 
-fn intersect_range(range1: (AtomOffset, AtomOffset), range2: (AtomOffset, AtomOffset)) -> Option<(AtomOffset, AtomOffset)> {
-    let start = AtomOffset::max(range1.0, range2.0);
-    let end = AtomOffset::min(range1.1, range2.1);
+pub fn intersect_range<T: Ord>(range1: (T, T), range2: (T, T)) -> Option<(T, T)> {
+    let start = T::max(range1.0, range2.0);
+    let end = T::min(range1.1, range2.1);
     if end > start {
         Some((start, end))
     } else {

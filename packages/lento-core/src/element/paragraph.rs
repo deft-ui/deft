@@ -1,13 +1,14 @@
+use std::cmp::Ordering;
 use crate as lento;
 use crate::color::parse_hex_color;
 use crate::element::text::text_paragraph::ParagraphRef;
-use crate::element::text::{FONT_COLLECTION, FONT_MGR};
-use crate::element::{Element, ElementBackend};
+use crate::element::text::{intersect_range, ColOffset, RowOffset, FONT_COLLECTION, FONT_MGR};
+use crate::element::{text, Element, ElementBackend};
 use crate::js::JsError;
 use crate::number::DeNan;
 use crate::string::StringUtils;
 use crate::style::{parse_color, parse_color_str, parse_optional_color_str, StylePropKey};
-use crate::{js_deserialize, js_serialize};
+use crate::{js_deserialize, js_serialize, match_event_type};
 use lento_macros::{element_backend, js_methods, mrc_object};
 use rodio::cpal::available_hosts;
 use serde::{Deserialize, Serialize};
@@ -20,7 +21,11 @@ use skia_safe::textlayout::{
 };
 use skia_safe::{Canvas, Color, Font, FontMgr, FontStyle, Paint, Point, Rect};
 use std::str::FromStr;
+use clipboard::{ClipboardContext, ClipboardProvider};
+use winit::keyboard::NamedKey;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
+use crate::base::{ElementEvent, MouseDetail, MouseEventType};
+use crate::event::{FocusShiftBind, KeyDownEvent, KeyEventDetail, KEY_MOD_CTRL, KEY_MOD_SHIFT};
 
 const DEFAULT_FONT_NAME: &str = "monospace,FreeMono";
 
@@ -42,6 +47,32 @@ pub enum ParagraphUnit {
 js_serialize!(ParagraphUnit);
 js_deserialize!(ParagraphUnit);
 
+impl ParagraphUnit {
+    fn atom_count(&self) -> usize {
+        match self {
+            ParagraphUnit::Text(text) => {
+                text.text.chars_count()
+            }
+        }
+    }
+    fn text(&self) -> &str {
+        match self {
+            ParagraphUnit::Text(t) => {
+                t.text.as_str()
+            }
+        }
+    }
+
+    fn get_text(&self, begin: usize, end: usize) -> &str {
+        match self {
+            ParagraphUnit::Text(t) => {
+                t.text.substring(begin, end - begin)
+            }
+        }
+    }
+
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct TextUnit {
@@ -57,11 +88,18 @@ pub struct TextUnit {
 js_serialize!(TextUnit);
 js_deserialize!(TextUnit);
 
+#[derive(Ord, PartialOrd, Eq, PartialEq, Debug, Copy, Clone)]
+pub struct TextCoord(usize, usize);
+
 #[element_backend]
 pub struct Paragraph {
     element: Element,
     params: ParagraphParams,
     lines: Vec<Line>,
+    /// Option<(start coord, end coord)>
+    selection: Option<(TextCoord, TextCoord)>,
+    selecting_begin: Option<TextCoord>,
+    selection_paint: Paint,
 }
 
 struct Line {
@@ -78,6 +116,60 @@ impl Line {
             units,
             sk_paragraph,
         }
+    }
+
+    fn atom_count(&self) -> usize {
+        let mut count = 0;
+        for u in &self.units {
+            count += u.atom_count();
+        }
+        count
+    }
+
+    pub fn get_text(&self) -> String {
+        let mut result = String::new();
+        for u in &self.units {
+            result.push_str(u.text());
+        }
+        result
+    }
+
+    pub fn subtext(&self, mut start: ColOffset, mut end: ColOffset) -> String {
+        let mut result = String::new();
+        let mut iter = self.units.iter();
+        let mut processed_atom_count = 0;
+        loop {
+            let u = match iter.next() {
+                Some(u) => u,
+                None => break,
+            };
+            let unit_atom_count = u.atom_count();
+            if let Some(intersect) = intersect_range((start, end), (processed_atom_count, unit_atom_count + processed_atom_count)) {
+                result.push_str(u.get_text(intersect.0 - processed_atom_count, intersect.1 - processed_atom_count));
+            }
+            processed_atom_count += unit_atom_count;
+            if processed_atom_count >= end {
+                break;
+            }
+        }
+        result.to_string()
+    }
+
+    pub fn get_column_by_pixel_coord(&self, coord: (f32, f32)) -> usize {
+        let (x, y) = coord;
+        let atom_count = self.atom_count();
+        if atom_count == 0 {
+            0
+        } else if x > self.sk_paragraph.max_intrinsic_width() {
+            atom_count
+        } else {
+            self.sk_paragraph.get_glyph_position_at_coordinate(coord).position as usize
+        }
+    }
+
+    pub fn get_char_bounds(&mut self, char_offset: usize) -> Option<Rect> {
+        let gc = self.sk_paragraph.get_glyph_info_at_utf16_offset(char_offset);
+        gc.map(|g| g.grapheme_layout_bounds)
     }
 
     fn rebuild_paragraph(&mut self, paragraph_params: &ParagraphParams) {
@@ -193,6 +285,113 @@ impl Paragraph {
         max_width
     }
 
+    pub fn select(&mut self, start: TextCoord, end: TextCoord) {
+        //TODO validate params
+        self.selection = Some((start, end));
+        self.element.mark_dirty(false);
+    }
+
+    pub fn unselect(&mut self) {
+        self.selection = None;
+        self.element.mark_dirty(false);
+    }
+
+    fn begin_select(&mut self, caret: TextCoord) {
+        self.element.emit_focus_shift(());
+        self.unselect();
+        self.selecting_begin = Some(caret);
+    }
+
+    fn end_select(&mut self) {
+        self.selecting_begin = None;
+    }
+
+    fn handle_mouse_event(&mut self, event: &MouseDetail) {
+        match event.event_type {
+            MouseEventType::MouseDown => {
+                let begin_coord = self.get_text_coord_by_pixel_coord((event.offset_x, event.offset_y));
+                self.begin_select(begin_coord);
+            }
+            MouseEventType::MouseMove => {
+                if self.selecting_begin.is_some() {
+                    let caret = self.get_text_coord_by_pixel_coord((event.offset_x, event.offset_y));
+                    if let Some(sb) = self.selecting_begin {
+                        let start = TextCoord::min(sb, caret);
+                        let end = TextCoord::max(sb, caret);
+                        self.select(start, end);
+                    }
+                }
+            }
+            MouseEventType::MouseUp => {
+                self.end_select();
+            }
+            _ => {},
+        }
+    }
+
+    pub fn get_text_coord_by_pixel_coord(&self, coord: (f32, f32)) -> TextCoord {
+        let (offset_x, offset_y) = coord;
+        let (padding_top, _, _, padding_left) = self.element.get_padding();
+        let expected_offset = (offset_x - padding_left, offset_y - padding_top);
+        let mut row = 0;
+        let mut height = 0f32;
+
+        let lines = &self.lines;
+        let max_offset = lines.len() - 1;
+        for p in lines {
+            height += p.sk_paragraph.height();
+            if row == max_offset || height > expected_offset.1 {
+                let line_pixel_coord = (expected_offset.0, expected_offset.1 - (height - p.sk_paragraph.height()));
+                let line_column = p.get_column_by_pixel_coord(line_pixel_coord);
+                return TextCoord(row, line_column);
+            }
+            row += 1;
+        }
+        TextCoord(0, 0)
+    }
+
+    fn handle_key_down(&mut self, event: &KeyEventDetail) {
+        if event.modifiers == KEY_MOD_CTRL {
+            if let Some(text) = &event.key_str {
+                match text.as_str() {
+                    "c" => {
+                        if let Some(sel) = self.get_selection_text() {
+                            let sel=  sel.to_string();
+                            if let Ok(mut ctx) = ClipboardContext::new() {
+                                ctx.set_contents(sel);
+                            }
+                        }
+                    },
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    pub fn get_selection_text(&self) -> Option<String> {
+        let selection = self.selection.as_ref()?;
+        let start = selection.0;
+        let end = selection.1;
+        let start_line = self.lines.get(start.0)?;
+        let end_line = self.lines.get(end.0)?;
+        let text = if start.0 == end.0 {
+            start_line.subtext(start.1, end.1)
+        } else {
+            let mut result =  start_line.subtext(start.1, start_line.atom_count());
+            if end.0 - start.0 > 1 {
+                for i in start.0 + 1..end.0 {
+                    let ln = self.lines.get(i)?;
+                    result.push_str("\n");
+                    result.push_str(&ln.get_text())
+                }
+            }
+            result.push_str("\n");
+            result.push_str(&end_line.subtext(0, end.1));
+            result
+        };
+        Some(text)
+    }
+
     fn rebuild_paragraph(&mut self) {
         let params = self.params.clone();
         for ln in &mut self.lines {
@@ -292,10 +491,16 @@ impl ElementBackend for Paragraph {
         };
         let units = Vec::new();
         let paragraph = Self::build_paragraph(&params, &units);
+
+        let mut selection_paint = Paint::default();
+        selection_paint.set_color(parse_hex_color("214283").unwrap());
         let this = ParagraphData {
             lines: Vec::new(),
             element: element.clone(),
             params,
+            selection: None,
+            selecting_begin: None,
+            selection_paint,
         }
         .to_ref();
         element
@@ -333,12 +538,55 @@ impl ElementBackend for Paragraph {
     fn draw(&self, canvas: &Canvas) {
         let mut p = self.clone();
         p.layout(None);
-        let mut y = 0.0;
-        for ln in &p.lines {
-            ln.sk_paragraph.paint(canvas, (0.0, y));
-            y += ln.sk_paragraph.height();
+
+        let clip_rect = canvas.local_clip_bounds();
+
+        let mut me = self.clone();
+        let mut consumed_top = 0.0;
+        let mut consumed_rows = 0usize;
+        let mut consumed_columns = 0usize;
+        for ln in &mut me.lines {
+            let ln_row = consumed_rows; consumed_rows += 1;
+            let ln_column = consumed_columns; consumed_columns += 1;
+
+            let ln_height = ln.sk_paragraph.height();
+            let ln_top = consumed_top; consumed_top += ln_height;
+            let ln_bottom = consumed_top;
+
+
+            if let Some(cp) = clip_rect {
+                if ln_bottom < cp.top {
+                    continue;
+                } else if ln_top > cp.bottom {
+                    break;
+                }
+            }
+            let atom_count = ln.atom_count();
+            if atom_count > 0 {
+                if let Some(selection_range) = self.selection {
+                    let ln_range = (TextCoord(ln_row, 0), TextCoord(ln_row, atom_count));
+                    if let Some((begin, end)) = intersect_range(selection_range, ln_range) {
+                        let left = ln.get_char_bounds(begin.1).unwrap().left;
+                        let right = ln.get_char_bounds(end.1 - 1).unwrap().right;
+                        let bounds = Rect::new(left, ln_top, right, ln_bottom);
+                        canvas.draw_rect(&bounds, &self.selection_paint);
+                    }
+                }
+            }
+            ln.sk_paragraph.paint(canvas, (0.0, ln_top));
         }
     }
+
+    fn handle_event_default_behavior(&mut self, event_type: &str, event: &mut ElementEvent) -> bool {
+        KeyDownEvent::try_match(event_type, event, |d| {
+            self.handle_key_down(d)
+        })
+    }
+
+    fn handle_event(&mut self, event_type: &str, event: &mut ElementEvent) {
+        match_event_type!(event, MouseDetail, self, handle_mouse_event);
+    }
+
 }
 
 fn parse_optional_weight(value: Option<&String>) -> Option<Weight> {
