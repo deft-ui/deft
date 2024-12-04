@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::cell::Cell;
 use std::rc::Rc;
 use std::string::ToString;
@@ -8,15 +9,15 @@ use skia_safe::{Canvas, Font, Paint};
 use skia_safe::textlayout::{TextAlign};
 use winit::keyboard::NamedKey;
 use winit::window::CursorIcon;
-use crate::base::{CaretDetail, ElementEvent, MouseDetail, MouseEventType, Rect, TextChangeDetail, TextUpdateDetail};
-use crate::element::{ElementBackend, Element};
+use crate::base::{CaretDetail, ElementEvent, EventContext, MouseDetail, MouseEventType, Rect, TextChangeDetail, TextUpdateDetail};
+use crate::element::{ElementBackend, Element, ElementWeak};
 use crate::element::text::{AtomOffset, Text as Label};
 use crate::number::DeNan;
 use crate::{js_call, match_event, match_event_type, timer};
 use crate::app::AppEvent;
 use crate::element::edit_history::{EditHistory, EditOpType};
 use crate::element::text::text_paragraph::Line;
-use crate::event::{CaretEventBind, KEY_MOD_CTRL, KEY_MOD_SHIFT, KeyDownEvent, KeyEventDetail};
+use crate::event::{KEY_MOD_CTRL, KEY_MOD_SHIFT, KeyEventDetail, MouseDownEvent, MouseUpEvent, MouseMoveEvent, KeyDownEvent, CaretChangeEvent, TextUpdateEvent, TextChangeEvent};
 use crate::event_loop::create_event_loop_proxy;
 use crate::string::StringUtils;
 use crate::style::StylePropKey;
@@ -165,7 +166,11 @@ impl Entry {
         let origin_bounds = bounds
             .translate(origin_bounds.x + border_left, origin_bounds.y + border_top);
 
-        ele.emit_caret_change(CaretDetail::new(caret, origin_bounds, bounds));
+        ele.emit(CaretChangeEvent {
+            position: caret,
+            origin_bounds,
+            bounds,
+        });
     }
 
     fn caret_tick(caret_visible: Rc<Cell<bool>>, mut context: Element) {
@@ -201,24 +206,6 @@ impl Entry {
 
     fn end_select(&mut self) {
         self.selecting_begin = None;
-    }
-
-    fn handle_mouse_event(&mut self, event: &MouseDetail) {
-        match event.event_type {
-            MouseEventType::MouseDown => {
-                self.update_caret_by_offset_coordinate(event.offset_x, event.offset_y, false);
-                self.begin_select();
-            }
-            MouseEventType::MouseMove => {
-                if self.selecting_begin.is_some() {
-                    self.update_caret_by_offset_coordinate(event.offset_x, event.offset_y, false);
-                }
-            }
-            MouseEventType::MouseUp => {
-                self.end_select();
-            }
-            _ => {},
-        }
     }
 
     fn handle_key_down(&mut self, event: &KeyEventDetail) {
@@ -350,16 +337,14 @@ impl Entry {
         }
 
         // emit text update
-        let mut event = ElementEvent::new("textupdate", TextUpdateDetail {
+        self.element.emit(TextUpdateEvent {
             value: self.base.get_text().to_string()
-        }, self.element.as_weak());
-        self.element.emit_event("textupdate", event);
+        });
 
         // emit text change
-        let mut event = ElementEvent::new("textchange",TextChangeDetail {
+        self.element.emit(TextChangeEvent {
             value: self.base.get_text().to_string(),
-        }, self.element.as_weak());
-        self.element.emit_event("textchange", event);
+        });
     }
 
 }
@@ -432,10 +417,31 @@ impl ElementBackend for Entry {
     }
 
     fn handle_event_default_behavior(&mut self, event_type: &str, event: &mut ElementEvent) -> bool {
-        KeyDownEvent::try_match(event_type, event, |d| {
-            self.handle_key_down(d)
-        })
-            || self.base.handle_event_default_behavior(event_type, event)
+        self.base.handle_event_default_behavior(event_type, event)
+    }
+
+    fn on_event(&mut self, event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
+        if let Some(e) = event.downcast_ref::<MouseDownEvent>() {
+            let event = e.0;
+            self.update_caret_by_offset_coordinate(event.offset_x, event.offset_y, false);
+            self.begin_select();
+        } else if let Some(e) = event.downcast_ref::<MouseMoveEvent>() {
+            let event = e.0;
+            if self.selecting_begin.is_some() {
+                self.update_caret_by_offset_coordinate(event.offset_x, event.offset_y, false);
+            }
+        } else if let Some(e) = event.downcast_ref::<MouseUpEvent>() {
+            self.end_select();
+        }
+    }
+
+    fn execute_default_behavior(&mut self, event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) -> bool {
+        if let Some(e) = event.downcast_ref::<KeyDownEvent>() {
+            self.handle_key_down(&e.0);
+            true
+        } else {
+            false
+        }
     }
 
     fn handle_origin_bounds_change(&mut self, bounds: &Rect) {
@@ -446,7 +452,6 @@ impl ElementBackend for Entry {
     fn handle_event(&mut self, event_type: &str, event: &mut ElementEvent) {
         match_event!(event_type, event, "focus", self, handle_focus);
         match_event!(event_type, event, "blur", self, handle_blur);
-        match_event_type!(event, MouseDetail, self, handle_mouse_event);
     }
 
 }

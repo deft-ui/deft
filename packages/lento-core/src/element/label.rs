@@ -9,6 +9,7 @@ use skia_safe::textlayout::{FontCollection, Paragraph, ParagraphBuilder, Paragra
 use crate::base::{ElementEvent, PropertyValue, Rect, TextUpdateDetail};
 use crate::color::parse_hex_color;
 use crate::element::{ElementData, ElementBackend, Element};
+use crate::event::TextUpdateEvent;
 use crate::js_call;
 use crate::js::js_value_util::JsValueHelper;
 use crate::number::DeNan;
@@ -141,10 +142,9 @@ impl Label {
             self.rebuild_paragraph();
             self.mark_dirty(true);
 
-            let mut event = ElementEvent::new("textupdate", TextUpdateDetail {
+            self.element.emit(TextUpdateEvent {
                 value: text
-            }, self.element.as_weak());
-            self.element.emit_event("textupdate", event);
+            })
         }
     }
 

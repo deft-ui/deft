@@ -2,6 +2,7 @@ pub mod skia_text_paragraph;
 pub mod text_paragraph;
 mod simple_text_paragraph;
 
+use std::any::Any;
 use crate as lento;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -12,13 +13,13 @@ use skia_safe::{Canvas, Color, Font, FontMgr, FontStyle, Paint, Typeface};
 use skia_safe::textlayout::{FontCollection, TextAlign};
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 use lento_macros::{js_methods, mrc_object};
-use crate::base::{ElementEvent, MouseDetail, MouseEventType, Rect, TextUpdateDetail};
+use crate::base::{ElementEvent, EventContext, MouseDetail, MouseEventType, Rect, TextUpdateDetail};
 use crate::color::parse_hex_color;
-use crate::element::{ElementBackend, Element};
+use crate::element::{ElementBackend, Element, ElementWeak};
 use crate::element::text::skia_text_paragraph::{SkiaTextParagraph};
 use crate::element::text::text_paragraph::{ParagraphData, Line, ParagraphRef, TextParams};
 use crate::{js_call, match_event_type};
-use crate::event::{AcceptFocusShiftEvent, FocusShiftBind};
+use crate::event::{FocusShiftEvent, TextUpdateEvent};
 use crate::number::DeNan;
 use crate::string::StringUtils;
 use crate::style::StylePropKey;
@@ -123,10 +124,9 @@ impl Text {
             self.mark_dirty(false);
             self.mark_layout_dirty_if_needed();
 
-            let event = ElementEvent::new("textupdate", TextUpdateDetail {
+            self.element.emit(TextUpdateEvent {
                 value: text
-            }, self.element.as_weak());
-            self.element.emit_event("textupdate", event);
+            })
         }
     }
 
@@ -416,7 +416,7 @@ impl Text {
     }
 
     fn begin_select(&mut self, caret: AtomOffset) {
-        self.element.emit_focus_shift(());
+        self.element.emit(FocusShiftEvent);
         self.unselect();
         self.selecting_begin = Some(caret);
     }
@@ -659,10 +659,11 @@ impl ElementBackend for Text {
         }
     }
 
-    fn handle_event_default_behavior(&mut self, _event_type: &str, event: &mut ElementEvent) -> bool {
-        event.accept_focus_shift(|_| {
+    fn execute_default_behavior(&mut self, event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) -> bool {
+        if let Some(d) = event.downcast_ref::<FocusShiftEvent>() {
             self.unselect();
-        })
+        }
+        false
     }
 
     fn handle_origin_bounds_change(&mut self, bounds: &Rect) {

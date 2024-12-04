@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::str::FromStr;
 
 use quick_js::JsValue;
@@ -5,12 +6,12 @@ use skia_safe::{Canvas, Paint};
 use yoga::Direction::LTR;
 
 use crate::{backend_as_api, js_call};
-use crate::base::{CaretDetail, ElementEvent, Rect};
+use crate::base::{CaretDetail, ElementEvent, EventContext, Rect};
 use crate::color::parse_hex_color;
-use crate::element::{ElementBackend, Element};
+use crate::element::{ElementBackend, Element, ViewEvent, ElementWeak};
 use crate::element::container::Container;
 use crate::element::scroll::ScrollBarStrategy::{Always, Auto, Never};
-use crate::event::{AcceptCaretEvent, AcceptMouseDownEvent, AcceptMouseMoveEvent, AcceptMouseUpEvent, AcceptTouchCancelEvent, AcceptTouchEndEvent, AcceptTouchMoveEvent, AcceptTouchStartEvent, MouseDownEvent, MouseWheelDetail};
+use crate::event::{CaretChangeEvent, MouseDownEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent};
 use crate::js::js_runtime::FromJsValue;
 
 const BACKGROUND_COLOR: &str = "1E1F22";
@@ -106,7 +107,7 @@ impl Scroll {
         (width, height)
     }
 
-    fn handle_default_mouse_wheel(&mut self, detail: &MouseWheelDetail) -> bool {
+    fn handle_default_mouse_wheel(&mut self, detail: &MouseWheelEvent) -> bool {
         if self.is_y_overflow {
             self.element.set_scroll_top(self.element.get_scroll_top() - 40.0 * detail.rows);
             true
@@ -115,7 +116,7 @@ impl Scroll {
         }
     }
 
-    fn handle_caret_change(&mut self, detail: &CaretDetail) {
+    fn handle_caret_change(&mut self, detail: &CaretChangeEvent) {
         // println!("caretchange:{:?}", detail.origin_bounds);
         let body = &mut self.element;
         let scroll_origin_bounds = body.get_origin_content_bounds();
@@ -331,23 +332,12 @@ impl ElementBackend for Scroll {
         js_call!("scroll_x", ScrollBarStrategy, self, set_scroll_x, p, v);
     }
 
-    fn handle_event_default_behavior(&mut self, _event_type: &str, event: &mut ElementEvent) -> bool {
-        let is_target_self = event.context.target.upgrade().ok().as_ref() == Some(&self.element);
-        event.accept_touch_start(|d| {
-            let touch = unsafe { d.touches.get_unchecked(0) };
-            self.begin_scroll_x(-touch.frame_x);
-            self.begin_scroll_y(-touch.frame_y);
-        }) || event.accept_touch_move(|d| {
-            let touch = unsafe { d.touches.get_unchecked(0) };
-            self.update_scroll_x(-touch.frame_x, false);
-            self.update_scroll_y(-touch.frame_y, false);
-        }) || event.accept_touch_end(|_| {
-            self.end_scroll();
-        }) || event.accept_touch_cancel(|_| {
-            self.end_scroll();
-        }) || event.accept_mouse_down(|d| {
+    fn execute_default_behavior(&mut self, event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) -> bool {
+        let is_target_self = ctx.target.upgrade().ok().as_ref() == Some(&self.element);
+        if let Some(e) = event.downcast_mut::<MouseDownEvent>() {
+            let d = e.0;
             if !is_target_self {
-                return;
+                return false;
             }
             let is_in_vertical_bar = self.vertical_bar_rect.contains_point(d.offset_x, d.offset_y);
             if is_in_vertical_bar {
@@ -357,7 +347,7 @@ impl ElementBackend for Scroll {
                 } else {
                     //TODO scroll page
                 }
-                return;
+                return true;
             }
             let is_in_horizontal_bar = self.horizontal_bar_rect.contains_point(d.offset_x, d.offset_y);
             if is_in_horizontal_bar {
@@ -367,20 +357,42 @@ impl ElementBackend for Scroll {
                 } else {
                     //TODO scroll page
                 }
-                return;
+                return true;
             }
-        }) || event.accept_mouse_up(|d| {
+        } else if let Some(d) = event.downcast_mut::<MouseUpEvent>() {
             self.end_scroll();
-        }) || event.accept_mouse_move(|d| {
+            return true;
+        } else if let Some(e) = event.downcast_mut::<MouseMoveEvent>() {
+            let d = e.0;
             self.update_scroll_x(d.frame_x, true);
             self.update_scroll_y(d.frame_y, true);
-        }) || event.accept_caret_change(|d| {
+            return true;
+        } else if let Some(e) = event.downcast_mut::<TouchStartEvent>() {
+            let d = &e.0;
+            let touch = unsafe { d.touches.get_unchecked(0) };
+            self.begin_scroll_x(-touch.frame_x);
+            self.begin_scroll_y(-touch.frame_y);
+            return true;
+        } else if let Some(e) = event.downcast_mut::<TouchMoveEvent>() {
+            let d = &e.0;
+            let touch = unsafe { d.touches.get_unchecked(0) };
+            self.update_scroll_x(-touch.frame_x, false);
+            self.update_scroll_y(-touch.frame_y, false);
+            return true;
+        } else if let Some(e) = event.downcast_mut::<TouchEndEvent>() {
+            self.end_scroll();
+            return true;
+        } else if let Some(e) = event.downcast_mut::<TouchCancelEvent>() {
+            self.end_scroll();
+            return true;
+        } else if let Some(d) = event.downcast_mut::<CaretChangeEvent>() {
             self.handle_caret_change(d);
-        }) || if let Some(e) = event.detail.raw().downcast_ref::<MouseWheelDetail>() {
-            self.handle_default_mouse_wheel(e)
-        } else {
-            false
+            return true;
+        } else if let Some(e) = event.downcast_mut::<MouseWheelEvent>() {
+            self.handle_default_mouse_wheel(e);
+            return true;
         }
+        false
     }
 
     fn draw(&self, canvas: &Canvas) {

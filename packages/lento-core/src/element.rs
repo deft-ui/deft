@@ -1,3 +1,4 @@
+use std::any::{Any, TypeId};
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 use std::default::Default;
@@ -5,7 +6,7 @@ use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 
 use anyhow::{anyhow, Error};
-use lento_macros::{js_methods, mrc_object};
+use lento_macros::{js_func, js_methods, mrc_object};
 use ordered_float::Float;
 use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
@@ -24,7 +25,7 @@ use crate::element::image::Image;
 use crate::element::scroll::Scroll;
 use crate::element::text::Text;
 use crate::element::textedit::TextEdit;
-use crate::event::{BoundsChangeBind, BoundsChangeEventDetail, ClickEventBind};
+use crate::event::{DragOverEventListener, BlurEventListener, BoundsChangeEventListener, CaretChangeEventListener, ClickEventListener, DragStartEventListener, DropEventListener, FocusEventListener, FocusShiftEventListener, KeyDownEventListener, KeyUpEventListener, MouseDownEventListener, MouseEnterEvent, MouseEnterEventListener, MouseLeaveEvent, MouseLeaveEventListener, MouseMoveEventListener, MouseUpEventListener, MouseWheelEventListener, ScrollEvent, ScrollEventListener, TextChangeEventListener, TextUpdateEventListener, TouchCancelEventListener, TouchEndEventListener, TouchMoveEventListener, TouchStartEventListener, BoundsChangeEvent};
 use crate::event_loop::{create_event_loop_callback};
 use crate::ext::ext_frame::{VIEW_TYPE_BUTTON, VIEW_TYPE_CONTAINER, VIEW_TYPE_ENTRY, VIEW_TYPE_IMAGE, VIEW_TYPE_LABEL, VIEW_TYPE_SCROLL, VIEW_TYPE_TEXT_EDIT};
 use crate::frame::{Frame, FrameWeak};
@@ -35,7 +36,7 @@ use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::resource_table::ResourceTable;
 use crate::style::{parse_style_obj, ColorHelper, StyleNode, StyleProp, StylePropKey};
-use crate::{base, define_resource, js_call, js_call_rust, js_get_prop, js_weak_value};
+use crate::{base, bind_js_event_listener, define_resource, js_call, js_call_rust, js_get_prop, js_weak_value};
 
 pub mod container;
 pub mod entry;
@@ -50,6 +51,7 @@ pub mod text;
 pub mod paragraph;
 
 use crate as lento;
+use crate::js::JsError;
 
 thread_local! {
     pub static NEXT_ELEMENT_ID: Cell<u32> = Cell::new(1);
@@ -190,8 +192,35 @@ impl Element {
     }
 
     #[js_func]
-    pub fn bind_event(&mut self, e: String, callback: JsValue) -> Result<i32, Error> {
-        Ok(self.event_registration.add_js_event_listener(&e, callback))
+    pub fn add_js_event_listener(&mut self, event_type: String, listener: JsValue) -> Result<u32, JsError> {
+        let id = bind_js_event_listener!(
+            self, event_type.as_str(), listener;
+            "click" => ClickEventListener,
+            "caretchange" => CaretChangeEventListener,
+            "mousedown" => MouseDownEventListener,
+            "mousemove" => MouseMoveEventListener,
+            "mouseup" => MouseUpEventListener,
+            "mouseenter" => MouseEnterEventListener,
+            "mouseleave" => MouseLeaveEventListener,
+            "keydown" => KeyDownEventListener,
+            "keyup" => KeyUpEventListener,
+            "mousewheel" => MouseWheelEventListener,
+            "textupdate" => TextUpdateEventListener,
+            "touchstart" => TouchStartEventListener,
+            "touchmove" => TouchMoveEventListener,
+            "touchend" => TouchEndEventListener,
+            "TouchCancel" => TouchCancelEventListener,
+            "focus" => FocusEventListener,
+            "blur" => BlurEventListener,
+            "focusshift" => FocusShiftEventListener,
+            "textchange" => TextChangeEventListener,
+            "scroll" => ScrollEventListener,
+            "dragstart" => DragStartEventListener,
+            "dragover" => DragOverEventListener,
+            "drop" => DropEventListener,
+            "boundschange" => BoundsChangeEventListener,
+        );
+        Ok(id)
     }
 
     pub fn set_cursor(&mut self, cursor: CursorIcon) {
@@ -266,11 +295,10 @@ impl Element {
     }
 
     fn emit_scroll_event(&mut self) {
-        let mut event = ElementEvent::new("scroll", ScrollEventDetail {
+        self.emit(ScrollEvent {
             scroll_top: self.scroll_top,
             scroll_left: self.scroll_left,
-        }, self.as_weak());
-        self.emit_event("scroll", event);
+        });
     }
 
     pub fn get_backend_as<T>(&self) -> &T {
@@ -735,13 +763,39 @@ impl Element {
             prevent_default: false,
         };
         self.handle_event(&mut event, &mut ctx);
+        if !ctx.prevent_default {
+            let mut e: Box<dyn Any> = Box::new(event);
+            self.handle_default_behavior(&mut e, &mut ctx);
+        }
     }
 
     fn handle_event<T: ViewEvent + 'static>(&mut self, event: &mut T, ctx: &mut EventContext<ElementWeak>) {
+        if TypeId::of::<T>() == TypeId::of::<MouseEnterEvent>() {
+            self.hover = true;
+            if !self.hover_style_props.is_empty() {
+                self.apply_style();
+            }
+        } else if TypeId::of::<T>() == TypeId::of::<MouseLeaveEvent>() {
+            self.hover = false;
+            if !self.hover_style_props.is_empty() {
+                self.apply_style();
+            }
+        }
+        let backend = self.get_backend_mut();
+        let mut e: Box<&mut dyn Any> = Box::new(event);
+        backend.on_event(e, ctx);
         self.event_registration.emit(event, ctx);
         if event.allow_bubbles() && !ctx.propagation_cancelled {
             if let Some(mut p) = self.get_parent() {
                 p.handle_event(event, ctx);
+            }
+        }
+    }
+
+    fn handle_default_behavior(&mut self, event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) {
+        if !self.backend.execute_default_behavior(event, ctx) {
+            if let Some(mut p) = self.get_parent() {
+                p.handle_default_behavior(event, ctx);
             }
         }
     }
@@ -757,41 +811,6 @@ impl Element {
     #[js_func]
     pub fn remove_event_listener(&mut self, event_type: String, id: u32) {
         self.event_registration.remove_event_listener(&event_type, id)
-    }
-
-    pub fn emit_event(&self, event_type: &str, mut event: ElementEvent) {
-        let mut me = self.clone();
-        let event_type = event_type.to_string();
-        let callback = create_event_loop_callback(move || {
-            me.emit_event_internal(&event_type, &mut event);
-            if !event.context.prevent_default {
-                me.handle_event_default_behavior(&event_type, &mut event);
-            }
-        });
-        callback.call();
-    }
-
-    fn emit_event_internal(&mut self, event_type: &str, event: &mut ElementEvent) {
-        if event_type == "mouseenter" {
-            self.hover = true;
-            if !self.hover_style_props.is_empty() {
-                self.apply_style();
-            }
-        } else if event_type == "mouseleave" {
-            self.hover = false;
-            if !self.hover_style_props.is_empty() {
-                self.apply_style();
-            }
-        }
-        let backend = self.get_backend_mut();
-        backend.handle_event(event_type, event);
-        self.event_registration.emit_event(event);
-        //TODO check bubble-supported
-        if !event.context.propagation_cancelled {
-            if let Some(mut parent) = self.get_parent() {
-                parent.emit_event_internal(event_type, event);
-            }
-        }
     }
 
     fn handle_event_default_behavior(&mut self,event_type: &str, event: &mut ElementEvent) {
@@ -830,13 +849,16 @@ impl Element {
         //TODO emit size change
         let origin_bounds = self.get_origin_bounds();
         if origin_bounds != self.rect {
-            let detail = BoundsChangeEventDetail {
+            // Disable bubble
+            let mut ctx = EventContext {
+                target: self.as_weak(),
+                propagation_cancelled: true,
+                prevent_default: false,
+            };
+            let mut event = BoundsChangeEvent {
                 origin_bounds: origin_bounds.clone(),
             };
-            let mut event = ElementEvent::new("boundschange", detail, self.as_weak());
-            // Disable bubble
-            event.context.propagation_cancelled = true;
-            self.event_registration.emit_event(&mut event);
+            self.event_registration.emit(&mut event, &mut ctx);
         }
         //TODO performance: maybe not changed?
         //TODO change is_visible?
@@ -989,6 +1011,15 @@ pub trait ElementBackend {
 
     fn handle_event_default_behavior(&mut self, event_type: &str, event: &mut ElementEvent) -> bool {
         (event_type, event);
+        false
+    }
+
+    fn on_event(&mut self, mut event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
+        let _ = (event, ctx);
+    }
+
+    fn execute_default_behavior(&mut self, mut event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) -> bool {
+        let _ = (event, ctx);
         false
     }
 

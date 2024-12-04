@@ -159,7 +159,7 @@ fn create_event(_attr: TokenStream, struct_def: TokenStream, target_type: TokenS
         }
 
         impl lento::js::FromJsValue for #listener_name {
-            fn from_js_value(value: JsValue) -> Result<Self, quick_js::ValueError> {
+            fn from_js_value(value: quick_js::JsValue) -> Result<Self, quick_js::ValueError> {
                 let listener = Self::new(move |e, ctx| {
                     let target = ctx.target.clone();
                     use lento::js::ToJsValue;
@@ -190,12 +190,13 @@ fn create_event(_attr: TokenStream, struct_def: TokenStream, target_type: TokenS
         }
 
         #[derive(serde::Serialize)]
+        #[serde(rename_all = "camelCase")]
         pub struct #event_name
             #fields_ts
 
         impl lento::element::ViewEvent for #event_name {
             fn allow_bubbles(&self) -> bool {
-                false
+                true
             }
         }
 

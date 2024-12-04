@@ -1,6 +1,8 @@
+use crate as lento;
 use serde::{Deserialize, Serialize};
 use winit::keyboard::{ModifiersState, NamedKey};
-use crate::base::{CaretDetail, MouseDetail, ScrollEventDetail, TextChangeDetail, TextUpdateDetail, TouchDetail};
+use lento_macros::event;
+use crate::base::{CaretDetail, MouseDetail, Rect, ScrollEventDetail, TextChangeDetail, TextUpdateDetail, TouchDetail};
 use crate::{base, define_event};
 
 pub const KEY_MOD_CTRL: u32 = 0x1;
@@ -366,59 +368,90 @@ pub fn named_key_to_str(key: &NamedKey) -> &'static str {
     )
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DragStartEventDetail {
+#[event]
+pub struct ClickEvent(pub MouseDetail);
 
-}
+#[event]
+pub struct MouseUpEvent(pub MouseDetail);
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DragOverEventDetail {
+#[event]
+pub struct MouseDownEvent(pub MouseDetail);
 
-}
+#[event]
+pub struct MouseMoveEvent(pub MouseDetail);
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DropEventDetail {
+#[event]
+pub struct MouseEnterEvent(pub MouseDetail);
 
-}
+#[event]
+pub struct MouseLeaveEvent(pub MouseDetail);
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MouseWheelDetail {
+#[event]
+pub struct KeyDownEvent(pub KeyEventDetail);
+
+#[event]
+pub struct KeyUpEvent(pub KeyEventDetail);
+
+#[event]
+pub struct MouseWheelEvent {
     pub cols: f32,
     pub rows: f32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BoundsChangeEventDetail {
+#[event]
+pub struct TextUpdateEvent {
+    pub value: String,
+}
+
+#[event]
+pub struct TouchStartEvent(pub TouchDetail);
+
+#[event]
+pub struct TouchMoveEvent(pub TouchDetail);
+
+#[event]
+pub struct TouchEndEvent(pub TouchDetail);
+
+#[event]
+pub struct TouchCancelEvent(pub TouchDetail);
+
+#[event]
+pub struct FocusEvent;
+
+#[event]
+pub struct BlurEvent;
+
+#[event]
+pub struct FocusShiftEvent;
+
+#[event]
+pub struct TextChangeEvent {
+    pub value: String,
+}
+
+#[event]
+pub struct ScrollEvent {
+    pub scroll_top: f32,
+    pub scroll_left: f32,
+}
+
+#[event]
+pub struct DragStartEvent;
+
+#[event]
+pub struct DragOverEvent;
+
+#[event]
+pub struct DropEvent;
+
+#[event]
+pub struct BoundsChangeEvent {
     pub origin_bounds: base::Rect,
 }
 
-define_event!(CaretEvent,       CaretEventBind,       "caretchange", bind_caret_change, emit_caret_change, AcceptCaretEvent,       accept_caret_change, CaretDetail);
-define_event!(MouseDownEvent,   MouseDownEventBind,   "mousedown",   bind_mouse_down,   emit_mouse_down,   AcceptMouseDownEvent,   accept_mouse_down,   MouseDetail);
-define_event!(MouseUpEvent,     MouseUpEventBind,     "mouseup",     bind_mouse_up,     emit_mouse_up,     AcceptMouseUpEvent,     accept_mouse_up,     MouseDetail);
-define_event!(MouseClickEvent,  ClickEventBind,       "click",       bind_click,        emit_click,        AcceptClickEvent,       accept_click,        MouseDetail);
-define_event!(MouseMoveEvent,   MouseMoveEventBind,   "mousemove",   bind_mouse_move,   emit_mouse_move,   AcceptMouseMoveEvent,   accept_mouse_move,   MouseDetail);
-define_event!(MouseEnterEvent,  MouseEnterEventBind,  "mouseenter",  bind_mouse_enter,  emit_mouse_enter,  AcceptMouseEnterEvent,  accept_mouse_enter,  MouseDetail);
-define_event!(MouseLeaveEvent,  MouseLeaveEventBind,  "mouseleave",  bind_mouse_leave,  emit_mouse_leave,  AcceptMouseLeaveEvent,  accept_mouse_leave,  MouseDetail);
-define_event!(KeyDownEvent,     KeyDownEventBind,     "keydown",     bind_key_down,     emit_key_down,     AcceptKeyDownEvent,     accept_key_down,     KeyEventDetail);
-define_event!(KeyUpEvent,       KeyUpEventBind,       "keyup",       bind_key_up,       emit_key_up,       AcceptKeyUpEvent,       accept_key_up,       KeyEventDetail);
-define_event!(MouseWheelEvent,  MouseWheelEventBind,  "mousewheel",  bind_mouse_wheel,  emit_mouse_wheel,  AcceptMouseWheelEvent,  accept_mouse_wheel,  MouseWheelDetail);
-define_event!(TextUpdateEvent,  TextUpdateEventBind,  "textupdate",  bind_text_update,  emit_text_update,  AcceptTextUpdateEvent,  accept_text_update,  TextUpdateDetail);
-define_event!(TouchStartEvent,  TouchStartEventBind,  "touchstart",  bind_touch_start,  emit_touch_start,  AcceptTouchStartEvent,  accept_touch_start,  TouchDetail);
-define_event!(TouchMoveEvent,   TouchMoveEventBind,   "touchmove",   bind_touch_move,   emit_touch_move,   AcceptTouchMoveEvent,   accept_touch_move,   TouchDetail);
-define_event!(TouchEndEvent,    TouchEndEventBind,    "touchend",    bind_touch_end,    emit_touch_end,    AcceptTouchEndEvent,    accept_touch_end,    TouchDetail);
-define_event!(TouchCancelEvent, TouchCancelEventBind, "touchcancel", bind_touch_cancel, emit_touch_cancel, AcceptTouchCancelEvent, accept_touch_cancel, TouchDetail);
-define_event!(FocusEvent,       FocusEventBind,       "focus",       bind_focus,        emit_focus,        AcceptFocusEvent,       accept_focus,        ());
-define_event!(BlurEvent,        BlurEventBind,        "blur",        bind_blur,         emit_blur,         AcceptBlurEvent,        accept_blur,         ());
-define_event!(FocusShiftEvent,  FocusShiftBind,       "focusshift",  bind_focus_shift,  emit_focus_shift,  AcceptFocusShiftEvent,  accept_focus_shift,  ());
-define_event!(TextChangeEvent,  TextChangeBind,       "textchange",  bind_text_change,  emit_text_change,  AcceptTextChange,       accept_text_change,  TextChangeDetail);
-define_event!(ScrollEvent,      ScrollBind,           "scroll",      bind_scroll,       emit_scroll,       AcceptScroll,           accept_scroll,       ScrollEventDetail);
-define_event!(DragStartEvent,   DragStartBind,        "dragstart",   bind_drag_start,   emit_drag_start,   AccpetDragStart,        accept_drag_start,   DragStartEventDetail);
-define_event!(DragOverEvent,    DragOverBind,         "dragover",    bind_drag_over,    emit_drag_over,    AccpetDragOver,         accept_drag_over,    DragOverEventDetail);
-define_event!(DropEvent,        DropBind,             "drop",        bind_drop,         emit_drop,         AccpetDrop,             accept_drop,         DropEventDetail);
-define_event!(BoundsChangeEvent,BoundsChangeBind,     "boundschange",bind_bounds_change,emit_bounds_change,AcceptBoundsChange,     accept_bounds_change,BoundsChangeEventDetail);
-
+#[event]
+pub struct CaretChangeEvent {
+    pub position: usize,
+    pub origin_bounds: Rect,
+    pub bounds: Rect,
+}

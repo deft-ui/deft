@@ -288,7 +288,7 @@ export class EventBinder {
         }
         let oldListenerId = this.#eventListeners[type];
         if (oldListenerId) {
-            this.#removeEventListenerApi(this.#target, type, oldListenerId);
+            this.#removeEventListenerApi(this.#target, oldListenerId);
         }
         this.#eventListeners[type] = this.addEventListener(type, callback);
     }
@@ -407,9 +407,9 @@ export class View {
     el
 
     /**
-     * @type EventRegistry
+     * @type EventBinder
      */
-    #eventRegistry;
+    #eventBinder;
 
     /**
      *
@@ -428,7 +428,7 @@ export class View {
         if (!this.el) {
             throw new Error("Failed to create view:" + el)
         }
-        this.#eventRegistry = new EventRegistry(this.el, Element_bind_event, Element_remove_event_listener, this, (target) => {
+        this.#eventBinder = new EventBinder(this.el, Element_add_js_event_listener, Element_remove_js_event_listener, (target) => {
             const myContext = Element_get_js_context(target);
             if (myContext) {
                 return CONTEXT2ELEMENT.get(myContext);
@@ -588,7 +588,7 @@ export class View {
      * @param callback {(event: IMouseEvent) => void}
      */
     bindClick(callback) {
-        this.bindEvent("click", callback);
+        this.#eventBinder.bindEvent("click", callback);
     }
 
     /**
@@ -596,7 +596,7 @@ export class View {
      * @param callback {(event: IMouseEvent) => void}
      */
     bindMouseDown(callback) {
-        this.bindEvent("mousedown", callback);
+        this.#eventBinder.bindEvent("mousedown", callback);
     }
 
     /**
@@ -604,7 +604,7 @@ export class View {
      * @param callback {(event: IMouseEvent) => void}
      */
     bindMouseUp(callback) {
-        this.bindEvent("mouseup", callback);
+        this.#eventBinder.bindEvent("mouseup", callback);
     }
 
     /**
@@ -612,7 +612,7 @@ export class View {
      * @param callback {(event: IMouseEvent) => void}
      */
     bindMouseMove(callback) {
-        this.bindEvent("mousemove", callback);
+        this.#eventBinder.bindEvent("mousemove", callback);
     }
 
     /**
@@ -620,7 +620,7 @@ export class View {
      * @param callback {(event: IMouseEvent) => void}
      */
     bindMouseEnter(callback) {
-        this.bindEvent("mouseenter", callback);
+        this.#eventBinder.bindEvent("mouseenter", callback);
     }
 
     /**
@@ -628,43 +628,43 @@ export class View {
      * @param callback {(event: IMouseEvent) => void}
      */
     bindMouseLeave(callback) {
-        this.bindEvent("mouseleave", callback);
+        this.#eventBinder.bindEvent("mouseleave", callback);
     }
 
     bindKeyDown(callback) {
-        this.bindEvent("keydown", callback);
+        this.#eventBinder.bindEvent("keydown", callback);
     }
 
     bindKeyUp(callback) {
-        this.bindEvent("keyup", callback);
+        this.#eventBinder.bindEvent("keyup", callback);
     }
 
     bindSizeChanged(callback) {
-        this.bindEvent("sizechange", callback);
+        this.#eventBinder.bindEvent("sizechange", callback);
     }
 
     bindScroll(callback) {
-        this.bindEvent("scroll", callback);
+        this.#eventBinder.bindEvent("scroll", callback);
     }
 
     bindMouseWheel(callback) {
-        this.bindEvent("mousewheel", callback);
+        this.#eventBinder.bindEvent("mousewheel", callback);
     }
 
     bindDragStart(callback) {
-        this.bindEvent("dragstart", callback);
+        this.#eventBinder.bindEvent("dragstart", callback);
     }
 
     bindDragOver(callback) {
-        this.bindEvent("dragover", callback);
+        this.#eventBinder.bindEvent("dragover", callback);
     }
 
     bindDrop(callback) {
-        this.bindEvent("drop", callback);
+        this.#eventBinder.bindEvent("drop", callback);
     }
 
     bindEvent(type, callback) {
-        this.#eventRegistry.bindEvent(type, callback);
+        this.#eventBinder.bindEvent(type, callback);
     }
 
     toString() {

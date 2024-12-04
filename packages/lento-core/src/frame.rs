@@ -5,7 +5,7 @@ use crate::base::{ElementEvent, Event, EventContext, EventHandler, EventListener
 use crate::canvas_util::CanvasHelper;
 use crate::cursor::search_cursor;
 use crate::element::{Element, ElementWeak};
-use crate::event::{build_modifier, named_key_to_str, CaretEventBind, ClickEventBind, DragOverEventDetail, DragStartEventDetail, DropEventDetail, FocusEventBind, FocusShiftBind, KeyEventDetail, MouseDownEventBind, MouseEnterEventBind, MouseLeaveEventBind, MouseMoveEventBind, MouseUpEventBind, MouseWheelDetail, TouchCancelEventBind, TouchEndEventBind, TouchMoveEventBind, TouchStartEventBind, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT};
+use crate::event::{build_modifier, named_key_to_str, CaretChangeEventListener, ClickEvent, DragOverEvent, DragStartEvent, DropEvent, FocusShiftEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent, MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT};
 use crate::event_loop::{create_event_loop_proxy, run_with_event_loop};
 use crate::ext::common::create_event_handler;
 use crate::ext::ext_frame::{FrameAttrs, FRAMES, FRAME_TYPE_MENU, FRAME_TYPE_NORMAL, MODAL_TO_OWNERS, WINDOW_TO_FRAME};
@@ -338,9 +338,11 @@ impl Frame {
                 };
 
                 if let Some(focusing) = &mut self.focusing {
-                    let event_type = if detail.pressed { "keydown" } else { "keyup" };
-                    let event = ElementEvent::new(event_type, detail, focusing.as_weak());
-                    focusing.emit_event(event_type, event);
+                    if detail.pressed {
+                        focusing.emit(KeyDownEvent(detail));
+                    } else {
+                        focusing.emit(KeyUpEvent(detail));
+                    }
                 }
             }
             WindowEvent::MouseInput { button, state, .. } => {
@@ -435,8 +437,7 @@ impl Frame {
 
     fn handle_mouse_wheel(&mut self, delta: (f32, f32)) {
         if let Some(mut target_node) = self.get_node_by_point() {
-            let event = ElementEvent::new("mousewheel", MouseWheelDetail {cols: delta.0, rows: delta.1}, target_node.as_weak());
-            target_node.emit_event("mousewheel",event);
+            target_node.emit(MouseWheelEvent { cols: delta.0, rows: delta.1 });
         }
 
     }
@@ -452,8 +453,7 @@ impl Frame {
             if dragging {
                 if let Some(target) = &mut target_node {
                     if target != pressing {
-                        let event = ElementEvent::new("dragover", DragOverEventDetail {}, target.as_weak());
-                        target.emit_event("dragover", event);
+                        target.emit(DragOverEvent {});
                         self.last_drag_over = Some(target.clone());
                     }
                 }
@@ -462,14 +462,13 @@ impl Frame {
                     f32::abs(frame_x - down_info.frame_x) > 3.0
                     || f32::abs(frame_y - down_info.frame_y) > 3.0
                 ) {
-                    let event = ElementEvent::new("dragstart", DragStartEventDetail {}, pressing.as_weak());
-                    pressing.emit_event("dragstart", event);
+                    pressing.emit(DragStartEvent);
                     //TODO check preventDefault?
                     self.window.set_cursor(Cursor::Icon(CursorIcon::Grabbing));
                     self.dragging = true;
                 } else {
                     self.update_cursor(pressing);
-                    emit_mouse_event(pressing, "mousemove", MouseEventType::MouseMove, 0, frame_x, frame_y, screen_x, screen_y);
+                    emit_mouse_event(pressing, MouseEventType::MouseMove, 0, frame_x, frame_y, screen_x, screen_y);
                 }
             }
             //TODO should emit mouseenter|mouseleave?
@@ -477,10 +476,10 @@ impl Frame {
             self.update_cursor(&node);
             if let Some(hover) = &mut self.hover {
                 if hover != &node {
-                    emit_mouse_event(hover, "mouseleave", MouseEventType::MouseLeave, 0, frame_x, frame_y, screen_x, screen_y);
+                    emit_mouse_event(hover, MouseEventType::MouseLeave, 0, frame_x, frame_y, screen_x, screen_y);
                     self.mouse_enter_node(node.clone(), frame_x, frame_y, screen_x, screen_y);
                 } else {
-                    emit_mouse_event(&mut node, "mousemove", MouseEventType::MouseMove, 0, frame_x, frame_y, screen_x, screen_y);
+                    emit_mouse_event(&mut node, MouseEventType::MouseMove, 0, frame_x, frame_y, screen_x, screen_y);
                 }
             } else {
                 self.mouse_enter_node(node.clone(), frame_x, frame_y, screen_x, screen_y);
@@ -495,7 +494,7 @@ impl Frame {
     }
 
     fn mouse_enter_node(&mut self, mut node: Element, offset_x: f32, offset_y: f32, screen_x: f32, screen_y: f32) {
-        emit_mouse_event(&mut node, "mouseenter", MouseEventType::MouseEnter, 0, offset_x, offset_y, screen_x, screen_y);
+        emit_mouse_event(&mut node, MouseEventType::MouseEnter, 0, offset_x, offset_y, screen_x, screen_y);
         self.hover = Some(node);
     }
 
@@ -531,24 +530,24 @@ impl Frame {
                 ElementState::Pressed => {
                     self.focus(node.clone());
                     self.pressing = Some((node.clone(), MouseDownInfo {button, frame_x, frame_y}));
-                    emit_mouse_event(&mut node, e_type, event_type, button, frame_x, frame_y, screen_x, screen_y);
+                    emit_mouse_event(&mut node, event_type, button, frame_x, frame_y, screen_x, screen_y);
                 }
                 ElementState::Released => {
                     if let Some(mut pressing) = self.pressing.clone() {
-                        emit_mouse_event(&mut pressing.0, "mouseup", MouseUp, button, frame_x, frame_y, screen_x, screen_y);
+                        emit_mouse_event(&mut pressing.0, MouseUp, button, frame_x, frame_y, screen_x, screen_y);
                         if pressing.0 == node && pressing.1.button == button {
-                            emit_mouse_event(&mut node, "click", MouseClick, button, frame_x, frame_y, screen_x, screen_y);
+                            emit_mouse_event(&mut node, MouseClick, button, frame_x, frame_y, screen_x, screen_y);
                         }
                         self.release_press();
                     } else {
-                        emit_mouse_event(&mut node, "mouseup", MouseUp, button, frame_x, frame_y, screen_x, screen_y);
+                        emit_mouse_event(&mut node, MouseUp, button, frame_x, frame_y, screen_x, screen_y);
                     }
                 }
             }
         }
         if state == ElementState::Released {
             if let Some(pressing) = &mut self.pressing {
-                emit_mouse_event(&mut pressing.0, "mouseup", MouseUp, pressing.1.button, frame_x, frame_y, screen_x, screen_y);
+                emit_mouse_event(&mut pressing.0, MouseUp, pressing.1.button, frame_x, frame_y, screen_x, screen_y);
                 self.release_press();
             }
         }
@@ -608,15 +607,15 @@ impl Frame {
             match phase {
                 TouchPhase::Started => {
                     println!("touch start:{:?}", touch_detail);
-                    node.emit_touch_start(touch_detail);
+                    node.emit(TouchStartEvent(touch_detail));
                 }
                 TouchPhase::Moved => {
                     println!("touch move:{:?}", &touch_detail);
-                    node.emit_touch_move(touch_detail);
+                    node.emit(TouchMoveEvent(touch_detail));
                 }
                 TouchPhase::Ended => {
                     println!("touch end:{:?}", &touch_detail);
-                    node.emit_touch_end(touch_detail);
+                    node.emit(TouchEndEvent(touch_detail));
                     if self.touching.max_identifiers == 1
                         && self.touching.times == 1
                         && SystemTime::now().duration_since(self.touching.start_time).unwrap().as_millis() < 1000
@@ -626,12 +625,12 @@ impl Frame {
                         self.touching.click_timer_handle = Some(set_timeout(move || {
                             println!("clicked");
                             //TODO fix screen_x, screen_y
-                            emit_mouse_event(&mut node, "click", MouseClick, 0, frame_x, frame_y, 0.0, 0.0);
+                            emit_mouse_event(&mut node, MouseClick, 0, frame_x, frame_y, 0.0, 0.0);
                         }, 300));
                     }
                 }
                 TouchPhase::Cancelled => {
-                    node.emit_touch_cancel(touch_detail);
+                    node.emit(TouchCancelEvent(touch_detail));
                 }
             }
         }
@@ -641,13 +640,12 @@ impl Frame {
         let focusing = Some(node.clone());
         if self.focusing != focusing {
             if let Some(old_focusing) = &mut self.focusing {
-                let blur_event = ElementEvent::new("blur", (), old_focusing.as_weak());
-                old_focusing.emit_event("blur", blur_event);
+                old_focusing.emit(BlurEvent);
 
-                old_focusing.emit_focus_shift(());
+                old_focusing.emit(FocusShiftEvent);
             }
             self.focusing = focusing;
-            node.emit_focus(());
+            node.emit(FocusEvent);
         }
     }
 
@@ -658,8 +656,7 @@ impl Frame {
                 self.dragging = false;
                 self.window.set_cursor(Cursor::Icon(CursorIcon::Default));
                 if let Some(last_drag_over) = &mut self.last_drag_over {
-                    let event = ElementEvent::new("drop", DropEventDetail{}, last_drag_over.as_weak());
-                    last_drag_over.emit_event("drop", event);
+                    last_drag_over.emit(DropEvent);
                 }
             }
             self.pressing = None;
@@ -707,7 +704,7 @@ impl Frame {
 
         //TODO unbind when change body
         let myself = self.as_weak();
-        body.bind_caret_change(move |e, detail| {
+        body.register_event_listener(CaretChangeEventListener::new(move |detail, e| {
             myself.upgrade_mut(|myself| {
                 if myself.focusing == e.target.upgrade().ok() {
                     let origin_ime_rect = &detail.origin_bounds;
@@ -720,7 +717,7 @@ impl Frame {
                     }));
                 }
             });
-        });
+        }));
         self.body = Some(body);
         self.mark_dirty(true);
     }
@@ -919,7 +916,7 @@ fn print_tree(node: &Element, padding: &str) {
     }
 }
 
-fn emit_mouse_event(node: &mut Element, _event_type: &str, event_type_enum: MouseEventType, button: i32, frame_x: f32, frame_y: f32, screen_x: f32, screen_y: f32) {
+fn emit_mouse_event(node: &mut Element, event_type_enum: MouseEventType, button: i32, frame_x: f32, frame_y: f32, screen_x: f32, screen_y: f32) {
     let node_bounds = node.get_origin_bounds();
     let (border_top, _, _, border_left) = node.get_border_width();
 
@@ -937,12 +934,12 @@ fn emit_mouse_event(node: &mut Element, _event_type: &str, event_type_enum: Mous
         screen_y,
     };
     match event_type_enum {
-        MouseEventType::MouseDown => node.emit_mouse_down(detail),
-        MouseEventType::MouseUp => node.emit_mouse_up(detail),
-        MouseEventType::MouseClick => node.emit_click(detail),
-        MouseEventType::MouseMove => node.emit_mouse_move(detail),
-        MouseEventType::MouseEnter => node.emit_mouse_enter(detail),
-        MouseEventType::MouseLeave => node.emit_mouse_leave(detail),
+        MouseEventType::MouseDown => node.emit(MouseDownEvent(detail)),
+        MouseEventType::MouseUp => node.emit(MouseUpEvent(detail)),
+        MouseEventType::MouseClick => node.emit(ClickEvent(detail)),
+        MouseEventType::MouseMove => node.emit(MouseMoveEvent(detail)),
+        MouseEventType::MouseEnter => node.emit(MouseEnterEvent(detail)),
+        MouseEventType::MouseLeave => node.emit(MouseLeaveEvent(detail)),
     }
 }
 

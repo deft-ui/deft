@@ -10,9 +10,9 @@ use crate::color::parse_hex_color;
 use crate::element::container::Container;
 use crate::element::{ElementBackend, Element};
 use crate::element::entry::Entry;
-use crate::event::{TextUpdateEventBind};
 use crate::{create_element, js_call_rust, set_style, tree};
 use crate::element::scroll::Scroll;
+use crate::event::TextUpdateEventListener;
 use crate::style::StylePropKey;
 
 pub struct TextEdit {
@@ -71,7 +71,7 @@ impl ElementBackend for TextEdit {
         };
         update_line_number_width(1);
 
-        element.bind_text_update(move |ctx, detail| {
+        element.register_event_listener(TextUpdateEventListener::new(move |detail, ctx| {
             let mut lines = 1;
             detail.value.chars().for_each(|c| {
                 if c == char::from_u32(10).unwrap() {
@@ -79,7 +79,7 @@ impl ElementBackend for TextEdit {
                 }
             });
             update_line_number_width(lines);
-        });
+        }));
 
         Self {
             entry_element,

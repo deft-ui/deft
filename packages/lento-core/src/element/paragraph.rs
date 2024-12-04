@@ -1,9 +1,10 @@
+use std::any::Any;
 use std::cmp::Ordering;
 use crate as lento;
 use crate::color::parse_hex_color;
 use crate::element::text::text_paragraph::ParagraphRef;
 use crate::element::text::{intersect_range, ColOffset, RowOffset, FONT_COLLECTION, FONT_MGR};
-use crate::element::{text, Element, ElementBackend};
+use crate::element::{text, Element, ElementBackend, ElementWeak};
 use crate::js::JsError;
 use crate::number::DeNan;
 use crate::string::StringUtils;
@@ -24,8 +25,8 @@ use std::str::FromStr;
 use clipboard::{ClipboardContext, ClipboardProvider};
 use winit::keyboard::NamedKey;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
-use crate::base::{ElementEvent, MouseDetail, MouseEventType};
-use crate::event::{FocusShiftBind, KeyDownEvent, KeyEventDetail, KEY_MOD_CTRL, KEY_MOD_SHIFT};
+use crate::base::{ElementEvent, EventContext, MouseDetail, MouseEventType};
+use crate::event::{FocusShiftEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
 
 const DEFAULT_FONT_NAME: &str = "monospace,FreeMono";
 
@@ -297,7 +298,7 @@ impl Paragraph {
     }
 
     fn begin_select(&mut self, caret: TextCoord) {
-        self.element.emit_focus_shift(());
+        self.element.emit(FocusShiftEvent);
         self.unselect();
         self.selecting_begin = Some(caret);
     }
@@ -577,16 +578,34 @@ impl ElementBackend for Paragraph {
         }
     }
 
-    fn handle_event_default_behavior(&mut self, event_type: &str, event: &mut ElementEvent) -> bool {
-        KeyDownEvent::try_match(event_type, event, |d| {
-            self.handle_key_down(d)
-        })
+    fn on_event(&mut self, event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
+        if let Some(e) = event.downcast_ref::<MouseDownEvent>() {
+            let event = e.0;
+            let begin_coord = self.get_text_coord_by_pixel_coord((event.offset_x, event.offset_y));
+            self.begin_select(begin_coord);
+        } else if let Some(e) = event.downcast_ref::<MouseMoveEvent>() {
+            let event = e.0;
+            if self.selecting_begin.is_some() {
+                let caret = self.get_text_coord_by_pixel_coord((event.offset_x, event.offset_y));
+                if let Some(sb) = self.selecting_begin {
+                    let start = TextCoord::min(sb, caret);
+                    let end = TextCoord::max(sb, caret);
+                    self.select(start, end);
+                }
+            }
+        } else if let Some(e) = event.downcast_ref::<MouseUpEvent>() {
+            self.end_select();
+        }
     }
 
-    fn handle_event(&mut self, event_type: &str, event: &mut ElementEvent) {
-        match_event_type!(event, MouseDetail, self, handle_mouse_event);
+    fn execute_default_behavior(&mut self, event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) -> bool {
+        if let Some(d) = event.downcast_ref::<KeyDownEvent>() {
+            self.handle_key_down(&d.0);
+            true
+        } else {
+            false
+        }
     }
-
 }
 
 fn parse_optional_weight(value: Option<&String>) -> Option<Weight> {
