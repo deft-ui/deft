@@ -1,3 +1,4 @@
+pub mod typeface_mgr;
 use std::any::Any;
 use std::cmp::Ordering;
 use crate as lento;
