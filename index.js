@@ -132,13 +132,18 @@ function main() {
 
     container.addChild(textEdit);
 
+    typeface_create("auto-mono", {
+        family: "monospace",
+        weight: "bold",
+    })
     const paragraph = new ParagraphElement();
     paragraph.addLine([
         {
             type: "text",
             text: "Normal",
             fontSize: 20,
-            backgroundColor: "#666",
+            backgroundColor: "#6666",
+            fontFamilies: ["auto-mono"],
         }, {
             type: "text",
             text: "Small red",

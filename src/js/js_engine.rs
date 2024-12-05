@@ -43,6 +43,7 @@ use crate::js::js_binding::{JsCallError, JsFunc};
 use crate::js::js_runtime::JsContext;
 use crate::js::js_value_util::DeserializeFromJsValue;
 use crate::mrc::Mrc;
+use crate::typeface::typeface_create;
 
 pub struct JsEngine {
     pub js_context: Mrc<JsContext>,
@@ -138,6 +139,7 @@ impl JsEngine {
         engine.add_global_func(fs_remove_dir_all::new());
 
         engine.add_global_func(animation_create::new());
+        engine.add_global_func(typeface_create::new());
 
         engine.add_global_func(clipboard_write_text::new());
         engine.add_global_func(clipboard_read_text::new());

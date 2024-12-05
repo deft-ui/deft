@@ -28,8 +28,9 @@ use winit::keyboard::NamedKey;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 use crate::base::{ElementEvent, EventContext, MouseDetail, MouseEventType};
 use crate::event::{FocusShiftEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
+use crate::typeface::get_font_mgr;
 
-const DEFAULT_FONT_NAME: &str = "monospace,FreeMono";
+const DEFAULT_FONT_NAME: &str = "system-ui";
 
 #[derive(Clone)]
 pub struct ParagraphParams {
@@ -415,6 +416,7 @@ impl Paragraph {
         FONT_MGR.with(|fm| {
             font_collection.set_default_font_manager(Some(fm.clone()), None);
         });
+        font_collection.set_dynamic_font_manager(get_font_mgr());
         let mut paragraph_style = ParagraphStyle::new();
         paragraph_style.set_text_align(paragraph_params.align);
 
@@ -609,14 +611,14 @@ impl ElementBackend for Paragraph {
     }
 }
 
-fn parse_optional_weight(value: Option<&String>) -> Option<Weight> {
+pub fn parse_optional_weight(value: Option<&String>) -> Option<Weight> {
     if let Some(v) = value {
         parse_weight(v)
     } else {
         None
     }
 }
-fn parse_weight(value: &str) -> Option<Weight> {
+pub fn parse_weight(value: &str) -> Option<Weight> {
     let w = match value.to_lowercase().as_str() {
         "invisible" => Weight::INVISIBLE,
         "thin" => Weight::THIN,

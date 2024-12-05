@@ -192,6 +192,13 @@ declare function path_filename(path: string): string;
 declare function path_join(path: string, other: string): string;
 declare function animation_create(name: string, keyFrames: Record<string, Record<string, any>>)
 
+declare interface TypefaceParams {
+    family: string,
+    weight?: string,
+}
+
+declare function typeface_create(name: string, params: TypefaceParams): boolean;
+
 declare function env_exe_dir(): String;
 declare function env_exe_path(): String;
 

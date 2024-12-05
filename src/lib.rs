@@ -72,6 +72,7 @@ pub mod animation;
 mod android;
 mod id_hash_map;
 mod id_generator;
+mod typeface;
 
 pub use lento_macros::*;
 
