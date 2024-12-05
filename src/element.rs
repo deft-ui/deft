@@ -223,6 +223,13 @@ impl Element {
         Ok(id)
     }
 
+    #[js_func]
+    pub fn focus(&mut self) {
+        if let Some(mut frame) = self.upgrade_frame() {
+            frame.focus(self.clone());
+        }
+    }
+
     pub fn set_cursor(&mut self, cursor: CursorIcon) {
         self.cursor = cursor;
         self.mark_dirty(false);
@@ -358,6 +365,14 @@ impl Element {
             return Some(ww.clone())
         }
         None
+    }
+
+    pub fn upgrade_frame(&self) -> Option<Frame> {
+        if let Some(f) = self.get_frame() {
+            f.upgrade().ok()
+        } else {
+            None
+        }
     }
 
     pub fn get_parent(&self) -> Option<Element> {

@@ -5,7 +5,7 @@ use crate::base::{ElementEvent, Event, EventContext, EventHandler, EventListener
 use crate::canvas_util::CanvasHelper;
 use crate::cursor::search_cursor;
 use crate::element::{Element, ElementWeak};
-use crate::event::{build_modifier, named_key_to_str, CaretChangeEventListener, ClickEvent, DragOverEvent, DragStartEvent, DropEvent, FocusShiftEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent, MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT};
+use crate::event::{build_modifier, named_key_to_str, BlurEvent, CaretChangeEventListener, ClickEvent, DragOverEvent, DragStartEvent, DropEvent, FocusEvent, FocusShiftEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent, MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT};
 use crate::event_loop::{create_event_loop_proxy, run_with_event_loop};
 use crate::ext::common::create_event_handler;
 use crate::ext::ext_frame::{FrameAttrs, FRAMES, FRAME_TYPE_MENU, FRAME_TYPE_NORMAL, MODAL_TO_OWNERS, WINDOW_TO_FRAME};
@@ -95,19 +95,19 @@ thread_local! {
 }
 
 #[frame_event]
-pub struct ResizeEvent {
+pub struct FrameResizeEvent {
     pub width: u32,
     pub height: u32,
 }
 
 #[frame_event]
-pub struct CloseEvent;
+pub struct FrameCloseEvent;
 
 #[frame_event]
-pub struct FocusEvent;
+pub struct FrameFocusEvent;
 
 #[frame_event]
-pub struct BlurEvent;
+pub struct FrameBlurEvent;
 
 #[js_methods]
 impl Frame {
@@ -262,7 +262,7 @@ impl Frame {
     }
     
     pub fn allow_close(&mut self) -> bool {
-        let ctx = self.emit(CloseEvent);
+        let ctx = self.emit(FrameCloseEvent);
         !ctx.prevent_default
     }
 
@@ -388,9 +388,9 @@ impl Frame {
             WindowEvent::Focused(focus) => {
                 let target = self.as_weak();
                 if focus {
-                    self.emit(FocusEvent);
+                    self.emit(FrameFocusEvent);
                 } else {
-                    self.emit(BlurEvent);
+                    self.emit(FrameBlurEvent);
                 }
             }
             _ => (),
@@ -409,10 +409,10 @@ impl Frame {
     pub fn bind_js_event_listener(&mut self, event_type: String, listener: JsValue) -> Result<u32, JsError> {
         let id = bind_js_event_listener!(
             self, event_type.as_str(), listener;
-            "resize" => ResizeEventListener,
-            "close"  => CloseEventListener,
-            "focus"  => FocusEventListener,
-            "blur"   => BlurEventListener,
+            "resize" => FrameResizeEventListener,
+            "close"  => FrameCloseEventListener,
+            "focus"  => FrameFocusEventListener,
+            "blur"   => FrameBlurEventListener,
         );
         Ok(id)
     }
@@ -636,7 +636,7 @@ impl Frame {
         }
     }
 
-    fn focus(&mut self, mut node: Element) {
+    pub fn focus(&mut self, mut node: Element) {
         let focusing = Some(node.clone());
         if self.focusing != focusing {
             if let Some(old_focusing) = &mut self.focusing {
@@ -744,7 +744,7 @@ impl Frame {
         self.window.resize_surface(width, height);
         self.mark_dirty(true);
         let scale_factor = self.window.scale_factor();
-        self.emit(ResizeEvent {
+        self.emit(FrameResizeEvent {
             width: (width as f64 / scale_factor) as u32,
             height: (height as f64 / scale_factor) as u32,
         });

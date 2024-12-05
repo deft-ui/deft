@@ -450,6 +450,10 @@ export class View {
         });
     }
 
+    focus() {
+        Element_focus(this.el);
+    }
+
     /**
      *
      * @param style {StyleProps}
