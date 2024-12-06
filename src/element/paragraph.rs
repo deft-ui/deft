@@ -1,10 +1,12 @@
 pub mod typeface_mgr;
 use std::any::Any;
 use std::cmp::Ordering;
+use std::fs::File;
+use std::io::Write;
 use crate as lento;
 use crate::color::parse_hex_color;
 use crate::element::text::text_paragraph::ParagraphRef;
-use crate::element::text::{intersect_range, ColOffset, RowOffset, FONT_COLLECTION, FONT_MGR};
+use crate::element::text::{intersect_range, ColOffset, RowOffset, DEFAULT_TYPE_FACE, FONT_COLLECTION, FONT_MGR};
 use crate::element::{text, Element, ElementBackend, ElementWeak};
 use crate::js::JsError;
 use crate::number::DeNan;
@@ -24,6 +26,8 @@ use skia_safe::textlayout::{
 use skia_safe::{Canvas, Color, Font, FontMgr, FontStyle, Paint, Point, Rect};
 use std::str::FromStr;
 use clipboard::{ClipboardContext, ClipboardProvider};
+use measure_time::print_time;
+use skia_safe::wrapper::NativeTransmutableWrapper;
 use winit::keyboard::NamedKey;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 use crate::base::{ElementEvent, EventContext, MouseDetail, MouseEventType};
@@ -340,7 +344,7 @@ impl Paragraph {
         let mut height = 0f32;
 
         let lines = &self.lines;
-        let max_offset = lines.len() - 1;
+        let max_offset = if lines.is_empty() { 0 } else { lines.len() - 1 };
         for p in lines {
             height += p.sk_paragraph.height();
             if row == max_offset || height > expected_offset.1 {
@@ -446,7 +450,9 @@ impl Paragraph {
                         &font_families
                     };
                     let font_size = unit.font_size.unwrap_or(paragraph_params.font_size);
-                    text_style.set_font_families(&font_families);
+                    if !font_families.is_empty() {
+                        text_style.set_font_families(&font_families);
+                    }
                     text_style.set_font_size(font_size);
 
                     let weight =
@@ -657,4 +663,48 @@ fn parse_text_decoration(value: &str) -> TextDecoration {
         decoration.set(t, true);
     }
     decoration
+}
+
+#[test]
+fn test_measure() {
+    let text_demo = include_str!("../../Cargo.lock");
+    let mut text = String::new();
+    for i in 0..200 {
+        text.push_str(text_demo);
+    }
+    let font = DEFAULT_TYPE_FACE.with(|tf| Font::from_typeface(tf, 14.0));
+    println!("font {:?}", font.typeface().family_name());
+    print_time!("measure time");
+    let result = font.measure_text(text.as_str(), None);
+}
+
+#[test]
+fn test_layout() {
+    let text_demo = include_str!("../../Cargo.lock");
+    let params = ParagraphParams {
+        line_height: Some(20.0),
+        align: Default::default(),
+        color: Default::default(),
+        font_size: 16.0,
+        font_families: vec!["monospace".to_string()],
+    };
+    let mut text = String::new();
+    for i in 0..200 {
+        text.push_str(text_demo);
+    }
+    //let mut file = File::create("target/test.txt").unwrap();
+    // file.write_all(text.as_bytes()).unwrap();
+
+    print_time!("build paragraph time");
+    let unit = ParagraphUnit::Text(TextUnit {
+        text: text.clone(),
+        font_families: None,
+        font_size: None,
+        color: None,
+        text_decoration_line: None,
+        weight: None,
+        background_color: None,
+    });
+    let mut p = Paragraph::build_paragraph(&params, &vec![unit]);
+    p.layout(600.0);
 }
