@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::f32::consts::PI;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
@@ -10,7 +10,7 @@ use skia_safe::{Color, Image, Matrix, Path};
 use yoga::{Align, Direction, Display, Edge, FlexDirection, Justify, Node, Overflow, PositionType, StyleUnit, Wrap};
 use crate::base::Rect;
 use crate::color::parse_hex_color;
-use crate::{inherit_color_prop};
+use crate::{compute_style, inherit_color_prop};
 use crate::animation::{AnimationInstance, SimpleFrameController};
 use crate::border::build_border_paths;
 use crate::cache::CacheValue;
@@ -183,6 +183,17 @@ impl PropValueParse for StyleColor {
     }
 }
 
+impl PropValueParse for Color {
+    fn parse_prop_value(value: &str) -> Option<Self> {
+        if let Some(hex) = value.strip_prefix("#") {
+            parse_hex_color(hex)
+        } else {
+            None
+        }
+    }
+}
+
+
 impl PropValueParse for StyleBorder {
     fn parse_prop_value(value: &str) -> Option<Self> {
         parse_border(value)
@@ -330,6 +341,9 @@ impl StyleTransform {
 pub struct StyleBorder(StyleUnit, StyleColor);
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct ComputedStyleBorder(f32, Color);
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum StylePropVal<T> {
     Custom(T),
     Unset,
@@ -397,10 +411,10 @@ macro_rules! define_style_props {
 }
 
 define_style_props!(
-    Color => StyleColor,
-    BackgroundColor => StyleColor,
-    FontSize        => f32,
-    LineHeight      => f32,
+    Color => PropValue<Color>,
+    BackgroundColor => PropValue<Color>,
+    FontSize        => PropValue<f32>,
+    LineHeight      => PropValue<f32>,
 
     BorderTop => StyleBorder,
     BorderRight => StyleBorder,
@@ -630,13 +644,17 @@ pub struct Style {
 pub struct ComputedStyle {
     pub color: Color,
     pub background_color: Color,
+    pub font_size: f32,
+    pub line_height: f32,
 }
 
 impl ComputedStyle {
     pub fn default() -> Self {
         Self {
             color: Color::new(0),
-            background_color: Color::new(0)
+            background_color: Color::new(0),
+            font_size: 12.0,
+            line_height: 12.0,
         }
     }
 }
@@ -645,6 +663,22 @@ impl ComputedStyle {
 pub enum ColorPropValue {
     Inherit,
     Color(Color),
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum PropValue<T> {
+    Inherit,
+    Custom(T),
+}
+
+impl<T: PropValueParse> PropValueParse for PropValue<T> {
+    fn parse_prop_value(value: &str) -> Option<Self> {
+        if value == "inherit" {
+            Some(Self::Inherit)
+        } else {
+            Some(Self::Custom(T::parse_prop_value(value)?))
+        }
+    }
 }
 
 impl Style {
@@ -695,13 +729,13 @@ pub struct StyleNodeInner {
     border_paths: CacheValue<BorderParams, [Path; 4]>,
 
     // (inherited, computed)
-    pub color: ColorPropValue,
+    pub color: PropValue<Color>,
     pub border_radius: [f32; 4],
     pub border_color: [Color;4],
-    pub background_color: ColorPropValue,
+    pub background_color: PropValue<Color>,
     pub background_image: Option<Image>,
-    pub line_height: Option<f32>,
-    pub font_size: f32,
+    pub line_height: PropValue<f32>,
+    pub font_size: PropValue<f32>,
     pub transform: Option<Matrix>,
     pub computed_style: ComputedStyle,
     animation_params: AnimationParams,
@@ -761,9 +795,9 @@ impl StyleNode {
             children: Vec::new(),
             border_radius: [0.0, 0.0, 0.0, 0.0],
             border_color: [transparent, transparent, transparent, transparent],
-            background_color: ColorPropValue::Color(Color::TRANSPARENT),
-            color: ColorPropValue::Inherit,
-            line_height: None,
+            background_color: PropValue::Custom(Color::TRANSPARENT),
+            color: PropValue::Inherit,
+            line_height: PropValue::Inherit,
             background_image: None,
             transform: None,
             animation_instance: None,
@@ -771,7 +805,7 @@ impl StyleNode {
             computed_style: ComputedStyle::default(),
             on_changed: None,
             animation_renderer: None,
-            font_size: 12.0,
+            font_size: PropValue::Inherit,
             border_paths: CacheValue::new(|p: &BorderParams| {
                 build_border_paths(p.border_width, p.border_radius, p.width, p.height)
             }),
@@ -783,6 +817,14 @@ impl StyleNode {
         let mut sn = Self::new();
         sn.inner.shadow_node = Some(Node::new());
         sn
+    }
+
+    pub fn compute_style(&self) {
+        //TODO reuse apply_style
+        compute_style!(Color, self, color, Color::from_rgb(0, 0, 0));
+        compute_style!(BackgroundColor, self, background_color, Color::TRANSPARENT);
+        compute_style!(FontSize, self, font_size, 12.0);
+        compute_style!(LineHeight, self, line_height, self.computed_style.font_size);
     }
 
     pub fn get_content_bounds(&self) -> Rect {
@@ -803,20 +845,22 @@ impl StyleNode {
 
         match p {
             StyleProp::Color(v) => {
-                self.color = v.resolve(&ColorPropValue::Inherit);
-                self.compute_color();
+                self.color = v.resolve(&PropValue::Inherit);
+                compute_style!(Color, self, color, Color::from_rgb(0, 0, 0));
                 need_layout = false;
             }
             StyleProp::BackgroundColor (value) =>   {
-                self.background_color = value.resolve(&ColorPropValue::Color(Color::TRANSPARENT));
-                self.compute_background_color();
+                self.background_color = value.resolve(&PropValue::Custom(Color::TRANSPARENT));
+                compute_style!(BackgroundColor, self, background_color, Color::TRANSPARENT);
                 need_layout = false;
             }
             StyleProp::FontSize(value) => {
-                self.font_size = value.resolve(&12.0);
+                self.font_size = value.resolve(&PropValue::Custom(12.0));
+                compute_style!(FontSize, self, font_size, 12.0);
             }
             StyleProp::LineHeight(value) => {
-                self.line_height = Some(value.resolve(&12.0));
+                self.line_height = value.resolve(&PropValue::Inherit);
+                compute_style!(LineHeight, self, line_height, self.computed_style.font_size);
             }
             StyleProp::BorderTop (value) =>   {
                 self.set_border(&value, &vec![0])
@@ -1030,13 +1074,6 @@ impl StyleNode {
         }
     }
 
-    inherit_color_prop!(
-        compute_color, compute_children_color, color, StylePropKey::Color, Color::from_rgb(0, 0, 0)
-    );
-    inherit_color_prop!(
-        compute_background_color, compute_children_background_color, background_color, StylePropKey::BackgroundColor, Color::from_argb(0, 0, 0, 0)
-    );
-
     pub fn get_border_paths(&self) -> [Path; 4] {
         let border_width = [
             self.get_layout_border_top().de_nan(0.0),
@@ -1054,7 +1091,7 @@ impl StyleNode {
         })
     }
 
-    fn get_parent(&self) -> Option<StyleNode> {
+    pub fn get_parent(&self) -> Option<StyleNode> {
         if let Some(p) = &self.parent {
             if let Ok(sn) = p.upgrade() {
                 return Some(StyleNode {

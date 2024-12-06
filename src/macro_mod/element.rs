@@ -1,3 +1,5 @@
+use crate::style::PropValue;
+
 #[macro_export]
 macro_rules! backend_as_api {
     ($trait_name: ident, $ty: ty, $as_name: ident, $as_mut_name: ident) => {
@@ -13,6 +15,44 @@ macro_rules! backend_as_api {
 
             fn $as_mut_name(&mut self) -> &mut $ty {
                 self.get_backend_mut_as::<$ty>()
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! compute_style {
+    ($key: ident, $element: expr, $field: ident, $default: expr) => {
+        {
+            use crate::style::PropValue;
+            let mut queue = std::collections::VecDeque::new();
+            queue.push_back($element.clone());
+            loop {
+                let mut e = match queue.pop_front() {
+                    Some(e) => e,
+                    None => break,
+                };
+                let new_value = match e.inner.$field {
+                    PropValue::Inherit => {
+                        if let Some(p) = e.get_parent() {
+                            p.computed_style.$field
+                        } else {
+                            $default
+                        }
+                    }
+                    PropValue::Custom(c) => {
+                        c
+                    }
+                };
+                if e.computed_style.$field != new_value {
+                    e.computed_style.$field = new_value;
+                    if let Some(on_changed) = &mut e.on_changed {
+                        (on_changed)(StylePropKey::$key);
+                    }
+                    for child in e.children.iter() {
+                        queue.push_back(child.clone());
+                    }
+                }
             }
         }
     };

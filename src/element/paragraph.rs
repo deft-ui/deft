@@ -531,10 +531,10 @@ impl ElementBackend for Paragraph {
                 self.params.color = self.element.layout.computed_style.color;
             }
             StylePropKey::FontSize => {
-                self.params.font_size = self.element.layout.font_size;
+                self.params.font_size = self.element.layout.computed_style.font_size;
             }
             StylePropKey::LineHeight => {
-                self.params.line_height = self.element.layout.line_height;
+                self.params.line_height = Some(self.element.layout.computed_style.line_height);
             }
             _ => {
                 rebuild = false;

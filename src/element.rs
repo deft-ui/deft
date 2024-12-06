@@ -36,7 +36,7 @@ use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::resource_table::ResourceTable;
 use crate::style::{parse_style_obj, ColorHelper, StyleNode, StyleProp, StylePropKey};
-use crate::{base, bind_js_event_listener, define_resource, js_call, js_call_rust, js_get_prop, js_weak_value};
+use crate::{base, bind_js_event_listener, compute_style, define_resource, js_call, js_call_rust, js_get_prop, js_weak_value};
 
 pub mod container;
 pub mod entry;
@@ -340,8 +340,8 @@ impl Element {
             None => None,
             Some(p) => Some(p.as_weak()),
         };
-        self.layout.compute_color();
-        self.layout.compute_background_color();
+        //TODO reuse apply_style
+        self.layout.compute_style();
     }
 
     pub fn set_window(&mut self, window: Option<FrameWeak>) {

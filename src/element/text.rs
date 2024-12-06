@@ -588,7 +588,7 @@ impl ElementBackend for Text {
                 self.mark_dirty(false);
             },
             StylePropKey::FontSize => {
-                let font_size = self.element.layout.font_size;
+                let font_size = self.element.layout.computed_style.font_size;
                 self.text_params.font.set_size(font_size);
                 self.refresh_lines();
                 self.mark_dirty(true);
