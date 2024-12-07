@@ -340,8 +340,7 @@ impl Element {
             None => None,
             Some(p) => Some(p.as_weak()),
         };
-        //TODO reuse apply_style
-        self.layout.compute_style();
+        self.layout.update_computed_style(None);
     }
 
     pub fn set_window(&mut self, window: Option<FrameWeak>) {

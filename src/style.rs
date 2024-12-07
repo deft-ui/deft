@@ -819,14 +819,6 @@ impl StyleNode {
         sn
     }
 
-    pub fn compute_style(&self) {
-        //TODO reuse apply_style
-        compute_style!(Color, self, color, Color::from_rgb(0, 0, 0));
-        compute_style!(BackgroundColor, self, background_color, Color::TRANSPARENT);
-        compute_style!(FontSize, self, font_size, 12.0);
-        compute_style!(LineHeight, self, line_height, self.computed_style.font_size);
-    }
-
     pub fn get_content_bounds(&self) -> Rect {
         let l = self.get_layout_padding_left().de_nan(0.0);
         let r = self.get_layout_padding_right().de_nan(0.0);
@@ -846,21 +838,21 @@ impl StyleNode {
         match p {
             StyleProp::Color(v) => {
                 self.color = v.resolve(&PropValue::Inherit);
-                compute_style!(Color, self, color, Color::from_rgb(0, 0, 0));
+                self.update_computed_style(Some(StylePropKey::Color));
                 need_layout = false;
             }
             StyleProp::BackgroundColor (value) =>   {
                 self.background_color = value.resolve(&PropValue::Custom(Color::TRANSPARENT));
-                compute_style!(BackgroundColor, self, background_color, Color::TRANSPARENT);
+                self.update_computed_style(Some(StylePropKey::BackgroundColor));
                 need_layout = false;
             }
             StyleProp::FontSize(value) => {
                 self.font_size = value.resolve(&PropValue::Custom(12.0));
-                compute_style!(FontSize, self, font_size, 12.0);
+                self.update_computed_style(Some(StylePropKey::FontSize));
             }
             StyleProp::LineHeight(value) => {
                 self.line_height = value.resolve(&PropValue::Inherit);
-                compute_style!(LineHeight, self, line_height, self.computed_style.font_size);
+                self.update_computed_style(Some(StylePropKey::LineHeight));
             }
             StyleProp::BorderTop (value) =>   {
                 self.set_border(&value, &vec![0])
@@ -1047,6 +1039,23 @@ impl StyleNode {
         }
 
         return (repaint, need_layout)
+    }
+
+
+    pub fn update_computed_style(&mut self, key: Option<StylePropKey>) {
+        let is_update_all = key.is_none();
+        if is_update_all || key == Some(StylePropKey::Color) {
+            compute_style!(Color, self, color, Color::from_rgb(0, 0, 0));
+        }
+        if is_update_all || key == Some(StylePropKey::BackgroundColor) {
+            compute_style!(BackgroundColor, self, background_color, Color::TRANSPARENT);
+        }
+        if is_update_all || key == Some(StylePropKey::FontSize) {
+            compute_style!(FontSize, self, font_size, 12.0);
+        }
+        if is_update_all || key == Some(StylePropKey::LineHeight) {
+            compute_style!(LineHeight, self, line_height, self.computed_style.font_size);
+        }
     }
 
     fn update_animation(&mut self) {
