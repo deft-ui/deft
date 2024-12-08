@@ -101,7 +101,7 @@ pub fn element_backend(_attr: TokenStream, struct_def: TokenStream) -> TokenStre
         #visibility struct #struct_name #struct_fields
 
         impl lento::js::FromJsValue for #struct_name {
-            fn from_js_value(value: lento::js::JsValue) -> Result<Self, quick_js::ValueError> {
+            fn from_js_value(value: lento::js::JsValue) -> Result<Self, lento::js::ValueError> {
                 let element = lento::element::Element::from_js_value(value)?;
                 Ok(element.get_backend_as::<#struct_name>().clone())
             }
@@ -159,7 +159,7 @@ fn create_event(_attr: TokenStream, struct_def: TokenStream, target_type: TokenS
         }
 
         impl lento::js::FromJsValue for #listener_name {
-            fn from_js_value(value: quick_js::JsValue) -> Result<Self, quick_js::ValueError> {
+            fn from_js_value(value: lento::js::JsValue) -> Result<Self, lento::js::ValueError> {
                 let listener = Self::new(move |e, ctx| {
                     let target = ctx.target.clone();
                     use lento::js::ToJsValue;

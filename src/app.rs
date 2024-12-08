@@ -3,7 +3,7 @@ use std::thread;
 use anyhow::Error;
 use jni::objects::JValue;
 use jni::sys::{jboolean, jlong};
-use quick_js::loader::JsModuleLoader;
+use crate::js::loader::JsModuleLoader;
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};

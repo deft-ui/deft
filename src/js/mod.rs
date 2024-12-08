@@ -8,4 +8,4 @@ pub mod js_event_loop;
 
 pub use js_binding::*;
 pub use js_runtime::JsContext;
-pub use quick_js::JsValue;
+pub use quick_js::*;
