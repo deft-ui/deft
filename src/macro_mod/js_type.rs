@@ -1,34 +1,4 @@
 #[macro_export]
-macro_rules! define_ref_and_resource {
-    ($ty: ident, $target_ty: ty) => {
-        crate::define_ref!($ty, $target_ty);
-        crate::define_resource!($ty);
-    };
-}
-
-#[macro_export]
-macro_rules! define_resource {
-    ($ty: ident) => {
-        impl crate::js::js_value_util::ToJsValue for $ty {
-            fn to_js_value(self) -> Result<JsValue, Error> {
-                Ok(JsValue::Resource(lento::js::ResourceValue { resource: std::rc::Rc::new(std::cell::RefCell::new(self)) }))
-            }
-        }
-
-        impl crate::js::js_value_util::FromJsValue for $ty {
-            fn from_js_value(value: JsValue) -> Result<Self, Error> {
-                if let Some(r) = value.as_resource(|r: &mut $ty| r.clone()) {
-                    Ok(r)
-                } else {
-                    use anyhow::anyhow;
-                    Err(anyhow!("invalid value"))
-                }
-            }
-        }
-    };
-}
-
-#[macro_export]
 macro_rules! js_value {
     ($ref_type: ty) => {
         impl lento::js::ToJsValue for $ref_type {
@@ -82,6 +52,7 @@ macro_rules! js_serialize {
         impl lento::js::ToJsValue for $ty {
             fn to_js_value(self) -> Result<lento::js::JsValue, lento::js::ValueError> {
                 let serializer = lento::js::js_serde::JsValueSerializer {};
+                use serde::Serialize;
                 let js_r = self.serialize(serializer).map_err(|e| lento::js::ValueError::Internal(e.to_string()))?;
                 Ok(js_r)
             }
@@ -97,29 +68,10 @@ macro_rules! js_deserialize {
         {
              fn from_js_value(value: lento::js::JsValue) -> Result<Self, lento::js::ValueError> {
                  //TODO no unwrap
+                 use serde::Deserialize;
                  Ok(Self::deserialize(lento::js::js_deserialze::JsDeserializer { value }).unwrap())
              }
 
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! js_element_event {
-    ($event_type: expr, $ty: ty) => {
-        impl $ty {
-             pub fn emit(self, element: lento::element::Element) {
-                let event = lento::base::Event::<ElementWeak>::new($event_type, self, element.as_weak());
-                element.emit_event($event_type, event);
-            }
-            pub fn emit_weak(self, element: lento::element::ElementWeak) -> bool {
-                if let Ok(el) = element.upgrade() {
-                    self.emit(el);
-                    true
-                } else {
-                    false
-                }
-            }
         }
     };
 }

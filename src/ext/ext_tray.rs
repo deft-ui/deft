@@ -88,8 +88,6 @@ pub struct SystemTray {
 }
 
 js_value!(SystemTray);
-//TODO remove
-define_resource!(SystemTray);
 
 unsafe impl Send for MyTray {}
 

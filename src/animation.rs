@@ -2,7 +2,7 @@ use crate as lento;
 use crate::mrc::Mrc;
 use crate::style::{StyleProp, StylePropVal, StyleTransform, StyleTransformOp};
 use crate::timer::{set_timeout, set_timeout_nanos, TimerHandle};
-use crate::{define_ref_and_resource, js_value};
+use crate::{js_value};
 use anyhow::{anyhow, Error};
 use ordered_float::OrderedFloat;
 use quick_js::JsValue;
@@ -44,10 +44,6 @@ macro_rules! match_both {
         }
     };
 }
-
-define_ref_and_resource!(AnimationResource, AnimationInstance);
-
-js_value!(AnimationResource);
 
 
 thread_local! {

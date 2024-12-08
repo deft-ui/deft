@@ -11,7 +11,7 @@ pub const KEY_MOD_META: u32 = 0x1 << 2;
 pub const KEY_MOD_SHIFT: u32 = 0x1 << 3;
 
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyEventDetail {
     pub modifiers: u32,

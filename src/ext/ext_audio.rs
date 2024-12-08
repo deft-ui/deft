@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::base::{Event, EventRegistration};
 use crate::ext::audio_player::{AudioNotify, AudioServer, AudioSources};
-use crate::{define_resource, js_deserialize, js_value};
+use crate::{js_deserialize, js_value};
 use anyhow::{anyhow, Error};
 use lento_macros::{js_methods, mrc_object};
 use quick_js::JsValue;
@@ -106,7 +106,6 @@ fn unregistry_playing(audio: &Audio) {
     })
 }
 
-define_resource!(Audio);
 js_value!(Audio);
 js_deserialize!(AudioOptions);
 

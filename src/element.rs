@@ -15,7 +15,6 @@ use skia_safe::{Canvas, Color, Paint, Path, Rect};
 use winit::window::CursorIcon;
 use yoga::{Direction, Edge, StyleUnit};
 
-use crate::animation::AnimationResource;
 use crate::base::{ElementEvent, ElementEventContext, ElementEventHandler, EventContext, EventListener, EventRegistration, ScrollEventDetail};
 use crate::border::build_rect_with_radius;
 use crate::element::button::Button;
@@ -31,12 +30,11 @@ use crate::ext::ext_frame::{VIEW_TYPE_BUTTON, VIEW_TYPE_CONTAINER, VIEW_TYPE_ENT
 use crate::frame::{Frame, FrameWeak};
 use crate::img_manager::IMG_MANAGER;
 use crate::js::js_serde::JsValueSerializer;
-use crate::js::js_value_util::{FromJsValue, SerializeToJsValue, ToJsValue};
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::resource_table::ResourceTable;
 use crate::style::{parse_style_obj, ColorHelper, StyleNode, StyleProp, StylePropKey};
-use crate::{base, bind_js_event_listener, compute_style, define_resource, js_call, js_call_rust, js_get_prop, js_weak_value};
+use crate::{base, bind_js_event_listener, compute_style, js_call, js_call_rust, js_get_prop, js_weak_value};
 
 pub mod container;
 pub mod entry;
@@ -56,8 +54,6 @@ use crate::js::JsError;
 thread_local! {
     pub static NEXT_ELEMENT_ID: Cell<u32> = Cell::new(1);
 }
-
-define_resource!(Element);
 
 struct ElementJsContext {
     context: JsValue,
@@ -579,18 +575,6 @@ impl Element {
         if self.hover {
             self.apply_style();
         }
-    }
-
-    #[js_func]
-    pub fn set_animation(&self, mut animation_res: AnimationResource) {
-        let mut ele = self.clone();
-        println!("running animation");
-        animation_res.run(Box::new(move |styles| {
-            // println!("rendering {:?}", styles);
-            let mut ele = ele.clone();
-            ele.animation_style_props = styles;
-            ele.apply_style();
-        }));
     }
 
     #[js_func]

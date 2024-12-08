@@ -22,74 +22,12 @@ pub trait SerializeToJsValue {
     fn to_js_value(self) -> Result<JsValue, Error>;
 }
 
-pub trait ToJsValue {
-    fn to_js_value(self) -> Result<JsValue, Error>;
-}
-
-pub trait SerializeResultToJsValue {
-    fn to_js_value(self) -> Result<JsValue, Error>;
-}
-
-pub trait ResultToJsValue {
-    fn to_js_value(self) -> Result<JsValue, Error>;
-}
-
 
 impl<F> SerializeToJsValue for F where F: Serialize {
     fn to_js_value(self) -> Result<JsValue, Error> {
         let serializer = JsValueSerializer {};
         let js_r = self.serialize(serializer)?;
         Ok(js_r)
-    }
-}
-
-impl<F> SerializeResultToJsValue for Result<F, Error> where F: Serialize {
-    fn to_js_value(self) -> Result<JsValue, Error> {
-        match self {
-            Ok(r) => {
-                let serializer = JsValueSerializer {};
-                let js_r = r.serialize(serializer)?;
-                Ok(js_r)
-            }
-            Err(e) => Err(e)
-        }
-
-    }
-}
-
-impl ResultToJsValue for Result<JsValue, Error> {
-    fn to_js_value(self) -> Result<JsValue, Error> {
-        self
-    }
-}
-
-impl ToJsValue for JsValue {
-    fn to_js_value(self) -> Result<JsValue, Error> {
-        Ok(self)
-    }
-
-}
-
-pub trait DeserializeFromJsValue: Sized {
-    fn from_js_value(value: JsValue) -> Result<Self, Error>;
-}
-
-pub trait FromJsValue: Sized {
-    fn from_js_value(value: JsValue) -> Result<Self, Error>;
-}
-
-impl<F> DeserializeFromJsValue for F
-where
-    F: for <'a> Deserialize<'a>,
-{
-    fn from_js_value(value: JsValue) -> Result<Self, Error> {
-        Ok(Self::deserialize(JsDeserializer { value })?)
-    }
-}
-
-impl FromJsValue for JsValue {
-    fn from_js_value(value: JsValue) -> Result<Self, Error> {
-        Ok(value)
     }
 }
 

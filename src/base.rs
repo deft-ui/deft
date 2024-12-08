@@ -186,12 +186,7 @@ pub struct Size {
     pub height: f32,
 }
 
-//TODO use macro?
-impl FromJsValue for Size {
-    fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
-        Ok(<Size as crate::js::js_value_util::DeserializeFromJsValue>::from_js_value(value).unwrap())
-    }
-}
+js_deserialize!(Size);
 
 impl CaretDetail {
 

@@ -14,7 +14,6 @@ use crate::element::Element;
 use crate::element::paragraph::Paragraph;
 use crate::element::text::Text;
 use crate::event_loop::run_with_event_loop;
-use crate::export_js_api;
 use crate::ext::ext_animation::animation_create;
 use crate::ext::ext_appfs::appfs;
 use crate::ext::ext_audio::Audio;
@@ -41,7 +40,6 @@ use crate::ext::ext_worker::{SharedModuleLoader, Worker, WorkerInitParams};
 use crate::frame::{Frame, FrameType};
 use crate::js::js_binding::{JsCallError, JsFunc};
 use crate::js::js_runtime::JsContext;
-use crate::js::js_value_util::DeserializeFromJsValue;
 use crate::mrc::Mrc;
 use crate::typeface::typeface_create;
 

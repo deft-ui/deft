@@ -9,7 +9,6 @@ use crate::event::{build_modifier, named_key_to_str, BlurEvent, CaretChangeEvent
 use crate::event_loop::{create_event_loop_proxy, run_with_event_loop};
 use crate::ext::common::create_event_handler;
 use crate::ext::ext_frame::{FrameAttrs, FRAMES, FRAME_TYPE_MENU, FRAME_TYPE_NORMAL, MODAL_TO_OWNERS, WINDOW_TO_FRAME};
-use crate::js::js_value_util::{FromJsValue, ToJsValue};
 use crate::js::JsError;
 use crate::mrc::{Mrc, MrcWeak};
 use crate::renderer::CpuRenderer;

@@ -12,9 +12,8 @@ use winit::window::{Window, WindowId};
 
 use crate::app::{exit_app};
 use crate::element::{ElementBackend, Element};
-use crate::{define_resource, js_deserialize, js_weak_value};
+use crate::{js_deserialize, js_weak_value};
 use crate::frame::{Frame, FrameWeak};
-use crate::js::js_value_util::{FromJsValue, ToJsValue};
 
 
 thread_local! {
