@@ -454,7 +454,7 @@ impl Text {
     }
 
     pub fn with_lines_mut<R, F: FnOnce(&mut Vec<Line>) -> R>(&self, callback: F) -> R {
-        let layout = &self.element.layout;
+        let layout = &self.element.style;
         let content_width = layout.get_layout_width()
             - layout.get_layout_padding_left().de_nan(0.0)
             - layout.get_layout_padding_right().de_nan(0.0);
@@ -570,8 +570,8 @@ pub fn intersect_range<T: Ord>(range1: (T, T), range2: (T, T)) -> Option<(T, T)>
 impl ElementBackend for Text {
     fn create(mut ele: Element) -> Self {
         let mut label = Self::new(ele.clone());
-        ele.layout.set_context(Some(Context::new(label.paragraph_ref.clone())));
-        ele.layout.set_measure_func(Some(measure_label));
+        ele.style.set_context(Some(Context::new(label.paragraph_ref.clone())));
+        ele.style.set_measure_func(Some(measure_label));
         label
     }
 
@@ -582,13 +582,13 @@ impl ElementBackend for Text {
     fn handle_style_changed(&mut self, key: StylePropKey) {
         match key {
             StylePropKey::Color => {
-                let color = self.element.layout.computed_style.color;
+                let color = self.element.style.computed_style.color;
                 self.text_params.paint.set_color(color);
                 self.refresh_lines();
                 self.mark_dirty(false);
             },
             StylePropKey::FontSize => {
-                let font_size = self.element.layout.computed_style.font_size;
+                let font_size = self.element.style.computed_style.font_size;
                 self.text_params.font.set_size(font_size);
                 self.refresh_lines();
                 self.mark_dirty(true);

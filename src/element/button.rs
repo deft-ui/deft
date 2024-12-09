@@ -29,20 +29,20 @@ impl ElementBackend for Button {
             label: Label::create(context.clone()),
             element: None,
         };
-        context.layout.set_margin(Edge::Top, StyleUnit::Point(OrderedFloat(4.0)));
-        context.layout.set_margin(Edge::Right, StyleUnit::Point(OrderedFloat(4.0)));
-        context.layout.set_margin(Edge::Bottom, StyleUnit::Point(OrderedFloat(4.0)));
-        context.layout.set_margin(Edge::Left, StyleUnit::Point(OrderedFloat(4.0)));
+        context.style.set_margin(Edge::Top, StyleUnit::Point(OrderedFloat(4.0)));
+        context.style.set_margin(Edge::Right, StyleUnit::Point(OrderedFloat(4.0)));
+        context.style.set_margin(Edge::Bottom, StyleUnit::Point(OrderedFloat(4.0)));
+        context.style.set_margin(Edge::Left, StyleUnit::Point(OrderedFloat(4.0)));
 
-        context.layout.set_padding(Edge::Left, StyleUnit::Point(OrderedFloat(4.0)));
-        context.layout.set_padding(Edge::Right, StyleUnit::Point(OrderedFloat(4.0)));
+        context.style.set_padding(Edge::Left, StyleUnit::Point(OrderedFloat(4.0)));
+        context.style.set_padding(Edge::Right, StyleUnit::Point(OrderedFloat(4.0)));
 
-        context.layout.set_border(Edge::Top, 1.0);
-        context.layout.set_border(Edge::Right, 1.0);
-        context.layout.set_border(Edge::Bottom, 1.0);
-        context.layout.set_border(Edge::Left, 1.0);
+        context.style.set_border(Edge::Top, 1.0);
+        context.style.set_border(Edge::Right, 1.0);
+        context.style.set_border(Edge::Bottom, 1.0);
+        context.style.set_border(Edge::Left, 1.0);
         let color = Color::from_rgb(128, 128, 128);
-        context.layout.border_color = [color, color, color, color];
+        context.style.border_color = [color, color, color, color];
         inst.element = Some(context);
         inst
     }

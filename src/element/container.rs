@@ -29,9 +29,9 @@ impl ElementBackend for Container {
         }
         let ele = &mut self.element;
         let pos = {
-            let layout = &mut ele.layout;
+            let layout = &mut ele.style;
             let pos = position.unwrap_or_else(|| layout.child_count());
-            layout.insert_child(&mut child.layout, pos);
+            layout.insert_child(&mut child.style, pos);
             pos
         };
         child.set_parent(Some(ele.clone()));
@@ -46,8 +46,8 @@ impl ElementBackend for Container {
         let mut c = self.children.remove(position as usize);
         c.set_parent(None);
         let mut ele = self.element.clone();
-        let layout = &mut ele.layout;
-        layout.remove_child(&mut c.layout);
+        let layout = &mut ele.style;
+        layout.remove_child(&mut c.style);
         ele.mark_dirty(true);
     }
 

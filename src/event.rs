@@ -451,7 +451,8 @@ pub struct BoundsChangeEvent {
 
 #[event]
 pub struct CaretChangeEvent {
-    pub position: usize,
+    pub row: usize,
+    pub col: usize,
     pub origin_bounds: Rect,
     pub bounds: Rect,
 }

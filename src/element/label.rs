@@ -258,7 +258,7 @@ impl Label {
     }
 
     pub fn with_paragraph<R, F: FnOnce(&mut Paragraph) -> R>(&self, callback: F) -> R {
-        let layout = &self.element.layout;
+        let layout = &self.element.style;
         let content_width = layout.get_layout_width()
             - layout.get_layout_padding_left().de_nan(0.0)
             - layout.get_layout_padding_right().de_nan(0.0);
@@ -323,8 +323,8 @@ fn default_typeface() -> Typeface {
 impl ElementBackend for Label {
     fn create(mut ele: Element) -> Self {
         let mut label = Self::new(ele.clone());
-        ele.layout.set_context(Some(Context::new(label.paragraph_props.clone())));
-        ele.layout.set_measure_func(Some(measure_label));
+        ele.style.set_context(Some(Context::new(label.paragraph_props.clone())));
+        ele.style.set_measure_func(Some(measure_label));
         label
     }
 
@@ -334,7 +334,7 @@ impl ElementBackend for Label {
 
     fn handle_style_changed(&mut self, key: StylePropKey) {
         if key == StylePropKey::Color {
-            let color = self.element.layout.computed_style.color;
+            let color = self.element.style.computed_style.color;
             self.paint.set_color(color);
             self.rebuild_paragraph();
             self.mark_dirty(false);

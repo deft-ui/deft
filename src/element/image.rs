@@ -87,7 +87,7 @@ impl Image {
                 ImageData::None
             }
         };
-        self.element.layout.set_context(Some(Context::new(self.img.clone())));
+        self.element.style.set_context(Some(Context::new(self.img.clone())));
         self.element.mark_dirty(true);
     }
 
@@ -107,7 +107,7 @@ impl Image {
 
 impl ElementBackend for Image {
     fn create(mut element: Element) -> Self {
-        element.layout.set_measure_func(Some(measure_image));
+        element.style.set_measure_func(Some(measure_image));
         Self {
             element,
             src: "".to_string(),

@@ -79,13 +79,13 @@ impl Element {
             inner,
         };
         let ele_weak = ele.inner.as_weak();
-        ele.inner.layout.on_changed = Some(Box::new(move |key| {
+        ele.inner.style.on_changed = Some(Box::new(move |key| {
             if let Ok(mut inner) = ele_weak.upgrade() {
                 inner.backend.handle_style_changed(key);
             }
         }));
         let ele_weak = ele.inner.as_weak();
-        ele.inner.layout.animation_renderer = Some(Mrc::new(Box::new(move |styles| {
+        ele.inner.style.animation_renderer = Some(Mrc::new(Box::new(move |styles| {
             if let Ok(inner) = ele_weak.upgrade() {
                 let mut el = Element::from_inner(inner);
                 el.animation_style_props = styles;
@@ -100,7 +100,7 @@ impl Element {
     }
 
     pub fn create_shadow(&mut self) {
-        self.layout = StyleNode::new_with_shadow();
+        self.style = StyleNode::new_with_shadow();
     }
 
     pub fn get_id(&self) -> u32 {
@@ -336,7 +336,7 @@ impl Element {
             None => None,
             Some(p) => Some(p.as_weak()),
         };
-        self.layout.update_computed_style(None);
+        self.style.update_computed_style(None);
     }
 
     pub fn set_window(&mut self, window: Option<FrameWeak>) {
@@ -388,11 +388,11 @@ impl Element {
     }
 
     pub fn draw_background(&self, canvas: &Canvas) {
-        if let Some(img) = &self.layout.background_image {
+        if let Some(img) = &self.style.background_image {
             canvas.draw_image(img, (0.0, 0.0), Some(&Paint::default()));
-        } else if !self.layout.computed_style.background_color.is_transparent() {
+        } else if !self.style.computed_style.background_color.is_transparent() {
             let mut paint = Paint::default();
-            let layout = &self.layout;
+            let layout = &self.style;
             let bd_top =  layout.get_style_border_top().de_nan(0.0);
             let bd_right =  layout.get_style_border_right().de_nan(0.0);
             let bd_bottom =  layout.get_style_border_bottom().de_nan(0.0);
@@ -400,15 +400,15 @@ impl Element {
             let size_layout = layout.get_layout();
             let rect = Rect::new(bd_left, bd_top, size_layout.width() - bd_right, size_layout.height() - bd_bottom);
 
-            paint.set_color(self.layout.computed_style.background_color);
+            paint.set_color(self.style.computed_style.background_color);
             paint.set_style(SkPaint_Style::Fill);
             canvas.draw_rect(&rect, &paint);
         }
     }
 
     pub fn draw_border(&self, canvas: &Canvas) {
-        let style = &self.layout;
-        let paths = self.layout.get_border_paths();
+        let style = &self.style;
+        let paths = self.style.get_border_paths();
         let color = style.border_color;
         for i in 0..4 {
             let p = &paths[i];
@@ -423,7 +423,7 @@ impl Element {
     }
 
     pub fn get_size(&self) -> (f32, f32) {
-        let layout = self.layout.get_layout();
+        let layout = self.style.get_layout();
         (layout.width().nan_to_zero(), layout.height().nan_to_zero())
     }
 
@@ -444,7 +444,7 @@ impl Element {
 
     /// bounds relative to parent
     pub fn get_bounds(&self) -> base::Rect {
-        let ml = self.layout.get_layout();
+        let ml = self.style.get_layout();
         base::Rect::from_layout(&ml)
     }
 
@@ -467,7 +467,7 @@ impl Element {
 
     /// content bounds relative to self(border box)
     pub fn get_content_bounds(&self) -> base::Rect {
-        self.layout.get_content_bounds()
+        self.style.get_content_bounds()
     }
 
     pub fn get_origin_content_bounds(&self) -> base::Rect {
@@ -520,42 +520,42 @@ impl Element {
     pub fn calculate_layout(&mut self, available_width: f32, available_height: f32) {
         // mark all children dirty so that custom measure function could be call
         self.mark_all_layout_dirty();
-        self.layout.calculate_layout(available_width, available_height, Direction::LTR);
+        self.style.calculate_layout(available_width, available_height, Direction::LTR);
         self.on_layout_update();
     }
 
     pub fn set_border_width(&mut self, width: (f32, f32, f32, f32)) {
-        self.layout.set_border(Edge::Top, width.0);
-        self.layout.set_border(Edge::Right, width.1);
-        self.layout.set_border(Edge::Bottom, width.2);
-        self.layout.set_border(Edge::Left, width.3);
+        self.style.set_border(Edge::Top, width.0);
+        self.style.set_border(Edge::Right, width.1);
+        self.style.set_border(Edge::Bottom, width.2);
+        self.style.set_border(Edge::Left, width.3);
     }
 
     pub fn get_border_width(&self) -> (f32, f32, f32, f32) {
         (
-            self.layout.get_style_border_top().de_nan(0.0),
-            self.layout.get_style_border_right().de_nan(0.0),
-            self.layout.get_style_border_bottom().de_nan(0.0),
-            self.layout.get_style_border_left().de_nan(0.0),
+            self.style.get_style_border_top().de_nan(0.0),
+            self.style.get_style_border_right().de_nan(0.0),
+            self.style.get_style_border_bottom().de_nan(0.0),
+            self.style.get_style_border_left().de_nan(0.0),
         )
     }
 
     pub fn get_padding(&self) -> (f32, f32, f32, f32) {
         (
-            self.layout.get_layout_padding_top().de_nan(0.0),
-            self.layout.get_layout_padding_right().de_nan(0.0),
-            self.layout.get_layout_padding_bottom().de_nan(0.0),
-            self.layout.get_layout_padding_left().de_nan(0.0),
+            self.style.get_layout_padding_top().de_nan(0.0),
+            self.style.get_layout_padding_right().de_nan(0.0),
+            self.style.get_layout_padding_bottom().de_nan(0.0),
+            self.style.get_layout_padding_left().de_nan(0.0),
         )
     }
 
     pub fn set_border_color(&mut self, color: [Color; 4]) {
-        self.layout.border_color = color;
+        self.style.border_color = color;
     }
 
 
     pub fn set_background_image(&mut self, src: &str) {
-        self.layout.background_image = IMG_MANAGER.with(|im| im.get_img(src));
+        self.style.background_image = IMG_MANAGER.with(|im| im.get_img(src));
         self.mark_dirty(true);
     }
 
@@ -633,7 +633,7 @@ impl Element {
         // println!("changed style props:{:?}", changed_style_props);
 
         changed_style_props.iter().for_each(| e | {
-            let (repaint, need_layout) = self.layout.set_style(e);
+            let (repaint, need_layout) = self.style.set_style(e);
             if need_layout || repaint {
                 self.mark_dirty(need_layout);
             }
@@ -825,8 +825,8 @@ impl Element {
     }
 
     pub fn mark_dirty(&mut self, layout_dirty: bool) {
-        if layout_dirty && self.layout.get_own_context_mut().is_some() {
-            self.layout.mark_dirty();
+        if layout_dirty && self.style.get_own_context_mut().is_some() {
+            self.style.mark_dirty();
         }
 
         self.with_window(|win| {
@@ -870,7 +870,7 @@ impl Element {
 
     pub fn get_border_box_path(&self) -> Path {
         let bounds = self.get_bounds();
-        build_rect_with_radius(self.layout.border_radius, bounds.width, bounds.height)
+        build_rect_with_radius(self.style.border_radius, bounds.width, bounds.height)
     }
 
     pub fn get_content_box_path(&self) -> Path {
@@ -882,7 +882,7 @@ impl Element {
 
     pub fn build_clip_path(&self) -> Path {
         let origin_bounds = self.get_origin_bounds();
-        let mut clip_path = build_rect_with_radius(self.layout.border_radius, origin_bounds.width, origin_bounds.height);
+        let mut clip_path = build_rect_with_radius(self.style.border_radius, origin_bounds.width, origin_bounds.height);
         if let Some(p) = self.get_parent() {
             let outer_bounds = p.get_origin_content_bounds();
             let clip_bounds = outer_bounds.intersect(&origin_bounds).translate(-origin_bounds.x, -origin_bounds.y);
@@ -913,9 +913,9 @@ pub struct Element {
     parent: Option<ElementWeak>,
     window: Option<FrameWeak>,
     event_registration: EventRegistration<ElementWeak>,
-    pub layout: StyleNode,
-    pub style_props: Vec<StyleProp>,
-    pub hover_style_props: Vec<StyleProp>,
+    pub style: StyleNode,
+    style_props: Vec<StyleProp>,
+    hover_style_props: Vec<StyleProp>,
     animation_style_props: Vec<StyleProp>,
     hover: bool,
 
@@ -945,7 +945,7 @@ impl ElementData {
             parent: None,
             window: None,
             event_registration: EventRegistration::new(),
-            layout: StyleNode::new(),
+            style: StyleNode::new(),
             style_props: Vec::new(),
             hover_style_props: Vec::new(),
             animation_style_props: Vec::new(),

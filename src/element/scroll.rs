@@ -87,7 +87,7 @@ impl Scroll {
     fn layout_content(&mut self) {
         let (width, height) = self.get_body_view_size();
         //TODO fix ltr
-        self.element.layout.calculate_shadow_layout(width, height, LTR);
+        self.element.style.calculate_shadow_layout(width, height, LTR);
 
         for child in &mut self.element.get_children().clone() {
             //TODO remove?

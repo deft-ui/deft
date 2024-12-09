@@ -833,6 +833,7 @@ impl StyleNode {
     pub fn set_style(&mut self, p: &StyleProp) -> (bool, bool) {
         let mut repaint = true;
         let mut need_layout = true;
+        let mut change_notified = false;
         let standard_node = Node::new();
 
         match p {
@@ -840,19 +841,23 @@ impl StyleNode {
                 self.color = v.resolve(&PropValue::Inherit);
                 self.update_computed_style(Some(StylePropKey::Color));
                 need_layout = false;
+                change_notified = true;
             }
             StyleProp::BackgroundColor (value) =>   {
                 self.background_color = value.resolve(&PropValue::Custom(Color::TRANSPARENT));
                 self.update_computed_style(Some(StylePropKey::BackgroundColor));
                 need_layout = false;
+                change_notified = true;
             }
             StyleProp::FontSize(value) => {
                 self.font_size = value.resolve(&PropValue::Custom(12.0));
                 self.update_computed_style(Some(StylePropKey::FontSize));
+                change_notified = true;
             }
             StyleProp::LineHeight(value) => {
                 self.line_height = value.resolve(&PropValue::Inherit);
                 self.update_computed_style(Some(StylePropKey::LineHeight));
+                change_notified = true;
             }
             StyleProp::BorderTop (value) =>   {
                 self.set_border(&value, &vec![0])
@@ -1034,8 +1039,10 @@ impl StyleNode {
             },
             //TODO aspectratio
         }
-        if let Some(on_changed) = &mut self.on_changed {
-            on_changed(p.key());
+        if !change_notified {
+            if let Some(on_changed) = &mut self.on_changed {
+                on_changed(p.key());
+            }
         }
 
         return (repaint, need_layout)
@@ -1109,6 +1116,22 @@ impl StyleNode {
             }
         }
         return None
+    }
+
+    pub fn parse_border(value: &StylePropVal<StyleBorder>) -> ComputedStyleBorder {
+        let default_border = StyleBorder(StyleUnit::UndefinedValue, StyleColor::Color(Color::TRANSPARENT));
+        let value = value.resolve(&default_border);
+        let color = match value.1 {
+            //TODO fix inherited color?
+            StyleColor::Inherit => {Color::TRANSPARENT}
+            StyleColor::Color(c) => {c}
+        };
+        //TODO fix percent?
+        let width = match value.0 {
+            StyleUnit::Point(f) => {f.0},
+            _ => 0.0,
+        };
+        ComputedStyleBorder(width, color)
     }
 
     fn set_border(&mut self, value: &StylePropVal<StyleBorder>, edges: &Vec<usize>) {
