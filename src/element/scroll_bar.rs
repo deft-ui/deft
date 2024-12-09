@@ -51,23 +51,23 @@ impl ElementBackend for ScrollBar {
         "ScrollBar"
     }
 
-    fn handle_event(&mut self, event_type: &str, event: &mut ElementEvent) {
-        match event_type {
-            "mousedown" | "mouseup" | "mousemove" | "click" => {
-                if let Some(mouse_event) = event.detail.raw().downcast_ref::<MouseDetail>() {
-                    match event_type {
-                        //TODO support click
-                        //"click" => self.handle_click(mouse_event),
-                        "mousedown" => self.handle_mouse_down(mouse_event),
-                        "mousemove" => self.handle_mouse_move(mouse_event),
-                        "mouseup" => self.handle_mouse_up(mouse_event),
-                        _ => {}
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
+    // fn handle_event(&mut self, event_type: &str, event: &mut ElementEvent) {
+    //     match event_type {
+    //         "mousedown" | "mouseup" | "mousemove" | "click" => {
+    //             if let Some(mouse_event) = event.detail.raw().downcast_ref::<MouseDetail>() {
+    //                 match event_type {
+    //                     //TODO support click
+    //                     //"click" => self.handle_click(mouse_event),
+    //                     "mousedown" => self.handle_mouse_down(mouse_event),
+    //                     "mousemove" => self.handle_mouse_move(mouse_event),
+    //                     "mouseup" => self.handle_mouse_up(mouse_event),
+    //                     _ => {}
+    //                 }
+    //             }
+    //         }
+    //         _ => {}
+    //     }
+    // }
 
     fn get_children(&self) -> Vec<Element> {
         self.base.get_children()

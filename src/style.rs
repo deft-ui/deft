@@ -375,6 +375,14 @@ macro_rules! define_style_props {
         }
 
         impl StyleProp {
+            pub fn parse_value(key: StylePropKey, value: &str) -> Option<StyleProp> {
+                $(
+                    if key == StylePropKey::$name {
+                        return <$type>::parse_prop_value(value).map(|v| StyleProp::$name(StylePropVal::Custom(v)));
+                    }
+                )*
+                return None
+            }
             pub fn parse(key: &str, value: &str) -> Option<StyleProp> {
                 let key = key.to_lowercase();
                 let k = key.as_str();
@@ -824,9 +832,11 @@ impl StyleNode {
         let r = self.get_layout_padding_right().de_nan(0.0);
         let t = self.get_layout_padding_top().de_nan(0.0);
         let b = self.get_layout_padding_bottom().de_nan(0.0);
-        let (width, height) = self.with_container_node(|n| {
-            (n.get_layout_width().de_nan(0.0), n.get_layout_height().de_nan(0.0))
-        });
+        let width = self.get_layout_width();
+        let height = self.get_layout_height();
+        // let (width, height) = self.with_container_node(|n| {
+        //     (n.get_layout_width().de_nan(0.0), n.get_layout_height().de_nan(0.0))
+        // });
         Rect::new(l, t, width - l - r, height - t - b)
     }
 

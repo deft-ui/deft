@@ -20,7 +20,7 @@ pub struct TextEdit {
     container_element: Element,
     entry_element: Element,
     base: Scroll,
-    line_number_font: Rc<RefCell<Font>>,
+    // line_number_font: Rc<RefCell<Font>>,
 }
 
 impl TextEdit {
@@ -52,40 +52,40 @@ impl ElementBackend for TextEdit {
         let entry = entry_element.get_backend_mut_as::<Entry>();
         entry.set_multiple_line(true);
         //TODO use width-fixed font?
-        let line_number_font = Rc::new(RefCell::new(entry.get_font().clone()));
+        // let line_number_font = Rc::new(RefCell::new(entry.get_font().clone()));
 
         tree!(container_ele, [
             entry_element,
         ]);
         base.add_child_view(container_ele.clone(), None);
 
-        let mut update_line_number_width = {
-            let mut container_ele = container_ele.clone();
-            let line_number_font = line_number_font.clone();
-            move |lines: i32| {
-                let line_number_width = line_number_font.borrow().size() * lines.to_string().len() as f32;
-                set_style!(container_ele, {
-                    paddingLeft => &line_number_width.to_string(),
-                });
-            }
-        };
-        update_line_number_width(1);
+        // let mut update_line_number_width = {
+        //     let mut container_ele = container_ele.clone();
+        //     let line_number_font = line_number_font.clone();
+        //     move |lines: i32| {
+        //         let line_number_width = line_number_font.borrow().size() * lines.to_string().len() as f32;
+        //         set_style!(container_ele, {
+        //             paddingLeft => &line_number_width.to_string(),
+        //         });
+        //     }
+        // };
+        // update_line_number_width(1);
 
-        element.register_event_listener(TextUpdateEventListener::new(move |detail, ctx| {
-            let mut lines = 1;
-            detail.value.chars().for_each(|c| {
-                if c == char::from_u32(10).unwrap() {
-                    lines += 1;
-                }
-            });
-            update_line_number_width(lines);
-        }));
+        // element.register_event_listener(TextUpdateEventListener::new(move |detail, ctx| {
+        //     let mut lines = 1;
+        //     detail.value.chars().for_each(|c| {
+        //         if c == char::from_u32(10).unwrap() {
+        //             lines += 1;
+        //         }
+        //     });
+        //     update_line_number_width(lines);
+        // }));
 
         Self {
             entry_element,
             base,
             element,
-            line_number_font,
+            // line_number_font,
             container_element: container_ele,
         }
     }
@@ -105,29 +105,29 @@ impl ElementBackend for TextEdit {
         let mut paint = Paint::default();
         paint.set_color(parse_hex_color("4A4B4E").unwrap());
         let entry = self.get_entry();
-        let font = self.line_number_font.clone();
-        entry.with_paragraph(|lines| {
-            let line_number_width = self.container_element.get_padding().3;
-            let padding_top = self.entry_element.get_relative_bounds(&self.element).y + self.entry_element.get_padding().0;
-            let mut line_start = padding_top;
-            let height = self.element.get_size().1;
-            let mut line_number = 0;
-            for p in lines {
-                let p_height = p.paragraph.height();
-                let y_start = line_start;
-                let y_end = y_start + p_height;
-                line_start += p_height;
-                line_number += 1;
-
-                if y_end < 0.0 {
-                    continue;
-                } else if y_start > height {
-                    break;
-                }
-                let rect = Rect::new(0.0, y_start, line_number_width, p.get_soft_line_height(0));
-                canvas.draw_text(&rect, &line_number.to_string(), &font.borrow(), &paint, TextAlign::Right, VerticalAlign::Middle);
-            }
-        });
+        // let font = self.line_number_font.clone();
+        // entry.with_paragraph(|lines| {
+        //     let line_number_width = self.container_element.get_padding().3;
+        //     let padding_top = self.entry_element.get_relative_bounds(&self.element).y + self.entry_element.get_padding().0;
+        //     let mut line_start = padding_top;
+        //     let height = self.element.get_size().1;
+        //     let mut line_number = 0;
+        //     for p in lines {
+        //         let p_height = p.paragraph.height();
+        //         let y_start = line_start;
+        //         let y_end = y_start + p_height;
+        //         line_start += p_height;
+        //         line_number += 1;
+        //
+        //         if y_end < 0.0 {
+        //             continue;
+        //         } else if y_start > height {
+        //             break;
+        //         }
+        //         let rect = Rect::new(0.0, y_start, line_number_width, p.get_soft_line_height(0));
+        //         canvas.draw_text(&rect, &line_number.to_string(), &font.borrow(), &paint, TextAlign::Right, VerticalAlign::Middle);
+        //     }
+        // });
         canvas.restore();
     }
 
@@ -141,16 +141,8 @@ impl ElementBackend for TextEdit {
         self.get_entry_mut().get_property(property_name)
     }
 
-    fn handle_input(&mut self, _input: &str) {
-        self.base.handle_input(_input)
-    }
-
     fn handle_origin_bounds_change(&mut self, _bounds: &Rect) {
         self.base.handle_origin_bounds_change(_bounds);
-    }
-
-    fn handle_event(&mut self, _event_type: &str, _event: &mut ElementEvent) {
-        self.base.handle_event(_event_type, _event)
     }
 
     fn add_child_view(&mut self, child: Element, position: Option<u32>) {
@@ -165,9 +157,6 @@ impl ElementBackend for TextEdit {
         self.base.remove_child_view(position)
     }
 
-    fn handle_event_default_behavior(&mut self,event_type: &str, event: &mut ElementEvent) -> bool {
-        self.base.handle_event_default_behavior(event_type, event)
-    }
 }
 
 

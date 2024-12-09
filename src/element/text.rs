@@ -682,9 +682,10 @@ impl ElementBackend for Text {
         }
     }
 
-    fn handle_event(&mut self, _event_type: &str, event: &mut ElementEvent) {
-        match_event_type!(event, MouseDetail, self, handle_mouse_event);
-    }
+    //TODO use on_event
+    // fn handle_event(&mut self, _event_type: &str, event: &mut ElementEvent) {
+    //     match_event_type!(event, MouseDetail, self, handle_mouse_event);
+    // }
 }
 
 pub fn parse_align(align: &str) -> TextAlign {

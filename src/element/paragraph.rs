@@ -31,13 +31,16 @@ use skia_safe::wrapper::NativeTransmutableWrapper;
 use winit::keyboard::NamedKey;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 use crate::base::{ElementEvent, EventContext, MouseDetail, MouseEventType};
-use crate::event::{FocusShiftEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
+use crate::event::{FocusShiftEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent, SelectEndEvent, SelectMoveEvent, SelectStartEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
 use crate::typeface::get_font_mgr;
 
 const DEFAULT_FONT_NAME: &str = "system-ui";
 
+const ZERO_WIDTH_WHITESPACE: &str = "\u{200B}";
+
 #[derive(Clone)]
 pub struct ParagraphParams {
+    pub text_wrap: Option<bool>,
     pub line_height: Option<f32>,
     pub align: TextAlign,
     pub color: Color,
@@ -96,7 +99,13 @@ js_serialize!(TextUnit);
 js_deserialize!(TextUnit);
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Debug, Copy, Clone)]
-pub struct TextCoord(usize, usize);
+pub struct TextCoord(pub usize, pub usize);
+
+impl TextCoord {
+    pub fn new(v: (usize, usize)) -> TextCoord {
+        TextCoord(v.0, v.1)
+    }
+}
 
 #[element_backend]
 pub struct Paragraph {
@@ -109,7 +118,7 @@ pub struct Paragraph {
     selection_paint: Paint,
 }
 
-struct Line {
+pub struct Line {
     units: Vec<ParagraphUnit>,
     sk_paragraph: SkParagraph,
     layout_calculated: bool,
@@ -125,7 +134,7 @@ impl Line {
         }
     }
 
-    fn atom_count(&self) -> usize {
+    pub fn atom_count(&self) -> usize {
         let mut count = 0;
         for u in &self.units {
             count += u.atom_count();
@@ -269,8 +278,18 @@ impl Paragraph {
         (sk_paragraph.max_intrinsic_width(), sk_paragraph.height())
     }
 
-    fn layout(&mut self, available_width: Option<f32>) {
-        let layout_width = self.element.layout.get_layout_width();
+    pub fn set_text_wrap(&mut self, wrap: bool) {
+        self.params.text_wrap = Some(wrap);
+        self.element.mark_dirty(true);
+    }
+
+    fn layout(&mut self, mut available_width: Option<f32>) {
+        let mut layout_width = f32::NAN;
+        if self.params.text_wrap.unwrap_or(false) {
+            layout_width = self.element.style.get_layout_width();
+        } else {
+            available_width = available_width.map(|_| f32::NAN);
+        }
         for ln in &mut self.lines {
             ln.layout(available_width, layout_width);
         }
@@ -292,6 +311,41 @@ impl Paragraph {
         max_width
     }
 
+    pub fn get_atom_count(&self) -> usize {
+        let mut count = 0;
+        for ln in &self.lines {
+            count += ln.atom_count();
+        }
+        count
+    }
+
+    pub fn get_text(&self) -> String {
+        let mut text = String::new();
+        let lines_count = self.lines.len();
+        if lines_count > 1 {
+            for i in 0..lines_count - 1 {
+                let line = unsafe { self.lines.get_unchecked(i) };
+                text.push_str(line.get_text().as_str());
+                text.push_str("\n");
+            }
+        }
+        if lines_count > 0 {
+            text.push_str(self.lines.last().unwrap().get_text().as_str());
+        }
+        text
+    }
+
+    pub fn get_soft_line_height(&self, row: usize, col: usize) -> Option<f32> {
+        let line = self.lines.get(row)?;
+        let ln = line.sk_paragraph.get_line_number_at_utf16_offset(col)?;
+        let lm = line.sk_paragraph.get_line_metrics_at(ln).unwrap();
+        Some(lm.height as f32)
+    }
+
+    pub fn get_lines(&self) -> &Vec<Line> {
+        &self.lines
+    }
+
     pub fn select(&mut self, start: TextCoord, end: TextCoord) {
         //TODO validate params
         self.selection = Some((start, end));
@@ -307,6 +361,10 @@ impl Paragraph {
         self.element.emit(FocusShiftEvent);
         self.unselect();
         self.selecting_begin = Some(caret);
+        self.element.emit(SelectStartEvent {
+            row: caret.0,
+            col: caret.1,
+        });
     }
 
     fn end_select(&mut self) {
@@ -357,7 +415,23 @@ impl Paragraph {
         TextCoord(0, 0)
     }
 
-    fn handle_key_down(&mut self, event: &KeyEventDetail) {
+    pub fn get_char_rect(&mut self, coord: TextCoord) -> Option<crate::base::Rect> {
+        let (row, col) = (coord.0, coord.1);
+        let line = self.lines.get_mut(row)?;
+        let gi = line.sk_paragraph.get_glyph_info_at_utf16_offset(col)?;
+        let bounds = gi.grapheme_layout_bounds;
+        let mut y_offset = 0.0;
+        if row > 0 {
+            for i in 0..row {
+                y_offset += unsafe {
+                    self.lines.get_unchecked(i).sk_paragraph.height()
+                }
+            }
+        }
+        Some(crate::base::Rect::new(bounds.left, y_offset + bounds.top, bounds.width(), bounds.height()))
+    }
+
+    fn handle_key_down(&mut self, event: &KeyEventDetail) -> bool {
         if event.modifiers == KEY_MOD_CTRL {
             if let Some(text) = &event.key_str {
                 match text.as_str() {
@@ -368,11 +442,21 @@ impl Paragraph {
                                 ctx.set_contents(sel);
                             }
                         }
+                        return true
                     },
                     _ => {}
                 }
             }
         }
+        false
+    }
+
+    pub fn get_line_text(&self, row: usize) -> Option<String> {
+        Some(self.lines.get(row)?.get_text())
+    }
+
+    pub fn get_selection(&self) -> Option<(TextCoord, TextCoord)> {
+        self.selection
     }
 
     pub fn get_selection_text(&self) -> Option<String> {
@@ -480,6 +564,7 @@ impl Paragraph {
                 }
             }
         }
+        pb.add_text(ZERO_WIDTH_WHITESPACE);
 
         pb.build()
     }
@@ -493,6 +578,7 @@ impl ElementBackend for Paragraph {
         let font_families:Vec<String> = DEFAULT_FONT_NAME.split(",").map(|i| i.to_string()).collect();
 
         let params = ParagraphParams {
+            text_wrap: Some(true),
             line_height: None,
             align: TextAlign::Left,
             color: Color::default(),
@@ -514,9 +600,9 @@ impl ElementBackend for Paragraph {
         }
         .to_ref();
         element
-            .layout
+            .style
             .set_context(Some(Context::new(this.as_weak())));
-        element.layout.set_measure_func(Some(measure_paragraph));
+        element.style.set_measure_func(Some(measure_paragraph));
         this
     }
 
@@ -528,13 +614,13 @@ impl ElementBackend for Paragraph {
         let mut rebuild = true;
         match key {
             StylePropKey::Color => {
-                self.params.color = self.element.layout.computed_style.color;
+                self.params.color = self.element.style.computed_style.color;
             }
             StylePropKey::FontSize => {
-                self.params.font_size = self.element.layout.computed_style.font_size;
+                self.params.font_size = self.element.style.computed_style.font_size;
             }
             StylePropKey::LineHeight => {
-                self.params.line_height = Some(self.element.layout.computed_style.line_height);
+                self.params.line_height = Some(self.element.style.computed_style.line_height);
             }
             _ => {
                 rebuild = false;
@@ -597,6 +683,10 @@ impl ElementBackend for Paragraph {
             if self.selecting_begin.is_some() {
                 let caret = self.get_text_coord_by_pixel_coord((event.offset_x, event.offset_y));
                 if let Some(sb) = self.selecting_begin {
+                    self.element.emit(SelectMoveEvent{
+                        row: caret.0,
+                        col: caret.1,
+                    });
                     let start = TextCoord::min(sb, caret);
                     let end = TextCoord::max(sb, caret);
                     self.select(start, end);
@@ -604,13 +694,13 @@ impl ElementBackend for Paragraph {
             }
         } else if let Some(e) = event.downcast_ref::<MouseUpEvent>() {
             self.end_select();
+            self.element.emit(SelectEndEvent);
         }
     }
 
     fn execute_default_behavior(&mut self, event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) -> bool {
         if let Some(d) = event.downcast_ref::<KeyDownEvent>() {
-            self.handle_key_down(&d.0);
-            true
+            self.handle_key_down(&d.0)
         } else {
             false
         }
@@ -687,6 +777,7 @@ fn test_layout() {
         color: Default::default(),
         font_size: 16.0,
         font_families: vec!["monospace".to_string()],
+        text_wrap: Some(false),
     };
     let mut text = String::new();
     for i in 0..200 {

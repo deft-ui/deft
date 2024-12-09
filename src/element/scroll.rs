@@ -66,6 +66,8 @@ pub struct Scroll {
     is_x_overflow: bool,
     real_content_width: f32,
     real_content_height: f32,
+    pub content_auto_width: bool,
+    pub content_auto_height: bool,
 }
 
 impl Scroll {
@@ -87,7 +89,11 @@ impl Scroll {
     fn layout_content(&mut self) {
         let (width, height) = self.get_body_view_size();
         //TODO fix ltr
-        self.element.style.calculate_shadow_layout(width, height, LTR);
+        // self.element.style.calculate_shadow_layout(width, height, LTR);
+        let layout_width = if self.content_auto_width { f32::NAN } else { width };
+        let layout_height = if self.content_auto_height { f32::NAN } else { height };
+        // self.element.style.calculate_shadow_layout(f32::NAN, f32::NAN, LTR);
+        self.element.style.calculate_shadow_layout(layout_width, layout_height, LTR);
 
         for child in &mut self.element.get_children().clone() {
             //TODO remove?
@@ -260,6 +266,8 @@ impl ElementBackend for Scroll {
             vertical_bar_rect: Rect::empty(),
             real_content_height: 0.0,
             horizontal_move_begin: None,
+            content_auto_height: false,
+            content_auto_width: false,
         };
         inst
     }

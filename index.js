@@ -21,6 +21,17 @@ function createSystemTray() {
     }]);
 }
 
+function createEntry() {
+    const entry = new EntryElement();
+    entry.setText("test测试");
+    entry.setStyle({
+        width: 100,
+        height: 100,
+        border: "1 #ccc"
+    })
+    return entry;
+}
+
 function main() {
     runWorker();
     createSystemTray();
@@ -117,20 +128,23 @@ function main() {
     container.addChild(animationButton);
 
 
-    const textEdit = new TextEditElement();
+    const textEdit = new EntryElement();
 
     //textEdit.setAlign("center")
-    textEdit.setText("TextEdit 测试test");
+    textEdit.setText("1\n12\n测试\n123\n1234");
+    textEdit.setMultipleLine(true);
 
     textEdit.setStyle({
-        "height": 50,
+        "height": 100,
         "width": 100,
         // "background": "#ccc",
-        // "border": "1 #ccc"
+        "border": "1 #ccc"
         // "minWidth": 600,
     });
 
     container.addChild(textEdit);
+
+    container.addChild(createEntry());
 
     typeface_create("auto-mono", {
         family: "monospace",

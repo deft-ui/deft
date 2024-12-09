@@ -232,7 +232,7 @@ impl Element {
     }
 
     pub fn scroll_by(&mut self, option: ScrollByOption) {
-        let mut el = self.backend.get_inner_element().unwrap_or(self.clone());
+        let mut el = self.clone();
         if option.x != 0.0 {
             el.set_scroll_left(el.scroll_left + option.x);
         }
@@ -641,7 +641,16 @@ impl Element {
         self.applied_style = new_style;
     }
 
-    pub fn set_style_property(&mut self, _name: &str, _value: &str) {
+    pub fn set_style_prop(&mut self, key: StylePropKey, value: &str) {
+        if let Some(prop) = StyleProp::parse_value(key, value) {
+            self.set_style_props(vec![prop]);
+        }
+    }
+
+    pub fn set_style_property(&mut self, key: &str, value: &str) {
+        if let Some(prop) = StyleProp::parse(key, value) {
+            self.set_style_props(vec![prop]);
+        }
         //FIXME remove
         /*
         let mut repaint = true;
@@ -733,14 +742,6 @@ impl Element {
         }*/
     }
 
-    fn inner_ele_or_self(&self) -> Element {
-        if let Some(e) = self.backend.get_inner_element() {
-            e
-        } else {
-            self.clone()
-        }
-    }
-
     pub fn register_event_listener<T: 'static, H: EventListener<T, ElementWeak> + 'static>(&mut self, mut listener: H) -> u32 {
         self.event_registration.register_event_listener(listener)
     }
@@ -755,16 +756,20 @@ impl Element {
     }
 
     pub fn emit<T: ViewEvent + 'static>(&mut self, mut event: T) {
-        let mut ctx = EventContext {
-            target: self.as_weak(),
-            propagation_cancelled: false,
-            prevent_default: false,
-        };
-        self.handle_event(&mut event, &mut ctx);
-        if !ctx.prevent_default {
-            let mut e: Box<dyn Any> = Box::new(event);
-            self.handle_default_behavior(&mut e, &mut ctx);
-        }
+        let mut me = self.clone();
+        let callback = create_event_loop_callback(move || {
+            let mut ctx = EventContext {
+                target: me.as_weak(),
+                propagation_cancelled: false,
+                prevent_default: false,
+            };
+            me.handle_event(&mut event, &mut ctx);
+            if !ctx.prevent_default {
+                let mut e: Box<dyn Any> = Box::new(event);
+                me.handle_default_behavior(&mut e, &mut ctx);
+            }
+        });
+        callback.call();
     }
 
     fn handle_event<T: ViewEvent + 'static>(&mut self, event: &mut T, ctx: &mut EventContext<ElementWeak>) {
@@ -809,19 +814,6 @@ impl Element {
     #[js_func]
     pub fn remove_event_listener(&mut self, event_type: String, id: u32) {
         self.event_registration.remove_event_listener(&event_type, id)
-    }
-
-    fn handle_event_default_behavior(&mut self,event_type: &str, event: &mut ElementEvent) {
-        let default_behavior = self.backend.handle_event_default_behavior(event_type, event);
-        if !default_behavior {
-            if let Some(mut parent) = self.get_parent() {
-                parent.handle_event_default_behavior(event_type, event);
-            }
-        }
-    }
-
-    pub fn handle_input(&mut self, input: &str) {
-        self.backend.handle_input(input);
     }
 
     pub fn mark_dirty(&mut self, layout_dirty: bool) {
@@ -993,23 +985,12 @@ pub trait ElementBackend {
         let _ = canvas;
     }
 
-    fn get_inner_element(&self) -> Option<Element> {
-        None
-    }
-
     fn set_property(&mut self, _property_name: &str, _property_value: JsValue) {
 
     }
 
     fn get_property(&mut self, _property_name: &str) -> Result<Option<JsValue>, Error> {
         Ok(None)
-    }
-
-    fn handle_input(&mut self, _input: &str) {}
-
-    fn handle_event_default_behavior(&mut self, event_type: &str, event: &mut ElementEvent) -> bool {
-        (event_type, event);
-        false
     }
 
     fn on_event(&mut self, mut event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
@@ -1022,10 +1003,6 @@ pub trait ElementBackend {
     }
 
     fn handle_origin_bounds_change(&mut self, _bounds: &base::Rect) {}
-
-    fn handle_event(&mut self, event_type: &str, event: &mut ElementEvent) {
-        let _ = (event_type, event);
-    }
 
     fn add_child_view(&mut self, child: Element, position: Option<u32>) {
         let _ = (child, position);

@@ -941,7 +941,8 @@ export class EntryElement extends View {
      * @param multipleLine {boolean}
      */
     setMultipleLine(multipleLine) {
-        Element_set_property(this.el, "multipleline", String(multipleLine));
+        Entry_set_multiple_line(this.el, multipleLine)
+        // Element_set_property(this.el, "multipleline", String(multipleLine));
     }
 
     /**

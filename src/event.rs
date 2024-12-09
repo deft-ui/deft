@@ -4,6 +4,7 @@ use winit::keyboard::{ModifiersState, NamedKey};
 use lento_macros::event;
 use crate::base::{CaretDetail, MouseDetail, Rect, ScrollEventDetail, TextChangeDetail, TextUpdateDetail, TouchDetail};
 use crate::{base, define_event};
+use crate::element::paragraph::TextCoord;
 
 pub const KEY_MOD_CTRL: u32 = 0x1;
 pub const KEY_MOD_ALT: u32 = 0x1 << 1;
@@ -369,6 +370,9 @@ pub fn named_key_to_str(key: &NamedKey) -> &'static str {
 }
 
 #[event]
+pub struct TextInputEvent(pub String);
+
+#[event]
 pub struct ClickEvent(pub MouseDetail);
 
 #[event]
@@ -423,6 +427,21 @@ pub struct BlurEvent;
 
 #[event]
 pub struct FocusShiftEvent;
+
+#[event]
+pub struct SelectStartEvent {
+    pub row: usize,
+    pub col: usize,
+}
+
+#[event]
+pub struct SelectMoveEvent {
+    pub row: usize,
+    pub col: usize,
+}
+
+#[event]
+pub struct SelectEndEvent;
 
 #[event]
 pub struct TextChangeEvent {
