@@ -45,6 +45,7 @@ pub enum MouseEventType {
     MouseDown,
     MouseUp,
     MouseClick,
+    ContextMenu,
     MouseMove,
     MouseEnter,
     MouseLeave,

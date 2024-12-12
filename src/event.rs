@@ -376,6 +376,9 @@ pub struct TextInputEvent(pub String);
 pub struct ClickEvent(pub MouseDetail);
 
 #[event]
+pub struct ContextMenuEvent(pub MouseDetail);
+
+#[event]
 pub struct MouseUpEvent(pub MouseDetail);
 
 #[event]

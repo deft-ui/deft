@@ -5,7 +5,7 @@ use crate::base::{ElementEvent, Event, EventContext, EventHandler, EventListener
 use crate::canvas_util::CanvasHelper;
 use crate::cursor::search_cursor;
 use crate::element::{Element, ElementWeak};
-use crate::event::{build_modifier, named_key_to_str, BlurEvent, CaretChangeEventListener, ClickEvent, DragOverEvent, DragStartEvent, DropEvent, FocusEvent, FocusShiftEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent, MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, TextInputEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT};
+use crate::event::{build_modifier, named_key_to_str, BlurEvent, CaretChangeEventListener, ClickEvent, ContextMenuEvent, DragOverEvent, DragStartEvent, DropEvent, FocusEvent, FocusShiftEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent, MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, TextInputEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT};
 use crate::event_loop::{create_event_loop_proxy, run_with_event_loop};
 use crate::ext::common::create_event_handler;
 use crate::ext::ext_frame::{FrameAttrs, FRAMES, FRAME_TYPE_MENU, FRAME_TYPE_NORMAL, MODAL_TO_OWNERS, WINDOW_TO_FRAME};
@@ -504,7 +504,7 @@ impl Frame {
         }
     }
 
-    pub fn emit_click(&mut self, button: MouseButton, state: ElementState) {
+    pub fn emit_click(&mut self, mouse_button: MouseButton, state: ElementState) {
         //TODO to logical?
         let frame_x = self.cursor_position.x as f32;
         let frame_y = self.cursor_position.y as f32;
@@ -517,7 +517,7 @@ impl Frame {
                 ElementState::Pressed =>("mousedown", MouseEventType::MouseDown),
                 ElementState::Released => ("mouseup", MouseEventType::MouseUp),
             };
-            let button = match button {
+            let button = match mouse_button {
                 MouseButton::Left => 1,
                 MouseButton::Right => 2,
                 MouseButton::Middle => 3,
@@ -535,7 +535,14 @@ impl Frame {
                     if let Some(mut pressing) = self.pressing.clone() {
                         emit_mouse_event(&mut pressing.0, MouseUp, button, frame_x, frame_y, screen_x, screen_y);
                         if pressing.0 == node && pressing.1.button == button {
-                            emit_mouse_event(&mut node, MouseClick, button, frame_x, frame_y, screen_x, screen_y);
+                            let ty = match mouse_button {
+                                MouseButton::Left => Some(MouseEventType::MouseClick),
+                                MouseButton::Right => Some(MouseEventType::ContextMenu),
+                                _ => None
+                            };
+                            if let Some(ty) = ty {
+                                emit_mouse_event(&mut node, ty, button, frame_x, frame_y, screen_x, screen_y);
+                            }
                         }
                         self.release_press();
                     } else {
@@ -936,6 +943,7 @@ fn emit_mouse_event(node: &mut Element, event_type_enum: MouseEventType, button:
         MouseEventType::MouseDown => node.emit(MouseDownEvent(detail)),
         MouseEventType::MouseUp => node.emit(MouseUpEvent(detail)),
         MouseEventType::MouseClick => node.emit(ClickEvent(detail)),
+        MouseEventType::ContextMenu => node.emit(ContextMenuEvent(detail)),
         MouseEventType::MouseMove => node.emit(MouseMoveEvent(detail)),
         MouseEventType::MouseEnter => node.emit(MouseEnterEvent(detail)),
         MouseEventType::MouseLeave => node.emit(MouseLeaveEvent(detail)),

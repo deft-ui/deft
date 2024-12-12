@@ -599,6 +599,14 @@ export class View {
      *
      * @param callback {(event: IMouseEvent) => void}
      */
+    bindContextMenu(callback) {
+        this.#eventBinder.bindEvent("contextmenu", callback);
+    }
+
+    /**
+     *
+     * @param callback {(event: IMouseEvent) => void}
+     */
     bindMouseDown(callback) {
         this.#eventBinder.bindEvent("mousedown", callback);
     }
