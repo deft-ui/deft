@@ -32,6 +32,23 @@ function createEntry() {
     return entry;
 }
 
+function createTextEdit() {
+    const textEdit = new EntryElement();
+
+    //textEdit.setAlign("center")
+    textEdit.setText("1\n12\n测试\n123\n1234");
+    textEdit.setMultipleLine(true);
+
+    textEdit.setStyle({
+        "height": 100,
+        "width": 100,
+        // "background": "#ccc",
+        "border": "1 #ccc"
+        // "minWidth": 600,
+    });
+    return textEdit;
+}
+
 function main() {
     runWorker();
     createSystemTray();
@@ -128,21 +145,7 @@ function main() {
     container.addChild(animationButton);
 
 
-    const textEdit = new EntryElement();
-
-    //textEdit.setAlign("center")
-    textEdit.setText("1\n12\n测试\n123\n1234");
-    textEdit.setMultipleLine(true);
-
-    textEdit.setStyle({
-        "height": 100,
-        "width": 100,
-        // "background": "#ccc",
-        "border": "1 #ccc"
-        // "minWidth": 600,
-    });
-
-    container.addChild(textEdit);
+    container.addChild(createTextEdit());
 
     container.addChild(createEntry());
 
