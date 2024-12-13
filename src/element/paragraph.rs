@@ -705,6 +705,10 @@ impl ElementBackend for Paragraph {
             false
         }
     }
+
+    fn before_origin_bounds_change(&mut self) {
+
+    }
 }
 
 pub fn parse_optional_weight(value: Option<&String>) -> Option<Weight> {

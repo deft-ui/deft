@@ -666,6 +666,10 @@ impl ElementBackend for Text {
         false
     }
 
+    fn before_origin_bounds_change(&mut self) {
+
+    }
+
     fn handle_origin_bounds_change(&mut self, bounds: &Rect) {
         //TODO check font/color changed?
         let last_width = if bounds.width != self.last_width {

@@ -370,6 +370,10 @@ impl ElementBackend for Label {
         }
     }
 
+    fn before_origin_bounds_change(&mut self) {
+
+    }
+
     fn handle_origin_bounds_change(&mut self, _bounds: &Rect) {
         let mut pi = self.paragraph_props.paragraph.borrow_mut();
         pi.paragraph_dirty = true;

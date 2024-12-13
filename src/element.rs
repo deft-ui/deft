@@ -463,7 +463,8 @@ impl Element {
             content_width = f32::max(content_width, cb.right());
             content_height = f32::max(content_height, cb.bottom());
         }
-        (content_width, content_height)
+        let padding = self.style.get_padding();
+        (content_width + padding.1, content_height + padding.2)
     }
 
     /// content bounds relative to self(border box)
@@ -521,6 +522,7 @@ impl Element {
     pub fn calculate_layout(&mut self, available_width: f32, available_height: f32) {
         // mark all children dirty so that custom measure function could be call
         self.mark_all_layout_dirty();
+        self.on_before_layout_update();
         self.style.calculate_layout(available_width, available_height, Direction::LTR);
         self.on_layout_update();
     }
@@ -542,12 +544,7 @@ impl Element {
     }
 
     pub fn get_padding(&self) -> (f32, f32, f32, f32) {
-        (
-            self.style.get_layout_padding_top().de_nan(0.0),
-            self.style.get_layout_padding_right().de_nan(0.0),
-            self.style.get_layout_padding_bottom().de_nan(0.0),
-            self.style.get_layout_padding_left().de_nan(0.0),
-        )
+        self.style.get_padding()
     }
 
     pub fn set_border_color(&mut self, color: [Color; 4]) {
@@ -835,6 +832,13 @@ impl Element {
         }
     }
 
+    pub fn on_before_layout_update(&mut self) {
+        self.backend.before_origin_bounds_change();
+        for c in &mut self.get_children() {
+            c.on_before_layout_update();
+        }
+    }
+
 
     pub fn on_layout_update(&mut self) {
         //TODO emit size change
@@ -969,6 +973,9 @@ impl ElementBackend for EmptyElementBackend {
         "Empty"
     }
 
+    fn before_origin_bounds_change(&mut self) {
+
+    }
 }
 
 pub trait ElementBackend {
@@ -1002,6 +1009,8 @@ pub trait ElementBackend {
         let _ = (event, ctx);
         false
     }
+
+    fn before_origin_bounds_change(&mut self);
 
     fn handle_origin_bounds_change(&mut self, _bounds: &base::Rect) {}
 

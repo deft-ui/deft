@@ -51,6 +51,10 @@ impl ElementBackend for ScrollBar {
         "ScrollBar"
     }
 
+    fn before_origin_bounds_change(&mut self) {
+
+    }
+
     // fn handle_event(&mut self, event_type: &str, event: &mut ElementEvent) {
     //     match event_type {
     //         "mousedown" | "mouseup" | "mousemove" | "click" => {

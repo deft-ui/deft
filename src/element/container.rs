@@ -23,6 +23,10 @@ impl ElementBackend for Container {
         "Container"
     }
 
+    fn before_origin_bounds_change(&mut self) {
+
+    }
+
     fn add_child_view(&mut self, mut child: Element, position: Option<u32>) {
         if let Some(p) = child.get_parent() {
             panic!("child({}) has parent({}) already", child.get_id(), p.get_id());

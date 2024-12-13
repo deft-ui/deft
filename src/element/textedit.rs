@@ -157,6 +157,9 @@ impl ElementBackend for TextEdit {
         self.base.remove_child_view(position)
     }
 
+    fn before_origin_bounds_change(&mut self) {
+
+    }
 }
 
 

@@ -69,4 +69,7 @@ impl ElementBackend for Button {
         self.label.handle_style_changed(key)
     }
 
+    fn before_origin_bounds_change(&mut self) {
+
+    }
 }

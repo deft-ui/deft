@@ -26,7 +26,7 @@ function createEntry() {
     entry.setText("test测试");
     entry.setStyle({
         width: 100,
-        height: 100,
+        padding: 5,
         border: "1 #ccc"
     })
     return entry;

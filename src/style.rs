@@ -827,6 +827,17 @@ impl StyleNode {
         sn
     }
 
+    pub fn get_padding(&self) -> (f32, f32, f32, f32) {
+        self.with_container_node(|n| {
+            (
+                n.get_layout_padding_top().de_nan(0.0),
+                n.get_layout_padding_right().de_nan(0.0),
+                n.get_layout_padding_bottom().de_nan(0.0),
+                n.get_layout_padding_left().de_nan(0.0),
+            )
+        })
+    }
+
     pub fn get_content_bounds(&self) -> Rect {
         let l = self.get_layout_padding_left().de_nan(0.0);
         let r = self.get_layout_padding_right().de_nan(0.0);

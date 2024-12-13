@@ -1,15 +1,17 @@
+use crate as lento;
 use std::any::Any;
 use std::str::FromStr;
-
+use lento_macros::element_backend;
 use quick_js::JsValue;
 use skia_safe::{Canvas, Paint};
 use yoga::Direction::LTR;
-
+use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 use crate::{backend_as_api, js_call};
 use crate::base::{CaretDetail, ElementEvent, EventContext, Rect};
 use crate::color::parse_hex_color;
 use crate::element::{ElementBackend, Element, ViewEvent, ElementWeak};
 use crate::element::container::Container;
+use crate::element::paragraph::ParagraphWeak;
 use crate::element::scroll::ScrollBarStrategy::{Always, Auto, Never};
 use crate::event::{CaretChangeEvent, MouseDownEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent};
 use crate::js::js_runtime::FromJsValue;
@@ -48,6 +50,31 @@ impl FromJsValue for ScrollBarStrategy {
 
 backend_as_api!(ScrollBackend, Scroll, as_scroll, as_scroll_mut);
 
+extern "C" fn measure_scroll(
+    node_ref: NodeRef,
+    width: f32,
+    width_mode: MeasureMode,
+    height: f32,
+    height_mode: MeasureMode,
+) -> Size {
+    if let Some(ctx) = Node::get_context(&node_ref) {
+        if let Some(scroll) = ctx.downcast_ref::<ScrollWeak>() {
+            if let Ok(mut s) = scroll.upgrade() {
+                s.do_layout_content(width, height);
+                return Size {
+                    width: s.real_content_width,
+                    height: s.real_content_height,
+                };
+            }
+        }
+    }
+    Size {
+        width: 0.0,
+        height: 0.0,
+    }
+}
+
+#[element_backend]
 pub struct Scroll {
     scroll_bar_size: f32,
     element: Element,
@@ -66,6 +93,7 @@ pub struct Scroll {
     is_x_overflow: bool,
     real_content_width: f32,
     real_content_height: f32,
+    content_layout_dirty: bool,
     pub content_auto_width: bool,
     pub content_auto_height: bool,
 }
@@ -115,7 +143,8 @@ impl Scroll {
 
     fn handle_default_mouse_wheel(&mut self, detail: &MouseWheelEvent) -> bool {
         if self.is_y_overflow {
-            self.element.set_scroll_top(self.element.get_scroll_top() - 40.0 * detail.rows);
+            let new_scroll_top = self.element.get_scroll_top() - 40.0 * detail.rows;
+            self.element.set_scroll_top(new_scroll_top);
             true
         } else {
             false
@@ -244,6 +273,56 @@ impl Scroll {
         self.horizontal_move_begin = None;
     }
 
+    fn do_layout_content(&mut self, bounds_width: f32, bounds_height: f32) {
+        self.layout_content();
+
+        let (mut body_width, mut body_height) = self.get_body_view_size();
+        let (mut real_content_width, mut real_content_height) = self.element.get_real_content_size();
+
+        let old_vertical_bar_visible = !self.vertical_bar_rect.is_empty();
+        self.is_y_overflow = real_content_height > body_height;
+        let new_vertical_bar_visible = match self.vertical_bar_strategy {
+            Never => false,
+            Auto => self.is_y_overflow,
+            Always => true,
+        };
+        if old_vertical_bar_visible != new_vertical_bar_visible {
+            self.update_vertical_bar_rect(new_vertical_bar_visible, bounds_width, bounds_height);
+            self.layout_content();
+            (body_width, body_height) = self.get_body_view_size();
+            (real_content_width, real_content_height) = self.element.get_real_content_size();
+        } else if new_vertical_bar_visible {
+            self.update_vertical_bar_rect(true, bounds_width, bounds_height);
+        }
+
+        let old_horizontal_bar_visible = !self.horizontal_bar_rect.is_empty();
+        self.is_x_overflow = real_content_width > body_width;
+        let new_horizontal_bar_visible = match self.horizontal_bar_strategy {
+            Never => false,
+            Auto => self.is_x_overflow,
+            Always => true
+        };
+        if old_horizontal_bar_visible != new_horizontal_bar_visible {
+            self.update_horizontal_bar_rect(new_horizontal_bar_visible, bounds_width, bounds_height);
+            self.update_vertical_bar_rect(new_vertical_bar_visible, bounds_width, bounds_height);
+
+            self.layout_content();
+            (body_width, body_height) = self.get_body_view_size();
+            (real_content_width, real_content_height) = self.element.get_real_content_size();
+        } else if new_horizontal_bar_visible {
+            self.update_horizontal_bar_rect(true, bounds_width, bounds_height);
+        }
+
+        // Update scroll offset
+        let scroll_left = self.element.get_scroll_left();
+        self.element.set_scroll_left(scroll_left);
+        let scroll_top = self.element.get_scroll_top();
+        self.element.set_scroll_top(scroll_top);
+        self.real_content_width = real_content_width;
+        self.real_content_height = real_content_height;
+        self.content_layout_dirty = false;
+    }
+
 
 }
 
@@ -252,7 +331,7 @@ impl ElementBackend for Scroll {
         ele.create_shadow();
         let mut base = Container::create(ele.clone());
 
-        let inst = Self {
+        let mut inst = ScrollData {
             scroll_bar_size: 14.0,
             element: ele.clone(),
             base,
@@ -268,7 +347,11 @@ impl ElementBackend for Scroll {
             horizontal_move_begin: None,
             content_auto_height: false,
             content_auto_width: false,
-        };
+            content_layout_dirty: true,
+        }.to_ref();
+        inst.element.style.set_measure_func(Some(measure_scroll));
+        let weak_ptr = inst.as_weak();
+        inst.element.style.set_context(Some(Context::new(weak_ptr)));
         inst
     }
 
@@ -276,51 +359,14 @@ impl ElementBackend for Scroll {
         "Scroll"
     }
 
+    fn before_origin_bounds_change(&mut self) {
+        self.content_layout_dirty = true;
+    }
+
     fn handle_origin_bounds_change(&mut self, bounds: &Rect) {
-        self.layout_content();
-
-        let (mut body_width, mut body_height) = self.get_body_view_size();
-        let (mut real_content_width, mut real_content_height) = self.element.get_real_content_size();
-
-        let old_vertical_bar_visible = !self.vertical_bar_rect.is_empty();
-        self.is_y_overflow = real_content_height > body_height;
-        let new_vertical_bar_visible = match self.vertical_bar_strategy {
-            Never => false,
-            Auto => self.is_y_overflow,
-            Always => true,
-        };
-        if old_vertical_bar_visible != new_vertical_bar_visible {
-            self.update_vertical_bar_rect(new_vertical_bar_visible, bounds.width, bounds.height);
-            self.layout_content();
-            (body_width, body_height) = self.get_body_view_size();
-            (real_content_width, real_content_height) = self.element.get_real_content_size();
-        } else if new_vertical_bar_visible {
-            self.update_vertical_bar_rect(true, bounds.width, bounds.height);
+        if self.content_layout_dirty {
+            self.do_layout_content(bounds.width, bounds.height);
         }
-
-        let old_horizontal_bar_visible = !self.horizontal_bar_rect.is_empty();
-        self.is_x_overflow = real_content_width > body_width;
-        let new_horizontal_bar_visible = match self.horizontal_bar_strategy {
-            Never => false,
-            Auto => self.is_x_overflow,
-            Always => true
-        };
-        if old_horizontal_bar_visible != new_horizontal_bar_visible {
-            self.update_horizontal_bar_rect(new_horizontal_bar_visible, bounds.width, bounds.height);
-            self.update_vertical_bar_rect(new_vertical_bar_visible, bounds.width, bounds.height);
-
-            self.layout_content();
-            (body_width, body_height) = self.get_body_view_size();
-            (real_content_width, real_content_height) = self.element.get_real_content_size();
-        } else if new_horizontal_bar_visible {
-            self.update_horizontal_bar_rect(true, bounds.width, bounds.height);
-        }
-
-        // Update scroll offset
-        self.element.set_scroll_left(self.element.get_scroll_left());
-        self.element.set_scroll_top(self.element.get_scroll_top());
-        self.real_content_width = real_content_width;
-        self.real_content_height = real_content_height;
     }
 
     fn add_child_view(&mut self, child: Element, position: Option<u32>) {

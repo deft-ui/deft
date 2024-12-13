@@ -140,4 +140,7 @@ impl ElementBackend for Image {
         canvas.restore();
     }
 
+    fn before_origin_bounds_change(&mut self) {
+
+    }
 }

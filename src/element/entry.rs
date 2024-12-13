@@ -576,6 +576,10 @@ impl ElementBackend for Entry {
         }
     }
 
+    fn before_origin_bounds_change(&mut self) {
+        self.base.before_origin_bounds_change();
+    }
+
     fn handle_origin_bounds_change(&mut self, bounds: &Rect) {
         self.base.handle_origin_bounds_change(bounds);
         //self.update_paint_offset(bounds.width, bounds.height);
