@@ -71,6 +71,7 @@ impl Entry {
             self.paragraph.clear();
             let lines = text.split('\n').collect::<Vec<&str>>();
             for ln in lines {
+                let ln = ln.trim_line_endings();
                 self.paragraph.add_line(Self::build_line(ln.to_string()));
             }
             self.update_caret_value(TextCoord::new((0, 0)), false);
@@ -285,11 +286,8 @@ impl Entry {
                         let caret = self.caret;
                         if self.paragraph.get_selection().is_none() {
                             if caret.0 > 0 || caret.1 > 0 {
-                                let start = if caret.1 == 0 {
-                                    TextCoord(caret.0 - 1, caret.1)
-                                } else {
-                                    TextCoord(caret.0, caret.1 - 1)
-                                };
+                                self.move_caret(-1);
+                                let start = self.caret;
                                 self.paragraph.select(start, caret);
                             }
                         }
@@ -409,11 +407,12 @@ impl Entry {
                 self.paragraph.update_line(caret.0, Self::build_line(new_text));
             } else {
                 let first_line = self.paragraph.get_line_text(start.0).unwrap();
-                self.paragraph.update_line(start.0, Self::build_line(first_line.substring(0, start.1).to_string()));
+                let left = first_line.substring(0, start.1).to_string();
                 let last_line = self.paragraph.get_line_text(end.0).unwrap();
-                self.paragraph.update_line(end.0, Self::build_line(last_line.substring(end.1, last_line.chars_count()).to_string()));
-                if end.0 - start.0 > 1 {
-                    for _ in start.0 + 1..end.0 {
+                let right = last_line.substring(end.1, last_line.chars_count()).to_string();
+                self.paragraph.update_line(start.0, Self::build_line(format!("{}{}", left, right)));
+                if end.0 > start.0 {
+                    for _ in start.0..end.0 {
                         self.paragraph.delete_line(start.0 + 1);
                     }
                 }
