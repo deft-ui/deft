@@ -890,9 +890,9 @@ fn draw_element(canvas: &Canvas, element: &Element) {
         canvas.save();
         if bounds.width > 0.0 && bounds.height > 0.0 {
             let (border_top_width, _, _, border_left_width) = element.get_border_width();
-            let (padding_top, _, _, padding_left) = element.get_padding();
+            // let (padding_top, _, _, padding_left) = element.get_padding();
             // draw content box
-            canvas.translate((padding_left + border_left_width, padding_top + border_top_width));
+            canvas.translate((border_left_width, border_top_width));
             element.get_backend().draw(canvas);
         }
         canvas.restore();

@@ -543,6 +543,7 @@ impl Element {
         )
     }
 
+    /// Return the padding of element (order: Top, Right, Bottom, Left)
     pub fn get_padding(&self) -> (f32, f32, f32, f32) {
         self.style.get_padding()
     }

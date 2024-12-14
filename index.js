@@ -40,8 +40,9 @@ function createTextEdit() {
     textEdit.setMultipleLine(true);
 
     textEdit.setStyle({
-        "height": 100,
-        "width": 100,
+        padding: 10,
+        // "height": 100,
+        // "width": 100,
         // "background": "#ccc",
         "border": "1 #ccc"
         // "minWidth": 600,

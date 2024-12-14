@@ -28,6 +28,7 @@ use crate::event::{KEY_MOD_CTRL, KEY_MOD_SHIFT, KeyEventDetail, MouseDownEvent, 
 use crate::event_loop::{create_event_loop_callback, create_event_loop_proxy};
 use crate::string::StringUtils;
 use crate::style::{StyleProp, StylePropKey, StylePropVal};
+use crate::style::StylePropKey::Height;
 use crate::timer::TimerHandle;
 
 const COPY_KEY: &str = "\x03";
@@ -52,6 +53,7 @@ pub struct Entry {
     element: Element,
     vertical_caret_moving_coord_x: f32,
     edit_history: EditHistory,
+    rows: u32,
 }
 
 pub type TextChangeHandler = dyn FnMut(&str);
@@ -92,9 +94,15 @@ impl Entry {
         } else {
             self.base.set_scroll_y(ScrollBarStrategy::Never);
         }
+        self.update_default_size();
         //self.base.set_text_wrap(multiple_line);
         //self.update_paint_offset(self.context.layout.get_layout_width(), self.context.layout.get_layout_height());
         self.element.clone().mark_dirty(true);
+    }
+
+    pub fn set_rows(&mut self, rows: u32) {
+        self.rows = rows;
+        self.update_default_size();
     }
 
     // pub fn get_font(&self) -> &Font {
@@ -112,6 +120,16 @@ impl Entry {
     // pub fn set_caret(&mut self, atom_offset: usize) {
     //     self.update_caret_value(atom_offset, false);
     // }
+
+    fn update_default_size(&mut self) {
+        if self.multiple_line {
+            let (_, line_height) = self.paragraph.measure_line(Self::build_line("a".to_string()));
+            let expected_height = (self.rows as f32 * line_height);
+            self.base.set_default_height(Some(expected_height));
+        } else {
+            self.base.set_default_height(None);
+        }
+    }
 
     fn move_caret(&mut self, mut delta: isize) {
         let mut row = self.caret.0;
@@ -503,6 +521,7 @@ impl ElementBackend for Entry {
             element: ele,
             vertical_caret_moving_coord_x: 0.0,
             edit_history: EditHistory::new(),
+            rows: 5,
         }.to_ref();
         inst.set_multiple_line(false);
         inst
@@ -532,8 +551,9 @@ impl ElementBackend for Entry {
         self.base.draw(canvas);
         if self.focusing && self.caret_visible.get() {
             paint.set_stroke_width(2.0);
-            let x = caret_rect.x - self.element.get_scroll_left();
-            let y = caret_rect.y - self.element.get_scroll_top();
+            let padding = self.element.get_padding();
+            let x = caret_rect.x - self.element.get_scroll_left() + padding.1;
+            let y = caret_rect.y - self.element.get_scroll_top() + padding.0;
             let start = (x, y);
             let end = (x, y + caret_rect.height);
             canvas.draw_line(start, end, &paint);

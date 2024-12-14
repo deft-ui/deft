@@ -60,11 +60,16 @@ extern "C" fn measure_scroll(
     if let Some(ctx) = Node::get_context(&node_ref) {
         if let Some(scroll) = ctx.downcast_ref::<ScrollWeak>() {
             if let Ok(mut s) = scroll.upgrade() {
-                s.do_layout_content(width, height);
-                return Size {
-                    width: s.real_content_width,
-                    height: s.real_content_height,
-                };
+                let width = s.default_width.unwrap_or(width);
+                let height = s.default_height.unwrap_or(height);
+                if s.default_width.is_none() || s.default_height.is_none() {
+                    s.do_layout_content(width, height);
+                }
+                let width = s.default_width.unwrap_or(s.real_content_width);
+                let height = s.default_height.unwrap_or(s.real_content_height);
+                let real_width = s.real_content_width;
+                let real_height = s.real_content_height;
+                return Size { width, height }
             }
         }
     }
@@ -96,6 +101,8 @@ pub struct Scroll {
     content_layout_dirty: bool,
     pub content_auto_width: bool,
     pub content_auto_height: bool,
+    default_width: Option<f32>,
+    default_height: Option<f32>,
 }
 
 impl Scroll {
@@ -109,13 +116,23 @@ impl Scroll {
         self.element.mark_dirty(true);
     }
 
+    pub fn set_default_height(&mut self, value: Option<f32>) {
+        self.default_height = value;
+        self.element.mark_dirty(true)
+    }
+
+    pub fn set_default_width(&mut self, value: Option<f32>) {
+        self.default_width = value;
+        self.element.mark_dirty(true);
+    }
+
     //TODO rename
     pub fn scroll_to_top(&mut self, top: f32) {
         self.element.set_scroll_top(top);
     }
 
-    fn layout_content(&mut self) {
-        let (width, height) = self.get_body_view_size();
+    fn layout_content(&mut self, bounds_width: f32, bounds_height: f32) {
+        let (width, height) = self.get_body_view_size(bounds_width, bounds_height);
         //TODO fix ltr
         // self.element.style.calculate_shadow_layout(width, height, LTR);
         let layout_width = if self.content_auto_width { f32::NAN } else { width };
@@ -129,8 +146,8 @@ impl Scroll {
         }
     }
 
-    fn get_body_view_size(&self) -> (f32, f32) {
-        let (mut width, mut height) = self.element.get_size();
+    fn get_body_view_size(&self, mut width: f32, mut height: f32) -> (f32, f32) {
+        // let (mut width, mut height) = self.element.get_size();
         // let (body_width, body_height) = self.body.get_size();
         width -= self.vertical_bar_rect.width;
         height -= self.horizontal_bar_rect.height;
@@ -274,9 +291,9 @@ impl Scroll {
     }
 
     fn do_layout_content(&mut self, bounds_width: f32, bounds_height: f32) {
-        self.layout_content();
+        self.layout_content(bounds_width, bounds_height);
 
-        let (mut body_width, mut body_height) = self.get_body_view_size();
+        let (mut body_width, mut body_height) = self.get_body_view_size(bounds_width, bounds_height);
         let (mut real_content_width, mut real_content_height) = self.element.get_real_content_size();
 
         let old_vertical_bar_visible = !self.vertical_bar_rect.is_empty();
@@ -288,8 +305,8 @@ impl Scroll {
         };
         if old_vertical_bar_visible != new_vertical_bar_visible {
             self.update_vertical_bar_rect(new_vertical_bar_visible, bounds_width, bounds_height);
-            self.layout_content();
-            (body_width, body_height) = self.get_body_view_size();
+            self.layout_content(bounds_width, bounds_height);
+            (body_width, body_height) = self.get_body_view_size(bounds_width, bounds_height);
             (real_content_width, real_content_height) = self.element.get_real_content_size();
         } else if new_vertical_bar_visible {
             self.update_vertical_bar_rect(true, bounds_width, bounds_height);
@@ -306,8 +323,8 @@ impl Scroll {
             self.update_horizontal_bar_rect(new_horizontal_bar_visible, bounds_width, bounds_height);
             self.update_vertical_bar_rect(new_vertical_bar_visible, bounds_width, bounds_height);
 
-            self.layout_content();
-            (body_width, body_height) = self.get_body_view_size();
+            self.layout_content(bounds_width, bounds_height);
+            (body_width, body_height) = self.get_body_view_size(bounds_width, bounds_height);
             (real_content_width, real_content_height) = self.element.get_real_content_size();
         } else if new_horizontal_bar_visible {
             self.update_horizontal_bar_rect(true, bounds_width, bounds_height);
@@ -348,6 +365,8 @@ impl ElementBackend for Scroll {
             content_auto_height: false,
             content_auto_width: false,
             content_layout_dirty: true,
+            default_width: None,
+            default_height: None,
         }.to_ref();
         inst.element.style.set_measure_func(Some(measure_scroll));
         let weak_ptr = inst.as_weak();
