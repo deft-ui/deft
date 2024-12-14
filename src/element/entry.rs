@@ -61,10 +61,12 @@ pub type TextChangeHandler = dyn FnMut(&str);
 #[js_methods]
 impl Entry {
 
+    #[js_func]
     pub fn get_text(&self) -> String {
         self.paragraph.get_text()
     }
 
+    #[js_func]
     pub fn set_text(&mut self, text: String) {
         let old_text = self.paragraph.get_text();
         if text != old_text {
@@ -104,6 +106,22 @@ impl Entry {
     pub fn set_rows(&mut self, rows: u32) {
         self.rows = rows;
         self.update_default_size();
+    }
+
+    #[js_func]
+    pub fn set_selection_by_char_offset(&mut self, start: usize, end: usize) {
+        if let Some(start_caret) = self.paragraph.get_text_coord_by_char_offset(start) {
+            if let Some(end_caret) = self.paragraph.get_text_coord_by_char_offset(end) {
+                self.paragraph.select(start_caret, end_caret);
+            }
+        }
+    }
+
+    #[js_func]
+    pub fn set_caret_by_char_offset(&mut self, char_offset: usize) {
+        if let Some(caret) = self.paragraph.get_text_coord_by_char_offset(char_offset) {
+            self.update_caret_value(caret, false);
+        }
     }
 
     // pub fn get_font(&self) -> &Font {
@@ -562,7 +580,7 @@ impl ElementBackend for Entry {
 
     fn set_property(&mut self, p: &str, v: JsValue) {
         let mut label = &mut self.paragraph;
-        js_call!("text", String, self, set_text, p, v);
+        // js_call!("text", String, self, set_text, p, v);
         js_call!("align", TextAlign, self, set_align, p, v);
         // js_call!("multipleline", bool, self, set_multiple_line, p, v);
     }

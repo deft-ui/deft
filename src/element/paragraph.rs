@@ -98,7 +98,7 @@ pub struct TextUnit {
 js_serialize!(TextUnit);
 js_deserialize!(TextUnit);
 
-#[derive(Ord, PartialOrd, Eq, PartialEq, Debug, Copy, Clone)]
+#[derive(Ord, PartialOrd, Eq, PartialEq, Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct TextCoord(pub usize, pub usize);
 
 impl TextCoord {
@@ -106,6 +106,8 @@ impl TextCoord {
         TextCoord(v.0, v.1)
     }
 }
+
+js_serialize!(TextCoord);
 
 #[element_backend]
 pub struct Paragraph {
@@ -413,6 +415,20 @@ impl Paragraph {
             row += 1;
         }
         TextCoord(0, 0)
+    }
+
+    #[js_func]
+    pub fn get_text_coord_by_char_offset(&self, caret: usize) -> Option<TextCoord> {
+        let mut col = caret;
+        let mut row = 0;
+        for ln in &self.lines {
+            if col <= ln.atom_count() {
+                return Some(TextCoord(row, col));
+            }
+            row += 1;
+            col -= ln.atom_count() + 1;
+        }
+        None
     }
 
     pub fn get_char_rect(&mut self, coord: TextCoord) -> Option<crate::base::Rect> {

@@ -941,7 +941,24 @@ export class EntryElement extends View {
      * @param text {string}
      */
     setText(text) {
-        Element_set_property(this.el, "text", text);
+        Entry_set_text(this.el, text);
+    }
+
+    /**
+     *
+     * @param start {number}
+     * @param end {number}
+     */
+    setSelectionByCharOffset(start, end) {
+        Entry_set_selection_by_char_offset(this.el, start, end)
+    }
+
+    /**
+     *
+     * @param charOffset {number}
+     */
+    setCaretByCharOffset(charOffset) {
+        Entry_set_caret_by_char_offset(this.el, charOffset);
     }
 
     /**
@@ -958,7 +975,7 @@ export class EntryElement extends View {
      * @returns {string}
      */
     getText() {
-        return Element_get_property(this.el, "text");
+        return Entry_get_text(this.el);
     }
 
     bindTextChange(callback) {
