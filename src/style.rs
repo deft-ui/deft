@@ -1179,7 +1179,7 @@ impl StyleNode {
         self.inner.children.insert(index as usize, child.clone());
         child.parent = Some(self.inner.as_weak());
         self.with_container_node_mut(|n| {
-            n.insert_child(&mut child.inner.yoga_node, index)
+            n.insert_child(&mut child.inner.yoga_node, index as usize)
         })
     }
 
