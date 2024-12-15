@@ -691,9 +691,11 @@ impl ElementBackend for Paragraph {
 
     fn on_event(&mut self, event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
         if let Some(e) = event.downcast_ref::<MouseDownEvent>() {
-            let event = e.0;
-            let begin_coord = self.get_text_coord_by_pixel_coord((event.offset_x, event.offset_y));
-            self.begin_select(begin_coord);
+            if e.0.button == 1 {
+                let event = e.0;
+                let begin_coord = self.get_text_coord_by_pixel_coord((event.offset_x, event.offset_y));
+                self.begin_select(begin_coord);
+            }
         } else if let Some(e) = event.downcast_ref::<MouseMoveEvent>() {
             let event = e.0;
             if self.selecting_begin.is_some() {
@@ -709,8 +711,10 @@ impl ElementBackend for Paragraph {
                 }
             }
         } else if let Some(e) = event.downcast_ref::<MouseUpEvent>() {
-            self.end_select();
-            self.element.emit(SelectEndEvent);
+            if e.0.button == 1 {
+                self.end_select();
+                self.element.emit(SelectEndEvent);
+            }
         }
     }
 
