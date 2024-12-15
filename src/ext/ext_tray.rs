@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::cell::Cell;
 use ksni::MenuItem::{Checkmark, Separator};
 use winit::event_loop::EventLoopProxy;
-use crate::{define_resource, js_deserialize, js_value};
+use crate::{js_deserialize, js_value};
 
 struct MyTray {
     tray_id: String,

@@ -117,7 +117,8 @@ pub struct Paragraph {
     /// Option<(start coord, end coord)>
     selection: Option<(TextCoord, TextCoord)>,
     selecting_begin: Option<TextCoord>,
-    selection_paint: Paint,
+    selection_bg: Paint,
+    selection_fg: Paint,
 }
 
 pub struct Line {
@@ -188,6 +189,56 @@ impl Line {
     pub fn get_char_bounds(&mut self, char_offset: usize) -> Option<Rect> {
         let gc = self.sk_paragraph.get_glyph_info_at_utf16_offset(char_offset);
         gc.map(|g| g.grapheme_layout_bounds)
+    }
+
+    pub fn get_utf8_offset(&self, char_offset: usize) -> usize {
+        if char_offset == 0 {
+            0
+        } else {
+            self.get_text().substring(0, char_offset).len()
+        }
+    }
+
+    fn paint_selection(
+        &mut self,
+        canvas: &Canvas,
+        line_offset: (f32,f32),
+        selection: (usize, usize),
+        bg_paint: &Paint,
+        fg_paint: &Paint,
+    ) {
+        let (start_offset, end_offset) = selection;
+        let line_offset = Point { x: line_offset.0, y: line_offset.1 };
+        for i in start_offset..end_offset {
+            if let Some(mut char_rect) = self.get_char_bounds(i) {
+                char_rect.offset(line_offset);
+                canvas.draw_rect(&char_rect, &bg_paint);
+            }
+        }
+
+        let begin_utf8_offset = self.get_utf8_offset(start_offset);
+        let end_utf8_offset = self.get_utf8_offset(end_offset);
+        self.sk_paragraph.visit(move |ln_no, info| {
+            if let Some(info) = info {
+                let glyphs = info.glyphs();
+                let positions = info.positions();
+                let mut origin = info.origin();
+                let starts = info.utf8_starts();
+                origin.offset(line_offset);
+                for i in 0..glyphs.len() {
+                    let utf8_offset = starts[i] as usize;
+                    if utf8_offset >= begin_utf8_offset && utf8_offset < end_utf8_offset {
+                        canvas.draw_glyphs_at(
+                            &glyphs[i..i+1],
+                            &positions[i..i+1],
+                            origin,
+                            info.font(),
+                            &fg_paint
+                        );
+                    }
+                }
+            }
+        });
     }
 
     fn rebuild_paragraph(&mut self, paragraph_params: &ParagraphParams) {
@@ -475,6 +526,7 @@ impl Paragraph {
         self.selection
     }
 
+    #[js_func]
     pub fn get_selection_text(&self) -> Option<String> {
         let selection = self.selection.as_ref()?;
         let start = selection.0;
@@ -604,15 +656,18 @@ impl ElementBackend for Paragraph {
         let units = Vec::new();
         let paragraph = Self::build_paragraph(&params, &units);
 
-        let mut selection_paint = Paint::default();
-        selection_paint.set_color(parse_hex_color("214283").unwrap());
+        let mut selection_bg = Paint::default();
+        selection_bg.set_color(parse_hex_color("214283").unwrap());
+        let mut selection_fg = Paint::default();
+        selection_fg.set_color(Color::from_rgb(255, 255, 255));
         let this = ParagraphData {
             lines: Vec::new(),
             element: element.clone(),
             params,
             selection: None,
             selecting_begin: None,
-            selection_paint,
+            selection_bg,
+            selection_fg,
         }
         .to_ref();
         element
@@ -673,19 +728,23 @@ impl ElementBackend for Paragraph {
                     break;
                 }
             }
+            ln.sk_paragraph.paint(canvas, (0.0, ln_top));
+
             let atom_count = ln.atom_count();
             if atom_count > 0 {
                 if let Some(selection_range) = self.selection {
                     let ln_range = (TextCoord(ln_row, 0), TextCoord(ln_row, atom_count));
                     if let Some((begin, end)) = intersect_range(selection_range, ln_range) {
-                        let left = ln.get_char_bounds(begin.1).unwrap().left;
-                        let right = ln.get_char_bounds(end.1 - 1).unwrap().right;
-                        let bounds = Rect::new(left, ln_top, right, ln_bottom);
-                        canvas.draw_rect(&bounds, &self.selection_paint);
+                        ln.paint_selection(
+                            canvas,
+                            (0.0, ln_top),
+                            (begin.1, end.1),
+                            &self.selection_bg,
+                            &self.selection_fg
+                        );
                     }
                 }
             }
-            ln.sk_paragraph.paint(canvas, (0.0, ln_top));
         }
     }
 

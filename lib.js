@@ -897,6 +897,14 @@ export class ParagraphElement extends View {
         return Paragraph_measure_line(this.#paragraph, units);
     }
 
+    /**
+     *
+     * @returns {string | undefined}
+     */
+    getSelectionText() {
+        return Paragraph_get_selection_text(this.#paragraph);
+    }
+
 }
 
 export class ImageElement extends View {
