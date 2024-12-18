@@ -68,6 +68,10 @@ impl App {
         }
     }
 
+    fn execute_pending_jobs(&mut self) {
+        self.js_engine.execute_pending_jobs();
+    }
+
 }
 
 impl ApplicationHandler<AppEvent> for App {
@@ -76,6 +80,7 @@ impl ApplicationHandler<AppEvent> for App {
             let uninitialized = FRAMES.with(|m| m.borrow().is_empty());
             if uninitialized {
                 self.js_engine.execute_main();
+                self.execute_pending_jobs();
             } else {
                 FRAMES.with_borrow_mut(|m| {
                     m.iter_mut().for_each(|(_, f)| {
@@ -112,24 +117,21 @@ impl ApplicationHandler<AppEvent> for App {
                     frame_input(frame_id, content);
                 },
             }
+            self.execute_pending_jobs();
         });
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
         run_event_loop_task(event_loop, move || {
             self.js_engine.handle_window_event(window_id, event);
+            self.execute_pending_jobs();
         });
     }
 
     fn device_event(&mut self, event_loop: &ActiveEventLoop, device_id: DeviceId, event: DeviceEvent) {
         run_event_loop_task(event_loop, move || {
             self.js_engine.handle_device_event(device_id, event);
-        });
-    }
-
-    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-        run_event_loop_task(event_loop, move || {
-            self.js_engine.execute_pending_jobs();
+            self.execute_pending_jobs();
         });
     }
 
