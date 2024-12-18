@@ -916,20 +916,6 @@ export class ImageElement extends View {
     }
 }
 
-export class ButtonElement extends View {
-    constructor() {
-        super(VT_BUTTON);
-    }
-
-    /**
-     *
-     * @param title {string}
-     */
-    setTitle(title) {
-        Element_set_property(this.el, "title", title);
-    }
-
-}
 
 export class EntryElement extends View {
     constructor() {
@@ -1124,6 +1110,12 @@ class ContainerBasedElement extends View {
         } else {
             console.log("remove child failed")
         }
+    }
+}
+
+export class ButtonElement extends ContainerBasedElement {
+    constructor() {
+        super(VT_BUTTON);
     }
 }
 

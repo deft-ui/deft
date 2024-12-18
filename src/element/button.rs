@@ -1,75 +1,92 @@
+use std::any::Any;
+use anyhow::Error;
 use ordered_float::OrderedFloat;
 use quick_js::JsValue;
 use skia_safe::{Canvas, Color};
 use yoga::{Edge, StyleUnit};
-use crate::base::PropertyValue;
-use crate::element::{ElementBackend, Element};
+use crate::base::{EventContext, PropertyValue, Rect};
+use crate::element::{ElementBackend, Element, ElementWeak};
+use crate::element::container::Container;
 use crate::element::label::Label;
 use crate::style::StylePropKey;
 
 pub struct Button {
-    label: Label,
-    element: Option<Element>,
+    base: Container,
+    element: Element,
 }
 
-impl Button {
-
-    pub fn set_title(&mut self, title: String) {
-        self.label.set_text(title);
-    }
-
-    pub fn get_title(&self) -> &str {
-        self.label.get_text()
-    }
-}
+impl Button {}
 
 impl ElementBackend for Button {
-    fn create(mut context: Element) -> Self {
-        let mut inst = Self {
-            label: Label::create(context.clone()),
-            element: None,
-        };
-        context.style.set_margin(Edge::Top, StyleUnit::Point(OrderedFloat(4.0)));
-        context.style.set_margin(Edge::Right, StyleUnit::Point(OrderedFloat(4.0)));
-        context.style.set_margin(Edge::Bottom, StyleUnit::Point(OrderedFloat(4.0)));
-        context.style.set_margin(Edge::Left, StyleUnit::Point(OrderedFloat(4.0)));
+    fn create(mut element: Element) -> Self {
+        let base = Container::create(element.clone());
 
-        context.style.set_padding(Edge::Left, StyleUnit::Point(OrderedFloat(4.0)));
-        context.style.set_padding(Edge::Right, StyleUnit::Point(OrderedFloat(4.0)));
+        element.style.set_margin(Edge::Top, StyleUnit::Point(OrderedFloat(4.0)));
+        element.style.set_margin(Edge::Right, StyleUnit::Point(OrderedFloat(4.0)));
+        element.style.set_margin(Edge::Bottom, StyleUnit::Point(OrderedFloat(4.0)));
+        element.style.set_margin(Edge::Left, StyleUnit::Point(OrderedFloat(4.0)));
 
-        context.style.set_border(Edge::Top, 1.0);
-        context.style.set_border(Edge::Right, 1.0);
-        context.style.set_border(Edge::Bottom, 1.0);
-        context.style.set_border(Edge::Left, 1.0);
+        element.style.set_padding(Edge::Left, StyleUnit::Point(OrderedFloat(4.0)));
+        element.style.set_padding(Edge::Right, StyleUnit::Point(OrderedFloat(4.0)));
+
+        element.style.set_border(Edge::Top, 1.0);
+        element.style.set_border(Edge::Right, 1.0);
+        element.style.set_border(Edge::Bottom, 1.0);
+        element.style.set_border(Edge::Left, 1.0);
         let color = Color::from_rgb(128, 128, 128);
-        context.style.border_color = [color, color, color, color];
-        inst.element = Some(context);
-        inst
+        element.style.border_color = [color, color, color, color];
+        Self {
+            base,
+            element: element.clone(),
+        }
     }
 
     fn get_name(&self) -> &str {
         "Button"
     }
 
-    fn draw(&self, canvas: &Canvas) {
-        self.label.draw(canvas);
-    }
-
-    fn set_property(&mut self, property_name: &str, property_value: JsValue) {
-        if let Some(str) = property_value.as_str() {
-            match property_name {
-                "title" => self.set_title(str.to_string()),
-                _ => {}
-            }
-        }
-
-    }
-
     fn handle_style_changed(&mut self, key: StylePropKey) {
-        self.label.handle_style_changed(key)
+        self.base.handle_style_changed(key);
+    }
+
+
+    fn draw(&self, canvas: &Canvas) {
+        self.base.draw(canvas);
+    }
+
+    fn set_property(&mut self, _property_name: &str, _property_value: JsValue) {
+        self.base.set_property(_property_name, _property_value);
+    }
+
+    fn get_property(&mut self, _property_name: &str) -> Result<Option<JsValue>, Error> {
+        self.base.get_property(_property_name)
+    }
+
+    fn on_event(&mut self, event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
+        self.base.on_event(event, ctx);
+    }
+
+    fn execute_default_behavior(&mut self, event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) -> bool {
+        self.base.execute_default_behavior(event, ctx)
     }
 
     fn before_origin_bounds_change(&mut self) {
+        self.base.before_origin_bounds_change();
+    }
 
+    fn handle_origin_bounds_change(&mut self, bounds: &Rect) {
+        self.base.handle_origin_bounds_change(bounds)
+    }
+
+    fn add_child_view(&mut self, child: Element, position: Option<u32>) {
+        self.base.add_child_view(child, position);
+    }
+
+    fn remove_child_view(&mut self, position: u32) {
+        self.base.remove_child_view(position);
+    }
+
+    fn get_children(&self) -> Vec<Element> {
+        self.base.get_children()
     }
 }

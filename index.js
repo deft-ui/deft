@@ -50,6 +50,12 @@ function createTextEdit() {
     return textEdit;
 }
 
+function createLabel(text) {
+    const label = new LabelElement();
+    label.setText(text);
+    return label;
+}
+
 function main() {
     runWorker();
     createSystemTray();
@@ -96,7 +102,7 @@ function main() {
     // container.addChild(img);
     //
     const button = new ButtonElement();
-    button.setTitle("Add children");
+    button.addChild(createLabel("Add children"));
     button.bindClick(() => {
         const wrapper = new ContainerElement();
         wrapper.setStyle({
@@ -127,7 +133,7 @@ function main() {
     animationButton.setStyle({
         width: 100,
     });
-    animationButton.setTitle("Animation");
+    animationButton.addChild(createLabel("Animation"));
     animation_create("rotate", {
         "0": {
             //width: 100,
