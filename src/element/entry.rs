@@ -103,6 +103,7 @@ impl Entry {
         self.element.clone().mark_dirty(true);
     }
 
+    #[js_func]
     pub fn set_rows(&mut self, rows: u32) {
         self.rows = rows;
         self.update_default_size();

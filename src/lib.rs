@@ -24,7 +24,9 @@ use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 use std::collections::HashMap;
 use std::env;
 use std::str::FromStr;
+use std::sync::OnceLock;
 use std::time::SystemTime;
+use anyhow::{anyhow, Error};
 use tokio_tungstenite::connect_async;
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
@@ -76,12 +78,14 @@ mod typeface;
 
 pub use lento_macros::*;
 
-#[cfg(target_os = "android")]
-use winit::platform::android::activity::AndroidApp;
-
+pub static APP_EVENT_PROXY: OnceLock<EventLoopProxy<AppEvent>> = OnceLock::new();
 
 fn run_event_loop(event_loop: EventLoop<AppEvent>, lento_app: Box<dyn LentoApp>) {
     let el_proxy = event_loop.create_proxy();
+    {
+        let el_proxy = el_proxy.clone();
+        APP_EVENT_PROXY.get_or_init(move || el_proxy);
+    }
     let mut app = App::new(lento_app, el_proxy);
     event_loop.run_app(&mut app).unwrap();
 }
@@ -89,6 +93,19 @@ fn run_event_loop(event_loop: EventLoop<AppEvent>, lento_app: Box<dyn LentoApp>)
 pub fn bootstrap(lento_app: Box<dyn LentoApp>) {
     let event_loop: EventLoop<AppEvent> = EventLoop::with_user_event().build().unwrap();
     run_event_loop(event_loop, lento_app);
+}
+
+pub fn send_app_event(event: AppEvent) -> Result<(), Error> {
+    let proxy = APP_EVENT_PROXY.get().ok_or_else(|| anyhow!("no app event proxy found"))?;
+    proxy.send_event(event)?;
+    Ok(())
+}
+
+pub fn is_mobile_platform() -> bool {
+    #[cfg(mobile_platform)]
+    return true;
+    #[cfg(not(mobile_platform))]
+    return false;
 }
 
 #[cfg(target_os = "android")]

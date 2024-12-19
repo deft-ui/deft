@@ -50,8 +50,9 @@ struct TouchingInfo {
     start_time: SystemTime,
     times: u32,
     max_identifiers: usize,
+    start_point: (f32, f32),
+    scrolled: bool,
     touches: HashMap<u64, Touch>,
-    click_timer_handle: Option<TimerHandle>,
 }
 
 const MOUSE_AS_TOUCH: bool = false;
@@ -186,7 +187,8 @@ impl Frame {
                 times: 0,
                 max_identifiers: 0,
                 touches: Default::default(),
-                click_timer_handle: None,
+                scrolled: false,
+                start_point: (0.0, 0.0),
             },
             frame_type,
             init_width: attrs.width,
@@ -584,13 +586,14 @@ impl Frame {
                     if self.touching.touches.is_empty() {
                         if SystemTime::now().duration_since(self.touching.start_time).unwrap().as_millis() < 300 {
                             self.touching.times += 1;
-                            self.touching.click_timer_handle = None;
                         } else {
                             self.touching.start_time = SystemTime::now();
                             self.touching.times = 1;
                         }
                     }
                     self.touching.touches.insert(identifier, touch_info);
+                    self.touching.scrolled = false;
+                    self.touching.start_point = (frame_x, frame_y);
                 }
                 TouchPhase::Moved => {
                     if let Some(e) = self.touching.touches.get_mut(&identifier) {
@@ -599,6 +602,9 @@ impl Frame {
                         e.frame_x = frame_x;
                         e.frame_y = frame_y;
                     }
+                    self.touching.scrolled = self.touching.scrolled
+                        || (frame_x - self.touching.start_point.0).abs() > 5.0
+                        || (frame_y - self.touching.start_point.1).abs() > 5.0;
                 }
                 TouchPhase::Cancelled => {
                     self.touching.touches.remove(&identifier);
@@ -616,7 +622,7 @@ impl Frame {
                     node.emit(TouchStartEvent(touch_detail));
                 }
                 TouchPhase::Moved => {
-                    println!("touch move:{:?}", &touch_detail);
+                    // println!("touch move:{:?}", &touch_detail);
                     node.emit(TouchMoveEvent(touch_detail));
                 }
                 TouchPhase::Ended => {
@@ -624,15 +630,14 @@ impl Frame {
                     node.emit(TouchEndEvent(touch_detail));
                     if self.touching.max_identifiers == 1
                         && self.touching.times == 1
+                        && !self.touching.scrolled
                         && SystemTime::now().duration_since(self.touching.start_time).unwrap().as_millis() < 1000
                     {
                         let mut node = node.clone();
                         self.focus(node.clone());
-                        self.touching.click_timer_handle = Some(set_timeout(move || {
-                            println!("clicked");
-                            //TODO fix screen_x, screen_y
-                            emit_mouse_event(&mut node, MouseClick, 0, frame_x, frame_y, 0.0, 0.0);
-                        }, 300));
+                        println!("clicked");
+                        //TODO fix screen_x, screen_y
+                        emit_mouse_event(&mut node, MouseClick, 0, frame_x, frame_y, 0.0, 0.0);
                     }
                 }
                 TouchPhase::Cancelled => {

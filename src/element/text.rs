@@ -605,6 +605,8 @@ impl ElementBackend for Text {
         //     paint.set_color(parse_hex_color("ccc").unwrap());
         //     canvas.draw_rect(clip_r, &paint);
         // }
+        let padding = self.element.get_padding();
+        canvas.translate((padding.3, padding.0));
         self.with_lines_mut(|p_list| {
             let mut top = 0.0;
             let mut line_atom_offset = 0;

@@ -1,12 +1,15 @@
 use crate as lento;
 use std::any::Any;
 use std::str::FromStr;
+use bezier_rs::{Bezier, TValue};
 use lento_macros::element_backend;
 use quick_js::JsValue;
-use skia_safe::{Canvas, Paint};
+use skia_safe::{Canvas, Color, Paint};
+use tokio::time::Instant;
 use yoga::Direction::LTR;
-use yoga::{Context, MeasureMode, Node, NodeRef, Size};
-use crate::{backend_as_api, js_call};
+use yoga::{Context, MeasureMode, Node, NodeRef, Size, StyleUnit};
+use crate::{backend_as_api, is_mobile_platform, js_call};
+use crate::animation::{AnimationDef, AnimationInstance, SimpleFrameController};
 use crate::base::{CaretDetail, ElementEvent, EventContext, Rect};
 use crate::color::parse_hex_color;
 use crate::element::{ElementBackend, Element, ViewEvent, ElementWeak};
@@ -15,10 +18,16 @@ use crate::element::paragraph::ParagraphWeak;
 use crate::element::scroll::ScrollBarStrategy::{Always, Auto, Never};
 use crate::event::{CaretChangeEvent, MouseDownEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent};
 use crate::js::js_runtime::FromJsValue;
+use crate::style::{StyleProp, StylePropVal};
 
-const BACKGROUND_COLOR: &str = "1E1F22";
+const MOMENTUM_DURATION: u128 = 200;
+const MOMENTUM_DISTANCE: f32 = 16.0;
 
-const INDICATOR_COLOR: &str = "444446";
+struct MomentumInfo {
+    start_time: Instant,
+    start_left: f32,
+    start_top: f32,
+}
 
 pub enum ScrollBarStrategy {
     Never,
@@ -84,6 +93,8 @@ pub struct Scroll {
     scroll_bar_size: f32,
     element: Element,
     base: Container,
+    bar_background_color: Color,
+    indicator_color: Color,
     vertical_bar_strategy: ScrollBarStrategy,
     horizontal_bar_strategy: ScrollBarStrategy,
 
@@ -103,6 +114,9 @@ pub struct Scroll {
     pub content_auto_height: bool,
     default_width: Option<f32>,
     default_height: Option<f32>,
+
+    momentum_info: Option<MomentumInfo>,
+    momentum_animation_instance: Option<AnimationInstance>,
 }
 
 impl Scroll {
@@ -149,8 +163,10 @@ impl Scroll {
     fn get_body_view_size(&self, mut width: f32, mut height: f32) -> (f32, f32) {
         // let (mut width, mut height) = self.element.get_size();
         // let (body_width, body_height) = self.body.get_size();
-        width -= self.vertical_bar_rect.width;
-        height -= self.horizontal_bar_rect.height;
+        if !is_mobile_platform() {
+            width -= self.vertical_bar_rect.width;
+            height -= self.horizontal_bar_rect.height;
+        }
 
         width = f32::max(0.0, width);
         height = f32::max(0.0, height);
@@ -305,7 +321,9 @@ impl Scroll {
         };
         if old_vertical_bar_visible != new_vertical_bar_visible {
             self.update_vertical_bar_rect(new_vertical_bar_visible, bounds_width, bounds_height);
-            self.layout_content(bounds_width, bounds_height);
+            if !is_mobile_platform() {
+                self.layout_content(bounds_width, bounds_height);
+            }
             (body_width, body_height) = self.get_body_view_size(bounds_width, bounds_height);
             (real_content_width, real_content_height) = self.element.get_real_content_size();
         } else if new_vertical_bar_visible {
@@ -322,8 +340,9 @@ impl Scroll {
         if old_horizontal_bar_visible != new_horizontal_bar_visible {
             self.update_horizontal_bar_rect(new_horizontal_bar_visible, bounds_width, bounds_height);
             self.update_vertical_bar_rect(new_vertical_bar_visible, bounds_width, bounds_height);
-
-            self.layout_content(bounds_width, bounds_height);
+            if !is_mobile_platform() {
+                self.layout_content(bounds_width, bounds_height);
+            }
             (body_width, body_height) = self.get_body_view_size(bounds_width, bounds_height);
             (real_content_width, real_content_height) = self.element.get_real_content_size();
         } else if new_horizontal_bar_visible {
@@ -347,11 +366,14 @@ impl ElementBackend for Scroll {
     fn create(mut ele: Element) -> Self {
         ele.create_shadow();
         let mut base = Container::create(ele.clone());
+        let is_mobile_platform = is_mobile_platform();
 
         let mut inst = ScrollData {
-            scroll_bar_size: 14.0,
+            scroll_bar_size: if is_mobile_platform { 4.0 } else { 14.0 },
             element: ele.clone(),
             base,
+            bar_background_color: parse_hex_color(if is_mobile_platform { "0000" } else { "1E1F22" } ).unwrap(),
+            indicator_color: parse_hex_color(if is_mobile_platform { "66666644" } else { "444446" }).unwrap(),
             horizontal_bar_strategy: Auto,
             vertical_bar_strategy: Auto,
             is_x_overflow: false,
@@ -367,6 +389,8 @@ impl ElementBackend for Scroll {
             content_layout_dirty: true,
             default_width: None,
             default_height: None,
+            momentum_info: None,
+            momentum_animation_instance: None,
         }.to_ref();
         inst.element.style.set_measure_func(Some(measure_scroll));
         let weak_ptr = inst.as_weak();
@@ -445,18 +469,76 @@ impl ElementBackend for Scroll {
             let touch = unsafe { d.touches.get_unchecked(0) };
             self.begin_scroll_x(-touch.frame_x);
             self.begin_scroll_y(-touch.frame_y);
+            self.momentum_info = Some(MomentumInfo {
+                start_time: Instant::now(),
+                start_left: self.element.get_scroll_left(),
+                start_top: self.element.get_scroll_top(),
+            });
+            self.momentum_animation_instance = None;
             return true;
         } else if let Some(e) = event.downcast_mut::<TouchMoveEvent>() {
             let d = &e.0;
             let touch = unsafe { d.touches.get_unchecked(0) };
             self.update_scroll_x(-touch.frame_x, false);
             self.update_scroll_y(-touch.frame_y, false);
+            let left = self.element.get_scroll_left();
+            let top = self.element.get_scroll_top();
+            if let Some(momentum_info) = &mut self.momentum_info {
+                if momentum_info.start_time.elapsed().as_millis() > MOMENTUM_DURATION {
+                    momentum_info.start_time = Instant::now();
+                    momentum_info.start_left = left;
+                    momentum_info.start_top = top;
+                }
+            }
             return true;
         } else if let Some(e) = event.downcast_mut::<TouchEndEvent>() {
+            if let Some(momentum_info) = &self.momentum_info {
+                let duration = momentum_info.start_time.elapsed().as_millis();
+                let horizontal_distance = self.element.get_scroll_left() - momentum_info.start_left;
+                let vertical_distance = self.element.get_scroll_top() - momentum_info.start_top;
+                let max_distance = f32::max(horizontal_distance.abs(), vertical_distance.abs());
+                if duration < MOMENTUM_DURATION && max_distance > MOMENTUM_DISTANCE {
+                    let horizontal_speed = horizontal_distance / duration as f32;
+                    let vertical_speed = vertical_distance / duration as f32;
+                    // println!("speed: {} {}", horizontal_speed, vertical_speed);
+                    let old_left = self.element.get_scroll_left();
+                    let old_top = self.element.get_scroll_top();
+                    let left_dist = horizontal_speed / 0.003;
+                    let top_dist = vertical_speed / 0.003;
+
+                    //TODO Don't use RowGap/ColumnGap
+                    let animation = AnimationDef::new()
+                        .key_frame(0.0, vec![StyleProp::RowGap(StylePropVal::Custom(0.0)), StyleProp::ColumnGap(StylePropVal::Custom(0.0))])
+                        .key_frame(1.0, vec![StyleProp::RowGap(StylePropVal::Custom(1.0)), StyleProp::ColumnGap(StylePropVal::Custom(1.0))])
+                        .build();
+                    let frame_controller = SimpleFrameController::new();
+                    let mut animation_instance = AnimationInstance::new(animation, 1000.0 * 1000000.0, 1.0, Box::new(frame_controller));
+                    let mut ele = self.element.clone();
+                    let timing_func = Bezier::from_cubic_coordinates(0.0, 0.0, 0.17, 0.89, 0.45, 1.0, 1.0, 1.0);
+                    animation_instance.run(Box::new(move |styles| {
+                        for style in styles {
+                            match style {
+                                StyleProp::RowGap(value) => {
+                                    let new_left = old_left + left_dist * timing_func.evaluate(TValue::Parametric(value.resolve(&0.0) as f64)).y as f32;
+                                    ele.set_scroll_left(new_left);
+                                },
+                                StyleProp::ColumnGap(value) => {
+                                    let new_top = old_top + top_dist * timing_func.evaluate(TValue::Parametric(value.resolve(&0.0) as f64)).y as f32;
+                                    ele.set_scroll_top(new_top);
+                                },
+                                _ => {}
+                            }
+                        }
+                    }));
+                    self.momentum_animation_instance = Some(animation_instance);
+                }
+            }
+            self.momentum_info = None;
             self.end_scroll();
             return true;
         } else if let Some(e) = event.downcast_mut::<TouchCancelEvent>() {
             self.end_scroll();
+            self.momentum_info = None;
             return true;
         } else if let Some(d) = event.downcast_mut::<CaretChangeEvent>() {
             self.handle_caret_change(d);
@@ -470,10 +552,10 @@ impl ElementBackend for Scroll {
 
     fn draw(&self, canvas: &Canvas) {
         let mut paint = Paint::default();
-        paint.set_color(parse_hex_color(BACKGROUND_COLOR).unwrap());
+        paint.set_color(self.bar_background_color);
 
         let mut indicator_paint = Paint::default();
-        indicator_paint.set_color(parse_hex_color(INDICATOR_COLOR).unwrap());
+        indicator_paint.set_color(self.indicator_color);
 
         if !self.vertical_bar_rect.is_empty() {
             canvas.draw_rect(self.vertical_bar_rect.to_skia_rect(), &paint);

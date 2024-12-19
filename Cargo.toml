@@ -46,6 +46,7 @@ jni = "0.21.1"
 tokio-util = { version = "0.7.12", features = ["codec"] }
 maplit = "1.0.2"
 rusqlite = { version = "0.32.0", features = ["bundled"] }
+bezier-rs = "0.4.0"
 
 [features]
 default=[]
@@ -69,6 +70,9 @@ serial_test = "3.0"
 static_assertions = "1.1"
 
 raw-window-handle = { version = "0.5.0" }
+
+[build-dependencies]
+cfg_aliases = "0.2.1"
 
 #[lib]
 #name = "lento"

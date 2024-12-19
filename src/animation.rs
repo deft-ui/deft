@@ -120,6 +120,9 @@ fn interpolate(pre_position: f32, pre_value: StyleProp, next_position: f32, next
         Bottom => interpolate_style_unit,
         Left => interpolate_style_unit,
 
+        RowGap => interpolate_f32,
+        ColumnGap => interpolate_f32,
+
         Transform => interpolate_transform,
     );
     None
@@ -237,7 +240,7 @@ impl AnimationInstance {
     fn render_frame(mut state: Mrc<AnimationState>, now: f32, mut renderer: Box<dyn FnMut(Vec<StyleProp>)>) {
         let elapsed = now - state.start_time;
         let position = elapsed / state.duration;
-        let frame = if position > state.iteration_count || state.stopped {
+        let frame = if position >= state.iteration_count || state.stopped {
             Vec::new()
         } else {
             state.animation.get_frame(position - position as usize as f32)

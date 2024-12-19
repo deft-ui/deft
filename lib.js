@@ -972,6 +972,14 @@ export class EntryElement extends View {
         return Entry_get_text(this.el);
     }
 
+    /**
+     *
+     * @param rows {number}
+     */
+    setRows(rows) {
+        Entry_set_rows(this.el, rows);
+    }
+
     bindTextChange(callback) {
         this.bindEvent("textchange", callback);
     }
