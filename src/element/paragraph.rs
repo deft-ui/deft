@@ -31,7 +31,7 @@ use skia_safe::wrapper::NativeTransmutableWrapper;
 use winit::keyboard::NamedKey;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 use crate::base::{ElementEvent, EventContext, MouseDetail, MouseEventType};
-use crate::event::{FocusShiftEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent, SelectEndEvent, SelectMoveEvent, SelectStartEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
+use crate::event::{FocusShiftEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent, SelectEndEvent, SelectMoveEvent, SelectStartEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
 use crate::typeface::get_font_mgr;
 
 const DEFAULT_FONT_NAME: &str = "system-ui";
@@ -405,6 +405,10 @@ impl Paragraph {
         self.element.mark_dirty(false);
     }
 
+    pub fn is_selecting(&self) -> bool {
+        self.selecting_begin.is_some()
+    }
+
     pub fn unselect(&mut self) {
         self.selection = None;
         self.element.mark_dirty(false);
@@ -418,6 +422,37 @@ impl Paragraph {
             row: caret.0,
             col: caret.1,
         });
+    }
+
+    fn selection_start(&mut self, point: (f32, f32)) {
+        let begin_coord = self.get_text_coord_by_pixel_coord(point);
+        self.begin_select(begin_coord);
+    }
+
+    fn selection_update(&mut self, point: (f32, f32)) -> bool {
+        if self.selecting_begin.is_some() {
+            let caret = self.get_text_coord_by_pixel_coord(point);
+            if let Some(sb) = self.selecting_begin {
+                self.element.emit(SelectMoveEvent{
+                    row: caret.0,
+                    col: caret.1,
+                });
+                let start = TextCoord::min(sb, caret);
+                let end = TextCoord::max(sb, caret);
+                self.select(start, end);
+                return true;
+            }
+        }
+        false
+    }
+
+    fn selection_end(&mut self) -> bool {
+        if self.selecting_begin.is_some() {
+            self.end_select();
+            self.element.emit(SelectEndEvent);
+            return true;
+        }
+        false
     }
 
     fn end_select(&mut self) {
@@ -749,40 +784,29 @@ impl ElementBackend for Paragraph {
     }
 
     fn on_event(&mut self, event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
-        if let Some(e) = event.downcast_ref::<MouseDownEvent>() {
-            if e.0.button == 1 {
-                let event = e.0;
-                let begin_coord = self.get_text_coord_by_pixel_coord((event.offset_x, event.offset_y));
-                self.begin_select(begin_coord);
-            }
-        } else if let Some(e) = event.downcast_ref::<MouseMoveEvent>() {
-            let event = e.0;
-            if self.selecting_begin.is_some() {
-                let caret = self.get_text_coord_by_pixel_coord((event.offset_x, event.offset_y));
-                if let Some(sb) = self.selecting_begin {
-                    self.element.emit(SelectMoveEvent{
-                        row: caret.0,
-                        col: caret.1,
-                    });
-                    let start = TextCoord::min(sb, caret);
-                    let end = TextCoord::max(sb, caret);
-                    self.select(start, end);
-                }
-            }
-        } else if let Some(e) = event.downcast_ref::<MouseUpEvent>() {
-            if e.0.button == 1 {
-                self.end_select();
-                self.element.emit(SelectEndEvent);
-            }
-        }
+
     }
 
     fn execute_default_behavior(&mut self, event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) -> bool {
         if let Some(d) = event.downcast_ref::<KeyDownEvent>() {
-            self.handle_key_down(&d.0)
+            self.handle_key_down(&d.0);
         } else {
-            false
+            if let Some(e) = event.downcast_ref::<MouseDownEvent>() {
+                if e.0.button == 1 {
+                    let event = e.0;
+                    self.selection_start((event.offset_x, event.offset_y));
+                    return true;
+                }
+            } else if let Some(e) = event.downcast_ref::<MouseMoveEvent>() {
+                let event = e.0;
+                return self.selection_update((event.offset_x, event.offset_y))
+            } else if let Some(e) = event.downcast_ref::<MouseUpEvent>() {
+                if e.0.button == 1 {
+                    return self.selection_end();
+                }
+            }
         }
+        return false;
     }
 
     fn before_origin_bounds_change(&mut self) {

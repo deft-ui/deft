@@ -27,6 +27,7 @@ use std::ops::{Deref, DerefMut};
 use std::process::exit;
 use std::rc::Rc;
 use std::slice;
+use std::string::ToString;
 use std::time::SystemTime;
 use winit::dpi::Position::Logical;
 use winit::dpi::{LogicalPosition, LogicalSize, Position, Size};
@@ -55,7 +56,9 @@ struct TouchingInfo {
     touches: HashMap<u64, Touch>,
 }
 
-const MOUSE_AS_TOUCH: bool = false;
+fn treat_mouse_as_touch() -> bool {
+    std::env::var("MOUSE_AS_TOUCH").unwrap_or("0".to_string()).as_str() != "0"
+}
 
 #[derive(PartialEq)]
 pub enum FrameType {
@@ -348,7 +351,7 @@ impl Frame {
             }
             WindowEvent::MouseInput { button, state, .. } => {
                 // println!("mouse:{:?}:{:?}", button, state);
-                if MOUSE_AS_TOUCH {
+                if treat_mouse_as_touch() {
                     match state {
                         ElementState::Pressed => {
                             self.emit_touch_event(0, TouchPhase::Started, self.cursor_position.x as f32, self.cursor_position.y as f32);
@@ -365,7 +368,7 @@ impl Frame {
                 //println!("cursor moved:{:?}", position);
                 self.cursor_position = position.to_logical(self.window.scale_factor());
                 self.cursor_root_position = root_position.to_logical(self.window.scale_factor());
-                if MOUSE_AS_TOUCH {
+                if treat_mouse_as_touch() {
                     if !self.touching.touches.is_empty() {
                         self.emit_touch_event(0, TouchPhase::Moved, self.cursor_position.x as f32, self.cursor_position.y as f32);
                     }

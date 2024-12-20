@@ -24,7 +24,7 @@ use crate::element::edit_history::{EditHistory, EditOpType};
 use crate::element::paragraph::{Paragraph, ParagraphUnit, TextCoord, TextUnit};
 use crate::element::scroll::{Scroll, ScrollBarStrategy};
 use crate::element::text::text_paragraph::Line;
-use crate::event::{KEY_MOD_CTRL, KEY_MOD_SHIFT, KeyEventDetail, MouseDownEvent, MouseUpEvent, MouseMoveEvent, KeyDownEvent, CaretChangeEvent, TextUpdateEvent, TextChangeEvent, FocusEvent, BlurEvent, SelectStartEvent, SelectEndEvent, SelectMoveEvent, TextInputEvent};
+use crate::event::{KEY_MOD_CTRL, KEY_MOD_SHIFT, KeyEventDetail, MouseDownEvent, MouseUpEvent, MouseMoveEvent, KeyDownEvent, CaretChangeEvent, TextUpdateEvent, TextChangeEvent, FocusEvent, BlurEvent, SelectStartEvent, SelectEndEvent, SelectMoveEvent, TextInputEvent, ClickEvent};
 use crate::event_loop::{create_event_loop_callback, create_event_loop_proxy};
 use crate::string::StringUtils;
 use crate::style::{StyleProp, StylePropKey, StylePropVal};
@@ -601,6 +601,10 @@ impl ElementBackend for Entry {
             self.update_caret_value(TextCoord(e.row, e.col), false);
         } else if let Some(e) = event.downcast_ref::<TextInputEvent>() {
             self.insert_text(e.0.as_str(), self.caret, true);
+        } else if let Some(e) = event.downcast_ref::<ClickEvent>() {
+            if !self.paragraph.is_selecting() {
+                self.update_caret_by_offset_coordinate(e.0.offset_x, e.0.offset_y, false);
+            }
         }
         self.base.on_event(event, ctx)
     }

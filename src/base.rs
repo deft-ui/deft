@@ -97,6 +97,16 @@ pub struct TouchDetail {
     pub touches: Vec<Touch>,
 }
 
+impl TouchDetail {
+    pub fn only_one_touch(&self) -> Option<&Touch> {
+        if self.touches.len() == 1 {
+            Some(&self.touches[0])
+        } else {
+            None
+        }
+    }
+}
+
 pub trait EventDetail: 'static {
     fn raw(&self) -> Box<&dyn Any>;
     fn raw_mut(&mut self) -> Box<&mut dyn Any>;
