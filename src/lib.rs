@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-use crate::app::{App, AppEvent, LentoApp};
+use crate::app::{App, AppEvent, AppEventPayload, LentoApp};
 use crate::data_dir::get_data_path;
 use crate::element::label::{AttributeText, Label, DEFAULT_TYPE_FACE};
 use crate::element::text::text_paragraph::TextParams;
@@ -24,7 +24,7 @@ use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 use std::collections::HashMap;
 use std::env;
 use std::str::FromStr;
-use std::sync::OnceLock;
+use std::sync::{Arc, Condvar, Mutex, OnceLock};
 use std::time::SystemTime;
 use anyhow::{anyhow, Error};
 use tokio_tungstenite::connect_async;
@@ -77,11 +77,12 @@ mod id_generator;
 mod typeface;
 
 pub use lento_macros::*;
+use crate::event_loop::{AppEventProxy, AppEventResult};
 
-pub static APP_EVENT_PROXY: OnceLock<EventLoopProxy<AppEvent>> = OnceLock::new();
+pub static APP_EVENT_PROXY: OnceLock<AppEventProxy> = OnceLock::new();
 
-fn run_event_loop(event_loop: EventLoop<AppEvent>, lento_app: Box<dyn LentoApp>) {
-    let el_proxy = event_loop.create_proxy();
+fn run_event_loop(event_loop: EventLoop<AppEventPayload>, lento_app: Box<dyn LentoApp>) {
+    let el_proxy = AppEventProxy::new(event_loop.create_proxy());
     {
         let el_proxy = el_proxy.clone();
         APP_EVENT_PROXY.get_or_init(move || el_proxy);
@@ -91,14 +92,14 @@ fn run_event_loop(event_loop: EventLoop<AppEvent>, lento_app: Box<dyn LentoApp>)
 }
 
 pub fn bootstrap(lento_app: Box<dyn LentoApp>) {
-    let event_loop: EventLoop<AppEvent> = EventLoop::with_user_event().build().unwrap();
+    let event_loop: EventLoop<AppEventPayload> = EventLoop::with_user_event().build().unwrap();
     run_event_loop(event_loop, lento_app);
 }
 
-pub fn send_app_event(event: AppEvent) -> Result<(), Error> {
+pub fn send_app_event(event: AppEvent) -> Result<AppEventResult, Error> {
     let proxy = APP_EVENT_PROXY.get().ok_or_else(|| anyhow!("no app event proxy found"))?;
-    proxy.send_event(event)?;
-    Ok(())
+    let result = proxy.send_event(event)?;
+    Ok(result)
 }
 
 pub fn is_mobile_platform() -> bool {
@@ -112,6 +113,7 @@ pub fn is_mobile_platform() -> bool {
 #[no_mangle]
 pub fn android_bootstrap(app: AndroidApp, lento_app: Box<dyn LentoApp>) {
     use winit::platform::android::EventLoopBuilderExtAndroid;
+    android::init_android_app(&app);
 
     // android_logger::init_once(android_logger::Config::default().with_min_level(log::Level::Debug));
 

@@ -1,17 +1,55 @@
 use std::cell::{Cell, RefCell};
 use std::ptr::null_mut;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Condvar, Mutex, OnceLock};
 use winit::event_loop::{ActiveEventLoop, EventLoopClosed, EventLoopProxy};
-use crate::app::{App, AppEvent};
+use crate::app::{App, AppEvent, AppEventPayload};
 use crate::base::{UnsafeFnMut, UnsafeFnOnce};
 
 thread_local! {
     pub static ACTIVE_EVENT_LOOP: Cell<*const ActiveEventLoop> = Cell::new(null_mut());
-    pub static STATIC_EVENT_LOOP_PROXY: RefCell<Option<EventLoopProxy<AppEvent>>> = RefCell::new(None);
+    pub static STATIC_EVENT_LOOP_PROXY: RefCell<Option<AppEventProxy>> = RefCell::new(None);
+}
+
+#[derive(Clone)]
+pub struct AppEventProxy {
+    proxy: EventLoopProxy<AppEventPayload>,
+}
+
+pub struct AppEventResult {
+    lock: Arc<(Mutex<bool>, Condvar)>,
+}
+
+impl AppEventResult {
+    pub fn wait(&self) {
+        let (lock, cvar) = &*self.lock;
+        let mut done = lock.lock().unwrap();
+        while !*done {
+            done = cvar.wait(done).unwrap();
+        }
+    }
+}
+
+impl AppEventProxy {
+
+    pub fn new(proxy: EventLoopProxy<AppEventPayload>) -> AppEventProxy {
+        Self { proxy }
+    }
+
+    pub fn send_event(&self, event: AppEvent) -> Result<AppEventResult, EventLoopClosed<AppEventPayload>> {
+        let lock = Arc::new((Mutex::new(false), Condvar::new()));
+        let lock2 = Arc::clone(&lock);
+        self.proxy.send_event(AppEventPayload {
+            event,
+            lock,
+        })?;
+        Ok(AppEventResult {
+            lock: lock2,
+        })
+    }
 }
 
 pub struct EventLoopCallback {
-    event_loop_proxy: EventLoopProxy<AppEvent>,
+    event_loop_proxy: AppEventProxy,
     callback: Option<UnsafeFnOnce>,
 }
 
@@ -26,7 +64,7 @@ impl EventLoopCallback {
 
 #[derive(Clone)]
 pub struct EventLoopFnMutCallback<P> {
-    event_loop_proxy: EventLoopProxy<AppEvent>,
+    event_loop_proxy: AppEventProxy,
     callback: Arc<Mutex<UnsafeFnMut<P>>>,
 }
 
@@ -76,13 +114,13 @@ pub fn run_with_event_loop<R, F: FnOnce(&ActiveEventLoop) -> R>(callback: F) -> 
     }
 }
 
-pub fn init_event_loop_proxy(elp: EventLoopProxy<AppEvent>) {
+pub fn init_event_loop_proxy(elp: AppEventProxy) {
     STATIC_EVENT_LOOP_PROXY.with_borrow_mut(move |m| {
         m.replace(elp);
     })
 }
 
-pub fn create_event_loop_proxy() -> EventLoopProxy<AppEvent> {
+pub fn create_event_loop_proxy() -> AppEventProxy {
     STATIC_EVENT_LOOP_PROXY.with_borrow(|p| {
         p.as_ref().expect("Failed to create event loop proxy").clone()
     })

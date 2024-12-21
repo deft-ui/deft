@@ -1,3 +1,5 @@
+use std::fmt::format;
+
 #[macro_export]
 macro_rules! js_value {
     ($ref_type: ty) => {
@@ -87,7 +89,7 @@ macro_rules! bind_js_event_listener {
                 }
             )*
             _ => {
-                return Err(JsError::from_str("unknown event_type"))
+                return Err(JsError::new(format!("unknown event_type:{}", $actual_type)))
             }
         }
     };

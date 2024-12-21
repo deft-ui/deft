@@ -1,4 +1,5 @@
 use std::fmt::{Debug, Formatter};
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use anyhow::Error;
 use jni::objects::JValue;
@@ -13,15 +14,31 @@ use winit::platform::android::ActiveEventLoopExtAndroid;
 use winit::platform::android::activity::AndroidApp;
 use winit::window::WindowId;
 
-use crate::event_loop::{init_event_loop_proxy, run_event_loop_task, run_with_event_loop};
+use crate::event_loop::{init_event_loop_proxy, run_event_loop_task, run_with_event_loop, AppEventProxy};
 use crate::ext::ext_frame::FRAMES;
 use crate::ext::ext_localstorage::localstorage_flush;
-use crate::frame::frame_input;
+use crate::frame::{frame_ime_resize, frame_input};
 use crate::js::js_engine::JsEngine;
 use crate::js::js_event_loop::{js_init_event_loop, JsEvent, JsEventLoopClosedError};
 use crate::js::js_runtime::JsContext;
 use crate::mrc::Mrc;
 use crate::timer;
+
+#[derive(Debug)]
+pub struct AppEventPayload {
+    pub event: AppEvent,
+    pub lock: Arc<(Mutex<bool>, Condvar)>,
+}
+
+impl AppEventPayload {
+    pub fn new(event: AppEvent) -> Self {
+        let lock = Arc::new((Mutex::new(false), Condvar::new()));
+        Self {
+            event,
+            lock,
+        }
+    }
+}
 
 pub enum AppEvent {
     Callback(Box<dyn FnOnce() + Send + Sync>),
@@ -29,6 +46,7 @@ pub enum AppEvent {
     ShowSoftInput(i32),
     HideSoftInput(i32),
     CommitInput(i32, String),
+    ImeResize(i32, f32),
 }
 
 impl Debug for AppEvent {
@@ -53,13 +71,14 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(mut lento_app: Box<dyn LentoApp>, event_loop_proxy: EventLoopProxy<AppEvent>) -> Self {
+    pub fn new(mut lento_app: Box<dyn LentoApp>, event_loop_proxy: AppEventProxy) -> Self {
         let module_loader = lento_app.create_module_loader();
         let mut js_engine = JsEngine::new(module_loader);
         js_engine.init_api();
         init_event_loop_proxy(event_loop_proxy.clone());
         let js_event_loop = js_init_event_loop(move |js_event| {
-            event_loop_proxy.send_event(AppEvent::JsEvent(js_event)).map_err(|_| JsEventLoopClosedError {})
+            event_loop_proxy.send_event(AppEvent::JsEvent(js_event)).map_err(|_| JsEventLoopClosedError {});
+            Ok(())
         });
         lento_app.init_js_engine(&mut js_engine);
         Self {
@@ -74,7 +93,7 @@ impl App {
 
 }
 
-impl ApplicationHandler<AppEvent> for App {
+impl ApplicationHandler<AppEventPayload> for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         run_event_loop_task(event_loop, move || {
             let uninitialized = FRAMES.with(|m| m.borrow().is_empty());
@@ -90,9 +109,9 @@ impl ApplicationHandler<AppEvent> for App {
             }
         });
     }
-    fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvent) {
+    fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEventPayload) {
         run_event_loop_task(event_loop, move || {
-            match event {
+            match event.event {
                 AppEvent::Callback(callback) => {
                     callback();
                 },
@@ -116,7 +135,14 @@ impl ApplicationHandler<AppEvent> for App {
                 AppEvent::CommitInput(frame_id, content) => {
                     frame_input(frame_id, content);
                 },
+                AppEvent::ImeResize(frame_id, height) => {
+                    frame_ime_resize(frame_id, height);
+                },
             }
+            let (lock, cvar) = &*event.lock;
+            let mut done = lock.lock().unwrap();
+            *done = true;
+            cvar.notify_one();
             self.execute_pending_jobs();
         });
     }

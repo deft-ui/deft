@@ -9,6 +9,11 @@ fn to_js_error(error: Box<dyn Error>) -> JsError {
 
 #[lento_macros::js_func]
 pub fn clipboard_write_text(text: String) -> Result<(), JsError> {
+    #[cfg(target_os = "android")]
+    {
+        crate::android::clipboard_write_text(&text)?;
+        return Ok(())
+    }
     let mut ctx: ClipboardContext = ClipboardProvider::new().map_err(to_js_error)?;
     ctx.set_contents(text).map_err(to_js_error)?;
     Ok(())

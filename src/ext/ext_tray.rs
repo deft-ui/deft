@@ -1,7 +1,7 @@
 use crate as lento;
 use crate::app::AppEvent;
 use crate::base::{Event, EventHandler, EventRegistration};
-use crate::event_loop::{create_event_loop_fn_mut, create_event_loop_proxy};
+use crate::event_loop::{create_event_loop_fn_mut, create_event_loop_proxy, AppEventProxy};
 use crate::mrc::Mrc;
 use anyhow::Error;
 use ksni::menu::{CheckmarkItem, StandardItem};
@@ -81,7 +81,7 @@ impl Tray for MyTray {
 
 #[mrc_object]
 pub struct SystemTray {
-    event_loop_proxy: EventLoopProxy<AppEvent>,
+    event_loop_proxy: AppEventProxy,
     event_registration: EventRegistration<SystemTray>,
     id: u32,
     handle: Handle<MyTray>,
@@ -115,7 +115,7 @@ impl SystemTray {
         Ok(tray)
     }
 
-    fn create_tray(tray_id: &str, event_loop_proxy: EventLoopProxy<AppEvent>) -> Self {
+    fn create_tray(tray_id: &str, event_loop_proxy: AppEventProxy) -> Self {
         let inner_id = NEXT_TRAY_ID.get();
         NEXT_TRAY_ID.set(inner_id + 1);
 

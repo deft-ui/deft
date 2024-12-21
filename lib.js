@@ -675,6 +675,22 @@ export class View {
         this.#eventBinder.bindEvent("drop", callback);
     }
 
+    bindTouchStart(callback) {
+        this.#eventBinder.bindEvent("touchstart", callback);
+    }
+
+    bindTouchMove(callback) {
+        this.#eventBinder.bindEvent("touchmove", callback);
+    }
+
+    bindTouchEnd(callback) {
+        this.#eventBinder.bindEvent("touchend", callback);
+    }
+
+    bindTouchCancel(callback) {
+        this.#eventBinder.bindEvent("touchcancel", callback);
+    }
+
     bindEvent(type, callback) {
         this.#eventBinder.bindEvent(type, callback);
     }

@@ -206,7 +206,7 @@ impl Element {
             "touchstart" => TouchStartEventListener,
             "touchmove" => TouchMoveEventListener,
             "touchend" => TouchEndEventListener,
-            "TouchCancel" => TouchCancelEventListener,
+            "touchcancel" => TouchCancelEventListener,
             "focus" => FocusEventListener,
             "blur" => BlurEventListener,
             "focusshift" => FocusShiftEventListener,

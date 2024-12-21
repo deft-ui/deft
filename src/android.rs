@@ -1,9 +1,18 @@
+use std::sync::OnceLock;
 use jni::JNIEnv;
-use jni::objects::{JClass, JString};
-use jni::sys::{jlong};
+use jni::objects::{JClass, JString, JValue};
+use jni::sys::{jboolean, jfloat, jlong};
+use winit::platform::android::activity::AndroidApp;
 use crate::app::AppEvent;
 use crate::event_loop::{create_event_loop_proxy};
 use crate::send_app_event;
+
+pub static ANDROID_APP: OnceLock<AndroidApp> = OnceLock::new();
+
+pub fn init_android_app(app: &AndroidApp) {
+    let app = app.clone();
+    ANDROID_APP.get_or_init(move || app);
+}
 
 #[no_mangle]
 pub extern "system" fn Java_fun_kason_lento_InputChannel_send<'local>(mut env: JNIEnv<'local>,
@@ -17,4 +26,32 @@ pub extern "system" fn Java_fun_kason_lento_InputChannel_send<'local>(mut env: J
     if let Err(e) = send_app_event(AppEvent::CommitInput(window_id as i32, input)) {
         println!("send app event error: {:?}", e);
     }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_fun_kason_lento_InputChannel_imeResize0<'local>(mut env: JNIEnv<'local>,
+                                                                            class: JClass<'local>,
+                                                                            window_id: jlong,
+                                                                            height: jfloat)
+{
+    match send_app_event(AppEvent::ImeResize(window_id as i32, height as f32)) {
+        Err(e) => {
+            println!("send app event error: {:?}", e);
+        }
+        Ok(_) => {}
+    }
+}
+
+pub fn clipboard_write_text(content: &str) -> Result<(), jni::errors::Error> {
+    use jni::JavaVM;
+    use jni::objects::JObject;
+    let app = ANDROID_APP.get().unwrap();
+    let vm = unsafe { JavaVM::from_raw(app.vm_as_ptr() as _)? };
+    let activity = unsafe { JObject::from_raw(app.activity_as_ptr() as _) };
+    let mut env = vm.attach_current_thread()?;
+    let content = env.new_string(content)?;
+    env.call_method(&activity, "setClipboardText", "(Ljava/lang/String;)V", &[
+        JValue::Object(&content)
+    ])?.v()?;
+    Ok(())
 }

@@ -1,5 +1,5 @@
 use crate as lento;
-use crate::app::{exit_app, AppEvent};
+use crate::app::{exit_app, AppEvent, AppEventPayload};
 use crate::base::MouseEventType::{MouseClick, MouseUp};
 use crate::base::{ElementEvent, Event, EventContext, EventHandler, EventListener, EventRegistration, MouseDetail, MouseEventType, Touch, TouchDetail, UnsafeFnOnce};
 use crate::canvas_util::CanvasHelper;
@@ -17,8 +17,8 @@ use anyhow::{anyhow, Error};
 use lento_macros::{event, frame_event, js_func, js_methods, mrc_object};
 use measure_time::print_time;
 use quick_js::{JsValue, ResourceValue};
-use skia_bindings::SkClipOp;
-use skia_safe::{Canvas, Color, ColorType, ImageInfo};
+use skia_bindings::{SkClipOp, SkRect};
+use skia_safe::{Canvas, Color, ColorType, ImageInfo, Paint, Rect};
 use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
@@ -29,6 +29,7 @@ use std::rc::Rc;
 use std::slice;
 use std::string::ToString;
 use std::time::SystemTime;
+use skia_bindings::SkPaint_Style::{Fill, Stroke};
 use winit::dpi::Position::Logical;
 use winit::dpi::{LogicalPosition, LogicalSize, Position, Size};
 use winit::error::ExternalError;
@@ -39,6 +40,7 @@ use winit::keyboard::{Key, NamedKey};
 use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorGrabMode, CursorIcon, Window, WindowAttributes, WindowId};
 use crate::bind_js_event_listener;
+use crate::style::ColorHelper;
 
 #[derive(Clone)]
 struct MouseDownInfo {
@@ -88,6 +90,8 @@ pub struct Frame {
     attributes: WindowAttributes,
     init_width: Option<f32>,
     init_height: Option<f32>,
+    ime_height: f32,
+    background_color: Color,
 }
 
 pub type FrameEventHandler = EventHandler<FrameWeak>;
@@ -196,6 +200,8 @@ impl Frame {
             frame_type,
             init_width: attrs.width,
             init_height: attrs.height,
+            ime_height: 0.0,
+            background_color: Color::from_rgb(0, 0, 0),
         };
         let mut handle = Frame {
             inner: Mrc::new(state),
@@ -225,6 +231,11 @@ impl Frame {
             let elp = create_event_loop_proxy();
             elp.send_event(AppEvent::Callback(callback)).unwrap();
         }
+    }
+
+    pub fn mark_dirty_and_update_immediate(&mut self, layout_dirty: bool) {
+        self.layout_dirty = self.layout_dirty || layout_dirty;
+        self.update();
     }
 
     pub fn get_id(&self) -> i32 {
@@ -687,13 +698,14 @@ impl Frame {
             } else {
                 size.width as f32 / scale_factor
             };
-            let height = if auto_size {
+            let mut height = if auto_size {
                 self.init_height.unwrap_or(f32::NAN)
             } else {
                 size.height as f32 / scale_factor
             };
+            height -= self.ime_height / scale_factor;
             if let Some(body) = &mut self.body {
-                print_time!("calculate layout, {} x {}", size.width, size.height);
+                print_time!("calculate layout, {} x {}", width, height);
                 body.calculate_layout(width, height);
                 if auto_size {
                     let (final_width, final_height) = body.get_size();
@@ -786,10 +798,14 @@ impl Frame {
         };
         let start = SystemTime::now();
         let scale_factor = self.window.scale_factor() as f32;
+        let background_color = self.background_color;
         self.window.render(move |canvas| {
             canvas.save();
             if scale_factor != 1.0 {
                 canvas.scale((scale_factor, scale_factor));
+            }
+            if !background_color.is_transparent() {
+                canvas.clear(background_color);
             }
             draw_root(canvas, &mut body);
             canvas.restore();
@@ -824,19 +840,22 @@ impl Frame {
     fn get_node_by_point_inner(&self, node: &mut Element, point: (f32, f32)) -> Option<Element> {
         //TODO use clip path?
         let bounds = node.get_bounds();
+        let mut result = None;
         if bounds.contains_point(point.0, point.1){
             let content_bounds = node.get_content_bounds().translate(bounds.x, bounds.y);
             if content_bounds.contains_point(point.0, point.1) {
                 let p = (point.0 + node.get_scroll_left() - bounds.x, point.1 + node.get_scroll_top() - bounds.y);
                 for child in node.get_backend().get_children() {
                     if let Some(n) = self.get_node_by_point_inner(&mut child.clone(), p) {
-                        return Some(n.clone());
+                        result = Some(n.clone());
                     }
                 }
             }
-            return Some(node.clone());
+            if result.is_none() {
+                result = Some(node.clone());
+            }
         }
-        return None
+        result
     }
 
     fn create_window(attributes: WindowAttributes) -> SkiaWindow {
@@ -863,7 +882,6 @@ impl WeakWindowHandle {
 
 fn draw_root(canvas: &Canvas, body: &mut Element) {
     // draw background
-    canvas.clear(Color::from_rgb(255, 255, 255));
     draw_element(canvas, body);
     // print_tree(&body, "");
 }
@@ -965,3 +983,13 @@ pub fn frame_input(frame_id: i32, content: String) {
         }
     });
 }
+
+pub fn frame_ime_resize(frame_id: i32, height: f32) {
+    FRAMES.with_borrow_mut(|m| {
+        if let Some(f) = m.get_mut(&frame_id) {
+            f.ime_height = height;
+            f.mark_dirty_and_update_immediate(true);
+        }
+    });
+}
+
