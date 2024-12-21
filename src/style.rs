@@ -281,10 +281,25 @@ impl PropValueParse for String {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub enum TranslateLength {
+    Point(f32),
+    Percent(f32),
+}
+
+impl TranslateLength {
+    pub fn to_absolute(&self, block_length: f32) -> f32 {
+        match self {
+            TranslateLength::Point(p) => { *p }
+            TranslateLength::Percent(p) => { *p / 100.0 * block_length }
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum StyleTransformOp {
     Rotate(f32),
     Scale(f32, f32),
-    Translate(f32, f32),
+    Translate(TranslateLength, TranslateLength),
 }
 
 impl StyleTransformOp {
@@ -299,6 +314,7 @@ impl StyleTransformOp {
         //TODO support double params
         match func {
             //"matrix" => parse_matrix(param_str).ok(),
+            "translate" => parse_translate_op(param_str),
             "rotate" => parse_rotate_op(param_str),
             _ => None,
         }
@@ -317,7 +333,7 @@ impl StyleTransform {
         }
     }
 
-    pub fn to_matrix(&self) -> Matrix {
+    pub fn to_matrix(&self, width: f32, height: f32) -> Matrix {
         let mut matrix = Matrix::new_identity();
         for op in &self.op_list {
             match op {
@@ -327,8 +343,10 @@ impl StyleTransform {
                 StyleTransformOp::Scale(_, _) => {
                     //TODO impl
                 }
-                StyleTransformOp::Translate(_, _) => {
-                    //TODO impl
+                StyleTransformOp::Translate(x, y) => {
+                    let x = x.to_absolute(width);
+                    let y = y.to_absolute(height);
+                    matrix.post_translate((x, y));
                 }
             }
         }
@@ -629,15 +647,6 @@ impl StylePropertyValue {
         }
     }
 
-    pub fn to_matrix(&self) -> Option<Matrix> {
-        match self {
-            StylePropertyValue::String(str) => {
-                parse_transform(str)
-            }
-            _ => None,
-        }
-    }
-
 }
 
 pub struct Style {
@@ -744,7 +753,7 @@ pub struct StyleNodeInner {
     pub background_image: Option<Image>,
     pub line_height: PropValue<f32>,
     pub font_size: PropValue<f32>,
-    pub transform: Option<Matrix>,
+    pub transform: Option<StyleTransform>,
     pub computed_style: ComputedStyle,
     animation_params: AnimationParams,
     animation_instance: Option<AnimationInstance>,
@@ -995,7 +1004,7 @@ impl StyleNode {
             },
             StyleProp::Transform (value) =>   {
                 if let StylePropVal::Custom(v) = value {
-                    self.transform = Some(v.to_matrix());
+                    self.transform = Some(v.clone());
                 } else {
                     self.transform = None;
                 }
@@ -1503,20 +1512,6 @@ pub fn parse_overflow(value: &str) -> Overflow {
     }
 }
 
-fn parse_transform(value: &str) -> Option<Matrix> {
-    let value = value.trim();
-    if !value.ends_with(")") {
-        return None;
-    }
-    let left_p = value.find("(")?;
-    let func = &value[0..left_p];
-    let param_str = &value[left_p + 1..value.len() - 1];
-    match func {
-        "matrix" => parse_matrix(param_str).ok(),
-        "rotate" => parse_rotate(param_str).ok(),
-        _ => None,
-    }
-}
 
 fn parse_matrix(value: &str) -> Result<Matrix, Error> {
     let parts: Vec<&str> = value.split(",").collect();
@@ -1551,21 +1546,32 @@ fn create_matrix(values: [f32; 6]) -> Matrix {
     )
 }
 
-fn parse_rotate(value: &str) -> Result<Matrix, Error> {
-    if let Some(v) = value.strip_suffix("deg") {
-        let v = f32::from_str(v)? / 180.0 * PI;
-        Ok(create_matrix([v.cos(), v.sin(), -v.sin(), v.cos(), 0.0, 0.0]))
-    } else {
-        Err(anyhow!("invalid value"))
-    }
-}
-
 fn parse_rotate_op(value: &str) -> Option<StyleTransformOp> {
     if let Some(v) = value.strip_suffix("deg") {
         let v = f32::from_str(v).ok()?;
         Some(StyleTransformOp::Rotate(v))
     } else {
         None
+    }
+}
+
+fn parse_translate_op(value: &str) -> Option<StyleTransformOp> {
+    let mut values = value.split(",").collect::<Vec<&str>>();
+    if values.len() < 2 {
+        values.push(values[0].clone());
+    }
+    let x = parse_translate_length(values[0].trim())?;
+    let y = parse_translate_length(values[1].trim())?;
+    Some(StyleTransformOp::Translate(x, y))
+}
+
+fn parse_translate_length(value: &str) -> Option<TranslateLength> {
+    if let Some(v) = value.strip_suffix("%") {
+        let v = f32::from_str(v.trim()).ok()?;
+        Some(TranslateLength::Percent(v))
+    } else {
+        let v = f32::from_str(value).ok()?;
+        Some(TranslateLength::Point(v))
     }
 }
 

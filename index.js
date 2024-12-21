@@ -50,6 +50,27 @@ function createTextEdit() {
     return textEdit;
 }
 
+function createCenterElement() {
+    const outer = new ContainerElement();
+    outer.setStyle({
+        position: 'relative',
+        height: 200,
+        background: '#000',
+    });
+    const inner = new ContainerElement();
+    inner.setStyle({
+        position: 'absolute',
+        left: '50%',
+        top: '50%',
+        width: 100,
+        height: 100,
+        transform: 'translate(-50%, -50%)',
+        border: '1 #ccc',
+    });
+    outer.addChild(inner);
+    return outer;
+}
+
 function createLabel(text) {
     const label = new LabelElement();
     label.setText(text);
@@ -181,6 +202,8 @@ function main() {
     //
     // console.log("setBody")
     container.addChild(label);
+
+    container.addChild(createCenterElement());
     frame.setBody(container);
 }
 

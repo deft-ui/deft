@@ -897,10 +897,10 @@ fn draw_element(canvas: &Canvas, element: &Element) {
 
         // translate to element left-top
         canvas.translate((bounds.x, bounds.y));
-        if let Some(m) = element.style.transform {
+        if let Some(m) = &element.style.transform {
             //TODO support transform origin
             canvas.translate((bounds.width / 2.0, bounds.height / 2.0));
-            canvas.concat(&m);
+            canvas.concat(&m.to_matrix(bounds.width, bounds.height));
             canvas.translate((-bounds.width / 2.0, -bounds.height / 2.0));
         }
 
