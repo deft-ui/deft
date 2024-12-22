@@ -1,6 +1,6 @@
 pub mod skia_text_paragraph;
 pub mod text_paragraph;
-mod simple_text_paragraph;
+pub mod simple_text_paragraph;
 
 use std::any::Any;
 use crate as lento;
@@ -10,7 +10,7 @@ use std::rc::Rc;
 use anyhow::Error;
 use quick_js::{JsValue, ValueError};
 use skia_safe::{Canvas, Color, Font, FontMgr, FontStyle, Paint, Typeface};
-use skia_safe::textlayout::{FontCollection, TextAlign};
+use skia_safe::textlayout::{FontCollection, TextAlign, TextStyle};
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 use lento_macros::{js_methods, mrc_object};
 use crate::base::{ElementEvent, EventContext, MouseDetail, MouseEventType, Rect, TextUpdateDetail};
@@ -19,7 +19,7 @@ use crate::element::{ElementBackend, Element, ElementWeak};
 use crate::element::text::skia_text_paragraph::{SkiaTextParagraph};
 use crate::element::text::text_paragraph::{ParagraphData, Line, ParagraphRef, TextParams};
 use crate::{js_call, match_event_type};
-use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
+use crate::element::text::simple_text_paragraph::{SimpleTextParagraph, TextBlock};
 use crate::event::{FocusShiftEvent, TextUpdateEvent};
 use crate::number::DeNan;
 use crate::string::StringUtils;
@@ -122,8 +122,8 @@ impl Text {
         if old_text != text {
             self.selection = None;
             self.rebuild_lines(&text);
-            self.mark_dirty(false);
-            self.mark_layout_dirty_if_needed();
+            self.mark_dirty(true);
+            // self.mark_layout_dirty_if_needed();
 
             self.element.emit(TextUpdateEvent {
                 value: text
@@ -507,7 +507,14 @@ impl Text {
         for ln in lines {
             // let p = SimpleTextParagraph::new(ln, params);
             let ln = Self::preprocess_text(ln);
-            let p = SimpleTextParagraph::new(&ln.to_string(), params);
+            let mut style = TextStyle::default();
+            style.set_foreground_paint(&params.paint);
+            let text_block = TextBlock {
+                text: ln.to_string(),
+                font: params.font.clone(),
+                style,
+            };
+            let p = SimpleTextParagraph::new(vec![text_block]);
             result.push(Line {
                 atom_count: ln.trim_line_endings().chars().count() + 1,
                 paragraph: p,

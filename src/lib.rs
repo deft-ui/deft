@@ -6,7 +6,7 @@ use crate::app::{App, AppEvent, AppEventPayload, LentoApp};
 use crate::data_dir::get_data_path;
 use crate::element::label::{AttributeText, Label, DEFAULT_TYPE_FACE};
 use crate::element::text::text_paragraph::TextParams;
-use crate::element::text::Text;
+use crate::element::text::{Text, FONT_MGR};
 use crate::element::ScrollByOption;
 use crate::js::js_deserialze::JsDeserializer;
 use crate::loader::{RemoteModuleLoader, StaticModuleLoader};
@@ -19,7 +19,7 @@ use memory_stats::memory_stats;
 use quick_js::loader::FsJsModuleLoader;
 use serde::{Deserialize, Serialize};
 use skia_safe::textlayout::{paragraph, TextAlign};
-use skia_safe::{Font, Paint};
+use skia_safe::{Font, FontMetrics, FontStyle, Paint};
 use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 use std::collections::HashMap;
 use std::env;
@@ -75,9 +75,16 @@ mod android;
 mod id_hash_map;
 mod id_generator;
 mod typeface;
+mod text;
 
 pub use lento_macros::*;
+use rodio::cpal::available_hosts;
+use skia_bindings::SkFontStyle_Slant;
+use skia_safe::font_style::{Weight, Width};
+use skia_safe::wrapper::ValueWrapper;
 use crate::event_loop::{AppEventProxy, AppEventResult};
+use crate::string::StringUtils;
+use crate::text::break_lines;
 
 pub static APP_EVENT_PROXY: OnceLock<AppEventProxy> = OnceLock::new();
 
@@ -167,7 +174,7 @@ async fn test_websocket_manager() {
 // test layout performance
 #[test]
 fn test_layout() {
-    let text = include_str!("../Cargo.lock");
+    let text = include_str!("../Cargo.lock").repeat(100);
     let start_mem_use = memory_stats().unwrap().physical_mem as f32;
     let font = DEFAULT_TYPE_FACE.with(|tf| Font::from_typeface(tf, 14.0));
     let paint = Paint::default();
@@ -206,16 +213,23 @@ fn test_layout() {
 
 #[test]
 fn test_text_measure() {
-    let text = include_str!("../Cargo.lock");
+    let text = include_str!("../Cargo.lock").repeat(100);
     let start_mem_use = memory_stats().unwrap().physical_mem as f32;
-    let font = DEFAULT_TYPE_FACE.with(|tf| Font::from_typeface(tf, 14.0));
+    // let font = DEFAULT_TYPE_FACE.with(|tf| Font::from_typeface(tf, 14.0));
     let paint = Paint::default();
+    let fm = FONT_MGR.with(|fm| fm.clone());
+    let mut font_style = FontStyle::new(Weight::NORMAL, Width::NORMAL, SkFontStyle_Slant::Upright);
+    let tf = fm.match_family_style("monospace", font_style).unwrap();
+    println!("font name: {}", &tf.family_name());
+    let font = Font::from_typeface(tf, 14.0);
     {
         print_time!("measure time");
         for ln in text.lines() {
-            for ch in ln.chars() {
-                font.measure_str(ch.to_string(), Some(&paint));
-            }
+            let lines = break_lines(&font, ln, 100.0);
+            // println!("lines:{:?}", lines);
+            // for ch in ln.chars() {
+            //     font.measure_str(ch.to_string(), Some(&paint));
+            // }
         }
         let mem_use = memory_stats().unwrap().physical_mem as f32 - start_mem_use;
         println!("mem use:{}", mem_use / 1024.0 / 1024.0);

@@ -1,4 +1,6 @@
 pub mod typeface_mgr;
+mod simple_paragraph_builder;
+
 use std::any::Any;
 use std::cmp::Ordering;
 use std::fs::File;
@@ -31,6 +33,8 @@ use skia_safe::wrapper::NativeTransmutableWrapper;
 use winit::keyboard::NamedKey;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 use crate::base::{ElementEvent, EventContext, MouseDetail, MouseEventType};
+use crate::element::paragraph::simple_paragraph_builder::SimpleParagraphBuilder;
+use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
 use crate::event::{FocusShiftEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent, SelectEndEvent, SelectMoveEvent, SelectStartEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
 use crate::typeface::get_font_mgr;
 
@@ -123,7 +127,7 @@ pub struct Paragraph {
 
 pub struct Line {
     units: Vec<ParagraphUnit>,
-    sk_paragraph: SkParagraph,
+    sk_paragraph: SimpleTextParagraph,
     layout_calculated: bool,
 }
 
@@ -182,13 +186,12 @@ impl Line {
         } else if x > self.sk_paragraph.max_intrinsic_width() {
             atom_count
         } else {
-            self.sk_paragraph.get_glyph_position_at_coordinate(coord).position as usize
+            self.sk_paragraph.get_char_offset_at_coordinate(coord)
         }
     }
 
     pub fn get_char_bounds(&mut self, char_offset: usize) -> Option<Rect> {
-        let gc = self.sk_paragraph.get_glyph_info_at_utf16_offset(char_offset);
-        gc.map(|g| g.grapheme_layout_bounds)
+        self.sk_paragraph.get_char_bounds(char_offset)
     }
 
     pub fn get_utf8_offset(&self, char_offset: usize) -> usize {
@@ -209,36 +212,16 @@ impl Line {
     ) {
         let (start_offset, end_offset) = selection;
         let line_offset = Point { x: line_offset.0, y: line_offset.1 };
+        canvas.save();
+        canvas.translate(line_offset);
         for i in start_offset..end_offset {
-            if let Some(mut char_rect) = self.get_char_bounds(i) {
-                char_rect.offset(line_offset);
+            if let Some(char_rect) = self.get_char_bounds(i) {
                 canvas.draw_rect(&char_rect, &bg_paint);
             }
         }
 
-        let begin_utf8_offset = self.get_utf8_offset(start_offset);
-        let end_utf8_offset = self.get_utf8_offset(end_offset);
-        self.sk_paragraph.visit(move |ln_no, info| {
-            if let Some(info) = info {
-                let glyphs = info.glyphs();
-                let positions = info.positions();
-                let mut origin = info.origin();
-                let starts = info.utf8_starts();
-                origin.offset(line_offset);
-                for i in 0..glyphs.len() {
-                    let utf8_offset = starts[i] as usize;
-                    if utf8_offset >= begin_utf8_offset && utf8_offset < end_utf8_offset {
-                        canvas.draw_glyphs_at(
-                            &glyphs[i..i+1],
-                            &positions[i..i+1],
-                            origin,
-                            info.font(),
-                            &fg_paint
-                        );
-                    }
-                }
-            }
-        });
+        self.sk_paragraph.paint_chars(canvas, start_offset, end_offset, Some(fg_paint));
+        canvas.restore();
     }
 
     fn rebuild_paragraph(&mut self, paragraph_params: &ParagraphParams) {
@@ -391,8 +374,8 @@ impl Paragraph {
     pub fn get_soft_line_height(&self, row: usize, col: usize) -> Option<f32> {
         let line = self.lines.get(row)?;
         let ln = line.sk_paragraph.get_line_number_at_utf16_offset(col)?;
-        let lm = line.sk_paragraph.get_line_metrics_at(ln).unwrap();
-        Some(lm.height as f32)
+        let lm = line.sk_paragraph.get_line_height_at(ln).unwrap();
+        Some(lm)
     }
 
     pub fn get_lines(&self) -> &Vec<Line> {
@@ -520,8 +503,7 @@ impl Paragraph {
     pub fn get_char_rect(&mut self, coord: TextCoord) -> Option<crate::base::Rect> {
         let (row, col) = (coord.0, coord.1);
         let line = self.lines.get_mut(row)?;
-        let gi = line.sk_paragraph.get_glyph_info_at_utf16_offset(col)?;
-        let bounds = gi.grapheme_layout_bounds;
+        let bounds = line.sk_paragraph.get_char_bounds(col)?;
         let mut y_offset = 0.0;
         if row > 0 {
             for i in 0..row {
@@ -600,7 +582,7 @@ impl Paragraph {
     pub fn build_paragraph(
         paragraph_params: &ParagraphParams,
         units: &Vec<ParagraphUnit>,
-    ) -> SkParagraph {
+    ) -> SimpleTextParagraph {
         // let mut text = text.trim_line_endings().to_string();
         // text.push_str(ZERO_WIDTH_WHITESPACE);
         let mut font_collection = FONT_COLLECTION.with(|f| f.clone());
@@ -621,7 +603,7 @@ impl Paragraph {
             paragraph_style.set_strut_style(strut_style);
         }
 
-        let mut pb = ParagraphBuilder::new(&paragraph_style, font_collection);
+        let mut pb = SimpleParagraphBuilder::new(&paragraph_params, font_collection);
         let p_color = paragraph_params.color;
         for u in units {
             match u {

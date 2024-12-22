@@ -77,51 +77,7 @@ function createLabel(text) {
     return label;
 }
 
-function main() {
-    runWorker();
-    createSystemTray();
-    console.log("begin create frame");
-    const frame = new Frame();
-    frame.setTitle("LentoDemo");
-    frame.bindResize((e) => {
-        console.log("frame resized", e);
-    })
-    console.log("frame created", frame);
-
-    const container = new ScrollElement();
-    container.setStyle({
-        background: "#2a2a2a",
-        color: "#FFF",
-        padding: 5,
-    })
-    // container.bindMouseMove(e => {
-    //     console.log("mouse move", e);
-    // })
-
-    const label = new LabelElement();
-    label.setAlign("center")
-    label.setText("测试test");
-    label.setStyle({
-        fontSize: 24,
-        "border-top": "#F00 3",
-        "border-right": "#0F0 3",
-        "border-bottom": "#00F 3",
-        "border-left": "#0F0 3"
-    });
-    // label.bindMouseDown((detail) => {
-    //     console.log("onClick111", detail);
-    //     // label.setText(new Date().toString());
-    // })
-    // const label2 = new LabelElement();
-    // label2.setAlign("center");
-    // label2.setText("Label2");
-    // container.addChild(label2);
-    // container.addChild(label);
-    //
-    // const img = new ImageElement();
-    // img.setSrc("img.png");
-    // container.addChild(img);
-    //
+function createAddChildrenButton(container) {
     const button = new ButtonElement();
     button.addChild(createLabel("Add children"));
     button.bindClick(() => {
@@ -148,8 +104,10 @@ function main() {
         container.addChild(wrapper);
         console.log("done");
     });
-    container.addChild(button);
+    return button;
+}
 
+function createAnimationButton() {
     let animationButton = new ButtonElement();
     animationButton.setStyle({
         width: 100,
@@ -170,17 +128,10 @@ function main() {
         animationDuration: 1000,
         animationIterationCount: Infinity,
     })
-    container.addChild(animationButton);
+    return animationButton;
+}
 
-
-    container.addChild(createTextEdit());
-
-    container.addChild(createEntry());
-
-    typeface_create("auto-mono", {
-        family: "monospace",
-        weight: "bold",
-    })
+function createParagraph() {
     const paragraph = new ParagraphElement();
     paragraph.addLine([
         {
@@ -196,13 +147,38 @@ function main() {
             color: "#F00",
         }
     ]);
-    container.addChild(paragraph);
-    //
-    // //container.removeChild(label2);
-    //
-    // console.log("setBody")
-    container.addChild(label);
+    return paragraph;
+}
 
+function main() {
+    runWorker();
+    createSystemTray();
+    console.log("begin create frame");
+    const frame = new Frame();
+    frame.setTitle("LentoDemo");
+    frame.bindResize((e) => {
+        console.log("frame resized", e);
+    })
+    console.log("frame created", frame);
+
+    typeface_create("auto-mono", {
+        family: "monospace",
+        weight: "bold",
+    })
+
+    const container = new ScrollElement();
+    container.setStyle({
+        background: "#2a2a2a",
+        color: "#FFF",
+        padding: 5,
+    })
+
+    container.addChild(createAddChildrenButton(container));
+    container.addChild(createAnimationButton());
+    container.addChild(createLabel("测试test"));
+    container.addChild(createParagraph());
+    container.addChild(createTextEdit());
+    container.addChild(createEntry());
     container.addChild(createCenterElement());
     frame.setBody(container);
 }
