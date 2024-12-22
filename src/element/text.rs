@@ -19,6 +19,7 @@ use crate::element::{ElementBackend, Element, ElementWeak};
 use crate::element::text::skia_text_paragraph::{SkiaTextParagraph};
 use crate::element::text::text_paragraph::{ParagraphData, Line, ParagraphRef, TextParams};
 use crate::{js_call, match_event_type};
+use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
 use crate::event::{FocusShiftEvent, TextUpdateEvent};
 use crate::number::DeNan;
 use crate::string::StringUtils;
@@ -506,7 +507,7 @@ impl Text {
         for ln in lines {
             // let p = SimpleTextParagraph::new(ln, params);
             let ln = Self::preprocess_text(ln);
-            let p = SkiaTextParagraph::new(ln.to_string(), params);
+            let p = SimpleTextParagraph::new(&ln.to_string(), params);
             result.push(Line {
                 atom_count: ln.trim_line_endings().chars().count() + 1,
                 paragraph: p,

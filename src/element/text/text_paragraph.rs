@@ -23,8 +23,8 @@ pub struct ParagraphData {
 pub struct Line {
     /// Atom count; \r\n is treated as one atom
     pub atom_count: AtomOffset,
-    pub paragraph: SkiaTextParagraph,
-    // pub paragraph: SimpleTextParagraph,
+    // pub paragraph: SkiaTextParagraph,
+    pub paragraph: SimpleTextParagraph,
     pub paragraph_dirty: bool,
 }
 
