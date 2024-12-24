@@ -12,7 +12,7 @@ use crate::ext::ext_frame::{FrameAttrs, FRAMES, FRAME_TYPE_MENU, FRAME_TYPE_NORM
 use crate::js::JsError;
 use crate::mrc::{Mrc, MrcWeak};
 use crate::renderer::CpuRenderer;
-use crate::timer::{set_timeout, TimerHandle};
+use crate::timer::{set_timeout, set_timeout_nanos, TimerHandle};
 use anyhow::{anyhow, Error};
 use lento_macros::{event, frame_event, js_func, js_methods, mrc_object};
 use measure_time::print_time;
@@ -40,6 +40,7 @@ use winit::keyboard::{Key, NamedKey};
 use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorGrabMode, CursorIcon, Window, WindowAttributes, WindowId};
 use crate::bind_js_event_listener;
+use crate::frame_rate::{get_total_frames, next_frame, FRAME_RATE_CONTROLLER};
 use crate::style::ColorHelper;
 
 #[derive(Clone)]
@@ -86,6 +87,7 @@ pub struct Frame {
     modifiers: Modifiers,
     layout_dirty: bool,
     dirty: bool,
+    repaint_timer_handle: Option<TimerHandle>,
     event_registration: EventRegistration<FrameWeak>,
     attributes: WindowAttributes,
     init_width: Option<f32>,
@@ -202,6 +204,7 @@ impl Frame {
             init_height: attrs.height,
             ime_height: 0.0,
             background_color: Color::from_rgb(0, 0, 0),
+            repaint_timer_handle: None,
         };
         let mut handle = Frame {
             inner: Mrc::new(state),
@@ -222,14 +225,15 @@ impl Frame {
         self.layout_dirty |= layout_dirty;
         if !self.dirty {
             self.dirty = true;
-            let el = self.as_weak();
-            let callback = unsafe {
-                UnsafeFnOnce::new(move || {
-                    el.upgrade_mut(|el| el.update());
-                }).into_box()
-            };
-            let elp = create_event_loop_proxy();
-            elp.send_event(AppEvent::Callback(callback)).unwrap();
+            let time_to_wait = next_frame();
+
+            let me = self.as_weak();
+            //TODO use another timer
+            self.repaint_timer_handle = Some(set_timeout_nanos(move || {
+                if let Ok(mut me) = me.upgrade() {
+                    me.update();
+                }
+            }, time_to_wait));
         }
     }
 
@@ -689,6 +693,7 @@ impl Frame {
     }
 
     pub fn update(&mut self) {
+        print_time!("frame update time");
         let auto_size = !self.attributes.resizable;
         if self.layout_dirty {
             let size = self.window.inner_size();
@@ -811,7 +816,7 @@ impl Frame {
             canvas.restore();
         });
         let _time = SystemTime::now().duration_since(start).unwrap();
-        // println!("Render time:{}", _time.as_millis());
+        // println!("Render time({}):{}", get_total_frames(), _time.as_millis());
     }
 
     #[inline]
