@@ -11,7 +11,7 @@ use ordered_float::Float;
 use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
 use skia_bindings::{SkPaint_Style, SkPathOp};
-use skia_safe::{Canvas, Color, Paint, Path, Rect};
+use skia_safe::{Canvas, Color, Matrix, Paint, Path, Rect};
 use winit::window::CursorIcon;
 use yoga::{Direction, Edge, StyleUnit};
 
@@ -33,7 +33,7 @@ use crate::js::js_serde::JsValueSerializer;
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::resource_table::ResourceTable;
-use crate::style::{parse_style_obj, ColorHelper, StyleNode, StyleProp, StylePropKey};
+use crate::style::{parse_style_obj, ColorHelper, StyleNode, StyleProp, StylePropKey, StyleTransform};
 use crate::{base, bind_js_event_listener, compute_style, js_call, js_call_rust, js_get_prop, js_weak_value};
 
 pub mod container;
@@ -50,6 +50,7 @@ pub mod paragraph;
 
 use crate as lento;
 use crate::js::JsError;
+use crate::paint::Painter;
 
 thread_local! {
     pub static NEXT_ELEMENT_ID: Cell<u32> = Cell::new(1);
@@ -449,6 +450,20 @@ impl Element {
         base::Rect::from_layout(&ml)
     }
 
+    pub fn get_total_matrix(&self) -> Matrix {
+        let mut matrix = match self.get_parent() {
+            Some(p) => p.get_total_matrix(),
+            None => Matrix::default(),
+        };
+        if let Some(tf) = &self.style.transform {
+            let bounds = self.get_bounds();
+            matrix.pre_translate((bounds.width / 2.0, bounds.height / 2.0));
+            matrix.pre_concat(&tf.to_matrix(bounds.width, bounds.height));
+            matrix.pre_translate((-bounds.width / 2.0, -bounds.height / 2.0));
+        }
+        matrix
+    }
+
     pub fn get_relative_bounds(&self, target: &Self) -> base::Rect {
         let my_origin_bounds = self.get_origin_bounds();
         let target_origin_bounds = target.get_origin_bounds();
@@ -821,7 +836,12 @@ impl Element {
         }
 
         self.with_window(|win| {
-            win.mark_dirty(layout_dirty);
+            if layout_dirty {
+                win.invalid_layout();
+            } else {
+                let bounds = self.get_origin_bounds();
+                win.invalid(Some(&bounds.to_skia_rect()));
+            }
         });
 
     }
@@ -992,6 +1012,10 @@ pub trait ElementBackend {
     //TODO use &mut self
     fn draw(&self, canvas: &Canvas) {
         let _ = canvas;
+    }
+
+    fn paint(&mut self, painter: &mut dyn Painter) {
+        let _ = painter;
     }
 
     fn set_property(&mut self, _property_name: &str, _property_value: JsValue) {

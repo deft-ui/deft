@@ -42,7 +42,7 @@ impl ElementBackend for Container {
         self.children.insert(pos as usize, child);
 
         ele.with_window(|win| {
-            win.mark_dirty(true);
+            win.invalid_layout();
         });
     }
 

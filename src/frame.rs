@@ -18,7 +18,7 @@ use lento_macros::{event, frame_event, js_func, js_methods, mrc_object};
 use measure_time::print_time;
 use quick_js::{JsValue, ResourceValue};
 use skia_bindings::{SkClipOp, SkRect};
-use skia_safe::{Canvas, Color, ColorType, ImageInfo, Paint, Rect};
+use skia_safe::{Canvas, Color, ColorType, ImageInfo, Matrix, Paint, Path, Rect};
 use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
@@ -41,6 +41,7 @@ use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorGrabMode, CursorIcon, Window, WindowAttributes, WindowId};
 use crate::bind_js_event_listener;
 use crate::frame_rate::{get_total_frames, next_frame, FRAME_RATE_CONTROLLER};
+use crate::paint::{InvalidArea, InvalidRects, Painter, SkiaPainter};
 use crate::style::ColorHelper;
 
 #[derive(Clone)]
@@ -86,7 +87,7 @@ pub struct Frame {
     hover: Option<Element>,
     modifiers: Modifiers,
     layout_dirty: bool,
-    dirty: bool,
+    invalid_area: InvalidArea,
     repaint_timer_handle: Option<TimerHandle>,
     event_registration: EventRegistration<FrameWeak>,
     attributes: WindowAttributes,
@@ -94,6 +95,7 @@ pub struct Frame {
     init_height: Option<f32>,
     ime_height: f32,
     background_color: Color,
+    sorted_elements: Vec<Element>,
 }
 
 pub type FrameEventHandler = EventHandler<FrameWeak>;
@@ -186,7 +188,7 @@ impl Frame {
             hover: None,
             modifiers: Modifiers::default(),
             layout_dirty: false,
-            dirty: false,
+            invalid_area: InvalidArea::None,
             dragging: false,
             last_drag_over: None,
             event_registration: EventRegistration::new(),
@@ -205,6 +207,7 @@ impl Frame {
             ime_height: 0.0,
             background_color: Color::from_rgb(0, 0, 0),
             repaint_timer_handle: None,
+            sorted_elements: Vec::new(),
         };
         let mut handle = Frame {
             inner: Mrc::new(state),
@@ -218,13 +221,27 @@ impl Frame {
         self.window = Self::create_window(self.attributes.clone());
     }
 
-    pub fn mark_dirty(&mut self, layout_dirty: bool) {
-        // Note: Uncomment to debug layout problems
-        // if layout_dirty && !self.layout_dirty { crate::trace::print_trace("layout dirty") }
-
-        self.layout_dirty |= layout_dirty;
-        if !self.dirty {
-            self.dirty = true;
+    pub fn invalid(&mut self, rect: Option<&Rect>) {
+        let is_first_invalid = self.invalid_area == InvalidArea::None;
+        match rect {
+            None => {
+                self.invalid_area = InvalidArea::Full;
+            }
+            Some(rect) => {
+                match &mut self.invalid_area {
+                    InvalidArea::Full => {}
+                    InvalidArea::Partial(p) => {
+                        p.add_rect(rect);
+                    }
+                    InvalidArea::None => {
+                        let mut p = InvalidRects::new();
+                        p.add_rect(rect);
+                        self.invalid_area = InvalidArea::Partial(p);
+                    }
+                }
+            }
+        }
+        if is_first_invalid {
             let time_to_wait = next_frame();
 
             let me = self.as_weak();
@@ -235,6 +252,13 @@ impl Frame {
                 }
             }, time_to_wait));
         }
+    }
+
+    pub fn invalid_layout(&mut self) {
+        // Note: Uncomment to debug layout problems
+        // if layout_dirty && !self.layout_dirty { crate::trace::print_trace("layout dirty") }
+        self.layout_dirty = true;
+        self.invalid(None);
     }
 
     pub fn mark_dirty_and_update_immediate(&mut self, layout_dirty: bool) {
@@ -294,6 +318,7 @@ impl Frame {
     pub fn handle_event(&mut self, event: WindowEvent) {
         match event {
             WindowEvent::RedrawRequested => {
+                self.invalid(None);
                 self.paint();
             }
             WindowEvent::Resized(_physical_size) => {
@@ -722,10 +747,16 @@ impl Frame {
                     }
                 }
             }
+            print_time!("collect element time");
+            self.sorted_elements = if let Some(body) = &self.body {
+                build_ordered_elements(&body)
+            } else {
+                Vec::new()
+            };
         }
         self.paint();
         self.layout_dirty = false;
-        self.dirty = false;
+        self.invalid_area = InvalidArea::None;
     }
 
     #[js_func]
@@ -750,7 +781,7 @@ impl Frame {
             });
         }));
         self.body = Some(body);
-        self.mark_dirty(true);
+        self.invalid_layout();
     }
 
     #[js_func]
@@ -773,7 +804,7 @@ impl Frame {
             return;
         }
         self.window.resize_surface(width, height);
-        self.mark_dirty(true);
+        self.invalid_layout();
         let scale_factor = self.window.scale_factor();
         self.emit(FrameResizeEvent {
             width: (width as f64 / scale_factor) as u32,
@@ -804,15 +835,19 @@ impl Frame {
         let start = SystemTime::now();
         let scale_factor = self.window.scale_factor() as f32;
         let background_color = self.background_color;
+        let mut me = self.clone();
         self.window.render(move |canvas| {
             canvas.save();
             if scale_factor != 1.0 {
                 canvas.scale((scale_factor, scale_factor));
             }
+            let invalid_area = me.invalid_area.clone();
+            let mut painter = SkiaPainter::new(canvas, invalid_area);
             if !background_color.is_transparent() {
                 canvas.clear(background_color);
             }
-            draw_root(canvas, &mut body);
+            draw_elements(canvas, &mut me.sorted_elements, &mut painter);
+
             canvas.restore();
         });
         let _time = SystemTime::now().duration_since(start).unwrap();
@@ -885,29 +920,35 @@ impl WeakWindowHandle {
     }
 }
 
-fn draw_root(canvas: &Canvas, body: &mut Element) {
-    // draw background
-    draw_element(canvas, body);
-    // print_tree(&body, "");
+fn draw_elements(canvas: &Canvas, elements: &mut [Element], painter: &mut dyn Painter) {
+    for element in elements {
+        canvas.session(|c| {
+            draw_element(canvas, element, painter);
+        });
+    }
 }
 
-fn draw_element(canvas: &Canvas, element: &Element) {
-    let bounds = element.get_bounds();
-    if let Some(lcb) = canvas.local_clip_bounds() {
-        if !lcb.intersects(&bounds.to_skia_rect()) {
-            return;
-        }
+fn draw_element(canvas: &Canvas, element: &mut Element, painter: &mut dyn Painter) {
+    let origin_bounds = element.get_origin_bounds();
+    if !painter.is_visible_origin(&origin_bounds.to_skia_rect()) {
+        return;
     }
+    if let Some(p) = element.get_parent() {
+        let p_bounds = p.get_origin_bounds();
+        canvas.translate((p_bounds.x, p_bounds.y));
+        let content_path = p.get_content_box_path();
+        canvas.clip_path(&content_path, SkClipOp::Intersect, true);
+        canvas.translate((-p.get_scroll_left(), -p.get_scroll_top()));
+        //TODO apply parent transform
+    }
+
+    let bounds = element.get_bounds();
     canvas.session(move |canvas| {
 
         // translate to element left-top
         canvas.translate((bounds.x, bounds.y));
-        if let Some(m) = &element.style.transform {
-            //TODO support transform origin
-            canvas.translate((bounds.width / 2.0, bounds.height / 2.0));
-            canvas.concat(&m.to_matrix(bounds.width, bounds.height));
-            canvas.translate((-bounds.width / 2.0, -bounds.height / 2.0));
-        }
+        let matrix = element.get_total_matrix();
+        canvas.concat(&matrix);
 
         // set clip path
         let clip_path = element.get_border_box_path();
@@ -925,17 +966,34 @@ fn draw_element(canvas: &Canvas, element: &Element) {
             // draw content box
             canvas.translate((border_left_width, border_top_width));
             element.get_backend().draw(canvas);
+            element.get_backend_mut().paint(painter);
         }
         canvas.restore();
-
-        // draw children
-        let content_path = element.get_content_box_path();
-        canvas.clip_path(&content_path, SkClipOp::Intersect, true);
-        canvas.translate((-element.get_scroll_left(), -element.get_scroll_top()));
-        for child_rc in element.get_backend().get_children() {
-            draw_element(canvas, &child_rc);
-        }
     });
+}
+
+fn build_ordered_elements(root: &Element) -> Vec<Element> {
+    let count = count_elements(root);
+    let mut result = Vec::with_capacity(count);
+    collect_ordered_elements(root, &mut result);
+    result
+}
+
+fn collect_ordered_elements(root: &Element, result: &mut Vec<Element>) {
+    result.push(root.clone());
+    let children = root.get_children();
+    for child in children {
+        collect_ordered_elements(&child, result);
+    }
+}
+
+fn count_elements(root: &Element) -> usize {
+    let mut elements_count = 1;
+    let children = root.get_children();
+    for child in children {
+        elements_count += count_elements(&child);
+    }
+    elements_count
 }
 
 fn print_tree(node: &Element, padding: &str) {

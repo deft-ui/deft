@@ -77,6 +77,7 @@ mod id_generator;
 mod typeface;
 mod text;
 mod frame_rate;
+mod paint;
 
 pub use lento_macros::*;
 use rodio::cpal::available_hosts;
