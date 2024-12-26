@@ -27,7 +27,7 @@ use crate::element::textedit::TextEdit;
 use crate::event::{DragOverEventListener, BlurEventListener, BoundsChangeEventListener, CaretChangeEventListener, ClickEventListener, DragStartEventListener, DropEventListener, FocusEventListener, FocusShiftEventListener, KeyDownEventListener, KeyUpEventListener, MouseDownEventListener, MouseEnterEvent, MouseEnterEventListener, MouseLeaveEvent, MouseLeaveEventListener, MouseMoveEventListener, MouseUpEventListener, MouseWheelEventListener, ScrollEvent, ScrollEventListener, TextChangeEventListener, TextUpdateEventListener, TouchCancelEventListener, TouchEndEventListener, TouchMoveEventListener, TouchStartEventListener, BoundsChangeEvent, ContextMenuEventListener};
 use crate::event_loop::{create_event_loop_callback};
 use crate::ext::ext_frame::{VIEW_TYPE_BUTTON, VIEW_TYPE_CONTAINER, VIEW_TYPE_ENTRY, VIEW_TYPE_IMAGE, VIEW_TYPE_LABEL, VIEW_TYPE_SCROLL, VIEW_TYPE_TEXT_EDIT};
-use crate::frame::{Frame, FrameWeak};
+use crate::frame::{Frame, FrameWeak, InvalidMode};
 use crate::img_manager::IMG_MANAGER;
 use crate::js::js_serde::JsValueSerializer;
 use crate::mrc::{Mrc, MrcWeak};
@@ -50,7 +50,7 @@ pub mod paragraph;
 
 use crate as lento;
 use crate::js::JsError;
-use crate::paint::Painter;
+use crate::paint::{Painter, UniqueRect};
 
 thread_local! {
     pub static NEXT_ELEMENT_ID: Cell<u32> = Cell::new(1);
@@ -104,6 +104,7 @@ impl Element {
         self.style = StyleNode::new_with_shadow();
     }
 
+    #[js_func]
     pub fn get_id(&self) -> u32 {
         self.id
     }
@@ -258,10 +259,11 @@ impl Element {
         }
         let max_scroll_left = (self.get_real_content_size().0 - width).max(0.0);
         value = value.clamp(0.0, max_scroll_left);
-        if self.scroll_left != value {
+        if value != self.scroll_left {
             self.scroll_left = value;
+            //TODO emit on layout updated?
             self.emit_scroll_event();
-            self.mark_dirty(false);
+            self.mark_unique_dirty();
         }
     }
 
@@ -284,10 +286,11 @@ impl Element {
         }
         let max_scroll_top = (self.get_real_content_size().1 - height).max(0.0);
         value = value.clamp(0.0, max_scroll_top);
-        if self.scroll_top != value {
+        if value != self.scroll_top {
             self.scroll_top = value;
+            //TODO emit on layout updated?
             self.emit_scroll_event();
-            self.mark_dirty(false);
+            self.mark_unique_dirty();
         }
     }
 
@@ -487,6 +490,12 @@ impl Element {
         self.style.get_content_bounds()
     }
 
+    pub fn get_origin_padding_bounds(&self) -> base::Rect {
+        let (t, r, b, l) = self.get_border_width();
+        let bounds = self.get_origin_bounds();
+        base::Rect::new(bounds.x + l, bounds.y + t, bounds.width - l - r, bounds.height - t - b)
+    }
+
     pub fn get_origin_content_bounds(&self) -> base::Rect {
         let (t, r, b, l) = self.get_padding();
         let bounds = self.get_origin_bounds();
@@ -506,6 +515,16 @@ impl Element {
         } else {
             b
         }
+    }
+
+    pub fn get_transformed_bounds(&self) -> Rect {
+        let bounds = self.get_origin_bounds();
+        let x = bounds.x;// + bounds.width / 2.0;
+        let y = bounds.y;// + bounds.height / 2.0;
+        let bounds = bounds.translate(-x, -y);
+        let matrix = self.get_total_matrix();
+        let (r, _) = matrix.map_rect(&bounds.to_skia_rect());
+        r.with_offset((x, y))
     }
 
     pub fn add_child_view(&mut self, mut child: Element, position: Option<u32>) {
@@ -830,6 +849,18 @@ impl Element {
         self.event_registration.remove_event_listener(&event_type, id)
     }
 
+    pub fn mark_unique_dirty(&mut self) {
+        let bounds = self.get_origin_bounds();
+        let rect = UniqueRect::from_rect(bounds.to_skia_rect());
+        self.with_window(|win| {
+            if let Some(old_rect) = &self.invalid_unique_rect {
+                win.remove_unique_invalid_rect(old_rect);
+            }
+            win.invalid(InvalidMode::UniqueRect(&rect));
+        });
+        self.invalid_unique_rect = Some(rect);
+    }
+
     pub fn mark_dirty(&mut self, layout_dirty: bool) {
         if layout_dirty && self.style.get_own_context_mut().is_some() {
             self.style.mark_dirty();
@@ -840,10 +871,9 @@ impl Element {
                 win.invalid_layout();
             } else {
                 let bounds = self.get_origin_bounds();
-                win.invalid(Some(&bounds.to_skia_rect()));
+                win.invalid(InvalidMode::Rect(&bounds.to_skia_rect()));
             }
         });
-
     }
 
     pub fn mark_all_layout_dirty(&mut self) {
@@ -851,6 +881,22 @@ impl Element {
         for mut c in self.get_children() {
             c.mark_all_layout_dirty();
         }
+    }
+
+    pub fn set_child_decoration(&mut self, decoration: (f32, f32, f32, f32)) {
+        self.children_decoration = decoration;
+        self.mark_dirty(false);
+    }
+
+    pub fn get_children_viewport(&self) -> Rect {
+        let border = self.get_border_width();
+        let children_decoration = self.children_decoration;
+        let bounds = self.get_bounds();
+        let x = border.3 + children_decoration.3;
+        let y = border.0 + children_decoration.0;
+        let right = bounds.width - border.1 - children_decoration.1;
+        let bottom = bounds.height - border.2 - children_decoration.2;
+        Rect::new(x, y, right, bottom)
     }
 
     pub fn on_before_layout_update(&mut self) {
@@ -941,12 +987,20 @@ pub struct Element {
     // animation_instance: Option<AnimationInstance>,
 
 
-    scroll_top: f32,
-    scroll_left: f32,
+    pub scroll_top: f32,
+    pub scroll_left: f32,
+    pub last_paint_info: Option<PaintInfo>,
+    pub invalid_unique_rect: Option<UniqueRect>,
     draggable: bool,
     cursor: CursorIcon,
     rect: base::Rect,
     resource_table: ResourceTable,
+    children_decoration: (f32, f32, f32, f32),
+}
+
+pub struct PaintInfo {
+    pub scroll_left: f32,
+    pub scroll_top: f32,
 }
 
 js_weak_value!(Element, ElementWeak);
@@ -970,12 +1024,15 @@ impl ElementData {
             applied_style: Vec::new(),
             hover: false,
 
+            invalid_unique_rect: None,
             scroll_top: 0.0,
             scroll_left: 0.0,
+            last_paint_info: None,
             draggable: false,
             cursor: CursorIcon::Default,
             rect: base::Rect::empty(),
             resource_table: ResourceTable::new(),
+            children_decoration: (0.0, 0.0, 0.0, 0.0),
         }
     }
 

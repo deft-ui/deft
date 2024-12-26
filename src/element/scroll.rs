@@ -4,7 +4,7 @@ use std::str::FromStr;
 use bezier_rs::{Bezier, TValue};
 use lento_macros::element_backend;
 use quick_js::JsValue;
-use skia_safe::{Canvas, Color, Paint};
+use skia_safe::{Canvas, Color, Paint, Path};
 use tokio::time::Instant;
 use yoga::Direction::LTR;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size, StyleUnit};
@@ -349,6 +349,9 @@ impl Scroll {
             self.update_horizontal_bar_rect(true, bounds_width, bounds_height);
         }
 
+        let vbw = self.vertical_bar_rect.width;
+        let hbw = self.horizontal_bar_rect.width;
+        self.element.set_child_decoration((0.0, vbw, hbw, 0.0));
         // Update scroll offset
         let scroll_left = self.element.get_scroll_left();
         self.element.set_scroll_left(scroll_left);

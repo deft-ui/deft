@@ -4,7 +4,7 @@ use crate::base::MouseEventType::{MouseClick, MouseUp};
 use crate::base::{ElementEvent, Event, EventContext, EventHandler, EventListener, EventRegistration, MouseDetail, MouseEventType, Touch, TouchDetail, UnsafeFnOnce};
 use crate::canvas_util::CanvasHelper;
 use crate::cursor::search_cursor;
-use crate::element::{Element, ElementWeak};
+use crate::element::{Element, ElementWeak, PaintInfo};
 use crate::event::{build_modifier, named_key_to_str, BlurEvent, CaretChangeEventListener, ClickEvent, ContextMenuEvent, DragOverEvent, DragStartEvent, DropEvent, FocusEvent, FocusShiftEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent, MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, TextInputEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT};
 use crate::event_loop::{create_event_loop_proxy, run_with_event_loop};
 use crate::ext::common::create_event_handler;
@@ -18,7 +18,7 @@ use lento_macros::{event, frame_event, js_func, js_methods, mrc_object};
 use measure_time::print_time;
 use quick_js::{JsValue, ResourceValue};
 use skia_bindings::{SkClipOp, SkRect};
-use skia_safe::{Canvas, Color, ColorType, ImageInfo, Matrix, Paint, Path, Rect};
+use skia_safe::{Canvas, Color, ColorType, IRect, ImageInfo, Matrix, Paint, Path, Rect};
 use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
@@ -41,7 +41,7 @@ use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorGrabMode, CursorIcon, Window, WindowAttributes, WindowId};
 use crate::bind_js_event_listener;
 use crate::frame_rate::{get_total_frames, next_frame, FRAME_RATE_CONTROLLER};
-use crate::paint::{InvalidArea, InvalidRects, Painter, SkiaPainter};
+use crate::paint::{InvalidArea, InvalidRects, Painter, RenderNode, RenderTree, SkiaPainter, UniqueRect};
 use crate::style::ColorHelper;
 
 #[derive(Clone)]
@@ -70,6 +70,12 @@ pub enum FrameType {
     Menu,
 }
 
+pub enum InvalidMode<'a> {
+    Full,
+    Rect(&'a Rect),
+    UniqueRect(&'a UniqueRect),
+}
+
 #[mrc_object]
 pub struct Frame {
     id: i32,
@@ -95,7 +101,7 @@ pub struct Frame {
     init_height: Option<f32>,
     ime_height: f32,
     background_color: Color,
-    sorted_elements: Vec<Element>,
+    render_tree: RenderTree,
 }
 
 pub type FrameEventHandler = EventHandler<FrameWeak>;
@@ -207,7 +213,7 @@ impl Frame {
             ime_height: 0.0,
             background_color: Color::from_rgb(0, 0, 0),
             repaint_timer_handle: None,
-            sorted_elements: Vec::new(),
+            render_tree: RenderTree::new(),
         };
         let mut handle = Frame {
             inner: Mrc::new(state),
@@ -221,24 +227,21 @@ impl Frame {
         self.window = Self::create_window(self.attributes.clone());
     }
 
-    pub fn invalid(&mut self, rect: Option<&Rect>) {
+    pub fn remove_unique_invalid_rect(&mut self, rect: &UniqueRect) {
+        self.invalid_area.remove_unique_rect(rect);
+    }
+
+    pub fn invalid(&mut self, mode: InvalidMode) {
         let is_first_invalid = self.invalid_area == InvalidArea::None;
-        match rect {
-            None => {
-                self.invalid_area = InvalidArea::Full;
+        match mode {
+            InvalidMode::Full => {
+                self.invalid_area.add_rect(None);
             }
-            Some(rect) => {
-                match &mut self.invalid_area {
-                    InvalidArea::Full => {}
-                    InvalidArea::Partial(p) => {
-                        p.add_rect(rect);
-                    }
-                    InvalidArea::None => {
-                        let mut p = InvalidRects::new();
-                        p.add_rect(rect);
-                        self.invalid_area = InvalidArea::Partial(p);
-                    }
-                }
+            InvalidMode::Rect(r) => {
+                self.invalid_area.add_rect(Some(r));
+            }
+            InvalidMode::UniqueRect(ur) => {
+                self.invalid_area.add_unique_rect(ur);
             }
         }
         if is_first_invalid {
@@ -258,7 +261,7 @@ impl Frame {
         // Note: Uncomment to debug layout problems
         // if layout_dirty && !self.layout_dirty { crate::trace::print_trace("layout dirty") }
         self.layout_dirty = true;
-        self.invalid(None);
+        self.invalid(InvalidMode::Full);
     }
 
     pub fn mark_dirty_and_update_immediate(&mut self, layout_dirty: bool) {
@@ -318,7 +321,7 @@ impl Frame {
     pub fn handle_event(&mut self, event: WindowEvent) {
         match event {
             WindowEvent::RedrawRequested => {
-                self.invalid(None);
+                self.invalid(InvalidMode::Full);
                 self.paint();
             }
             WindowEvent::Resized(_physical_size) => {
@@ -748,11 +751,6 @@ impl Frame {
                 }
             }
             print_time!("collect element time");
-            self.sorted_elements = if let Some(body) = &self.body {
-                build_ordered_elements(&body)
-            } else {
-                Vec::new()
-            };
         }
         self.paint();
         self.layout_dirty = false;
@@ -837,16 +835,25 @@ impl Frame {
         let background_color = self.background_color;
         let mut me = self.clone();
         self.window.render(move |canvas| {
+            let invalid_area = me.invalid_area.clone();
+            me.render_tree = if let Some(body) = &mut me.body {
+                // print_time!("build render nodes time");
+                build_render_nodes(body, invalid_area, canvas, scale_factor)
+            } else {
+                RenderTree::new()
+            };
             canvas.save();
             if scale_factor != 1.0 {
                 canvas.scale((scale_factor, scale_factor));
             }
-            let invalid_area = me.invalid_area.clone();
-            let mut painter = SkiaPainter::new(canvas, invalid_area);
+            let mut painter = SkiaPainter::new(canvas);
             if !background_color.is_transparent() {
+                canvas.save();
+                painter.set_invalid_area(me.render_tree.invalid_rects_list[0].clone());
                 canvas.clear(background_color);
+                canvas.restore();
             }
-            draw_elements(canvas, &mut me.sorted_elements, &mut painter);
+            draw_elements(canvas, &mut me.render_tree, &mut painter);
 
             canvas.restore();
         });
@@ -920,19 +927,34 @@ impl WeakWindowHandle {
     }
 }
 
-fn draw_elements(canvas: &Canvas, elements: &mut [Element], painter: &mut dyn Painter) {
-    for element in elements {
+fn draw_elements(canvas: &Canvas, tree: &mut RenderTree, painter: &mut dyn Painter) {
+    for node in &mut tree.nodes {
         canvas.session(|c| {
-            draw_element(canvas, element, painter);
+            painter.set_invalid_area(tree.invalid_rects_list[node.invalid_rects_idx].clone());
+            draw_element(canvas, &mut node.element, painter);
         });
+        if let Some((rect, i)) = &node.snapshot {
+            let ob = node.element.get_origin_bounds();
+            let vp = node.element.get_children_viewport();
+            let mut vp_path = Path::new();
+            vp_path.add_rect(&vp, None);
+            canvas.session(|c| {
+                c.translate((ob.x, ob.y));
+                c.clip_path(&vp_path, SkClipOp::Intersect, false);
+                c.translate((-ob.x, -ob.y));
+                c.draw_image_rect(i, None, &rect, &Paint::default());
+            });
+        }
+        node.snapshot = None;
     }
 }
 
 fn draw_element(canvas: &Canvas, element: &mut Element, painter: &mut dyn Painter) {
-    let origin_bounds = element.get_origin_bounds();
-    if !painter.is_visible_origin(&origin_bounds.to_skia_rect()) {
+    let final_bounds = element.get_transformed_bounds();
+    if !painter.is_visible_origin(&final_bounds) {
         return;
     }
+    let origin_bounds = element.get_origin_bounds();
     if let Some(p) = element.get_parent() {
         let p_bounds = p.get_origin_bounds();
         canvas.translate((p_bounds.x, p_bounds.y));
@@ -972,18 +994,94 @@ fn draw_element(canvas: &Canvas, element: &mut Element, painter: &mut dyn Painte
     });
 }
 
-fn build_ordered_elements(root: &Element) -> Vec<Element> {
+fn build_render_nodes(root: &mut Element, invalid_area: InvalidArea, canvas: &Canvas, scale: f32) -> RenderTree {
     let count = count_elements(root);
-    let mut result = Vec::with_capacity(count);
-    collect_ordered_elements(root, &mut result);
-    result
+    let mut render_tree = RenderTree {
+        invalid_rects_list: vec![invalid_area],
+        nodes: vec![],
+    };
+    collect_render_nodes(root, &mut render_tree, 0, canvas, scale);
+    render_tree
 }
 
-fn collect_ordered_elements(root: &Element, result: &mut Vec<Element>) {
-    result.push(root.clone());
+fn collect_render_nodes(root: &mut Element, result: &mut RenderTree, mut invalid_rects_idx: usize, canvas: &Canvas, scale: f32) {
+    let mut node = RenderNode {
+        element: root.clone(),
+        invalid_rects_idx,
+        snapshot: None,
+    };
+    let mut scroll_delta = (0.0, 0.0);
+    if let Some(lpi) = &root.last_paint_info {
+        scroll_delta.0 = root.scroll_left - lpi.scroll_left;
+        scroll_delta.1 = root.scroll_top - lpi.scroll_top;
+    }
+    if scroll_delta.0 != 0.0 || scroll_delta.1 != 0.0 {
+        root.last_paint_info = Some(PaintInfo {
+            scroll_left: root.scroll_left,
+            scroll_top: root.scroll_top,
+        });
+        let old_origin_bounds = node.element.get_origin_padding_bounds();
+        let reuse_bounds = old_origin_bounds.translate(scroll_delta.0, scroll_delta.1)
+            .intersect(&old_origin_bounds);
+        if !reuse_bounds.is_empty() {
+            unsafe {
+                if let Some(mut surface) = canvas.surface() {
+                    let mut bounds = reuse_bounds.clone();
+                    let paint_x = bounds.x - scroll_delta.0;
+                    let paint_y = bounds.y - scroll_delta.1;
+                    let paint_rect = Rect::from_xywh(paint_x, paint_y, bounds.width, bounds.height);
+                    if scale != 1.0 {
+                        bounds.x *= scale;
+                        bounds.y *= scale;
+                        bounds.width *= scale;
+                        bounds.height *= scale;
+                    }
+                    let i_bounds = IRect {
+                        left: bounds.x as i32,
+                        top: bounds.y as i32,
+                        right: bounds.right() as i32,
+                        bottom: bounds.bottom() as i32,
+                    };
+                    node.snapshot = surface.image_snapshot_with_bounds(&i_bounds)
+                        .map(|i| (paint_rect, i));
+                }
+            }
+        }
+        if let Some(ir) = &mut root.invalid_unique_rect {
+            let mut invalid_area = result.invalid_rects_list[invalid_rects_idx].clone();
+            invalid_area.offset(-scroll_delta.0, -scroll_delta.1);
+            let reuse_bounds = reuse_bounds.translate(-scroll_delta.0, -scroll_delta.1);
+            //TODO scroll bar?
+            // let bounds = node.element.get_origin_bounds();
+            if !reuse_bounds.is_empty() {
+                invalid_area.remove_unique_rect(ir);
+                if reuse_bounds.x > 0.0 {
+                    let rect = Rect::new(old_origin_bounds.x, old_origin_bounds.y, reuse_bounds.x, old_origin_bounds.bottom());
+                    invalid_area.add_rect(Some(&rect));
+                }
+                if reuse_bounds.right() < old_origin_bounds.right() {
+                    let rect = Rect::new(reuse_bounds.right(), old_origin_bounds.y, old_origin_bounds.right(), old_origin_bounds.bottom());
+                    invalid_area.add_rect(Some(&rect));
+                }
+                if reuse_bounds.y > 0.0 {
+                    let rect = Rect::new(old_origin_bounds.x, old_origin_bounds.y, old_origin_bounds.right(), reuse_bounds.y);
+                    invalid_area.add_rect(Some(&rect));
+                }
+                if reuse_bounds.bottom() < old_origin_bounds.bottom() {
+                    let rect = Rect::new(old_origin_bounds.x, reuse_bounds.bottom(), old_origin_bounds.right(), old_origin_bounds.bottom());
+                    invalid_area.add_rect(Some(&rect));
+                }
+            }
+
+            result.invalid_rects_list.push(invalid_area);
+            invalid_rects_idx = result.invalid_rects_list.len() - 1;
+            root.invalid_unique_rect =  None;
+        }
+    }
+    result.nodes.push(node);
     let children = root.get_children();
-    for child in children {
-        collect_ordered_elements(&child, result);
+    for mut child in children {
+        collect_render_nodes(&mut child, result, invalid_rects_idx, canvas, scale);
     }
 }
 

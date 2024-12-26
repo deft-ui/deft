@@ -1003,6 +1003,7 @@ impl StyleNode {
                 self.border_radius[3] = value.resolve(&0.0)
             },
             StyleProp::Transform (value) =>   {
+                need_layout = false;
                 if let StylePropVal::Custom(v) = value {
                     self.transform = Some(v.clone());
                 } else {
@@ -1010,6 +1011,7 @@ impl StyleNode {
                 }
             }
             StyleProp::AnimationName(value) => {
+                need_layout = false;
                 let name = value.resolve(&"".to_string());
                 if name != self.animation_params.name {
                     self.animation_params.name = name;
@@ -1017,6 +1019,7 @@ impl StyleNode {
                 }
             }
             StyleProp::AnimationDuration(value) => {
+                need_layout = false;
                 let duration = value.resolve(&0.0);
                 if duration != self.animation_params.duration {
                     self.animation_params.duration = duration;
@@ -1024,6 +1027,7 @@ impl StyleNode {
                 }
             }
             StyleProp::AnimationIterationCount(value) => {
+                need_layout = false;
                 let ic = value.resolve(&1.0);
                 if ic != self.animation_params.iteration_count {
                     self.animation_params.iteration_count = ic;

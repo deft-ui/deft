@@ -84,6 +84,7 @@ use rodio::cpal::available_hosts;
 use skia_bindings::SkFontStyle_Slant;
 use skia_safe::font_style::{Weight, Width};
 use skia_safe::wrapper::ValueWrapper;
+use yoga::Direction::LTR;
 use crate::event_loop::{AppEventProxy, AppEventResult};
 use crate::string::StringUtils;
 use crate::text::break_lines;
@@ -272,4 +273,47 @@ fn test_border_performance_gl() {
     }
     let mut app = TestApp { window: None };
     event_loop.run_app(&mut app).unwrap();
+}
+
+#[test]
+fn test_layout_mem() {
+    let sm = memory_stats::memory_stats().unwrap();
+    let mut root = Node::new();
+    let mut children = Vec::new();
+    for i in 0..10000 {
+        let mut child = Node::new();
+        root.insert_child(&mut child, i);
+        children.push(child);
+    }
+    {
+        print_time!("layout time");
+        root.calculate_layout(512.0, 512.0, LTR);
+    }
+    let used = memory_stats::memory_stats().unwrap().physical_mem - sm.physical_mem;
+    println!("used:{}K", used / 1024);
+}
+
+
+#[test]
+fn test_layout_mem2() {
+    let sm = memory_stats::memory_stats().unwrap();
+    let mut roots = Vec::new();
+    let mut children = Vec::new();
+    for i in 0..100 {
+        let mut root = Node::new();
+        for j in 0..100 {
+            let mut child = Node::new();
+            root.insert_child(&mut child, j);
+            children.push(child);
+        }
+        roots.push(root);
+    }
+    {
+        print_time!("layout time");
+        for root in &mut roots {
+            root.calculate_layout(512.0, 512.0, LTR);
+        }
+    }
+    let used = memory_stats::memory_stats().unwrap().physical_mem - sm.physical_mem;
+    println!("used:{}K", used / 1024);
 }

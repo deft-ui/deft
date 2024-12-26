@@ -450,6 +450,14 @@ export class View {
         });
     }
 
+    /**
+     *
+     * @returns {number}
+     */
+    getId() {
+        return Element_get_id(this.el)
+    }
+
     focus() {
         Element_focus(this.el);
     }

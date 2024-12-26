@@ -68,6 +68,7 @@ function createCenterElement() {
         border: '1 #ccc',
     });
     outer.addChild(inner);
+    console.log("innerId", inner.getId());
     return outer;
 }
 
@@ -86,7 +87,7 @@ function createAddChildrenButton(container) {
             flexDirection: 'row',
             flexWrap: 'wrap',
         })
-        for (let i = 0; i < 200; i++) {
+        for (let i = 0; i < 2000; i++) {
             const lb = new LabelElement();
             lb.setStyle({
                 border: '1 #ccc',
@@ -128,6 +129,7 @@ function createAnimationButton() {
         animationDuration: 1000,
         animationIterationCount: Infinity,
     })
+    console.log("animationButtonId", animationButton.getId());
     return animationButton;
 }
 
