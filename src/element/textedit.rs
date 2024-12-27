@@ -57,7 +57,7 @@ impl ElementBackend for TextEdit {
         tree!(container_ele, [
             entry_element,
         ]);
-        base.add_child_view(container_ele.clone(), None);
+        element.add_child_view(container_ele.clone(), None);
 
         // let mut update_line_number_width = {
         //     let mut container_ele = container_ele.clone();
@@ -143,18 +143,6 @@ impl ElementBackend for TextEdit {
 
     fn handle_origin_bounds_change(&mut self, _bounds: &Rect) {
         self.base.handle_origin_bounds_change(_bounds);
-    }
-
-    fn add_child_view(&mut self, child: Element, position: Option<u32>) {
-        self.base.add_child_view(child, position);
-    }
-
-    fn get_children(&self) -> Vec<Element> {
-        self.base.get_children()
-    }
-
-    fn remove_child_view(&mut self, position: u32) {
-        self.base.remove_child_view(position)
     }
 
     fn before_origin_bounds_change(&mut self) {

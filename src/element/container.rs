@@ -2,7 +2,6 @@ use crate::element::{ElementBackend, Element};
 
 pub struct Container {
     dirty: bool,
-    children: Vec<Element>,
     element: Element,
 }
 
@@ -14,7 +13,6 @@ impl ElementBackend for Container {
     fn create(element: Element) -> Self {
         Self {
             dirty: false,
-            children: Vec::new(),
             element,
         }
     }
@@ -25,38 +23,6 @@ impl ElementBackend for Container {
 
     fn before_origin_bounds_change(&mut self) {
 
-    }
-
-    fn add_child_view(&mut self, mut child: Element, position: Option<u32>) {
-        if let Some(p) = child.get_parent() {
-            panic!("child({}) has parent({}) already", child.get_id(), p.get_id());
-        }
-        let ele = &mut self.element;
-        let pos = {
-            let layout = &mut ele.style;
-            let pos = position.unwrap_or_else(|| layout.child_count());
-            layout.insert_child(&mut child.style, pos);
-            pos
-        };
-        child.set_parent(Some(ele.clone()));
-        self.children.insert(pos as usize, child);
-
-        ele.with_window(|win| {
-            win.invalid_layout();
-        });
-    }
-
-    fn remove_child_view(&mut self, position: u32) {
-        let mut c = self.children.remove(position as usize);
-        c.set_parent(None);
-        let mut ele = self.element.clone();
-        let layout = &mut ele.style;
-        layout.remove_child(&mut c.style);
-        ele.mark_dirty(true);
-    }
-
-    fn get_children(&self) -> Vec<Element> {
-        self.children.clone()
     }
 
 }

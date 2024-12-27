@@ -177,15 +177,15 @@ impl Element {
     }
 
     #[js_func]
-    pub fn add_child(&mut self, child: Element, position: i32) -> Result<(), Error> {
+    pub fn add_child(&mut self, mut child: Element, position: i32) -> Result<(), Error> {
         let position = if position < 0 { None } else { Some(position as u32) };
-        self.backend.add_child_view(child, position);
+        self.add_child_view(child, position);
         Ok(())
     }
 
     #[js_func]
     pub fn remove_child(&mut self, position: u32) -> Result<(), Error> {
-        self.get_backend_mut().remove_child_view(position);
+        self.remove_child_view(position);
         Ok(())
     }
 
@@ -528,15 +528,34 @@ impl Element {
     }
 
     pub fn add_child_view(&mut self, mut child: Element, position: Option<u32>) {
-        self.backend.add_child_view(child, position);
+        if let Some(p) = child.get_parent() {
+            panic!("child({}) has parent({}) already", child.get_id(), p.get_id());
+        }
+        let pos = {
+            let layout = &mut self.style;
+            let pos = position.unwrap_or_else(|| layout.child_count());
+            layout.insert_child(&mut child.style, pos);
+            pos
+        };
+        child.set_parent(Some(self.clone()));
+        self.children.insert(pos as usize, child);
+
+        self.with_window(|win| {
+            win.invalid_layout();
+        });
     }
 
     pub fn remove_child_view(&mut self, position: u32) {
-        self.backend.remove_child_view(position)
+        let mut c = self.children.remove(position as usize);
+        c.set_parent(None);
+        let mut ele = self.clone();
+        let layout = &mut ele.style;
+        layout.remove_child(&mut c.style);
+        ele.mark_dirty(true);
     }
 
     pub fn get_children(&self) -> Vec<Element> {
-        self.backend.get_children()
+        self.children.clone()
     }
 
     // pub fn get_layout(&self) -> Layout {
@@ -975,6 +994,7 @@ pub struct Element {
     id: u32,
     backend: Box<dyn ElementBackend>,
     parent: Option<ElementWeak>,
+    children: Vec<Element>,
     window: Option<FrameWeak>,
     event_registration: EventRegistration<ElementWeak>,
     pub style: StyleNode,
@@ -1033,6 +1053,7 @@ impl ElementData {
             rect: base::Rect::empty(),
             resource_table: ResourceTable::new(),
             children_decoration: (0.0, 0.0, 0.0, 0.0),
+            children: Vec::new(),
         }
     }
 
@@ -1096,14 +1117,5 @@ pub trait ElementBackend {
 
     fn handle_origin_bounds_change(&mut self, _bounds: &base::Rect) {}
 
-    fn add_child_view(&mut self, child: Element, position: Option<u32>) {
-        let _ = (child, position);
-    }
-    fn remove_child_view(&mut self, position: u32) {
-        //panic!("unsupported")
-    }
-    fn get_children(&self) -> Vec<Element> {
-        Vec::new()
-    }
 }
 

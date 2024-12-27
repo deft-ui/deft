@@ -509,7 +509,7 @@ impl ElementBackend for Entry {
         let mut paragraph = paragraph_element.get_backend_as::<Paragraph>().clone();
         paragraph.set_text_wrap(false);
         paragraph.add_line(Self::build_line("".to_string()));
-        base.add_child_view(paragraph_element.clone(), None);
+        ele.add_child_view(paragraph_element.clone(), None);
         // base.set_text_wrap(false);
         ele.set_cursor(CursorIcon::Text);
         ele.set_style_prop(StylePropKey::Height, "24");
@@ -627,9 +627,6 @@ impl ElementBackend for Entry {
         //self.update_paint_offset(bounds.width, bounds.height);
     }
 
-    fn get_children(&self) -> Vec<Element> {
-        self.base.get_children()
-    }
 }
 
 #[test]

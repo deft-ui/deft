@@ -892,7 +892,7 @@ impl Frame {
             let content_bounds = node.get_content_bounds().translate(bounds.x, bounds.y);
             if content_bounds.contains_point(point.0, point.1) {
                 let p = (point.0 + node.get_scroll_left() - bounds.x, point.1 + node.get_scroll_top() - bounds.y);
-                for child in node.get_backend().get_children() {
+                for child in node.get_children() {
                     if let Some(n) = self.get_node_by_point_inner(&mut child.clone(), p) {
                         result = Some(n.clone());
                     }

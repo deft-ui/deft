@@ -78,15 +78,4 @@ impl ElementBackend for Button {
         self.base.handle_origin_bounds_change(bounds)
     }
 
-    fn add_child_view(&mut self, child: Element, position: Option<u32>) {
-        self.base.add_child_view(child, position);
-    }
-
-    fn remove_child_view(&mut self, position: u32) {
-        self.base.remove_child_view(position);
-    }
-
-    fn get_children(&self) -> Vec<Element> {
-        self.base.get_children()
-    }
 }

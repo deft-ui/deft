@@ -415,18 +415,6 @@ impl ElementBackend for Scroll {
         }
     }
 
-    fn add_child_view(&mut self, child: Element, position: Option<u32>) {
-        self.base.add_child_view(child, position);
-    }
-
-    fn remove_child_view(&mut self, position: u32) {
-        self.base.remove_child_view(position)
-    }
-
-    fn get_children(&self) -> Vec<Element> {
-        self.base.get_children()
-    }
-
     fn set_property(&mut self, p: &str, v: JsValue) {
         js_call!("scroll_y", ScrollBarStrategy, self, set_scroll_y, p, v);
         js_call!("scroll_x", ScrollBarStrategy, self, set_scroll_x, p, v);

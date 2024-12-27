@@ -30,7 +30,7 @@ impl ElementBackend for ScrollBar {
         let mut indicator_ele = Element::create(Container::create);
         indicator_ele.set_style_property("background", INDICATOR_COLOR);
         indicator_ele.set_style_property("borderradius", "4");
-        base.add_child_view(indicator_ele.clone(), None);
+        element.add_child_view(indicator_ele.clone(), None);
         let mut inst = Self {
             base,
             element,
@@ -72,10 +72,6 @@ impl ElementBackend for ScrollBar {
     //         _ => {}
     //     }
     // }
-
-    fn get_children(&self) -> Vec<Element> {
-        self.base.get_children()
-    }
 
 }
 
