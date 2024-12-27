@@ -131,23 +131,10 @@ impl ElementBackend for TextEdit {
         canvas.restore();
     }
 
-    fn set_property(&mut self, property_name: &str, property_value: JsValue) {
-        let base = &mut self.base;
-        js_call_rust!("scroll_to_top", f32, base, scroll_to_top, property_name, property_value);
-        self.get_entry_mut().set_property(property_name, property_value);
-    }
-
-    fn get_property(&mut self, property_name: &str) -> Result<Option<JsValue>, Error> {
-        self.get_entry_mut().get_property(property_name)
-    }
-
     fn handle_origin_bounds_change(&mut self, _bounds: &Rect) {
         self.base.handle_origin_bounds_change(_bounds);
     }
 
-    fn before_origin_bounds_change(&mut self) {
-
-    }
 }
 
 

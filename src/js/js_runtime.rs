@@ -280,11 +280,11 @@ impl FromJsValue for (usize, usize) {
     }
 }
 
-impl FromJsValue for CursorIcon {
-    fn from_js_value(value: &JsValue) -> Option<Self> {
+impl crate::js::js_binding::FromJsValue for CursorIcon {
+    fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
         match value {
-            JsValue::String(str) => parse_cursor(str),
-            _ => None,
+            JsValue::String(str) => parse_cursor(&str).ok_or_else(|| ValueError::UnexpectedType),
+            _ => Err(ValueError::UnexpectedType),
         }
     }
 }

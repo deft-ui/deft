@@ -579,17 +579,6 @@ impl ElementBackend for Entry {
         canvas.restore();
     }
 
-    fn set_property(&mut self, p: &str, v: JsValue) {
-        let mut label = &mut self.paragraph;
-        // js_call!("text", String, self, set_text, p, v);
-        js_call!("align", TextAlign, self, set_align, p, v);
-        // js_call!("multipleline", bool, self, set_multiple_line, p, v);
-    }
-
-    fn get_property(&mut self, property_name: &str) -> Result<Option<JsValue>, Error> {
-        self.base.get_property(property_name)
-    }
-
     fn on_event(&mut self, event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
         if let Some(e) = event.downcast_ref::<FocusEvent>() {
             self.handle_focus();
@@ -616,10 +605,6 @@ impl ElementBackend for Entry {
         } else {
             self.base.execute_default_behavior(event, ctx)
         }
-    }
-
-    fn before_origin_bounds_change(&mut self) {
-        self.base.before_origin_bounds_change();
     }
 
     fn handle_origin_bounds_change(&mut self, bounds: &Rect) {

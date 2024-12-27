@@ -117,6 +117,7 @@ impl Text {
         }.to_ref()
     }
 
+    #[js_func]
     pub fn set_text(&mut self, text: String) {
         let old_text = self.get_text();
         if old_text != text {
@@ -280,6 +281,7 @@ impl Text {
         }
     }
 
+    #[js_func]
     pub fn get_text(&self) -> String {
         self.with_lines_mut(|ps| {
             let mut text = String::new();
@@ -653,31 +655,11 @@ impl ElementBackend for Text {
         });
     }
 
-    fn set_property(&mut self, p: &str, v: JsValue) {
-        js_call!("text", String, self, set_text, p, v);
-        js_call!("fontsize", f32, self, set_font_size, p, v);
-        js_call!("align", TextAlign, self, set_align, p, v);
-        js_call!("selection", (usize, usize), self, set_selection, p, v);
-    }
-
-    fn get_property(&mut self, property_name: &str) -> Result<Option<JsValue>, Error> {
-        match property_name {
-            "text" => Ok(Some(JsValue::String(self.get_text().to_string()))),
-            _ => {
-                Ok(None)
-            }
-        }
-    }
-
     fn execute_default_behavior(&mut self, event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) -> bool {
         if let Some(d) = event.downcast_ref::<FocusShiftEvent>() {
             self.unselect();
         }
         false
-    }
-
-    fn before_origin_bounds_change(&mut self) {
-
     }
 
     fn handle_origin_bounds_change(&mut self, bounds: &Rect) {

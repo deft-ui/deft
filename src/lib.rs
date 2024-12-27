@@ -4,7 +4,7 @@
 
 use crate::app::{App, AppEvent, AppEventPayload, LentoApp};
 use crate::data_dir::get_data_path;
-use crate::element::label::{AttributeText, Label, DEFAULT_TYPE_FACE};
+use crate::element::label::{AttributeText, DEFAULT_TYPE_FACE};
 use crate::element::text::text_paragraph::TextParams;
 use crate::element::text::{Text, FONT_MGR};
 use crate::element::ScrollByOption;
@@ -78,6 +78,7 @@ mod typeface;
 mod text;
 mod frame_rate;
 mod paint;
+mod layout;
 
 pub use lento_macros::*;
 use rodio::cpal::available_hosts;

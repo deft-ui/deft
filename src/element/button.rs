@@ -7,7 +7,6 @@ use yoga::{Edge, StyleUnit};
 use crate::base::{EventContext, PropertyValue, Rect};
 use crate::element::{ElementBackend, Element, ElementWeak};
 use crate::element::container::Container;
-use crate::element::label::Label;
 use crate::style::StylePropKey;
 
 pub struct Button {
@@ -54,24 +53,12 @@ impl ElementBackend for Button {
         self.base.draw(canvas);
     }
 
-    fn set_property(&mut self, _property_name: &str, _property_value: JsValue) {
-        self.base.set_property(_property_name, _property_value);
-    }
-
-    fn get_property(&mut self, _property_name: &str) -> Result<Option<JsValue>, Error> {
-        self.base.get_property(_property_name)
-    }
-
     fn on_event(&mut self, event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
         self.base.on_event(event, ctx);
     }
 
     fn execute_default_behavior(&mut self, event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) -> bool {
         self.base.execute_default_behavior(event, ctx)
-    }
-
-    fn before_origin_bounds_change(&mut self) {
-        self.base.before_origin_bounds_change();
     }
 
     fn handle_origin_bounds_change(&mut self, bounds: &Rect) {

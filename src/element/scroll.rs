@@ -2,13 +2,14 @@ use crate as lento;
 use std::any::Any;
 use std::str::FromStr;
 use bezier_rs::{Bezier, TValue};
-use lento_macros::element_backend;
+use lento_macros::{element_backend, js_methods};
 use quick_js::JsValue;
+use serde::{Deserialize, Serialize};
 use skia_safe::{Canvas, Color, Paint, Path};
 use tokio::time::Instant;
 use yoga::Direction::LTR;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size, StyleUnit};
-use crate::{backend_as_api, is_mobile_platform, js_call};
+use crate::{backend_as_api, is_mobile_platform, js_call, js_deserialize, js_serialize};
 use crate::animation::{AnimationDef, AnimationInstance, SimpleFrameController};
 use crate::base::{CaretDetail, ElementEvent, EventContext, Rect};
 use crate::color::parse_hex_color;
@@ -18,7 +19,9 @@ use crate::element::paragraph::ParagraphWeak;
 use crate::element::scroll::ScrollBarStrategy::{Always, Auto, Never};
 use crate::event::{CaretChangeEvent, MouseDownEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent};
 use crate::js::js_runtime::FromJsValue;
+use crate::layout::LayoutManager;
 use crate::style::{StyleProp, StylePropVal};
+use crate::timer::{set_timeout, TimerHandle};
 
 const MOMENTUM_DURATION: u128 = 200;
 const MOMENTUM_DISTANCE: f32 = 16.0;
@@ -29,11 +32,14 @@ struct MomentumInfo {
     start_top: f32,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
 pub enum ScrollBarStrategy {
     Never,
     Auto,
     Always,
 }
+js_serialize!(ScrollBarStrategy);
+js_deserialize!(ScrollBarStrategy);
 
 impl ScrollBarStrategy {
     pub fn from_str(str: &str) -> Option<ScrollBarStrategy> {
@@ -119,12 +125,16 @@ pub struct Scroll {
     momentum_animation_instance: Option<AnimationInstance>,
 }
 
+#[js_methods]
 impl Scroll {
+
+    #[js_func]
     pub fn set_scroll_y(&mut self, value: ScrollBarStrategy) {
         self.vertical_bar_strategy = value;
         self.element.mark_dirty(true);
     }
 
+    #[js_func]
     pub fn set_scroll_x(&mut self, value: ScrollBarStrategy) {
         self.horizontal_bar_strategy = value;
         self.element.mark_dirty(true);
@@ -143,6 +153,11 @@ impl Scroll {
     //TODO rename
     pub fn scroll_to_top(&mut self, top: f32) {
         self.element.set_scroll_top(top);
+    }
+
+    fn mark_layout_dirty(&mut self) {
+        self.content_layout_dirty = true;
+        self.element.mark_dirty(false);
     }
 
     fn layout_content(&mut self, bounds_width: f32, bounds_height: f32) {
@@ -398,6 +413,7 @@ impl ElementBackend for Scroll {
         inst.element.style.set_measure_func(Some(measure_scroll));
         let weak_ptr = inst.as_weak();
         inst.element.style.set_context(Some(Context::new(weak_ptr)));
+        ele.set_layout_manager(Some(Box::new(inst.as_weak())));
         inst
     }
 
@@ -405,19 +421,10 @@ impl ElementBackend for Scroll {
         "Scroll"
     }
 
-    fn before_origin_bounds_change(&mut self) {
-        self.content_layout_dirty = true;
-    }
-
     fn handle_origin_bounds_change(&mut self, bounds: &Rect) {
         if self.content_layout_dirty {
             self.do_layout_content(bounds.width, bounds.height);
         }
-    }
-
-    fn set_property(&mut self, p: &str, v: JsValue) {
-        js_call!("scroll_y", ScrollBarStrategy, self, set_scroll_y, p, v);
-        js_call!("scroll_x", ScrollBarStrategy, self, set_scroll_x, p, v);
     }
 
     fn execute_default_behavior(&mut self, event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) -> bool {
@@ -583,5 +590,13 @@ impl Indicator {
 
     fn get_indicator_end(&self) -> f32 {
         self.get_indicator_offset() + self.get_indicator_size()
+    }
+}
+
+impl LayoutManager for ScrollWeak {
+    fn mark_layout_dirty(&mut self) {
+        if let Ok(mut scroll) = self.upgrade() {
+            scroll.mark_layout_dirty();
+        }
     }
 }

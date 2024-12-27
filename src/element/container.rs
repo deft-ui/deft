@@ -21,9 +21,5 @@ impl ElementBackend for Container {
         "Container"
     }
 
-    fn before_origin_bounds_change(&mut self) {
-
-    }
-
 }
 

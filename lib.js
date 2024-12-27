@@ -487,7 +487,7 @@ export class View {
      * @param value {number}
      */
     setScrollTop(value) {
-        Element_set_property(this.el, "scrollTop", value);
+        Element_set_scroll_top(this.el, value);
     }
 
     /**
@@ -495,7 +495,7 @@ export class View {
      * @param value {number}
      */
     setScrollLeft(value) {
-        Element_set_property(this.el, "scrollLeft", value);
+        Element_set_scroll_left(this.el, value);
     }
 
 
@@ -504,7 +504,7 @@ export class View {
      * @param value {boolean}
      */
     setDraggable(value) {
-        Element_set_property(this.el, "draggable", value);
+        Element_set_draggable(this.el, value);
     }
 
     /**
@@ -512,7 +512,7 @@ export class View {
      * @param value {string}
      */
     setCursor(value) {
-        Element_set_property(this.el, "cursor", value);
+        Element_set_cursor(this.el, value);
     }
 
     /**
@@ -520,7 +520,7 @@ export class View {
      * @returns {[number, number]}
      */
     getSize() {
-        return Element_get_property(this.el, "size");
+        return Element_get_size(this.el);
     }
 
     /**
@@ -528,7 +528,7 @@ export class View {
      * @returns {[number, number]}
      */
     getContentSize() {
-        return Element_get_property(this.el, "content_size");
+        return Element_get_real_content_size(this.el);
     }
 
     /**
@@ -544,7 +544,7 @@ export class View {
      * @returns {number}
      */
     getScrollTop() {
-        return Element_get_property(this.el, "scroll_top");
+        return Element_get_scroll_top(this.el);
     }
 
     /**
@@ -552,7 +552,7 @@ export class View {
      * @returns {number}
      */
     getScrollLeft() {
-        return Element_get_property(this.el, "scroll_left");
+        return Element_get_scroll_left(this.el);
     }
 
     /**
@@ -560,7 +560,7 @@ export class View {
      * @returns {number}
      */
     getScrollHeight() {
-        return Element_get_property(this.el, "scroll_height");
+        return Element_get_scroll_height(this.el);
     }
 
     /**
@@ -568,7 +568,7 @@ export class View {
      * @returns {number}
      */
     getScrollWidth() {
-        return Element_get_property(this.el, "scroll_width");
+        return Element_scroll_width(this.el);
     }
 
     /**
@@ -778,7 +778,7 @@ export class LabelElement extends View {
      * @param text {string}
      */
     setText(text) {
-        Element_set_property(this.el, "text", text);
+        Text_set_text(this.el, text);
     }
 
     /**
@@ -936,7 +936,7 @@ export class ImageElement extends View {
         super(VT_IMAGE);
     }
     setSrc(src) {
-        Element_set_property(this.el, "src", src);
+        Element_set_src(this.el, src);
     }
 }
 
@@ -1167,7 +1167,7 @@ export class ScrollElement extends ContainerBasedElement {
      * @param value {"auto"|"always"|"never"}
      */
     setScrollX(value) {
-        Element_set_property(this.el, "scroll_x", value);
+        Scroll_set_scroll_x(this.el, value);
     }
 
     /**
@@ -1175,13 +1175,13 @@ export class ScrollElement extends ContainerBasedElement {
      * @param value {"auto"|"always"|"never"}
      */
     setScrollY(value) {
-        Element_set_property(this.el, "scroll_y", value);
+        Scroll_set_scroll_y(this.el, value);
     }
 
     scrollBy(value) {
         value.x = value.x || 0;
         value.y = value.y || 0;
-        Element_set_property(this.el, "scroll_by", value);
+        Element_scroll_by(this.el, value);
     }
 
 }

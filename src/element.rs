@@ -34,7 +34,7 @@ use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::resource_table::ResourceTable;
 use crate::style::{parse_style_obj, ColorHelper, StyleNode, StyleProp, StylePropKey, StyleTransform};
-use crate::{base, bind_js_event_listener, compute_style, js_call, js_call_rust, js_get_prop, js_weak_value};
+use crate::{base, bind_js_event_listener, compute_style, js_call, js_call_rust, js_deserialize, js_get_prop, js_serialize, js_weak_value};
 
 pub mod container;
 pub mod entry;
@@ -50,6 +50,7 @@ pub mod paragraph;
 
 use crate as lento;
 use crate::js::JsError;
+use crate::layout::LayoutManager;
 use crate::paint::{Painter, UniqueRect};
 
 thread_local! {
@@ -65,6 +66,8 @@ pub struct ScrollByOption {
     x: f32,
     y: f32,
 }
+js_serialize!(ScrollByOption);
+js_deserialize!(ScrollByOption);
 
 //TODO rename
 pub trait ViewEvent {
@@ -109,6 +112,7 @@ impl Element {
         self.id
     }
 
+    #[js_func]
     pub fn set_draggable(&mut self, draggable: bool) {
         self.draggable = draggable;
     }
@@ -146,34 +150,6 @@ impl Element {
             .map(|e| e.context.clone())
             .unwrap_or(JsValue::Undefined);
         Ok(e)
-    }
-
-    #[js_func]
-    pub fn set_property(&mut self, property_name: String, value: JsValue) -> Result<(), Error> {
-        js_call!("scrollTop", f32, self, set_scroll_top, property_name, value, Ok(()));
-        js_call!("scrollLeft", f32, self, set_scroll_left, property_name, value, Ok(()));
-        js_call!("draggable", bool, self, set_draggable, property_name, value, Ok(()));
-        js_call!("cursor", CursorIcon, self, set_cursor, property_name, value, Ok(()));
-        js_call_rust!("scroll_by", ScrollByOption, self, scroll_by, property_name, value, Ok(()));
-        self.get_backend_mut().set_property(&property_name, value);
-        Ok(())
-    }
-
-    #[js_func]
-    pub fn get_property(&mut self, property_name: String) -> Result<JsValue, Error> {
-        js_get_prop!("scroll_top", self, get_scroll_top, property_name);
-        js_get_prop!("scroll_left", self, get_scroll_left, property_name);
-        js_get_prop!("scroll_height", self, get_scroll_height, property_name);
-        js_get_prop!("scroll_width", self, get_scroll_width, property_name);
-        //TODO support clientSize?
-        js_get_prop!("size", self, get_size, property_name);
-        js_get_prop!("content_size", self, get_real_content_size, property_name);
-        let v = self.backend.get_property(&property_name)?;
-        if let Some(s) = v {
-            Ok(s)
-        } else {
-            Err(anyhow!("No property found:{}", property_name))
-        }
     }
 
     #[js_func]
@@ -229,11 +205,13 @@ impl Element {
         }
     }
 
+    #[js_func]
     pub fn set_cursor(&mut self, cursor: CursorIcon) {
         self.cursor = cursor;
         self.mark_dirty(false);
     }
 
+    #[js_func]
     pub fn scroll_by(&mut self, option: ScrollByOption) {
         let mut el = self.clone();
         if option.x != 0.0 {
@@ -248,6 +226,7 @@ impl Element {
         self.cursor
     }
 
+    #[js_func]
     pub fn set_scroll_left(&mut self, mut value: f32) {
         if value.is_nan() {
             return
@@ -267,14 +246,17 @@ impl Element {
         }
     }
 
+    #[js_func]
     pub fn get_scroll_left(&self) -> f32 {
         self.scroll_left
     }
 
+    #[js_func]
     pub fn get_scroll_top(&self) -> f32 {
         self.scroll_top
     }
 
+    #[js_func]
     pub fn set_scroll_top(&mut self, mut value: f32) {
         if value.is_nan() {
             return
@@ -294,10 +276,12 @@ impl Element {
         }
     }
 
+    #[js_func]
     pub fn get_scroll_height(&self) -> f32 {
         self.get_real_content_size().1
     }
 
+    #[js_func]
     pub fn get_scroll_width(&self) -> f32 {
         self.get_real_content_size().0
     }
@@ -427,6 +411,7 @@ impl Element {
         }
     }
 
+    #[js_func]
     pub fn get_size(&self) -> (f32, f32) {
         let layout = self.style.get_layout();
         (layout.width().nan_to_zero(), layout.height().nan_to_zero())
@@ -473,6 +458,7 @@ impl Element {
         my_origin_bounds.translate(-target_origin_bounds.x, -target_origin_bounds.y)
     }
 
+    #[js_func]
     pub fn get_real_content_size(&self) -> (f32, f32) {
         let mut content_width = 0.0;
         let mut content_height = 0.0;
@@ -880,19 +866,33 @@ impl Element {
         self.invalid_unique_rect = Some(rect);
     }
 
+    pub fn set_layout_manager(&mut self, layout_manager: Option<Box<dyn LayoutManager>>) {
+        self.layout_manager = layout_manager;
+    }
+
     pub fn mark_dirty(&mut self, layout_dirty: bool) {
         if layout_dirty && self.style.get_own_context_mut().is_some() {
             self.style.mark_dirty();
         }
 
-        self.with_window(|win| {
-            if layout_dirty {
+        if layout_dirty {
+            if let Some(layout_mgr) = &mut self.layout_manager {
+                layout_mgr.mark_layout_dirty();
+                return;
+            }
+            if let Some(mut parent) = self.get_parent() {
+                parent.mark_dirty(true);
+                return;
+            }
+            self.with_window(|win| {
                 win.invalid_layout();
-            } else {
+            });
+        } else {
+            self.with_window(|win| {
                 let bounds = self.get_origin_bounds();
                 win.invalid(InvalidMode::Rect(&bounds.to_skia_rect()));
-            }
-        });
+            });
+        }
     }
 
     pub fn mark_all_layout_dirty(&mut self) {
@@ -918,8 +918,8 @@ impl Element {
         Rect::new(x, y, right, bottom)
     }
 
+    //TODO remove?
     pub fn on_before_layout_update(&mut self) {
-        self.backend.before_origin_bounds_change();
         for c in &mut self.get_children() {
             c.on_before_layout_update();
         }
@@ -1016,6 +1016,8 @@ pub struct Element {
     rect: base::Rect,
     resource_table: ResourceTable,
     children_decoration: (f32, f32, f32, f32),
+
+    layout_manager: Option<Box<dyn LayoutManager>>,
 }
 
 pub struct PaintInfo {
@@ -1054,6 +1056,7 @@ impl ElementData {
             resource_table: ResourceTable::new(),
             children_decoration: (0.0, 0.0, 0.0, 0.0),
             children: Vec::new(),
+            layout_manager: None,
         }
     }
 
@@ -1072,9 +1075,6 @@ impl ElementBackend for EmptyElementBackend {
         "Empty"
     }
 
-    fn before_origin_bounds_change(&mut self) {
-
-    }
 }
 
 pub trait ElementBackend {
@@ -1096,14 +1096,6 @@ pub trait ElementBackend {
         let _ = painter;
     }
 
-    fn set_property(&mut self, _property_name: &str, _property_value: JsValue) {
-
-    }
-
-    fn get_property(&mut self, _property_name: &str) -> Result<Option<JsValue>, Error> {
-        Ok(None)
-    }
-
     fn on_event(&mut self, mut event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
         let _ = (event, ctx);
     }
@@ -1112,8 +1104,6 @@ pub trait ElementBackend {
         let _ = (event, ctx);
         false
     }
-
-    fn before_origin_bounds_change(&mut self);
 
     fn handle_origin_bounds_change(&mut self, _bounds: &base::Rect) {}
 
