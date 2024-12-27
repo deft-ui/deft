@@ -936,7 +936,7 @@ export class ImageElement extends View {
         super(VT_IMAGE);
     }
     setSrc(src) {
-        Element_set_src(this.el, src);
+        Image_set_src(this.el, src);
     }
 }
 

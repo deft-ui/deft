@@ -3,6 +3,7 @@ use std::any::Any;
 use std::str::FromStr;
 use bezier_rs::{Bezier, TValue};
 use lento_macros::{element_backend, js_methods};
+use measure_time::print_time;
 use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
 use skia_safe::{Canvas, Color, Paint, Path};
@@ -19,7 +20,7 @@ use crate::element::paragraph::ParagraphWeak;
 use crate::element::scroll::ScrollBarStrategy::{Always, Auto, Never};
 use crate::event::{CaretChangeEvent, MouseDownEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent};
 use crate::js::js_runtime::FromJsValue;
-use crate::layout::LayoutManager;
+use crate::layout::LayoutRoot;
 use crate::style::{StyleProp, StylePropVal};
 use crate::timer::{set_timeout, TimerHandle};
 
@@ -78,7 +79,8 @@ extern "C" fn measure_scroll(
                 let width = s.default_width.unwrap_or(width);
                 let height = s.default_height.unwrap_or(height);
                 if s.default_width.is_none() || s.default_height.is_none() {
-                    s.do_layout_content(width, height);
+                    s.last_layout_size = (width, height);
+                    s.do_layout_content();
                 }
                 let width = s.default_width.unwrap_or(s.real_content_width);
                 let height = s.default_height.unwrap_or(s.real_content_height);
@@ -123,6 +125,8 @@ pub struct Scroll {
 
     momentum_info: Option<MomentumInfo>,
     momentum_animation_instance: Option<AnimationInstance>,
+
+    last_layout_size: (f32, f32),
 }
 
 #[js_methods]
@@ -321,7 +325,18 @@ impl Scroll {
         self.horizontal_move_begin = None;
     }
 
-    fn do_layout_content(&mut self, bounds_width: f32, bounds_height: f32) {
+    fn handle_root_bounds_change(&mut self, bounds: skia_safe::Rect) {
+        let size = (bounds.width(), bounds.height());
+        if size == self.last_layout_size {
+            return;
+        }
+        self.last_layout_size = size;
+        self.do_layout_content();
+    }
+
+    fn do_layout_content(&mut self) {
+        print_time!("scroll layout content time");
+        let (bounds_width, bounds_height) = self.last_layout_size;
         self.layout_content(bounds_width, bounds_height);
 
         let (mut body_width, mut body_height) = self.get_body_view_size(bounds_width, bounds_height);
@@ -409,22 +424,17 @@ impl ElementBackend for Scroll {
             default_height: None,
             momentum_info: None,
             momentum_animation_instance: None,
+            last_layout_size: (f32::NAN, f32::NAN),
         }.to_ref();
         inst.element.style.set_measure_func(Some(measure_scroll));
         let weak_ptr = inst.as_weak();
         inst.element.style.set_context(Some(Context::new(weak_ptr)));
-        ele.set_layout_manager(Some(Box::new(inst.as_weak())));
+        ele.set_as_layout_root(Some(Box::new(inst.as_weak())));
         inst
     }
 
     fn get_name(&self) -> &str {
         "Scroll"
-    }
-
-    fn handle_origin_bounds_change(&mut self, bounds: &Rect) {
-        if self.content_layout_dirty {
-            self.do_layout_content(bounds.width, bounds.height);
-        }
     }
 
     fn execute_default_behavior(&mut self, event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) -> bool {
@@ -549,6 +559,12 @@ impl ElementBackend for Scroll {
     }
 
     fn draw(&self, canvas: &Canvas) {
+        let mut me = self.clone();
+        //TODO use ensure_layout_update?
+        if me.content_layout_dirty {
+            let bounds = me.element.get_bounds();
+            me.do_layout_content();
+        }
         let mut paint = Paint::default();
         paint.set_color(self.bar_background_color);
 
@@ -593,10 +609,16 @@ impl Indicator {
     }
 }
 
-impl LayoutManager for ScrollWeak {
+impl LayoutRoot for ScrollWeak {
     fn mark_layout_dirty(&mut self) {
         if let Ok(mut scroll) = self.upgrade() {
             scroll.mark_layout_dirty();
+        }
+    }
+
+    fn on_root_bounds_updated(&mut self, bounds: skia_safe::Rect) {
+        if let Ok(mut scroll) = self.upgrade() {
+            scroll.handle_root_bounds_change(bounds);
         }
     }
 }

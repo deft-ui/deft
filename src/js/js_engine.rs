@@ -12,6 +12,7 @@ use crate::app::exit_app;
 use crate::console::Console;
 use crate::element::Element;
 use crate::element::entry::Entry;
+use crate::element::image::Image;
 use crate::element::paragraph::Paragraph;
 use crate::element::text::Text;
 use crate::event_loop::run_with_event_loop;
@@ -102,6 +103,7 @@ impl JsEngine {
         engine.add_global_functions(Entry::create_js_apis());
         engine.add_global_functions(Paragraph::create_js_apis());
         engine.add_global_functions(Text::create_js_apis());
+        engine.add_global_functions(Image::create_js_apis());
         engine.add_global_functions(SqliteConn::create_js_apis());
         #[cfg(feature = "tray")]
         {

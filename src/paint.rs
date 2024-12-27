@@ -13,6 +13,7 @@ thread_local! {
 }
 
 pub struct RenderTree {
+    pub viewport: Rect,
     pub invalid_rects_list: Vec<InvalidArea>,
     pub nodes: Vec<RenderNode>,
 }
@@ -20,6 +21,7 @@ pub struct RenderTree {
 impl RenderTree {
     pub fn new() -> Self {
         Self {
+            viewport: Rect::default(),
             invalid_rects_list: vec![],
             nodes: vec![],
         }
@@ -40,8 +42,39 @@ pub enum PaintElement {
 #[derive(PartialEq, Debug, Clone)]
 pub enum InvalidArea {
     Full,
-    Partial(InvalidRects),
+    Partial(PartialInvalidArea),
     None,
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct InvalidRects {
+    is_full: bool,
+    rects: Vec<Rect>,
+}
+
+impl Default for InvalidRects {
+    fn default() -> Self {
+        InvalidRects {
+            is_full: true,
+            rects: vec![],
+        }
+    }
+}
+
+impl InvalidRects {
+    fn has_intersects(&self, rect: &Rect) -> bool {
+        if self.is_full {
+            return true;
+        }
+        for r in &self.rects {
+            let intersect = f32::min(r.right, rect.right) >= f32::max(r.left(), rect.left())
+                && f32::min(r.bottom, rect.bottom) >= f32::max(r.top, rect.top);
+            if intersect {
+                return true;
+            }
+        }
+        false
+    }
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -79,7 +112,7 @@ impl InvalidArea {
                 p.add_unique_rect(&unique_rect);
             }
             InvalidArea::None => {
-                let mut p = InvalidRects::new();
+                let mut p = PartialInvalidArea::new();
                 p.add_unique_rect(unique_rect);
                 *self = InvalidArea::Partial(p);
             }
@@ -103,59 +136,73 @@ impl InvalidArea {
             InvalidArea::None => {}
         }
     }
+
+    pub fn build(&self, viewport: Rect) -> InvalidRects {
+        let mut rects = Vec::new();
+        let mut is_full = false;
+        match self {
+            InvalidArea::Full => {
+                rects.push(viewport);
+            }
+            InvalidArea::Partial(pia) => {
+                //Too many rect may make a poor performance
+                if pia.rects.len() > 100 {
+                    rects.push(viewport);
+                } else {
+                    for (_,r) in &pia.rects {
+                        rects.push(*r);
+                    }
+                }
+            }
+            InvalidArea::None => {}
+        }
+        InvalidRects { is_full, rects }
+    }
+
 }
 
 pub trait Painter {
-    fn set_invalid_area(&mut self, invalid_area: InvalidArea);
+    fn set_invalid_rects(&mut self, invalid_area: InvalidRects);
     fn is_visible_origin(&self, bounds: &Rect) -> bool;
 }
 
 pub struct SkiaPainter<'a> {
-    invalid_area: InvalidArea,
+    invalid_rects: InvalidRects,
     canvas: &'a Canvas,
 }
 
 impl<'a> SkiaPainter<'a> {
     pub fn new(canvas: &'a Canvas) -> SkiaPainter {
         Self {
-            invalid_area: InvalidArea::Full,
+            invalid_rects: InvalidRects::default(),
             canvas,
         }
     }
 }
 
 impl<'a> Painter for SkiaPainter<'a> {
-    fn set_invalid_area(&mut self, invalid_area: InvalidArea) {
-        if let InvalidArea::Partial(rects) = &invalid_area {
+    fn set_invalid_rects(&mut self, invalid_rects: InvalidRects) {
+        if !invalid_rects.is_full {
             let mut path = Path::new();
-            for r in rects.rects.values() {
+            for r in &invalid_rects.rects {
                 path.add_rect(r, None);
             }
             self.canvas.clip_path(&path, SkClipOp::Intersect, false);
         }
-        self.invalid_area = invalid_area;
+        self.invalid_rects = invalid_rects;
     }
     fn is_visible_origin(&self, bounds: &Rect) -> bool {
-        match &self.invalid_area {
-            //TODO optimize
-            InvalidArea::Full => { true }
-            InvalidArea::Partial(p) => {
-                p.has_intersects(bounds)
-            }
-            InvalidArea::None => {
-                false
-            }
-        }
+        self.invalid_rects.has_intersects(bounds)
     }
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub struct InvalidRects {
+pub struct PartialInvalidArea {
     rects: HashMap<u64, Rect>,
 }
 
-impl InvalidRects {
-    pub fn new() -> InvalidRects {
+impl PartialInvalidArea {
+    pub fn new() -> PartialInvalidArea {
         Self { rects: HashMap::new() }
     }
     pub fn add_rect(&mut self, rect: &Rect) {
@@ -172,29 +219,20 @@ impl InvalidRects {
             r.offset((x, y));
         }
     }
-    fn has_intersects(&self, rect: &Rect) -> bool {
-        for r in self.rects.values() {
-            let intersect = f32::min(r.right, rect.right) >= f32::max(r.left(), rect.left())
-                && f32::min(r.bottom, rect.bottom) >= f32::max(r.top, rect.top);
-            if intersect {
-                return true;
-            }
-        }
-        false
-    }
 }
 
 #[test]
 pub fn test_visible() {
     let mut render = CpuRenderer::new(100, 100);
-    let mut rects = InvalidRects::new();
-    rects.add_rect(&Rect::from_xywh(0.0, 0.0, 100.0, 100.0));
-    rects.add_rect(&Rect::from_xywh(10.0, 70.0, 100.0, 100.0));
-    rects.add_rect(&Rect::from_xywh(20.0, 40.0, 100.0, 100.0));
-    rects.add_rect(&Rect::from_xywh(30.0, 40.0, 100.0, 100.0));
-    rects.add_rect(&Rect::from_xywh(40.0, 40.0, 100.0, 100.0));
-    rects.add_rect(&Rect::from_xywh(50.0, 40.0, 100.0, 100.0));
+    let mut area = InvalidArea::None;
+    area.add_rect(Some(&Rect::from_xywh(0.0, 0.0, 100.0, 100.0)));
+    area.add_rect(Some(&Rect::from_xywh(10.0, 70.0, 100.0, 100.0)));
+    area.add_rect(Some(&Rect::from_xywh(20.0, 40.0, 100.0, 100.0)));
+    area.add_rect(Some(&Rect::from_xywh(30.0, 40.0, 100.0, 100.0)));
+    area.add_rect(Some(&Rect::from_xywh(40.0, 40.0, 100.0, 100.0)));
+    area.add_rect(Some(&Rect::from_xywh(50.0, 40.0, 100.0, 100.0)));
 
+    let rects = area.build(Rect::from_xywh(0.0, 0.0, 1000.0, 1000.0));
     print_time!("check time");
     for _ in 0..20000 {
         rects.has_intersects(&Rect::new(40.0, 20.0, 80.0, 50.0));

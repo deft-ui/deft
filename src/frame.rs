@@ -41,7 +41,7 @@ use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorGrabMode, CursorIcon, Window, WindowAttributes, WindowId};
 use crate::bind_js_event_listener;
 use crate::frame_rate::{get_total_frames, next_frame, FRAME_RATE_CONTROLLER};
-use crate::paint::{InvalidArea, InvalidRects, Painter, RenderNode, RenderTree, SkiaPainter, UniqueRect};
+use crate::paint::{InvalidArea, PartialInvalidArea, Painter, RenderNode, RenderTree, SkiaPainter, UniqueRect, InvalidRects};
 use crate::style::ColorHelper;
 
 #[derive(Clone)]
@@ -821,6 +821,7 @@ impl Frame {
     }
 
     fn paint(&mut self) {
+        print_time!("paint time");
         let size = self.window.inner_size();
         let (width, height) = (size.width, size.height);
         if width <= 0 || height <= 0 {
@@ -835,6 +836,7 @@ impl Frame {
         let background_color = self.background_color;
         let mut me = self.clone();
         self.window.render(move |canvas| {
+            print_time!("render time");
             let invalid_area = me.invalid_area.clone();
             me.render_tree = if let Some(body) = &mut me.body {
                 // print_time!("build render nodes time");
@@ -842,6 +844,8 @@ impl Frame {
             } else {
                 RenderTree::new()
             };
+            let viewport = Rect::new(0.0, 0.0, width as f32, height as f32);
+            me.render_tree.viewport = viewport.clone();
             canvas.save();
             if scale_factor != 1.0 {
                 canvas.scale((scale_factor, scale_factor));
@@ -849,7 +853,7 @@ impl Frame {
             let mut painter = SkiaPainter::new(canvas);
             if !background_color.is_transparent() {
                 canvas.save();
-                painter.set_invalid_area(me.render_tree.invalid_rects_list[0].clone());
+                painter.set_invalid_rects(me.render_tree.invalid_rects_list[0].build(viewport));
                 canvas.clear(background_color);
                 canvas.restore();
             }
@@ -857,8 +861,6 @@ impl Frame {
 
             canvas.restore();
         });
-        let _time = SystemTime::now().duration_since(start).unwrap();
-        // println!("Render time({}):{}", get_total_frames(), _time.as_millis());
     }
 
     #[inline]
@@ -928,9 +930,17 @@ impl WeakWindowHandle {
 }
 
 fn draw_elements(canvas: &Canvas, tree: &mut RenderTree, painter: &mut dyn Painter) {
+    let viewport = tree.viewport.clone();
+    let mut last_invalid_rects_idx = None;
+    canvas.save();
     for node in &mut tree.nodes {
+        if last_invalid_rects_idx != Some(node.invalid_rects_idx) {
+            canvas.restore();
+            canvas.save();
+            painter.set_invalid_rects(tree.invalid_rects_list[node.invalid_rects_idx].build(viewport));
+            last_invalid_rects_idx = Some(node.invalid_rects_idx);
+        }
         canvas.session(|c| {
-            painter.set_invalid_area(tree.invalid_rects_list[node.invalid_rects_idx].clone());
             draw_element(canvas, &mut node.element, painter);
         });
         if let Some((rect, i)) = &node.snapshot {
@@ -947,6 +957,7 @@ fn draw_elements(canvas: &Canvas, tree: &mut RenderTree, painter: &mut dyn Paint
         }
         node.snapshot = None;
     }
+    canvas.restore();
 }
 
 fn draw_element(canvas: &Canvas, element: &mut Element, painter: &mut dyn Painter) {
@@ -999,6 +1010,7 @@ fn build_render_nodes(root: &mut Element, invalid_area: InvalidArea, canvas: &Ca
     let mut render_tree = RenderTree {
         invalid_rects_list: vec![invalid_area],
         nodes: vec![],
+        viewport: Rect::new(0.0, 0.0, 0.0, 0.0),
     };
     collect_render_nodes(root, &mut render_tree, 0, canvas, scale);
     render_tree

@@ -47,7 +47,7 @@ impl GlRenderer {
 
             let template = ConfigTemplateBuilder::new()
                 .with_alpha_size(8)
-                .with_transparency(true).build();
+                .with_transparency(false).build();
 
             let configs = gl_display.find_configs(template).unwrap();
             let gl_config = configs.reduce(|accum, config| {
@@ -109,8 +109,12 @@ impl GlRenderer {
         let mut context = self.context.borrow_mut();
         let canvas = context.surface.canvas();
         drawer(canvas);
-        context.gr_context.flush_and_submit();
+        {
+            measure_time::print_time!("submit time");
+            context.gr_context.flush_and_submit();
+        }
 
+        measure_time::print_time!("swap buffers time");
         if let Err(err) = context.gl_surface.swap_buffers(&context.context) {
             log::error!("Failed to swap buffers after render: {}", err);
         }

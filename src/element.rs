@@ -50,7 +50,7 @@ pub mod paragraph;
 
 use crate as lento;
 use crate::js::JsError;
-use crate::layout::LayoutManager;
+use crate::layout::LayoutRoot;
 use crate::paint::{Painter, UniqueRect};
 
 thread_local! {
@@ -523,12 +523,10 @@ impl Element {
             layout.insert_child(&mut child.style, pos);
             pos
         };
+        self.mark_dirty(true);
         child.set_parent(Some(self.clone()));
+        child.set_dirty_state_recurse(true);
         self.children.insert(pos as usize, child);
-
-        self.with_window(|win| {
-            win.invalid_layout();
-        });
     }
 
     pub fn remove_child_view(&mut self, position: u32) {
@@ -560,10 +558,11 @@ impl Element {
 
     pub fn calculate_layout(&mut self, available_width: f32, available_height: f32) {
         // mark all children dirty so that custom measure function could be call
-        self.mark_all_layout_dirty();
+        // self.mark_all_layout_dirty();
         self.on_before_layout_update();
         self.style.calculate_layout(available_width, available_height, Direction::LTR);
         self.on_layout_update();
+        self.set_dirty_state_recurse(false);
     }
 
     pub fn set_border_width(&mut self, width: (f32, f32, f32, f32)) {
@@ -866,8 +865,8 @@ impl Element {
         self.invalid_unique_rect = Some(rect);
     }
 
-    pub fn set_layout_manager(&mut self, layout_manager: Option<Box<dyn LayoutManager>>) {
-        self.layout_manager = layout_manager;
+    pub fn set_as_layout_root(&mut self, layout_root: Option<Box<dyn LayoutRoot>>) {
+        self.layout_root = layout_root;
     }
 
     pub fn mark_dirty(&mut self, layout_dirty: bool) {
@@ -876,14 +875,16 @@ impl Element {
         }
 
         if layout_dirty {
-            if let Some(layout_mgr) = &mut self.layout_manager {
-                layout_mgr.mark_layout_dirty();
+            if let Some(layout_root) = &mut self.layout_root {
+                layout_root.mark_layout_dirty();
+                self.set_dirty_state_recurse(true);
                 return;
             }
             if let Some(mut parent) = self.get_parent() {
                 parent.mark_dirty(true);
                 return;
             }
+            self.set_dirty_state_recurse(true);
             self.with_window(|win| {
                 win.invalid_layout();
             });
@@ -892,6 +893,17 @@ impl Element {
                 let bounds = self.get_origin_bounds();
                 win.invalid(InvalidMode::Rect(&bounds.to_skia_rect()));
             });
+        }
+    }
+
+    fn set_dirty_state_recurse(&mut self, dirty: bool) {
+        if self.layout_dirty != dirty {
+            self.layout_dirty = dirty;
+            for mut c in self.get_children() {
+                if c.layout_root.is_none() {
+                    c.set_dirty_state_recurse(dirty);
+                }
+            }
         }
     }
 
@@ -927,6 +939,10 @@ impl Element {
 
 
     pub fn on_layout_update(&mut self) {
+        let origin_bounds = self.get_origin_bounds();
+        if let Some(layout_root) = &mut self.layout_root {
+            layout_root.on_root_bounds_updated(origin_bounds.to_skia_rect());
+        }
         //TODO emit size change
         let origin_bounds = self.get_origin_bounds();
         if origin_bounds != self.rect {
@@ -944,7 +960,7 @@ impl Element {
         //TODO performance: maybe not changed?
         //TODO change is_visible?
         if !origin_bounds.is_empty() {
-            self.backend.handle_origin_bounds_change(&origin_bounds);
+            // self.backend.handle_origin_bounds_change(&origin_bounds);
             for child in &mut self.get_children() {
                 child.on_layout_update();
             }
@@ -1017,7 +1033,8 @@ pub struct Element {
     resource_table: ResourceTable,
     children_decoration: (f32, f32, f32, f32),
 
-    layout_manager: Option<Box<dyn LayoutManager>>,
+    layout_root: Option<Box<dyn LayoutRoot>>,
+    layout_dirty: bool,
 }
 
 pub struct PaintInfo {
@@ -1056,7 +1073,8 @@ impl ElementData {
             resource_table: ResourceTable::new(),
             children_decoration: (0.0, 0.0, 0.0, 0.0),
             children: Vec::new(),
-            layout_manager: None,
+            layout_root: None,
+            layout_dirty: true,
         }
     }
 

@@ -3636,6 +3636,7 @@ dependencies = [
  "gl_generator",
  "glutin",
  "log",
+ "measure_time",
  "raw-window-handle 0.5.2",
  "skia-safe",
  "softbuffer",

@@ -20,6 +20,7 @@ wayland = ["glutin/wayland", "winit/wayland", "winit/wayland-dlopen", "winit/way
 log = "0.4"
 winit = { path = "../third_party/winit", features = ["android-native-activity", "rwh_05"] }
 glutin = "0.31"
+measure_time = "0.8.3"
 raw-window-handle = "0.5.0"
 skia-safe = { version = "0.75.0", features = ["gl"] }
 gl = "0.14.0"
