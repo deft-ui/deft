@@ -1,5 +1,3 @@
-mod skia_window;
-mod gl_renderer;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -29,7 +27,7 @@ use skia_safe::gpu::gl::FramebufferInfo;
 use skia_safe::PaintStyle::Stroke;
 use winit::application::ApplicationHandler;
 use winit::window::{Window, WindowAttributes, WindowId};
-use crate::skia_window::SkiaWindow;
+use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 
 
 pub struct App {
@@ -47,17 +45,17 @@ impl App {
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let win = SkiaWindow::new(event_loop, WindowAttributes::default());
-        self.windows.insert(win.window_id(), win);
+        let win = SkiaWindow::new(event_loop, WindowAttributes::default(), RenderBackendType::GL);
+        self.windows.insert(win.id(), win);
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
         if let WindowEvent::KeyboardInput { event, .. } = &event {
             if event.state == ElementState::Released {
                 info!("create window");
-                let mut app = SkiaWindow::new(event_loop);
+                let mut app = SkiaWindow::new(event_loop, WindowAttributes::default(), RenderBackendType::GL);
                 // app.resumed(event_loop);
-                self.windows.insert(app.window_id(), app);
+                self.windows.insert(app.id(), app);
             }
         }
         if let Some(win) = self.windows.get_mut(&window_id) {

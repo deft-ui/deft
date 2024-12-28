@@ -8,4 +8,4 @@ mod gl_surface;
 mod soft_surface;
 mod soft_renderer;
 mod surface;
-
+pub use offscreen_gl_context::*;

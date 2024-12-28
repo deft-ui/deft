@@ -22,9 +22,10 @@ winit = { path = "../third_party/winit", features = ["android-native-activity", 
 glutin = "0.31"
 measure_time = "0.8.3"
 raw-window-handle = "0.5.0"
-skia-safe = { version = "0.75.0", features = ["gl"] }
+skia-safe = { version = "0.75.0", features = ["textlayout", "svg", "x11", "gl"] }
 gl = "0.14.0"
-
+offscreen_gl_context = { git = "https://github.com/rust-skia/rust-offscreen-rendering-context", rev = "82b022cd0e42baaabfb82c319c9785a84a04f395" }
+# sparkle = { version = "0.1.25" }
 
 [target.'cfg(not(target_os = "android"))'.dependencies]
 env_logger = "0.10"
@@ -60,7 +61,4 @@ cfg_aliases = "0.1.1"
 #path = "src/lib.rs"
 #crate_type=["cdylib", "lib"]
 
-[[bin]]
-path="src/main.rs"
-name="skia-window-demo"
 #required-features = [ "desktop" ]
