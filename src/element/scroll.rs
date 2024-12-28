@@ -21,6 +21,7 @@ use crate::element::scroll::ScrollBarStrategy::{Always, Auto, Never};
 use crate::event::{CaretChangeEvent, MouseDownEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent};
 use crate::js::js_runtime::FromJsValue;
 use crate::layout::LayoutRoot;
+use crate::render::RenderFn;
 use crate::style::{StyleProp, StylePropVal};
 use crate::timer::{set_timeout, TimerHandle};
 
@@ -558,7 +559,7 @@ impl ElementBackend for Scroll {
         false
     }
 
-    fn draw(&self, canvas: &Canvas) {
+    fn render(&mut self) -> RenderFn {
         let mut me = self.clone();
         //TODO use ensure_layout_update?
         if me.content_layout_dirty {
@@ -571,16 +572,25 @@ impl ElementBackend for Scroll {
         let mut indicator_paint = Paint::default();
         indicator_paint.set_color(self.indicator_color);
 
-        if !self.vertical_bar_rect.is_empty() {
-            canvas.draw_rect(self.vertical_bar_rect.to_skia_rect(), &paint);
-            let v_indicator_rect = self.calculate_vertical_indicator_rect();
-            canvas.draw_rect(v_indicator_rect.to_skia_rect(), &indicator_paint);
-        }
-        if !self.horizontal_bar_rect.is_empty() {
-            canvas.draw_rect(self.horizontal_bar_rect.to_skia_rect(), &paint);
-            let h_indicator_rect = self.calculate_horizontal_indicator_rect();
-            canvas.draw_rect(h_indicator_rect.to_skia_rect(), &indicator_paint);
-        }
+        let vertical_bar_rect_visible = !self.vertical_bar_rect.is_empty();
+
+        let horizontal_bar_rect_visible = !self.horizontal_bar_rect.is_empty();
+
+        let v_indicator_rect = self.calculate_vertical_indicator_rect();
+        let h_indicator_rect = self.calculate_horizontal_indicator_rect();
+        let vertical_bar_rect = self.vertical_bar_rect.to_skia_rect();
+        let horizontal_bar_rect = self.horizontal_bar_rect.to_skia_rect();
+
+        RenderFn::new(move |canvas| {
+            if vertical_bar_rect_visible {
+                canvas.draw_rect(vertical_bar_rect, &paint);
+                canvas.draw_rect(v_indicator_rect.to_skia_rect(), &indicator_paint);
+            }
+            if horizontal_bar_rect_visible {
+                canvas.draw_rect(horizontal_bar_rect, &paint);
+                canvas.draw_rect(h_indicator_rect.to_skia_rect(), &indicator_paint);
+            }
+        })
     }
 }
 

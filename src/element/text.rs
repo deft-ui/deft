@@ -22,6 +22,7 @@ use crate::{js_call, match_event_type};
 use crate::element::text::simple_text_paragraph::{SimpleTextParagraph, TextBlock};
 use crate::event::{FocusShiftEvent, TextUpdateEvent};
 use crate::number::DeNan;
+use crate::render::RenderFn;
 use crate::string::StringUtils;
 use crate::style::StylePropKey;
 
@@ -607,20 +608,24 @@ impl ElementBackend for Text {
         }
     }
 
-    fn draw(&self, canvas: &Canvas) {
-        let clip_rect = canvas.local_clip_bounds();
-        // if let Some(clip_r) = canvas.local_clip_bounds() {
-        //     println!("clip_r:{:?}", clip_r);
-        //     let mut paint = Paint::default();
-        //     paint.set_color(parse_hex_color("ccc").unwrap());
-        //     canvas.draw_rect(clip_r, &paint);
-        // }
+    fn render(&mut self) -> RenderFn {
         let padding = self.element.get_padding();
-        canvas.translate((padding.3, padding.0));
-        self.with_lines_mut(|p_list| {
+        let selection = self.selection;
+        let selection_paint = self.selection_paint.clone();
+
+        let mut p_list = self.with_lines_mut(|ln| ln.clone());
+        RenderFn::new(move |canvas| {
+            let clip_rect = canvas.local_clip_bounds();
+            // if let Some(clip_r) = canvas.local_clip_bounds() {
+            //     println!("clip_r:{:?}", clip_r);
+            //     let mut paint = Paint::default();
+            //     paint.set_color(parse_hex_color("ccc").unwrap());
+            //     canvas.draw_rect(clip_r, &paint);
+            // }
+            canvas.translate((padding.3, padding.0));
             let mut top = 0.0;
             let mut line_atom_offset = 0;
-            for p in p_list {
+            for p in &mut p_list {
                 let p_height = p.paragraph.height();
                 let p_top = top;
                 let p_bottom = top + p_height;
@@ -637,7 +642,7 @@ impl ElementBackend for Text {
                         break;
                     }
                 }
-                if let Some(si_range) = self.selection {
+                if let Some(si_range) = selection {
                     let p_range = (p_atom_begin, p_atom_end);
                     if let Some((begin, end)) = intersect_range(si_range, p_range) {
                         let begin = begin - p_atom_begin;
@@ -645,14 +650,14 @@ impl ElementBackend for Text {
                         for offset in begin..end {
                             if let Some(g) = p.paragraph.get_char_bounds(offset) {
                                 let bounds = g.with_offset((0.0, p_top));
-                                canvas.draw_rect(&bounds, &self.selection_paint);
+                                canvas.draw_rect(&bounds, &selection_paint);
                             }
                         }
                     }
                 }
                 p.paragraph.paint(canvas, (0.0, p_top));
             }
-        });
+        })
     }
 
     fn execute_default_behavior(&mut self, event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) -> bool {

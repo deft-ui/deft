@@ -98,6 +98,7 @@ impl ElementBackend for TextEdit {
         self.get_entry_mut().handle_style_changed(key);
     }
 
+    /*
     fn draw(&self, canvas: &Canvas) {
         self.base.draw(canvas);
         canvas.save();
@@ -130,6 +131,7 @@ impl ElementBackend for TextEdit {
         // });
         canvas.restore();
     }
+     */
 
     fn handle_origin_bounds_change(&mut self, _bounds: &Rect) {
         self.base.handle_origin_bounds_change(_bounds);

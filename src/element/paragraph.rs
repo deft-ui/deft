@@ -36,6 +36,7 @@ use crate::base::{ElementEvent, EventContext, MouseDetail, MouseEventType};
 use crate::element::paragraph::simple_paragraph_builder::SimpleParagraphBuilder;
 use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
 use crate::event::{FocusShiftEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent, SelectEndEvent, SelectMoveEvent, SelectStartEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
+use crate::render::RenderFn;
 use crate::typeface::get_font_mgr;
 
 const DEFAULT_FONT_NAME: &str = "system-ui";
@@ -52,7 +53,7 @@ pub struct ParagraphParams {
     pub font_families: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum ParagraphUnit {
     Text(TextUnit),
@@ -87,7 +88,7 @@ impl ParagraphUnit {
 
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TextUnit {
     pub text: String,
@@ -125,6 +126,7 @@ pub struct Paragraph {
     selection_fg: Paint,
 }
 
+#[derive(Clone)]
 pub struct Line {
     units: Vec<ParagraphUnit>,
     sk_paragraph: SimpleTextParagraph,
@@ -719,54 +721,56 @@ impl ElementBackend for Paragraph {
         }
     }
 
-    fn draw(&self, canvas: &Canvas) {
+    fn render(&mut self) -> RenderFn {
         let mut p = self.clone();
         p.layout(None);
-
-        let clip_rect = canvas.local_clip_bounds();
 
         let mut me = self.clone();
         let mut consumed_top = 0.0;
         let mut consumed_rows = 0usize;
         let mut consumed_columns = 0usize;
-        for ln in &mut me.lines {
-            let ln_row = consumed_rows; consumed_rows += 1;
-            let ln_column = consumed_columns; consumed_columns += 1;
+        let mut lines = me.lines.clone();
+        let selection = self.selection;
+        let selection_bg = self.selection_bg.clone();
+        let selection_fg = self.selection_fg.clone();
 
-            let ln_height = ln.sk_paragraph.height();
-            let ln_top = consumed_top; consumed_top += ln_height;
-            let ln_bottom = consumed_top;
+        RenderFn::new(move |canvas| {
+            let clip_rect = canvas.local_clip_bounds();
+            for ln in &mut lines {
+                let ln_row = consumed_rows; consumed_rows += 1;
+                let ln_column = consumed_columns; consumed_columns += 1;
+
+                let ln_height = ln.sk_paragraph.height();
+                let ln_top = consumed_top; consumed_top += ln_height;
+                let ln_bottom = consumed_top;
 
 
-            if let Some(cp) = clip_rect {
-                if ln_bottom < cp.top {
-                    continue;
-                } else if ln_top > cp.bottom {
-                    break;
+                if let Some(cp) = clip_rect {
+                    if ln_bottom < cp.top {
+                        continue;
+                    } else if ln_top > cp.bottom {
+                        break;
+                    }
                 }
-            }
-            ln.sk_paragraph.paint(canvas, (0.0, ln_top));
+                ln.sk_paragraph.paint(canvas, (0.0, ln_top));
 
-            let atom_count = ln.atom_count();
-            if atom_count > 0 {
-                if let Some(selection_range) = self.selection {
-                    let ln_range = (TextCoord(ln_row, 0), TextCoord(ln_row, atom_count));
-                    if let Some((begin, end)) = intersect_range(selection_range, ln_range) {
-                        ln.paint_selection(
-                            canvas,
-                            (0.0, ln_top),
-                            (begin.1, end.1),
-                            &self.selection_bg,
-                            &self.selection_fg
-                        );
+                let atom_count = ln.atom_count();
+                if atom_count > 0 {
+                    if let Some(selection_range) = selection {
+                        let ln_range = (TextCoord(ln_row, 0), TextCoord(ln_row, atom_count));
+                        if let Some((begin, end)) = intersect_range(selection_range, ln_range) {
+                            ln.paint_selection(
+                                canvas,
+                                (0.0, ln_top),
+                                (begin.1, end.1),
+                                &selection_bg,
+                                &selection_fg
+                            );
+                        }
                     }
                 }
             }
-        }
-    }
-
-    fn on_event(&mut self, event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
-
+        })
     }
 
     fn execute_default_behavior(&mut self, event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) -> bool {

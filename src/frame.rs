@@ -998,8 +998,8 @@ fn draw_element(canvas: &Canvas, element: &mut Element, painter: &mut dyn Painte
             // let (padding_top, _, _, padding_left) = element.get_padding();
             // draw content box
             canvas.translate((border_left_width, border_top_width));
-            element.get_backend().draw(canvas);
-            element.get_backend_mut().paint(painter);
+            let render = element.get_backend_mut().render();
+            render.run(canvas);
         }
         canvas.restore();
     });

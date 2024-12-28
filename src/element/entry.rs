@@ -26,6 +26,7 @@ use crate::element::scroll::{Scroll, ScrollBarStrategy};
 use crate::element::text::text_paragraph::Line;
 use crate::event::{KEY_MOD_CTRL, KEY_MOD_SHIFT, KeyEventDetail, MouseDownEvent, MouseUpEvent, MouseMoveEvent, KeyDownEvent, CaretChangeEvent, TextUpdateEvent, TextChangeEvent, FocusEvent, BlurEvent, SelectStartEvent, SelectEndEvent, SelectMoveEvent, TextInputEvent, ClickEvent};
 use crate::event_loop::{create_event_loop_callback, create_event_loop_proxy};
+use crate::render::RenderFn;
 use crate::string::StringUtils;
 use crate::style::{StyleProp, StylePropKey, StylePropVal};
 use crate::style::StylePropKey::Height;
@@ -553,7 +554,7 @@ impl ElementBackend for Entry {
         self.base.handle_style_changed(key)
     }
 
-    fn draw(&self, canvas: &Canvas) {
+    fn render(&mut self) -> RenderFn {
         let ele = &self.element;
         let children = ele.get_children();
         //let paint = self.label.get_paint().clone();
@@ -562,21 +563,27 @@ impl ElementBackend for Entry {
 
         let mut me = self.clone();
         let caret_rect = match me.paragraph.get_char_rect(self.caret) {
-            None => return,
+            None => return RenderFn::empty(),
             Some(r) => r,
         };
-        canvas.save();
-        self.base.draw(canvas);
-        if self.focusing && self.caret_visible.get() {
-            paint.set_stroke_width(2.0);
-            let padding = self.element.get_padding();
-            let x = caret_rect.x - self.element.get_scroll_left() + padding.1;
-            let y = caret_rect.y - self.element.get_scroll_top() + padding.0;
-            let start = (x, y);
-            let end = (x, y + caret_rect.height);
-            canvas.draw_line(start, end, &paint);
-        }
-        canvas.restore();
+        let mut base_render_fn = self.base.render();
+        let focusing = self.focusing;
+        let caret_visible = self.caret_visible.get();
+        let padding = self.element.get_padding();
+        let x = caret_rect.x - self.element.get_scroll_left() + padding.1;
+        let y = caret_rect.y - self.element.get_scroll_top() + padding.0;
+
+        RenderFn::new(move |canvas| {
+            canvas.save();
+            base_render_fn.run(canvas);
+            if focusing && caret_visible {
+                paint.set_stroke_width(2.0);
+                let start = (x, y);
+                let end = (x, y + caret_rect.height);
+                canvas.draw_line(start, end, &paint);
+            }
+            canvas.restore();
+        })
     }
 
     fn on_event(&mut self, event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {

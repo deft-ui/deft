@@ -7,6 +7,7 @@ use yoga::{Edge, StyleUnit};
 use crate::base::{EventContext, PropertyValue, Rect};
 use crate::element::{ElementBackend, Element, ElementWeak};
 use crate::element::container::Container;
+use crate::render::RenderFn;
 use crate::style::StylePropKey;
 
 pub struct Button {
@@ -48,9 +49,8 @@ impl ElementBackend for Button {
         self.base.handle_style_changed(key);
     }
 
-
-    fn draw(&self, canvas: &Canvas) {
-        self.base.draw(canvas);
+    fn render(&mut self) -> RenderFn {
+        self.base.render()
     }
 
     fn on_event(&mut self, event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {

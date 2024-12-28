@@ -52,6 +52,7 @@ use crate as lento;
 use crate::js::JsError;
 use crate::layout::LayoutRoot;
 use crate::paint::{Painter, UniqueRect};
+use crate::render::RenderFn;
 
 thread_local! {
     pub static NEXT_ELEMENT_ID: Cell<u32> = Cell::new(1);
@@ -1105,13 +1106,8 @@ pub trait ElementBackend {
         let _ = key;
     }
 
-    //TODO use &mut self
-    fn draw(&self, canvas: &Canvas) {
-        let _ = canvas;
-    }
-
-    fn paint(&mut self, painter: &mut dyn Painter) {
-        let _ = painter;
+    fn render(&mut self) -> RenderFn {
+        RenderFn::new(|_c| {})
     }
 
     fn on_event(&mut self, mut event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {

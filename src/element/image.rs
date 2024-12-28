@@ -16,6 +16,7 @@ use crate::element::{ElementBackend, Element};
 use crate::element::label::FONT_MGR;
 use crate::img_manager::IMG_MANAGER;
 use crate::js_call;
+use crate::render::RenderFn;
 
 extern "C" fn measure_image(node_ref: NodeRef, width: f32, _mode: MeasureMode, _height: f32, _height_mode: MeasureMode) -> Size {
     if let Some(ctx) = Node::get_context(&node_ref) {
@@ -125,21 +126,24 @@ impl ElementBackend for Image {
         "Image"
     }
 
-    fn draw(&self, canvas: &Canvas) {
+    fn render(&mut self) -> RenderFn {
         let (img_width, img_height) = self.img.get_size();
         let (width, height) = self.element.get_size();
-        canvas.save();
-        canvas.scale((width / img_width, height / img_height));
-        match &self.img {
-            ImageSrc::Svg(dom) => {
-                dom.render(canvas);
+        let img = self.img.clone();
+        RenderFn::new(move |canvas| {
+            canvas.save();
+            canvas.scale((width / img_width, height / img_height));
+            match &img {
+                ImageSrc::Svg(dom) => {
+                    dom.render(canvas);
+                }
+                ImageSrc::Img(img) => {
+                    canvas.draw_image(img, (0.0, 0.0), None);
+                }
+                ImageSrc::None => {}
             }
-            ImageSrc::Img(img) => {
-                canvas.draw_image(img, (0.0, 0.0), None);
-            }
-            ImageSrc::None => {}
-        }
-        canvas.restore();
+            canvas.restore();
+        })
     }
 
 }

@@ -11,6 +11,7 @@ use crate::number::DeNan;
 use crate::string::StringUtils;
 use crate::text::calculate_line_char_count;
 
+#[derive(Clone)]
 struct LineUnit {
     block: TextBlock,
     x: f32,
@@ -85,6 +86,7 @@ impl LineUnit {
 
 }
 
+#[derive(Clone)]
 struct TextLine {
     units: Vec<LineUnit>,
     line_number: usize,
@@ -107,6 +109,7 @@ impl TextLine {
     }
 }
 
+#[derive(Clone)]
 pub struct SimpleTextParagraph {
     text: String,
     line_height: Option<f32>,
@@ -117,6 +120,7 @@ pub struct SimpleTextParagraph {
 }
 
 
+#[derive(Clone)]
 pub struct TextBlock {
     pub text: String,
     pub style: TextStyle,

@@ -20,6 +20,7 @@ pub struct ParagraphData {
     pub measure_mode: Option<(MeasureMode, MeasureMode)>,
 }
 
+#[derive(Clone)]
 pub struct Line {
     /// Atom count; \r\n is treated as one atom
     pub atom_count: AtomOffset,
