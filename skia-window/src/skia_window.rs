@@ -29,7 +29,7 @@ impl SkiaWindow {
                 #[cfg(target_os = "android")]
                 panic!("Android does not support this backend!");
                 #[cfg(not(target_os = "android"))]
-                Box::new(SoftSurface::new(event_loop, window))
+                Box::new(SurfaceState::new(event_loop, window))
             }
             RenderBackendType::GL => {
                 Box::new(SurfaceState::new(event_loop, window))
@@ -41,6 +41,10 @@ impl SkiaWindow {
     pub fn resize_surface(&mut self, width: u32, height: u32) {
         // self.surface_state.render.resize(&self.winit_window(), width, height);
         self.surface_state.resize(width, height);
+    }
+
+    pub fn scale_factor(&self) -> f64 {
+        self.winit_window().scale_factor()
     }
 
 }
@@ -60,7 +64,7 @@ impl SkiaWindow {
         &self.surface_state.window()
     }
 
-    pub fn render<F: FnOnce(&Canvas) + 'static>(&mut self, renderer: F) {
+    pub fn render<F: FnOnce(&Canvas) + Send + 'static>(&mut self, renderer: F) {
         // self.surface_state.render.draw(renderer);
         self.surface_state.render(Box::new(renderer))
     }

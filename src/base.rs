@@ -1,21 +1,62 @@
 use crate as lento;
 use std::any::{Any, TypeId};
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
+use std::marker::PhantomData;
 use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::Mutex;
+use std::thread::LocalKey;
 use anyhow::Error;
 use quick_js::{JsValue, ValueError};
 use serde::{Deserialize, Serialize};
 use skia_safe::Path;
-use yoga::Layout;
+use yoga::{Layout};
 use crate::element::{Element, ElementWeak};
 use crate::ext::common::create_event_handler;
 use crate::js::{FromJsValue, ToJsValue};
 use crate::js::js_serde::JsValueSerializer;
 use crate::{js_deserialize, js_serialize};
 use crate::number::DeNan;
+
+pub struct IdKey {
+    next_id: Cell<usize>,
+}
+
+impl IdKey {
+    pub fn new() -> Self {
+        Self { next_id: Cell::new(1) }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Id<T> {
+    id: usize,
+    _phantom: PhantomData<T>,
+}
+
+impl<T> Display for Id<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.id.fmt(f)
+    }
+}
+
+impl<T> Id<T> {
+    pub fn next(local_key: &'static LocalKey<IdKey>) -> Self {
+        let id = {
+            local_key.with(|k| {
+                let id = k.next_id.get();
+                k.next_id.set(id + 1);
+                id
+            })
+        };
+        Id {
+            id,
+            _phantom: PhantomData,
+        }
+    }
+}
 
 pub enum TextAlign {
     Left,

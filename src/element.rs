@@ -377,41 +377,6 @@ impl Element {
         clip_path.contains((x, y))
     }
 
-    pub fn draw_background(&self, canvas: &Canvas) {
-        if let Some(img) = &self.style.background_image {
-            canvas.draw_image(img, (0.0, 0.0), Some(&Paint::default()));
-        } else if !self.style.computed_style.background_color.is_transparent() {
-            let mut paint = Paint::default();
-            let layout = &self.style;
-            let bd_top =  layout.get_style_border_top().de_nan(0.0);
-            let bd_right =  layout.get_style_border_right().de_nan(0.0);
-            let bd_bottom =  layout.get_style_border_bottom().de_nan(0.0);
-            let bd_left =  layout.get_style_border_left().de_nan(0.0);
-            let size_layout = layout.get_layout();
-            let rect = Rect::new(bd_left, bd_top, size_layout.width() - bd_right, size_layout.height() - bd_bottom);
-
-            paint.set_color(self.style.computed_style.background_color);
-            paint.set_style(SkPaint_Style::Fill);
-            canvas.draw_rect(&rect, &paint);
-        }
-    }
-
-    pub fn draw_border(&self, canvas: &Canvas) {
-        let style = &self.style;
-        let paths = self.style.get_border_paths();
-        let color = style.border_color;
-        for i in 0..4 {
-            let p = &paths[i];
-            if !p.is_empty() {
-                let mut paint = Paint::default();
-                paint.set_style(SkPaint_Style::Fill);
-                paint.set_anti_alias(true);
-                paint.set_color(color[i]);
-                canvas.draw_path(&p, &paint);
-            }
-        }
-    }
-
     #[js_func]
     pub fn get_size(&self) -> (f32, f32) {
         let layout = self.style.get_layout();
@@ -1036,6 +1001,7 @@ pub struct Element {
 
     layout_root: Option<Box<dyn LayoutRoot>>,
     layout_dirty: bool,
+    pub need_snapshot: bool,
 }
 
 pub struct PaintInfo {
@@ -1076,6 +1042,7 @@ impl ElementData {
             children: Vec::new(),
             layout_root: None,
             layout_dirty: true,
+            need_snapshot: false,
         }
     }
 

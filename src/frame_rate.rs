@@ -43,6 +43,7 @@ impl FrameRateController {
         self.total_frames += 1;
         let next_frame_time_nano = next_frame_no * NANOS_PER_FRAME;
         let now_nano = now.duration_since(self.start_time).as_nanos() as u64;
+        self.current_frame = next_frame_no;
         next_frame_time_nano - now_nano
     }
 }

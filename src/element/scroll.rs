@@ -399,6 +399,7 @@ impl Scroll {
 impl ElementBackend for Scroll {
     fn create(mut ele: Element) -> Self {
         ele.create_shadow();
+        ele.need_snapshot = true;
         let mut base = Container::create(ele.clone());
         let is_mobile_platform = is_mobile_platform();
 

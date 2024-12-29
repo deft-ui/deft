@@ -32,7 +32,7 @@ impl RenderBackend for SoftSurface {
         &self.surface.window()
     }
 
-    fn render(&mut self, draw: Box<dyn FnOnce(&Canvas)>) {
+    fn render(&mut self, draw: Box<dyn FnOnce(&Canvas) + Send>) {
         {
             let mut buffer = self.surface.buffer_mut().expect("Failed to get the softbuffer buffer");
             let buf_ptr = buffer.as_mut_ptr() as *mut u8;

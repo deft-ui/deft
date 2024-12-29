@@ -17,8 +17,8 @@ use anyhow::{anyhow, Error};
 use lento_macros::{event, frame_event, js_func, js_methods, mrc_object};
 use measure_time::print_time;
 use quick_js::{JsValue, ResourceValue};
-use skia_bindings::{SkClipOp, SkRect};
-use skia_safe::{Canvas, Color, ColorType, IRect, ImageInfo, Matrix, Paint, Path, Rect};
+use skia_bindings::{SkCanvas_SrcRectConstraint, SkClipOp, SkRect};
+use skia_safe::{Canvas, Color, ColorType, IRect, Image, ImageInfo, Matrix, Paint, Path, Rect};
 use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
@@ -28,6 +28,7 @@ use std::process::exit;
 use std::rc::Rc;
 use std::slice;
 use std::string::ToString;
+use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 use skia_bindings::SkPaint_Style::{Fill, Stroke};
 use winit::dpi::Position::Logical;
@@ -39,9 +40,9 @@ use winit::keyboard::{Key, NamedKey};
 #[cfg(feature = "x11")]
 use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorGrabMode, CursorIcon, Window, WindowAttributes, WindowId};
-use crate::bind_js_event_listener;
+use crate::{bind_js_event_listener, is_snapshot_usable};
 use crate::frame_rate::{get_total_frames, next_frame, FRAME_RATE_CONTROLLER};
-use crate::paint::{InvalidArea, PartialInvalidArea, Painter, RenderNode, RenderTree, SkiaPainter, UniqueRect, InvalidRects};
+use crate::paint::{InvalidArea, PartialInvalidArea, Painter, RenderNode, RenderTree, SkiaPainter, UniqueRect, InvalidRects, RenderOp, Snapshot, SnapshotManager};
 use crate::style::ColorHelper;
 
 #[derive(Clone)]
@@ -84,6 +85,7 @@ pub struct Frame {
     pub(crate) frame_type: FrameType,
     cursor_root_position: LogicalPosition<f64>,
     body: Option<Element>,
+    snapshots: SnapshotManager,
     focusing: Option<Element>,
     /// (element, button)
     pressing: Option<(Element, MouseDownInfo)>,
@@ -101,7 +103,6 @@ pub struct Frame {
     init_height: Option<f32>,
     ime_height: f32,
     background_color: Color,
-    render_tree: RenderTree,
 }
 
 pub type FrameEventHandler = EventHandler<FrameWeak>;
@@ -213,7 +214,7 @@ impl Frame {
             ime_height: 0.0,
             background_color: Color::from_rgb(0, 0, 0),
             repaint_timer_handle: None,
-            render_tree: RenderTree::new(),
+            snapshots: SnapshotManager::new(),
         };
         let mut handle = Frame {
             inner: Mrc::new(state),
@@ -233,15 +234,24 @@ impl Frame {
 
     pub fn invalid(&mut self, mode: InvalidMode) {
         let is_first_invalid = self.invalid_area == InvalidArea::None;
+        let snapshot_usable = is_snapshot_usable();
         match mode {
             InvalidMode::Full => {
                 self.invalid_area.add_rect(None);
             }
             InvalidMode::Rect(r) => {
-                self.invalid_area.add_rect(Some(r));
+                if snapshot_usable {
+                    self.invalid_area.add_rect(Some(r));
+                } else {
+                    self.invalid_area.add_rect(None);
+                }
             }
             InvalidMode::UniqueRect(ur) => {
-                self.invalid_area.add_unique_rect(ur);
+                if snapshot_usable {
+                    self.invalid_area.add_unique_rect(ur);
+                } else {
+                    self.invalid_area.add_rect(None);
+                }
             }
         }
         if is_first_invalid {
@@ -265,7 +275,7 @@ impl Frame {
     }
 
     pub fn mark_dirty_and_update_immediate(&mut self, layout_dirty: bool) {
-        self.layout_dirty = self.layout_dirty || layout_dirty;
+        self.invalid_layout();
         self.update();
     }
 
@@ -738,7 +748,7 @@ impl Frame {
             };
             height -= self.ime_height / scale_factor;
             if let Some(body) = &mut self.body {
-                print_time!("calculate layout, {} x {}", width, height);
+                // print_time!("calculate layout, {} x {}", width, height);
                 body.calculate_layout(width, height);
                 if auto_size {
                     let (final_width, final_height) = body.get_size();
@@ -750,7 +760,7 @@ impl Frame {
                     }
                 }
             }
-            print_time!("collect element time");
+            // print_time!("collect element time");
         }
         self.paint();
         self.layout_dirty = false;
@@ -821,9 +831,9 @@ impl Frame {
     }
 
     fn paint(&mut self) {
-        print_time!("paint time");
         let size = self.window.inner_size();
         let (width, height) = (size.width, size.height);
+        print_time!("paint time: {} {}", width, height);
         if width <= 0 || height <= 0 {
             return;
         }
@@ -835,17 +845,19 @@ impl Frame {
         let scale_factor = self.window.scale_factor() as f32;
         let background_color = self.background_color;
         let mut me = self.clone();
+        let invalid_area = me.invalid_area.clone();
+        let old_snapshots = me.snapshots.clone();
+        let snapshots = SnapshotManager::new();
+        me.snapshots = snapshots.clone();
+        let viewport = Rect::new(0.0, 0.0, width as f32, height as f32);
+        let mut render_tree = if let Some(body) = &mut me.body {
+            // print_time!("build render nodes time");
+            build_render_nodes(body, invalid_area, scale_factor, viewport.clone())
+        } else {
+            RenderTree::new()
+        };
         self.window.render(move |canvas| {
-            print_time!("render time");
-            let invalid_area = me.invalid_area.clone();
-            me.render_tree = if let Some(body) = &mut me.body {
-                // print_time!("build render nodes time");
-                build_render_nodes(body, invalid_area, canvas, scale_factor)
-            } else {
-                RenderTree::new()
-            };
-            let viewport = Rect::new(0.0, 0.0, width as f32, height as f32);
-            me.render_tree.viewport = viewport.clone();
+            //print_time!("render time");
             canvas.save();
             if scale_factor != 1.0 {
                 canvas.scale((scale_factor, scale_factor));
@@ -853,11 +865,11 @@ impl Frame {
             let mut painter = SkiaPainter::new(canvas);
             if !background_color.is_transparent() {
                 canvas.save();
-                painter.set_invalid_rects(me.render_tree.invalid_rects_list[0].build(viewport));
+                painter.set_invalid_rects(render_tree.invalid_rects_list[0].build(viewport));
                 canvas.clear(background_color);
                 canvas.restore();
             }
-            draw_elements(canvas, &mut me.render_tree, &mut painter);
+            draw_elements(canvas, &mut render_tree, &mut painter, scale_factor, old_snapshots, snapshots);
 
             canvas.restore();
         });
@@ -929,172 +941,265 @@ impl WeakWindowHandle {
     }
 }
 
-fn draw_elements(canvas: &Canvas, tree: &mut RenderTree, painter: &mut dyn Painter) {
+fn draw_elements(canvas: &Canvas,
+                 tree: &mut RenderTree,
+                 painter: &mut dyn Painter,
+                 scale: f32,
+                 old_snapshots: SnapshotManager,
+                 new_snapshots: SnapshotManager,
+) {
     let viewport = tree.viewport.clone();
     let mut last_invalid_rects_idx = None;
     canvas.save();
-    for node in &mut tree.nodes {
-        if last_invalid_rects_idx != Some(node.invalid_rects_idx) {
-            canvas.restore();
-            canvas.save();
-            painter.set_invalid_rects(tree.invalid_rects_list[node.invalid_rects_idx].build(viewport));
-            last_invalid_rects_idx = Some(node.invalid_rects_idx);
+    // let ops = tree.ops.clone();
+    println!("render ops length: {}", tree.ops.len());
+    for op in &mut tree.ops {
+        match op {
+            RenderOp::Render(idx) => {
+                let node = &mut tree.nodes[*idx];
+                if last_invalid_rects_idx != Some(node.invalid_rects_idx) {
+                    canvas.restore();
+                    canvas.save();
+                    painter.set_invalid_rects(tree.invalid_rects_list[node.invalid_rects_idx].build(viewport));
+                    last_invalid_rects_idx = Some(node.invalid_rects_idx);
+                }
+                canvas.session(|c| {
+                    draw_element(canvas, node, painter);
+                });
+                if let Some(snapshot) = &old_snapshots.remove(node.element_id) {
+                    let (img_rect, img) = (&snapshot.rect, &snapshot.image);
+                    if let Some((x, y, rect)) = &node.reuse_bounds {
+                        let src_rect = Rect::from_xywh(
+                            rect.left * scale,
+                            rect.top * scale,
+                            rect.width() * scale,
+                            rect.height() * scale,
+                        );
+                        let dst_rect = rect.with_offset((img_rect.left - x, img_rect.top - y));
+                        let dst_rect = Rect::from_xywh(
+                            dst_rect.left * scale,
+                            dst_rect.top * scale,
+                            dst_rect.width() * scale,
+                            dst_rect.height() * scale,
+                        );
+                        let ob = node.origin_bounds;
+                        let vp = node.children_viewport;
+                        let mut vp_path = Path::new();
+                        vp_path.add_rect(&vp, None);
+                        canvas.session(|c| {
+                            let children_invalid_rects = tree.invalid_rects_list[node.children_invalid_rects_idx].build(viewport);
+                            let children_invalid_path = children_invalid_rects.to_path(viewport);
+                            c.translate((ob.left, ob.top));
+                            c.clip_path(&vp_path, SkClipOp::Intersect, false);
+                            c.translate((-ob.left, -ob.top));
+                            c.clip_path(&children_invalid_path, SkClipOp::Difference, false);
+                            c.scale((1.0 / scale, 1.0 / scale));
+                            c.draw_image_rect(img, Some((&src_rect, SkCanvas_SrcRectConstraint::Fast)), &dst_rect, &Paint::default());
+                        });
+                    }
+                }
+                // node.snapshot = None;
+            }
+            RenderOp::Finish(idx) => {
+                let node = &mut tree.nodes[*idx];
+                if is_snapshot_usable() && node.need_snapshot {
+                    unsafe {
+                        if let Some(mut surface) = canvas.surface() {
+                            //TODO result will be wrong if has transform
+                            let mut bounds = node.origin_bounds;
+                            if scale != 1.0 {
+                                bounds.left *= scale;
+                                bounds.top *= scale;
+                                bounds.right *= scale;
+                                bounds.bottom *= scale;
+                            }
+                            let i_bounds = IRect {
+                                left: bounds.left as i32,
+                                top: bounds.top as i32,
+                                right: bounds.right() as i32,
+                                bottom: bounds.bottom() as i32,
+                            };
+
+                            if let Some(img) = surface.image_snapshot_with_bounds(&i_bounds) {
+                                new_snapshots.insert(node.element_id, Snapshot::new(node.origin_bounds, img));
+                            }
+                            // let snapshot = surface.image_snapshot_with_bounds(&i_bounds)
+                            //     .map(|img| (bounds, img));
+
+
+                        }
+                    }
+                }
+            }
         }
-        canvas.session(|c| {
-            draw_element(canvas, &mut node.element, painter);
-        });
-        if let Some((rect, i)) = &node.snapshot {
-            let ob = node.element.get_origin_bounds();
-            let vp = node.element.get_children_viewport();
-            let mut vp_path = Path::new();
-            vp_path.add_rect(&vp, None);
-            canvas.session(|c| {
-                c.translate((ob.x, ob.y));
-                c.clip_path(&vp_path, SkClipOp::Intersect, false);
-                c.translate((-ob.x, -ob.y));
-                c.draw_image_rect(i, None, &rect, &Paint::default());
-            });
-        }
-        node.snapshot = None;
     }
     canvas.restore();
 }
 
-fn draw_element(canvas: &Canvas, element: &mut Element, painter: &mut dyn Painter) {
-    let final_bounds = element.get_transformed_bounds();
-    if !painter.is_visible_origin(&final_bounds) {
-        return;
+fn draw_element(canvas: &Canvas, node: &mut RenderNode, painter: &mut dyn Painter) {
+    let origin_bounds = node.origin_bounds;
+    if let Some(cp) = &node.parent_clip_path {
+        canvas.clip_path(cp, SkClipOp::Intersect, false);
     }
-    let origin_bounds = element.get_origin_bounds();
-    if let Some(p) = element.get_parent() {
-        let p_bounds = p.get_origin_bounds();
-        canvas.translate((p_bounds.x, p_bounds.y));
-        let content_path = p.get_content_box_path();
-        canvas.clip_path(&content_path, SkClipOp::Intersect, true);
-        canvas.translate((-p.get_scroll_left(), -p.get_scroll_top()));
-        //TODO apply parent transform
+    if let Some(pt) = &node.parent_translate {
+        canvas.translate(*pt);
     }
 
-    let bounds = element.get_bounds();
+    let bounds = node.bounds;
     canvas.session(move |canvas| {
 
         // translate to element left-top
-        canvas.translate((bounds.x, bounds.y));
-        let matrix = element.get_total_matrix();
+        canvas.translate((bounds.left, bounds.top));
+        let matrix = node.total_matrix;
         canvas.concat(&matrix);
 
         // set clip path
-        let clip_path = element.get_border_box_path();
+        let clip_path = &node.border_box_path;
         canvas.clip_path(&clip_path, SkClipOp::Intersect, true);
 
         // draw background and border
-        element.draw_background(&canvas);
-        element.draw_border(&canvas);
+        node.draw_background(&canvas);
+        node.draw_border(&canvas);
 
         // draw padding box and content box
         canvas.save();
-        if bounds.width > 0.0 && bounds.height > 0.0 {
-            let (border_top_width, _, _, border_left_width) = element.get_border_width();
+        if bounds.width() > 0.0 && bounds.height() > 0.0 {
+            let (border_top_width, _, _, border_left_width) = node.border_width;
             // let (padding_top, _, _, padding_left) = element.get_padding();
             // draw content box
             canvas.translate((border_left_width, border_top_width));
-            let render = element.get_backend_mut().render();
-            render.run(canvas);
+            if let Some(render_fn) = node.render_fn.take() {
+                render_fn.run(canvas);
+            }
         }
         canvas.restore();
     });
 }
 
-fn build_render_nodes(root: &mut Element, invalid_area: InvalidArea, canvas: &Canvas, scale: f32) -> RenderTree {
+fn build_render_nodes(root: &mut Element, mut invalid_area: InvalidArea, scale: f32,  viewport: Rect) -> RenderTree {
     let count = count_elements(root);
+    let viewport_rect = UniqueRect::from_rect(viewport);
+    invalid_area.add_unique_rect(&viewport_rect);
     let mut render_tree = RenderTree {
         invalid_rects_list: vec![invalid_area],
-        nodes: vec![],
-        viewport: Rect::new(0.0, 0.0, 0.0, 0.0),
+        nodes: Vec::with_capacity(count),
+        ops: Vec::with_capacity(count * 2),
+        viewport,
     };
-    collect_render_nodes(root, &mut render_tree, 0, canvas, scale);
+    root.need_snapshot = true;
+    root.invalid_unique_rect = Some(viewport_rect);
+    collect_render_nodes(root, &mut render_tree, 0, scale);
     render_tree
 }
 
-fn collect_render_nodes(root: &mut Element, result: &mut RenderTree, mut invalid_rects_idx: usize, canvas: &Canvas, scale: f32) {
+fn collect_render_nodes(root: &mut Element, result: &mut RenderTree, mut invalid_rects_idx: usize, scale: f32) {
+    let mut parent_translate = None;
+    let mut parent_clip_path = None;
+    if let Some(p) = root.get_parent() {
+        let p_bounds = p.get_origin_bounds();
+        parent_translate = Some((p_bounds.x - p.get_scroll_left(), p_bounds.y - p.get_scroll_top()));
+        let mut content_path = p.get_content_box_path();
+        content_path.offset((p_bounds.x, p_bounds.y));
+        parent_clip_path = Some(content_path);
+        //TODO apply parent transform
+    }
+
+    let invalid_rects = result.invalid_rects_list[invalid_rects_idx].build(result.viewport);
+    let final_bounds =root.get_transformed_bounds();
+    if !invalid_rects.has_intersects(&final_bounds) {
+        return;
+    }
+
     let mut node = RenderNode {
-        element: root.clone(),
+        element_id: root.get_id(),
+        bounds: root.get_bounds().to_skia_rect(),
         invalid_rects_idx,
-        snapshot: None,
+        children_invalid_rects_idx: invalid_rects_idx,
+        transformed_bounds: root.get_transformed_bounds(),
+        origin_bounds: root.get_origin_bounds().to_skia_rect(),
+        total_matrix: root.get_total_matrix(),
+        parent_clip_path,
+        parent_translate,
+        border_width: root.get_border_width(),
+        border_box_path: root.get_border_box_path(),
+        render_fn: Some(root.get_backend_mut().render()),
+        background_image: root.style.background_image.clone(),
+        background_color: root.style.computed_style.background_color,
+        border_paths: root.style.get_border_paths(),
+        border_color: root.style.border_color,
+        children_viewport: root.get_children_viewport(),
+        need_snapshot: root.need_snapshot,
+        reuse_bounds: None,
     };
     let mut scroll_delta = (0.0, 0.0);
     if let Some(lpi) = &root.last_paint_info {
         scroll_delta.0 = root.scroll_left - lpi.scroll_left;
         scroll_delta.1 = root.scroll_top - lpi.scroll_top;
     }
-    if scroll_delta.0 != 0.0 || scroll_delta.1 != 0.0 {
-        root.last_paint_info = Some(PaintInfo {
-            scroll_left: root.scroll_left,
-            scroll_top: root.scroll_top,
-        });
-        let old_origin_bounds = node.element.get_origin_padding_bounds();
+    root.last_paint_info = Some(PaintInfo {
+        scroll_left: root.scroll_left,
+        scroll_top: root.scroll_top,
+    });
+    if let Some(ir) = &root.invalid_unique_rect {
+        let old_origin_bounds = root.get_origin_padding_bounds();
         let reuse_bounds = old_origin_bounds.translate(scroll_delta.0, scroll_delta.1)
-            .intersect(&old_origin_bounds);
+            .intersect(&old_origin_bounds)
+            .translate(-old_origin_bounds.x, -old_origin_bounds.y).to_skia_rect();
         if !reuse_bounds.is_empty() {
-            unsafe {
-                if let Some(mut surface) = canvas.surface() {
-                    let mut bounds = reuse_bounds.clone();
-                    let paint_x = bounds.x - scroll_delta.0;
-                    let paint_y = bounds.y - scroll_delta.1;
-                    let paint_rect = Rect::from_xywh(paint_x, paint_y, bounds.width, bounds.height);
-                    if scale != 1.0 {
-                        bounds.x *= scale;
-                        bounds.y *= scale;
-                        bounds.width *= scale;
-                        bounds.height *= scale;
-                    }
-                    let i_bounds = IRect {
-                        left: bounds.x as i32,
-                        top: bounds.y as i32,
-                        right: bounds.right() as i32,
-                        bottom: bounds.bottom() as i32,
-                    };
-                    node.snapshot = surface.image_snapshot_with_bounds(&i_bounds)
-                        .map(|i| (paint_rect, i));
-                }
-            }
+            node.reuse_bounds = Some((
+                scroll_delta.0,
+                scroll_delta.1,
+                reuse_bounds
+            ));
+        } else {
+            node.reuse_bounds = None;
         }
-        if let Some(ir) = &mut root.invalid_unique_rect {
-            let mut invalid_area = result.invalid_rects_list[invalid_rects_idx].clone();
-            invalid_area.offset(-scroll_delta.0, -scroll_delta.1);
-            let reuse_bounds = reuse_bounds.translate(-scroll_delta.0, -scroll_delta.1);
-            //TODO scroll bar?
-            // let bounds = node.element.get_origin_bounds();
-            if !reuse_bounds.is_empty() {
-                invalid_area.remove_unique_rect(ir);
-                if reuse_bounds.x > 0.0 {
-                    let rect = Rect::new(old_origin_bounds.x, old_origin_bounds.y, reuse_bounds.x, old_origin_bounds.bottom());
-                    invalid_area.add_rect(Some(&rect));
-                }
-                if reuse_bounds.right() < old_origin_bounds.right() {
-                    let rect = Rect::new(reuse_bounds.right(), old_origin_bounds.y, old_origin_bounds.right(), old_origin_bounds.bottom());
-                    invalid_area.add_rect(Some(&rect));
-                }
-                if reuse_bounds.y > 0.0 {
-                    let rect = Rect::new(old_origin_bounds.x, old_origin_bounds.y, old_origin_bounds.right(), reuse_bounds.y);
-                    invalid_area.add_rect(Some(&rect));
-                }
-                if reuse_bounds.bottom() < old_origin_bounds.bottom() {
-                    let rect = Rect::new(old_origin_bounds.x, reuse_bounds.bottom(), old_origin_bounds.right(), old_origin_bounds.bottom());
-                    invalid_area.add_rect(Some(&rect));
-                }
-            }
+        let mut children_invalid_area = result.invalid_rects_list[invalid_rects_idx].clone();
+        children_invalid_area.remove_unique_rect(ir);
+        children_invalid_area.offset(-scroll_delta.0, -scroll_delta.1);
+        let reuse_bounds = reuse_bounds.with_offset((-scroll_delta.0, -scroll_delta.1));
+        //TODO scroll bar?
+        // let bounds = node.element.get_origin_bounds();
+        if !reuse_bounds.is_empty() {
+            let invalid_top_width = reuse_bounds.top;
+            let invalid_left_width = reuse_bounds.left;
+            let invalid_bottom_width = old_origin_bounds.height - reuse_bounds.bottom;
+            let invalid_right_width = old_origin_bounds.width - reuse_bounds.right;
 
-            result.invalid_rects_list.push(invalid_area);
-            invalid_rects_idx = result.invalid_rects_list.len() - 1;
-            root.invalid_unique_rect =  None;
+            if invalid_left_width > 0.0 {
+                let rect = Rect::new(old_origin_bounds.x, old_origin_bounds.y, old_origin_bounds.x + invalid_left_width, old_origin_bounds.bottom());
+                children_invalid_area.add_rect(Some(&rect));
+            }
+            if invalid_right_width > 0.0 {
+                let rect = Rect::new(old_origin_bounds.right() - invalid_right_width, old_origin_bounds.y, old_origin_bounds.right(), old_origin_bounds.bottom());
+                children_invalid_area.add_rect(Some(&rect));
+            }
+            if invalid_top_width > 0.0 {
+                let rect = Rect::new(old_origin_bounds.x, old_origin_bounds.y, old_origin_bounds.right(), old_origin_bounds.y + invalid_top_width);
+                children_invalid_area.add_rect(Some(&rect));
+            }
+            if invalid_bottom_width > 0.0 {
+                let rect = Rect::new(old_origin_bounds.x, reuse_bounds.bottom() - invalid_bottom_width, old_origin_bounds.right(), old_origin_bounds.bottom());
+                children_invalid_area.add_rect(Some(&rect));
+            }
+        } else {
+            children_invalid_area.add_rect(Some(&ir.rect));
         }
+
+        result.invalid_rects_list.push(children_invalid_area);
+        invalid_rects_idx = result.invalid_rects_list.len() - 1;
+        root.invalid_unique_rect =  None;
     }
+    node.children_invalid_rects_idx = invalid_rects_idx;
     result.nodes.push(node);
+    let node_id = result.nodes.len() - 1;
+    result.ops.push(RenderOp::Render(node_id));
+
     let children = root.get_children();
     for mut child in children {
-        collect_render_nodes(&mut child, result, invalid_rects_idx, canvas, scale);
+        collect_render_nodes(&mut child, result, invalid_rects_idx, scale);
     }
+    result.ops.push(RenderOp::Finish(node_id));
 }
 
 fn count_elements(root: &Element) -> usize {
@@ -1161,7 +1266,7 @@ pub fn frame_ime_resize(frame_id: i32, height: f32) {
     FRAMES.with_borrow_mut(|m| {
         if let Some(f) = m.get_mut(&frame_id) {
             f.ime_height = height;
-            f.mark_dirty_and_update_immediate(true);
+            f.invalid_layout();
         }
     });
 }

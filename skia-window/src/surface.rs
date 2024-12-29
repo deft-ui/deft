@@ -4,7 +4,7 @@ use winit::window::Window;
 pub trait RenderBackend {
     fn window(&self) -> &Window;
 
-    fn render(&mut self, renderer: Box<dyn FnOnce(&Canvas)>);
+    fn render(&mut self, renderer: Box<dyn FnOnce(&Canvas) + Send>);
 
     fn resize(&mut self, width: u32, height: u32);
 }

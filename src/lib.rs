@@ -121,6 +121,10 @@ pub fn is_mobile_platform() -> bool {
     return false;
 }
 
+pub fn is_snapshot_usable() -> bool {
+    false
+}
+
 #[cfg(target_os = "android")]
 #[no_mangle]
 pub fn android_bootstrap(app: AndroidApp, lento_app: Box<dyn LentoApp>) {

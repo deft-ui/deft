@@ -158,7 +158,7 @@ impl RenderBackend for SurfaceState {
         &self.window
     }
 
-    fn render(&mut self, renderer: Box<dyn FnOnce(&Canvas)>) {
+    fn render(&mut self, renderer: Box<dyn FnOnce(&Canvas) + Send>) {
         self.render.draw(renderer);
     }
 
