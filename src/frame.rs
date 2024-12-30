@@ -17,7 +17,7 @@ use anyhow::{anyhow, Error};
 use lento_macros::{event, frame_event, js_func, js_methods, mrc_object};
 use measure_time::print_time;
 use quick_js::{JsValue, ResourceValue};
-use skia_bindings::{SkCanvas_SrcRectConstraint, SkClipOp, SkRect};
+use skia_bindings::{SkCanvas_SrcRectConstraint, SkClipOp, SkPathOp, SkRect};
 use skia_safe::{Canvas, Color, ColorType, IRect, Image, ImageInfo, Matrix, Paint, Path, Rect};
 use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 use std::cell::{Cell, RefCell};
@@ -275,7 +275,9 @@ impl Frame {
     }
 
     pub fn mark_dirty_and_update_immediate(&mut self, layout_dirty: bool) {
-        self.invalid_layout();
+        if let Some(body) = &mut self.body {
+            body.mark_dirty(true);
+        }
         self.update();
     }
 
@@ -731,6 +733,10 @@ impl Frame {
     }
 
     pub fn update(&mut self) {
+        if self.invalid_area == InvalidArea::None {
+            // skip duplicate update
+            return;
+        }
         print_time!("frame update time");
         let auto_size = !self.attributes.resizable;
         if self.layout_dirty {
@@ -983,14 +989,14 @@ fn draw_elements(canvas: &Canvas,
                             dst_rect.height() * scale,
                         );
                         let ob = node.origin_bounds;
-                        let vp = node.children_viewport;
-                        let mut vp_path = Path::new();
-                        vp_path.add_rect(&vp, None);
+                        let vp_path = node.children_viewport.as_ref().map(|r| Path::rect(r, None));
                         canvas.session(|c| {
                             let children_invalid_rects = tree.invalid_rects_list[node.children_invalid_rects_idx].build(viewport);
                             let children_invalid_path = children_invalid_rects.to_path(viewport);
                             c.translate((ob.left, ob.top));
-                            c.clip_path(&vp_path, SkClipOp::Intersect, false);
+                            if let Some(vp_path) = vp_path {
+                                c.clip_path(&vp_path, SkClipOp::Intersect, false);
+                            }
                             c.translate((-ob.left, -ob.top));
                             c.clip_path(&children_invalid_path, SkClipOp::Difference, false);
                             c.scale((1.0 / scale, 1.0 / scale));
@@ -1038,18 +1044,16 @@ fn draw_elements(canvas: &Canvas,
 
 fn draw_element(canvas: &Canvas, node: &mut RenderNode, painter: &mut dyn Painter) {
     let origin_bounds = node.origin_bounds;
-    if let Some(cp) = &node.parent_clip_path {
+    if let Some(cp) = &node.absolute_clip_path {
         canvas.clip_path(cp, SkClipOp::Intersect, false);
     }
-    if let Some(pt) = &node.parent_translate {
-        canvas.translate(*pt);
-    }
+    canvas.translate((node.origin_bounds.left, node.origin_bounds.top));
+    let width = origin_bounds.width();
+    let height = origin_bounds.height();
 
-    let bounds = node.bounds;
     canvas.session(move |canvas| {
 
         // translate to element left-top
-        canvas.translate((bounds.left, bounds.top));
         let matrix = node.total_matrix;
         canvas.concat(&matrix);
 
@@ -1063,7 +1067,7 @@ fn draw_element(canvas: &Canvas, node: &mut RenderNode, painter: &mut dyn Painte
 
         // draw padding box and content box
         canvas.save();
-        if bounds.width() > 0.0 && bounds.height() > 0.0 {
+        if width > 0.0 && height > 0.0 {
             let (border_top_width, _, _, border_left_width) = node.border_width;
             // let (padding_top, _, _, padding_left) = element.get_padding();
             // draw content box
@@ -1088,20 +1092,24 @@ fn build_render_nodes(root: &mut Element, mut invalid_area: InvalidArea, scale: 
     };
     root.need_snapshot = true;
     root.invalid_unique_rect = Some(viewport_rect);
-    collect_render_nodes(root, &mut render_tree, 0, scale);
+    collect_render_nodes(root, &mut render_tree, 0, scale, None);
     render_tree
 }
 
-fn collect_render_nodes(root: &mut Element, result: &mut RenderTree, mut invalid_rects_idx: usize, scale: f32) {
-    let mut parent_translate = None;
-    let mut parent_clip_path = None;
-    if let Some(p) = root.get_parent() {
-        let p_bounds = p.get_origin_bounds();
-        parent_translate = Some((p_bounds.x - p.get_scroll_left(), p_bounds.y - p.get_scroll_top()));
-        let mut content_path = p.get_content_box_path();
-        content_path.offset((p_bounds.x, p_bounds.y));
-        parent_clip_path = Some(content_path);
-        //TODO apply parent transform
+fn collect_render_nodes(root: &mut Element, result: &mut RenderTree, mut invalid_rects_idx: usize, scale: f32, parent_node_idx: Option<usize>) {
+    let mut absolute_clip_path = None;
+    if let Some(p) = parent_node_idx {
+        let parent = &result.nodes[p];
+        absolute_clip_path = parent.absolute_clip_path.clone();
+        if let Some(pp) = &parent.children_viewport {
+            let pp = pp.with_offset((parent.origin_bounds.left, parent.origin_bounds.top));
+            let mut vp_path = Path::rect(&pp, None);
+            if let Some(acp) = &absolute_clip_path {
+                absolute_clip_path = Some(vp_path.op(acp, SkPathOp::Intersect).unwrap_or_default());
+            } else {
+                absolute_clip_path = Some(vp_path);
+            }
+        }
     }
 
     let invalid_rects = result.invalid_rects_list[invalid_rects_idx].build(result.viewport);
@@ -1112,14 +1120,12 @@ fn collect_render_nodes(root: &mut Element, result: &mut RenderTree, mut invalid
 
     let mut node = RenderNode {
         element_id: root.get_id(),
-        bounds: root.get_bounds().to_skia_rect(),
         invalid_rects_idx,
         children_invalid_rects_idx: invalid_rects_idx,
         transformed_bounds: root.get_transformed_bounds(),
         origin_bounds: root.get_origin_bounds().to_skia_rect(),
         total_matrix: root.get_total_matrix(),
-        parent_clip_path,
-        parent_translate,
+        absolute_clip_path,
         border_width: root.get_border_width(),
         border_box_path: root.get_border_box_path(),
         render_fn: Some(root.get_backend_mut().render()),
@@ -1192,14 +1198,14 @@ fn collect_render_nodes(root: &mut Element, result: &mut RenderTree, mut invalid
     }
     node.children_invalid_rects_idx = invalid_rects_idx;
     result.nodes.push(node);
-    let node_id = result.nodes.len() - 1;
-    result.ops.push(RenderOp::Render(node_id));
+    let node_idx = result.nodes.len() - 1;
+    result.ops.push(RenderOp::Render(node_idx));
 
     let children = root.get_children();
     for mut child in children {
-        collect_render_nodes(&mut child, result, invalid_rects_idx, scale);
+        collect_render_nodes(&mut child, result, invalid_rects_idx, scale, Some(node_idx));
     }
-    result.ops.push(RenderOp::Finish(node_id));
+    result.ops.push(RenderOp::Finish(node_idx));
 }
 
 fn count_elements(root: &Element) -> usize {
@@ -1266,7 +1272,7 @@ pub fn frame_ime_resize(frame_id: i32, height: f32) {
     FRAMES.with_borrow_mut(|m| {
         if let Some(f) = m.get_mut(&frame_id) {
             f.ime_height = height;
-            f.invalid_layout();
+            f.mark_dirty_and_update_immediate(true);
         }
     });
 }

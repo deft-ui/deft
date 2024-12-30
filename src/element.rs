@@ -885,7 +885,8 @@ impl Element {
         self.mark_dirty(false);
     }
 
-    pub fn get_children_viewport(&self) -> Rect {
+    pub fn get_children_viewport(&self) -> Option<Rect> {
+        //TODO support overflow:visible
         let border = self.get_border_width();
         let children_decoration = self.children_decoration;
         let bounds = self.get_bounds();
@@ -893,7 +894,7 @@ impl Element {
         let y = border.0 + children_decoration.0;
         let right = bounds.width - border.1 - children_decoration.1;
         let bottom = bounds.height - border.2 - children_decoration.2;
-        Rect::new(x, y, right, bottom)
+        Some(Rect::new(x, y, right, bottom))
     }
 
     //TODO remove?

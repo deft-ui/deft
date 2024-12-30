@@ -38,7 +38,7 @@ pub extern "system" fn Java_fun_kason_lento_InputChannel_imeResize0<'local>(mut 
         Err(e) => {
             println!("send app event error: {:?}", e);
         }
-        Ok(_) => {}
+        Ok(r) => {r.wait()}
     }
 }
 

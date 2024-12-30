@@ -84,15 +84,13 @@ pub enum RenderOp {
 
 pub struct RenderNode {
     pub element_id: u32,
-    pub bounds: Rect,
     pub origin_bounds: Rect,
     pub transformed_bounds: Rect,
     pub total_matrix: Matrix,
     pub invalid_rects_idx: usize,
     pub children_invalid_rects_idx: usize,
     pub need_snapshot: bool,
-    pub parent_translate: Option<(f32, f32)>,
-    pub parent_clip_path: Option<Path>,
+    pub absolute_clip_path: Option<Path>,
     pub border_box_path: Path,
     pub border_width: (f32, f32, f32, f32),
     pub border_paths: [Path; 4],
@@ -100,7 +98,7 @@ pub struct RenderNode {
     pub render_fn: Option<RenderFn>,
     pub background_image: Option<Image>,
     pub background_color: Color,
-    pub children_viewport: Rect,
+    pub children_viewport: Option<Rect>,
     // relative bounds
     pub reuse_bounds: Option<(f32, f32, Rect)>
 }
@@ -112,7 +110,9 @@ impl RenderNode {
         } else if !self.background_color.is_transparent() {
             let mut paint = Paint::default();
             let (bd_top, bd_right, bd_bottom, bd_left) = self.border_width;
-            let rect = Rect::new(bd_left, bd_top, self.bounds.width() - bd_right, self.bounds.height() - bd_bottom);
+            let width = self.origin_bounds.width();
+            let height = self.origin_bounds.height();
+            let rect = Rect::new(bd_left, bd_top, width - bd_right, height - bd_bottom);
 
             paint.set_color(self.background_color);
             paint.set_style(SkPaint_Style::Fill);
