@@ -32,7 +32,7 @@ impl RenderBackend for SoftSurface {
         &self.surface.window()
     }
 
-    fn render(&mut self, draw: Box<dyn FnOnce(&Canvas) + Send>) {
+    fn render(&mut self, draw: Box<dyn FnOnce(&Canvas) + Send>, callback: Box<dyn FnOnce(bool) + Send + 'static>) {
         {
             let mut buffer = self.surface.buffer_mut().expect("Failed to get the softbuffer buffer");
             let buf_ptr = buffer.as_mut_ptr() as *mut u8;
@@ -51,6 +51,7 @@ impl RenderBackend for SoftSurface {
             let _ = renderer.canvas().read_pixels(&img_info, buf_ptr, width as usize * 4, (0, 0));
         }
         self.surface.buffer_mut().unwrap().present().expect("Failed to present the softbuffer buffer");
+        callback(true);
     }
 
     fn resize(&mut self, width: u32, height: u32) {

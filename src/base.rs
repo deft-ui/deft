@@ -6,7 +6,7 @@ use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
 use std::rc::Rc;
 use std::str::FromStr;
-use std::sync::Mutex;
+use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::thread::LocalKey;
 use anyhow::Error;
 use quick_js::{JsValue, ValueError};
@@ -55,6 +55,47 @@ impl<T> Id<T> {
             id,
             _phantom: PhantomData,
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct ResultWaiter<T> {
+    lock: Arc<(Mutex<Option<T>>, Condvar)>,
+}
+
+impl<T> ResultWaiter<T> {
+    pub fn new() -> Self {
+        Self {
+            lock: Arc::new((Mutex::new(None), Condvar::new())),
+        }
+    }
+
+    pub fn new_finished(value: T) -> Self {
+        let waiter = Self::new();
+        waiter.finish(value);
+        waiter
+    }
+    pub fn finish(&self, value: T) {
+        let (lock, cvar) = &*self.lock;
+        let mut done = lock.lock().unwrap();
+        *done = Some(value);
+        cvar.notify_all();
+    }
+
+    pub fn wait_result<R, F: FnOnce(&T) -> R>(&self, callback: F) -> R {
+        let (lock, cvar) = &*self.lock;
+        let mut done = lock.lock().unwrap();
+        while done.is_none() {
+            done = cvar.wait(done).unwrap();
+        }
+        if let Some(value) = &*done {
+            return callback(value);
+        }
+        unreachable!()
+    }
+
+    pub fn wait_finish(&self) {
+        self.wait_result(|_| {});
     }
 }
 

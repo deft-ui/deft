@@ -152,8 +152,8 @@ impl GlRenderer {
         }
     }
 
-    pub fn draw<F: FnOnce(&Canvas) + Send + 'static>(&mut self, drawer: F) {
-        self.render_context_wrapper.render(Box::new(drawer));
+    pub fn draw<F: FnOnce(&Canvas) + Send + 'static>(&mut self, drawer: F, callback: Box<dyn FnOnce(bool) + Send + 'static>) {
+        self.render_context_wrapper.render(Box::new(drawer), Box::new(callback));
         self.sender.send(RenderMsg::Updated).unwrap();
     }
 
@@ -186,10 +186,15 @@ impl GlRenderer {
     }
 }
 
+struct RenderTask {
+    pub task: Box<dyn FnOnce(&Canvas) + Send + 'static>,
+    pub callback: Box<dyn FnOnce(bool) + Send + 'static>,
+}
+
 #[derive(Clone)]
 pub struct RenderContextWrapper {
     context: Arc<Mutex<RenderContext>>,
-    drawer: Arc<Mutex<Option<Box<dyn FnOnce(&Canvas) + Send + 'static>>>>,
+    drawer: Arc<Mutex<Option<RenderTask>>>,
     surface_params: SurfaceParams,
 }
 
@@ -220,10 +225,13 @@ impl RenderContextWrapper {
         );
     }
 
-    pub fn render(&self,  drawer: Box<dyn FnOnce(&Canvas) + Send + 'static>) {
+    pub fn render(&self,  drawer: Box<dyn FnOnce(&Canvas) + Send + 'static>, callback: Box<dyn FnOnce(bool) + Send + 'static>) {
         // print_time!("replace drawer");
         let mut drawer_mg = self.drawer.lock().unwrap();
-        drawer_mg.replace(drawer);
+        if let Some(task) = drawer_mg.take() {
+            (task.callback)(false);
+        }
+        drawer_mg.replace(RenderTask { task: drawer, callback });
     }
 
     fn update(&self) {
@@ -235,18 +243,19 @@ impl RenderContextWrapper {
 
         // let mut context = context.borrow_mut();
         let canvas = context.surface.canvas();
-        {
+        let callback = {
             // print_time!("draw time");
             let drawer = {
                 let mut drawer_arc = self.drawer.lock().unwrap();
                 drawer_arc.take()
             };
             if let Some(mut drawer) = drawer {
-                drawer(canvas);
+                (drawer.task)(canvas);
+                drawer.callback
             } else {
                 return;
             }
-        }
+        };
 
         {
             // measure_time::print_time!("submit time");
@@ -259,6 +268,7 @@ impl RenderContextWrapper {
                 log::error!("Failed to swap buffers after render: {}", err);
             }
         }
+        callback(true);
     }
 }
 

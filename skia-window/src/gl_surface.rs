@@ -158,8 +158,8 @@ impl RenderBackend for SurfaceState {
         &self.window
     }
 
-    fn render(&mut self, renderer: Box<dyn FnOnce(&Canvas) + Send>) {
-        self.render.draw(renderer);
+    fn render(&mut self, renderer: Box<dyn FnOnce(&Canvas) + Send>, callback: Box<dyn FnOnce(bool) + Send + 'static>) {
+        self.render.draw(renderer, callback);
     }
 
     fn resize(&mut self, width: u32, height: u32) {

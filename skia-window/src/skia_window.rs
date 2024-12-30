@@ -64,8 +64,13 @@ impl SkiaWindow {
         &self.surface_state.window()
     }
 
+    pub fn render_with_result<F: FnOnce(&Canvas) + Send + 'static, C: FnOnce(bool) + Send + 'static>(&mut self, renderer: F, callback: C) {
+        // self.surface_state.render.draw(renderer);
+        self.surface_state.render(Box::new(renderer), Box::new(callback));
+    }
+
     pub fn render<F: FnOnce(&Canvas) + Send + 'static>(&mut self, renderer: F) {
         // self.surface_state.render.draw(renderer);
-        self.surface_state.render(Box::new(renderer))
+        self.render_with_result(renderer, |_| ());
     }
 }

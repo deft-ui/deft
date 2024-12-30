@@ -1,7 +1,7 @@
 use crate as lento;
 use crate::app::{exit_app, AppEvent, AppEventPayload};
 use crate::base::MouseEventType::{MouseClick, MouseUp};
-use crate::base::{ElementEvent, Event, EventContext, EventHandler, EventListener, EventRegistration, MouseDetail, MouseEventType, Touch, TouchDetail, UnsafeFnOnce};
+use crate::base::{ElementEvent, Event, EventContext, EventHandler, EventListener, EventRegistration, MouseDetail, MouseEventType, ResultWaiter, Touch, TouchDetail, UnsafeFnOnce};
 use crate::canvas_util::CanvasHelper;
 use crate::cursor::search_cursor;
 use crate::element::{Element, ElementWeak, PaintInfo};
@@ -274,11 +274,11 @@ impl Frame {
         self.invalid(InvalidMode::Full);
     }
 
-    pub fn mark_dirty_and_update_immediate(&mut self, layout_dirty: bool) {
+    pub fn mark_dirty_and_update_immediate(&mut self, layout_dirty: bool) -> ResultWaiter<bool> {
         if let Some(body) = &mut self.body {
             body.mark_dirty(true);
         }
-        self.update();
+        self.update()
     }
 
     pub fn get_id(&self) -> i32 {
@@ -732,10 +732,10 @@ impl Frame {
         }
     }
 
-    pub fn update(&mut self) {
+    pub fn update(&mut self) -> ResultWaiter<bool> {
         if self.invalid_area == InvalidArea::None {
             // skip duplicate update
-            return;
+            return ResultWaiter::new_finished(false);
         }
         print_time!("frame update time");
         let auto_size = !self.attributes.resizable;
@@ -768,9 +768,10 @@ impl Frame {
             }
             // print_time!("collect element time");
         }
-        self.paint();
+        let r = self.paint();
         self.layout_dirty = false;
         self.invalid_area = InvalidArea::None;
+        r
     }
 
     #[js_func]
@@ -836,16 +837,21 @@ impl Frame {
         ctx
     }
 
-    fn paint(&mut self) {
+    fn paint(&mut self) -> ResultWaiter<bool> {
         let size = self.window.inner_size();
         let (width, height) = (size.width, size.height);
         print_time!("paint time: {} {}", width, height);
+        let waiter = ResultWaiter::new();
         if width <= 0 || height <= 0 {
-            return;
+            waiter.finish(false);
+            return waiter;
         }
         let mut body = match self.body.clone() {
             Some(b) => b,
-            None => return,
+            None => {
+                waiter.finish(false);
+                return waiter;
+            },
         };
         let start = SystemTime::now();
         let scale_factor = self.window.scale_factor() as f32;
@@ -862,7 +868,8 @@ impl Frame {
         } else {
             RenderTree::new()
         };
-        self.window.render(move |canvas| {
+        let waiter_finisher = waiter.clone();
+        self.window.render_with_result(move |canvas| {
             //print_time!("render time");
             canvas.save();
             if scale_factor != 1.0 {
@@ -878,7 +885,10 @@ impl Frame {
             draw_elements(canvas, &mut render_tree, &mut painter, scale_factor, old_snapshots, snapshots);
 
             canvas.restore();
+        }, move|r| {
+            waiter_finisher.finish(r);
         });
+        waiter
     }
 
     #[inline]
@@ -1272,7 +1282,7 @@ pub fn frame_ime_resize(frame_id: i32, height: f32) {
     FRAMES.with_borrow_mut(|m| {
         if let Some(f) = m.get_mut(&frame_id) {
             f.ime_height = height;
-            f.mark_dirty_and_update_immediate(true);
+            f.mark_dirty_and_update_immediate(true).wait_finish();
         }
     });
 }

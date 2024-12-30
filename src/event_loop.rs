@@ -15,6 +15,7 @@ pub struct AppEventProxy {
     proxy: EventLoopProxy<AppEventPayload>,
 }
 
+//TODO use ResultWaiter?
 pub struct AppEventResult {
     lock: Arc<(Mutex<bool>, Condvar)>,
 }
