@@ -17,6 +17,7 @@ use crate::cache::CacheValue;
 use crate::animation::ANIMATIONS;
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
+use crate::paint::MatrixCalculator;
 
 macro_rules! define_props {
     ($($str: expr => $key: ident, )*; $($union_str: expr => $union_key: ident, )*) => {
@@ -316,6 +317,7 @@ impl StyleTransformOp {
             //"matrix" => parse_matrix(param_str).ok(),
             "translate" => parse_translate_op(param_str),
             "rotate" => parse_rotate_op(param_str),
+            "scale" => parse_scale_op(param_str),
             _ => None,
         }
     }
@@ -333,24 +335,22 @@ impl StyleTransform {
         }
     }
 
-    pub fn to_matrix(&self, width: f32, height: f32) -> Matrix {
-        let mut matrix = Matrix::new_identity();
+    pub fn apply(&self, width: f32, height: f32, mc: &mut MatrixCalculator) {
         for op in &self.op_list {
             match op {
                 StyleTransformOp::Rotate(deg) => {
-                    matrix.post_rotate(*deg, None);
+                    mc.rotate(*deg, None);
                 }
-                StyleTransformOp::Scale(_, _) => {
-                    //TODO impl
+                StyleTransformOp::Scale(x, y) => {
+                    mc.scale((*x, *y));
                 }
                 StyleTransformOp::Translate(x, y) => {
                     let x = x.to_absolute(width);
                     let y = y.to_absolute(height);
-                    matrix.post_translate((x, y));
+                    mc.translate((x, y));
                 }
             }
         }
-        matrix
     }
 
 }
@@ -1557,6 +1557,16 @@ fn parse_rotate_op(value: &str) -> Option<StyleTransformOp> {
     } else {
         None
     }
+}
+
+fn parse_scale_op(value: &str) -> Option<StyleTransformOp> {
+    let mut values = value.split(",").collect::<Vec<&str>>();
+    if values.len() < 2 {
+        values.push(values[0].clone());
+    }
+    let x = f32::from_str(values[0].trim()).ok()?;
+    let y = f32::from_str(values[1].trim()).ok()?;
+    Some(StyleTransformOp::Scale(x, y))
 }
 
 fn parse_translate_op(value: &str) -> Option<StyleTransformOp> {

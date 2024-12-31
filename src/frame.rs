@@ -18,7 +18,7 @@ use lento_macros::{event, frame_event, js_func, js_methods, mrc_object};
 use measure_time::print_time;
 use quick_js::{JsValue, ResourceValue};
 use skia_bindings::{SkCanvas_SrcRectConstraint, SkClipOp, SkPathOp, SkRect};
-use skia_safe::{Canvas, Color, ColorType, IRect, Image, ImageInfo, Matrix, Paint, Path, Rect};
+use skia_safe::{Canvas, Color, ColorType, IRect, Image, ImageInfo, Matrix, Paint, Path, Point, Rect};
 use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
@@ -31,6 +31,8 @@ use std::string::ToString;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 use skia_bindings::SkPaint_Style::{Fill, Stroke};
+use skia_safe::canvas::SetMatrix;
+use skia_safe::wrapper::NativeTransmutableWrapper;
 use winit::dpi::Position::Logical;
 use winit::dpi::{LogicalPosition, LogicalSize, Position, Size};
 use winit::error::ExternalError;
@@ -42,7 +44,7 @@ use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorGrabMode, CursorIcon, Window, WindowAttributes, WindowId};
 use crate::{bind_js_event_listener, is_snapshot_usable};
 use crate::frame_rate::{get_total_frames, next_frame, FRAME_RATE_CONTROLLER};
-use crate::paint::{InvalidArea, PartialInvalidArea, Painter, RenderNode, RenderTree, SkiaPainter, UniqueRect, InvalidRects, RenderOp, Snapshot, SnapshotManager};
+use crate::paint::{InvalidArea, PartialInvalidArea, Painter, RenderNode, RenderTree, SkiaPainter, UniqueRect, InvalidRects, RenderOp, Snapshot, SnapshotManager, MatrixCalculator, ClipPath};
 use crate::style::ColorHelper;
 
 #[derive(Clone)]
@@ -103,6 +105,7 @@ pub struct Frame {
     init_height: Option<f32>,
     ime_height: f32,
     background_color: Color,
+    pub render_tree: Arc<Mutex<RenderTree>>,
 }
 
 pub type FrameEventHandler = EventHandler<FrameWeak>;
@@ -215,6 +218,7 @@ impl Frame {
             background_color: Color::from_rgb(0, 0, 0),
             repaint_timer_handle: None,
             snapshots: SnapshotManager::new(),
+            render_tree: Arc::new(Mutex::new(RenderTree::new())),
         };
         let mut handle = Frame {
             inner: Mrc::new(state),
@@ -508,6 +512,7 @@ impl Frame {
         let screen_y = self.cursor_root_position.y as f32;
         let mut target_node = self.get_node_by_point();
         let dragging = self.dragging;
+        let render_tree = self.render_tree.clone();
         if let Some((pressing, down_info)) = &mut self.pressing.clone() {
             if dragging {
                 if let Some(target) = &mut target_node {
@@ -527,7 +532,7 @@ impl Frame {
                     self.dragging = true;
                 } else {
                     self.update_cursor(pressing);
-                    emit_mouse_event(pressing, MouseEventType::MouseMove, 0, frame_x, frame_y, screen_x, screen_y);
+                    emit_mouse_event(&render_tree, pressing, MouseEventType::MouseMove, 0, frame_x, frame_y, screen_x, screen_y);
                 }
             }
             //TODO should emit mouseenter|mouseleave?
@@ -535,10 +540,10 @@ impl Frame {
             self.update_cursor(&node);
             if let Some(hover) = &mut self.hover {
                 if hover != &node {
-                    emit_mouse_event(hover, MouseEventType::MouseLeave, 0, frame_x, frame_y, screen_x, screen_y);
+                    emit_mouse_event(&render_tree, hover, MouseEventType::MouseLeave, 0, frame_x, frame_y, screen_x, screen_y);
                     self.mouse_enter_node(node.clone(), frame_x, frame_y, screen_x, screen_y);
                 } else {
-                    emit_mouse_event(&mut node, MouseEventType::MouseMove, 0, frame_x, frame_y, screen_x, screen_y);
+                    emit_mouse_event(&render_tree, &mut node, MouseEventType::MouseMove, 0, frame_x, frame_y, screen_x, screen_y);
                 }
             } else {
                 self.mouse_enter_node(node.clone(), frame_x, frame_y, screen_x, screen_y);
@@ -553,7 +558,8 @@ impl Frame {
     }
 
     fn mouse_enter_node(&mut self, mut node: Element, offset_x: f32, offset_y: f32, screen_x: f32, screen_y: f32) {
-        emit_mouse_event(&mut node, MouseEventType::MouseEnter, 0, offset_x, offset_y, screen_x, screen_y);
+        let render_tree = self.render_tree.clone();
+        emit_mouse_event(&render_tree, &mut node, MouseEventType::MouseEnter, 0, offset_x, offset_y, screen_x, screen_y);
         self.hover = Some(node);
     }
 
@@ -570,6 +576,7 @@ impl Frame {
         let frame_y = self.cursor_position.y as f32;
         let screen_x = self.cursor_root_position.x as f32;
         let screen_y = self.cursor_root_position.y as f32;
+        let render_tree = self.render_tree.clone();
         //TODO impl
 
         if let Some(mut node) = self.get_node_by_point() {
@@ -589,11 +596,11 @@ impl Frame {
                 ElementState::Pressed => {
                     self.focus(node.clone());
                     self.pressing = Some((node.clone(), MouseDownInfo {button, frame_x, frame_y}));
-                    emit_mouse_event(&mut node, event_type, button, frame_x, frame_y, screen_x, screen_y);
+                    emit_mouse_event(&render_tree, &mut node, event_type, button, frame_x, frame_y, screen_x, screen_y);
                 }
                 ElementState::Released => {
                     if let Some(mut pressing) = self.pressing.clone() {
-                        emit_mouse_event(&mut pressing.0, MouseUp, button, frame_x, frame_y, screen_x, screen_y);
+                        emit_mouse_event(&render_tree, &mut pressing.0, MouseUp, button, frame_x, frame_y, screen_x, screen_y);
                         if pressing.0 == node && pressing.1.button == button {
                             let ty = match mouse_button {
                                 MouseButton::Left => Some(MouseEventType::MouseClick),
@@ -601,25 +608,25 @@ impl Frame {
                                 _ => None
                             };
                             if let Some(ty) = ty {
-                                emit_mouse_event(&mut node, ty, button, frame_x, frame_y, screen_x, screen_y);
+                                emit_mouse_event(&render_tree, &mut node, ty, button, frame_x, frame_y, screen_x, screen_y);
                             }
                         }
                         self.release_press();
                     } else {
-                        emit_mouse_event(&mut node, MouseUp, button, frame_x, frame_y, screen_x, screen_y);
+                        emit_mouse_event(&render_tree, &mut node, MouseUp, button, frame_x, frame_y, screen_x, screen_y);
                     }
                 }
             }
         }
         if state == ElementState::Released {
             if let Some(pressing) = &mut self.pressing {
-                emit_mouse_event(&mut pressing.0, MouseUp, pressing.1.button, frame_x, frame_y, screen_x, screen_y);
+                emit_mouse_event(&render_tree, &mut pressing.0, MouseUp, pressing.1.button, frame_x, frame_y, screen_x, screen_y);
                 self.release_press();
             }
         }
     }
 
-    pub fn emit_touch_event(&mut self, identifier: u64, phase: TouchPhase, frame_x: f32, frame_y: f32) {
+    pub fn emit_touch_event(&mut self, identifier: u64, phase: TouchPhase, frame_x: f32, frame_y: f32) -> Option<()> {
         if let Some(mut node) = self.get_node_by_pos(frame_x, frame_y) {
             let _e_type = match phase {
                 TouchPhase::Started => "touchstart",
@@ -630,8 +637,15 @@ impl Frame {
             let node_bounds = node.get_origin_bounds();
             let (border_top, _, _, border_left) = node.get_border_width();
 
-            let offset_x = frame_x - node_bounds.x - border_left;
-            let offset_y = frame_y - node_bounds.y - border_top;
+            let Point {x: relative_x, y: relative_y} = {
+                let render_tree = self.render_tree.clone();
+                let render_tree = render_tree.lock().unwrap();
+                let render_node = render_tree.get_by_element_id(node.get_id())?;
+                let inverted_matrix = render_node.total_matrix.invert()?;
+                inverted_matrix.map_xy(frame_x, frame_y)
+            };
+            let offset_x = relative_x - border_left;
+            let offset_y = relative_y - border_top;
             match phase {
                 TouchPhase::Started => {
                     let touch_info = Touch {
@@ -694,8 +708,9 @@ impl Frame {
                         let mut node = node.clone();
                         self.focus(node.clone());
                         println!("clicked");
+                        let render_tree = self.render_tree.clone();
                         //TODO fix screen_x, screen_y
-                        emit_mouse_event(&mut node, MouseClick, 0, frame_x, frame_y, 0.0, 0.0);
+                        emit_mouse_event(&render_tree, &mut node, MouseClick, 0, frame_x, frame_y, 0.0, 0.0);
                     }
                 }
                 TouchPhase::Cancelled => {
@@ -703,6 +718,7 @@ impl Frame {
                 }
             }
         }
+        None
     }
 
     pub fn focus(&mut self, mut node: Element) {
@@ -866,8 +882,10 @@ impl Frame {
             // print_time!("build render nodes time");
             build_render_nodes(body, invalid_area, scale_factor, viewport.clone())
         } else {
-            RenderTree::new()
+            return ResultWaiter::new_finished(false);
         };
+        let render_tree = Arc::new(Mutex::new(render_tree));
+        self.render_tree = render_tree.clone();
         let waiter_finisher = waiter.clone();
         self.window.render_with_result(move |canvas| {
             //print_time!("render time");
@@ -876,6 +894,7 @@ impl Frame {
                 canvas.scale((scale_factor, scale_factor));
             }
             let mut painter = SkiaPainter::new(canvas);
+            let mut render_tree = render_tree.lock().unwrap();
             if !background_color.is_transparent() {
                 canvas.save();
                 painter.set_invalid_rects(render_tree.invalid_rects_list[0].build(viewport));
@@ -897,42 +916,33 @@ impl Frame {
     }
 
     fn get_node_by_point(&self) -> Option<Element> {
-        let mut body = match self.body.clone() {
-            None => return None,
-            Some(body) => body
-        };
         let x = self.cursor_position.x as f32;
         let y = self.cursor_position.y as f32;
-        self.get_node_by_point_inner(&mut body, (x, y))
+        self.get_node_by_pos(x, y)
+    }
+
+    fn get_element_by_id(&self, element: &Element, id: u32) -> Option<Element> {
+        if element.get_id() == id {
+            return Some(element.clone());
+        }
+        for child in element.get_children() {
+            if let Some(element) = self.get_element_by_id(&child, id) {
+                return Some(element)
+            }
+        }
+        None
     }
 
     fn get_node_by_pos(&self, x: f32, y: f32) -> Option<Element> {
-        let mut body = match self.body.clone() {
-            None => return None,
-            Some(body) => body
-        };
-        self.get_node_by_point_inner(&mut body, (x, y))
-    }
-
-    fn get_node_by_point_inner(&self, node: &mut Element, point: (f32, f32)) -> Option<Element> {
-        //TODO use clip path?
-        let bounds = node.get_bounds();
-        let mut result = None;
-        if bounds.contains_point(point.0, point.1){
-            let content_bounds = node.get_content_bounds().translate(bounds.x, bounds.y);
-            if content_bounds.contains_point(point.0, point.1) {
-                let p = (point.0 + node.get_scroll_left() - bounds.x, point.1 + node.get_scroll_top() - bounds.y);
-                for child in node.get_children() {
-                    if let Some(n) = self.get_node_by_point_inner(&mut child.clone(), p) {
-                        result = Some(n.clone());
-                    }
-                }
-            }
-            if result.is_none() {
-                result = Some(node.clone());
+        let mut render_tree = self.render_tree.clone();
+        let render_tree = render_tree.lock().unwrap();
+        let body = self.body.clone()?;
+        for n in render_tree.nodes.iter().rev() {
+            if n.absolute_transformed_visible_path.contains((x, y)) {
+                return self.get_element_by_id(&body, n.element_id);
             }
         }
-        result
+        None
     }
 
     fn create_window(attributes: WindowAttributes) -> SkiaWindow {
@@ -998,6 +1008,8 @@ fn draw_elements(canvas: &Canvas,
                             dst_rect.width() * scale,
                             dst_rect.height() * scale,
                         );
+                        unimplemented!();
+                        /*
                         let ob = node.origin_bounds;
                         let vp_path = node.children_viewport.as_ref().map(|r| Path::rect(r, None));
                         canvas.session(|c| {
@@ -1012,6 +1024,7 @@ fn draw_elements(canvas: &Canvas,
                             c.scale((1.0 / scale, 1.0 / scale));
                             c.draw_image_rect(img, Some((&src_rect, SkCanvas_SrcRectConstraint::Fast)), &dst_rect, &Paint::default());
                         });
+                         */
                     }
                 }
                 // node.snapshot = None;
@@ -1019,6 +1032,8 @@ fn draw_elements(canvas: &Canvas,
             RenderOp::Finish(idx) => {
                 let node = &mut tree.nodes[*idx];
                 if is_snapshot_usable() && node.need_snapshot {
+                    unimplemented!()
+                    /*
                     unsafe {
                         if let Some(mut surface) = canvas.surface() {
                             //TODO result will be wrong if has transform
@@ -1036,6 +1051,7 @@ fn draw_elements(canvas: &Canvas,
                                 bottom: bounds.bottom() as i32,
                             };
 
+                            // wrong result when transform applied
                             if let Some(img) = surface.image_snapshot_with_bounds(&i_bounds) {
                                 new_snapshots.insert(node.element_id, Snapshot::new(node.origin_bounds, img));
                             }
@@ -1045,6 +1061,7 @@ fn draw_elements(canvas: &Canvas,
 
                         }
                     }
+                    */
                 }
             }
         }
@@ -1053,23 +1070,15 @@ fn draw_elements(canvas: &Canvas,
 }
 
 fn draw_element(canvas: &Canvas, node: &mut RenderNode, painter: &mut dyn Painter) {
-    let origin_bounds = node.origin_bounds;
-    if let Some(cp) = &node.absolute_clip_path {
-        canvas.clip_path(cp, SkClipOp::Intersect, false);
-    }
-    canvas.translate((node.origin_bounds.left, node.origin_bounds.top));
-    let width = origin_bounds.width();
-    let height = origin_bounds.height();
+    let width = node.width;
+    let height = node.height;
+    canvas.concat(&node.total_matrix);
+    node.clip_path.apply(canvas);
 
     canvas.session(move |canvas| {
-
-        // translate to element left-top
-        let matrix = node.total_matrix;
-        canvas.concat(&matrix);
-
         // set clip path
         let clip_path = &node.border_box_path;
-        canvas.clip_path(&clip_path, SkClipOp::Intersect, true);
+        canvas.clip_path(&clip_path, SkClipOp::Intersect, false);
 
         // draw background and border
         node.draw_background(&canvas);
@@ -1102,42 +1111,51 @@ fn build_render_nodes(root: &mut Element, mut invalid_area: InvalidArea, scale: 
     };
     root.need_snapshot = true;
     root.invalid_unique_rect = Some(viewport_rect);
-    collect_render_nodes(root, &mut render_tree, 0, scale, None);
+    let mut mc = MatrixCalculator::new();
+    let bounds = root.get_bounds().to_skia_rect();
+    collect_render_nodes(root, &mut render_tree, 0, scale, None, &mut mc, bounds);
     render_tree
 }
 
-fn collect_render_nodes(root: &mut Element, result: &mut RenderTree, mut invalid_rects_idx: usize, scale: f32, parent_node_idx: Option<usize>) {
-    let mut absolute_clip_path = None;
-    if let Some(p) = parent_node_idx {
-        let parent = &result.nodes[p];
-        absolute_clip_path = parent.absolute_clip_path.clone();
-        if let Some(pp) = &parent.children_viewport {
-            let pp = pp.with_offset((parent.origin_bounds.left, parent.origin_bounds.top));
-            let mut vp_path = Path::rect(&pp, None);
-            if let Some(acp) = &absolute_clip_path {
-                absolute_clip_path = Some(vp_path.op(acp, SkPathOp::Intersect).unwrap_or_default());
-            } else {
-                absolute_clip_path = Some(vp_path);
-            }
-        }
-    }
-
+fn collect_render_nodes(
+    root: &mut Element,
+    result: &mut RenderTree,
+    mut invalid_rects_idx: usize,
+    scale: f32,
+    parent_node_idx: Option<usize>,
+    matrix_calculator: &mut MatrixCalculator,
+    bounds: Rect,
+) {
     let invalid_rects = result.invalid_rects_list[invalid_rects_idx].build(result.viewport);
-    let final_bounds =root.get_transformed_bounds();
-    if !invalid_rects.has_intersects(&final_bounds) {
+    let origin_bounds = root.get_origin_bounds().to_skia_rect();
+    let border_box_path =  root.get_border_box_path();
+
+    root.apply_transform(matrix_calculator);
+    //TODO support overflow:visible
+    matrix_calculator.intersect_clip_path(&ClipPath::from_path(&border_box_path));
+
+    let total_matrix = matrix_calculator.get_total_matrix();
+    let clip_path = matrix_calculator.get_clip_path().clone();
+
+    let absolute_transformed_visible_path = clip_path.clip(&border_box_path).with_transform(&total_matrix);
+
+    let (transformed_bounds, _) = total_matrix.map_rect(Rect::from_xywh(0.0, 0.0, bounds.width(), bounds.height()));
+    if !invalid_rects.has_intersects(&transformed_bounds) {
         return;
     }
 
     let mut node = RenderNode {
         element_id: root.get_id(),
         invalid_rects_idx,
+        absolute_transformed_visible_path,
         children_invalid_rects_idx: invalid_rects_idx,
-        transformed_bounds: root.get_transformed_bounds(),
-        origin_bounds: root.get_origin_bounds().to_skia_rect(),
-        total_matrix: root.get_total_matrix(),
-        absolute_clip_path,
+        absolute_transformed_bounds: transformed_bounds,
+        width: origin_bounds.width(),
+        height: origin_bounds.height(),
+        total_matrix,
+        clip_path,
         border_width: root.get_border_width(),
-        border_box_path: root.get_border_box_path(),
+        border_box_path,
         render_fn: Some(root.get_backend_mut().render()),
         background_image: root.style.background_image.clone(),
         background_color: root.style.computed_style.background_color,
@@ -1213,7 +1231,11 @@ fn collect_render_nodes(root: &mut Element, result: &mut RenderTree, mut invalid
 
     let children = root.get_children();
     for mut child in children {
-        collect_render_nodes(&mut child, result, invalid_rects_idx, scale, Some(node_idx));
+        let child_bounds = child.get_bounds().translate(-root.scroll_left, -root.scroll_top);
+        matrix_calculator.save();
+        matrix_calculator.translate((child_bounds.x, child_bounds.y));
+        collect_render_nodes(&mut child, result, invalid_rects_idx, scale, Some(node_idx), matrix_calculator, child_bounds.to_skia_rect());
+        matrix_calculator.restore();
     }
     result.ops.push(RenderOp::Finish(node_idx));
 }
@@ -1242,12 +1264,21 @@ fn print_tree(node: &Element, padding: &str) {
     }
 }
 
-fn emit_mouse_event(node: &mut Element, event_type_enum: MouseEventType, button: i32, frame_x: f32, frame_y: f32, screen_x: f32, screen_y: f32) {
-    let node_bounds = node.get_origin_bounds();
+fn emit_mouse_event(render_tree: &Arc<Mutex<RenderTree>>, node: &mut Element, event_type_enum: MouseEventType, button: i32, frame_x: f32, frame_y: f32, screen_x: f32, screen_y: f32) {
+    let render_tree = render_tree.clone();
+    let mut render_tree = render_tree.lock().unwrap();
+    let render_node = match render_tree.get_by_element_id(node.get_id()) {
+        Some(node) => node,
+        None => return,
+    };
     let (border_top, _, _, border_left) = node.get_border_width();
 
-    let off_x = frame_x - node_bounds.x - border_left;
-    let off_y = frame_y - node_bounds.y - border_top;
+    //TODO maybe not inverted?
+    let inverted_matrix = render_node.total_matrix.invert().unwrap();
+
+    let Point { x: relative_x, y: relative_y } = inverted_matrix.map_xy(frame_x, frame_y);
+    let off_x = relative_x - border_left;
+    let off_y = relative_y - border_top;
 
     let detail = MouseDetail {
         event_type: event_type_enum,

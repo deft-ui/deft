@@ -51,7 +51,7 @@ pub mod paragraph;
 use crate as lento;
 use crate::js::JsError;
 use crate::layout::LayoutRoot;
-use crate::paint::{Painter, UniqueRect};
+use crate::paint::{MatrixCalculator, Painter, UniqueRect};
 use crate::render::RenderFn;
 
 thread_local! {
@@ -404,18 +404,13 @@ impl Element {
         base::Rect::from_layout(&ml)
     }
 
-    pub fn get_total_matrix(&self) -> Matrix {
-        let mut matrix = match self.get_parent() {
-            Some(p) => p.get_total_matrix(),
-            None => Matrix::default(),
-        };
+    pub fn apply_transform(&self, mc: &mut MatrixCalculator) {
         if let Some(tf) = &self.style.transform {
             let bounds = self.get_bounds();
-            matrix.pre_translate((bounds.width / 2.0, bounds.height / 2.0));
-            matrix.pre_concat(&tf.to_matrix(bounds.width, bounds.height));
-            matrix.pre_translate((-bounds.width / 2.0, -bounds.height / 2.0));
+            mc.translate((bounds.width / 2.0, bounds.height / 2.0));
+            tf.apply(bounds.width, bounds.height, mc);
+            mc.translate((-bounds.width / 2.0, -bounds.height / 2.0));
         }
-        matrix
     }
 
     pub fn get_relative_bounds(&self, target: &Self) -> base::Rect {
@@ -467,16 +462,6 @@ impl Element {
         } else {
             b
         }
-    }
-
-    pub fn get_transformed_bounds(&self) -> Rect {
-        let bounds = self.get_origin_bounds();
-        let x = bounds.x;// + bounds.width / 2.0;
-        let y = bounds.y;// + bounds.height / 2.0;
-        let bounds = bounds.translate(-x, -y);
-        let matrix = self.get_total_matrix();
-        let (r, _) = matrix.map_rect(&bounds.to_skia_rect());
-        r.with_offset((x, y))
     }
 
     pub fn add_child_view(&mut self, mut child: Element, position: Option<u32>) {

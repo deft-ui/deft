@@ -1,9 +1,10 @@
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use measure_time::print_time;
 use skia_bindings::{SkClipOp, SkPaint_Style, SkPathOp};
-use skia_safe::{Color, IRect, Image, Matrix, Paint, Path, Rect};
+use skia_safe::{scalar, Color, IRect, Image, Matrix, Paint, Path, Point, Rect, Vector};
 use skia_safe::Canvas;
 use crate::base::{Id, IdKey};
 use crate::element::Element;
@@ -75,6 +76,16 @@ impl RenderTree {
             ops: vec![],
         }
     }
+
+    pub fn get_by_element_id(&self, element_id: u32) -> Option<&RenderNode> {
+        for n in self.nodes.iter().rev() {
+            if n.element_id == element_id {
+                return Some(n)
+            }
+        }
+        None
+    }
+
 }
 
 pub enum RenderOp {
@@ -84,13 +95,19 @@ pub enum RenderOp {
 
 pub struct RenderNode {
     pub element_id: u32,
-    pub origin_bounds: Rect,
-    pub transformed_bounds: Rect,
+    // Relative to viewport
+    pub absolute_transformed_bounds: Rect,
+    pub absolute_transformed_visible_path: Path,
+    // Relative to viewport
     pub total_matrix: Matrix,
     pub invalid_rects_idx: usize,
     pub children_invalid_rects_idx: usize,
     pub need_snapshot: bool,
-    pub absolute_clip_path: Option<Path>,
+    pub width: f32,
+    pub height: f32,
+
+
+    pub clip_path: ClipPath,
     pub border_box_path: Path,
     pub border_width: (f32, f32, f32, f32),
     pub border_paths: [Path; 4],
@@ -110,8 +127,8 @@ impl RenderNode {
         } else if !self.background_color.is_transparent() {
             let mut paint = Paint::default();
             let (bd_top, bd_right, bd_bottom, bd_left) = self.border_width;
-            let width = self.origin_bounds.width();
-            let height = self.origin_bounds.height();
+            let width = self.width;
+            let height = self.height;
             let rect = Rect::new(bd_left, bd_top, width - bd_right, height - bd_bottom);
 
             paint.set_color(self.background_color);
@@ -334,6 +351,144 @@ impl PartialInvalidArea {
     }
 }
 
+pub struct MatrixCalculator {
+    matrix: Matrix,
+    clip_path: ClipPath,
+    cpu_renderer: CpuRenderer,
+    saved_paths: Vec<ClipPath>,
+}
+
+impl MatrixCalculator {
+    pub fn new() -> MatrixCalculator {
+        let cpu_renderer = CpuRenderer::new(1, 1);
+        Self {
+            matrix: Matrix::default(),
+            cpu_renderer,
+            clip_path: ClipPath::unlimited(),
+            saved_paths: Vec::new(),
+        }
+    }
+    pub fn intersect_clip_path(&mut self, path: &ClipPath) {
+        self.clip_path.intersect(path);
+    }
+
+    pub fn translate(&mut self, vector: impl Into<Vector>) {
+        let vector = vector.into();
+        self.cpu_renderer.canvas().translate(vector);
+        self.clip_path.offset((-vector.x, -vector.y));
+    }
+    pub fn rotate(&mut self, degree: f32, p: Option<Point>) {
+        let p = p.into();
+        self.cpu_renderer.canvas().rotate(degree, p);
+        if let Some(p) = p {
+            self.clip_path.transform(&Matrix::rotate_deg_pivot(-degree, p));
+        } else {
+            self.clip_path.transform(&Matrix::rotate_deg(-degree));
+        }
+    }
+    pub fn scale(&mut self, (sx, sy): (scalar, scalar)) {
+        self.cpu_renderer.canvas().scale((sx, sy));
+        self.clip_path.transform(&Matrix::scale((1.0 / sx, 1.0 / sy)));
+    }
+    pub fn get_total_matrix(&mut self) -> Matrix {
+        self.cpu_renderer.canvas().total_matrix()
+    }
+    pub fn get_clip_path(&mut self) -> &ClipPath {
+        &self.clip_path
+    }
+    pub fn save(&mut self) {
+        self.cpu_renderer.canvas().save();
+        self.saved_paths.push(self.clip_path.clone());
+    }
+    pub fn restore(&mut self) {
+        self.cpu_renderer.canvas().restore();
+        self.clip_path = self.saved_paths.pop().unwrap();
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ClipPath {
+    unlimited: bool,
+    path: Path,
+}
+
+impl ClipPath {
+    pub fn unlimited() -> ClipPath {
+        Self {
+            unlimited: true,
+            path: Path::new(),
+        }
+    }
+    pub fn empty() -> ClipPath {
+        Self {
+            unlimited: false,
+            path: Path::new(),
+        }
+    }
+    pub fn from_wh(width: f32, height: f32) -> ClipPath {
+        Self::from_rect(&Rect::from_xywh(0.0, 0.0, width, height))
+    }
+    pub fn from_rect(rect: &Rect) -> ClipPath {
+        Self {
+            unlimited: false,
+            path: Path::rect(rect, None),
+        }
+    }
+
+    pub fn from_path(path: &Path) -> ClipPath {
+        Self {
+            unlimited: false,
+            path: path.clone(),
+        }
+    }
+
+    pub fn intersect(&mut self, other: &ClipPath) {
+        if other.unlimited {
+            return;
+        }
+        if self.unlimited {
+            *self = other.clone();
+            return;
+        }
+        self.path = self.path.op(&other.path, SkPathOp::Intersect).unwrap_or(Path::new());
+    }
+
+    pub fn offset(&mut self, d: impl Into<Vector>) {
+        if !self.unlimited {
+            self.path.offset(d);
+        }
+    }
+
+    pub fn transform(&mut self, matrix: &Matrix) {
+        if self.unlimited {
+            return;
+        }
+        self.path = self.path.with_transform(matrix);
+    }
+
+    pub fn with_offset(&self, d: impl Into<Vector>) -> ClipPath {
+        let mut cp = self.clone();
+        cp.offset(d);
+        cp
+    }
+
+    pub fn apply(&self, canvas: &Canvas) {
+        if !self.unlimited {
+            canvas.clip_path(&self.path, SkClipOp::Intersect, false);
+        }
+    }
+
+    pub fn clip(&self, path: &Path) -> Path {
+        if self.unlimited {
+            path.clone()
+        } else {
+            self.path.op(path, SkPathOp::Intersect).unwrap_or(Path::new())
+        }
+    }
+
+}
+
+
 #[test]
 pub fn test_visible() {
     let mut render = CpuRenderer::new(100, 100);
@@ -352,3 +507,30 @@ pub fn test_visible() {
     }
 }
 
+#[test]
+pub fn test_path() {
+    let empty_path = Path::new();
+    assert!(!empty_path.contains((0.0, 0.0)));
+
+    let rect = Rect::from_xywh(10.0, 70.0, 100.0, 100.0);
+    let mut path = Path::rect(rect, None);
+    assert!(!path.contains((0.0, 10.0)));
+    assert!(path.contains((30.0, 80.0)));
+}
+
+#[test]
+pub fn test_matrix() {
+    let mut matrix = Matrix::translate(Vector::new(100.0, 200.0));
+    matrix.post_scale((3.0, 3.0), None);
+    matrix.post_scale((2.0, -2.0), None);
+    let sx = 4.0;
+    let sy = 9.0;
+    let d = matrix.map_xy(sx, sy);
+    println!("s={},{}", sx, sy);
+    println!("d={},{}", d.x, d.y);
+
+    let invert_matrix = matrix.invert().unwrap();
+    let r = invert_matrix.map_xy(d.x, d.y);
+    println!("r={}, {}", r.x, r.y);
+
+}

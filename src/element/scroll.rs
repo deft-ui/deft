@@ -6,7 +6,7 @@ use lento_macros::{element_backend, js_methods};
 use measure_time::print_time;
 use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
-use skia_safe::{Canvas, Color, Paint, Path};
+use skia_safe::{Canvas, Color, Paint, Path, Point};
 use tokio::time::Instant;
 use yoga::Direction::LTR;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size, StyleUnit};
@@ -393,6 +393,15 @@ impl Scroll {
         self.content_layout_dirty = false;
     }
 
+    /// invert transform effect
+    fn map_frame_xy(&self, frame_x: f32, frame_y: f32) -> Option<(f32, f32)> {
+        let element_id = self.element.get_id();
+        let mut frame = self.element.get_frame()?.upgrade().ok()?;
+        let mut render_tree = frame.render_tree.lock().unwrap();
+        let rn = render_tree.get_by_element_id(element_id)?;
+        let p = rn.total_matrix.invert()?.map_xy(frame_x, frame_y);
+        Some((p.x, p.y))
+    }
 
 }
 
@@ -477,8 +486,12 @@ impl ElementBackend for Scroll {
         } else if let Some(e) = event.downcast_mut::<TouchStartEvent>() {
             let d = &e.0;
             let touch = unsafe { d.touches.get_unchecked(0) };
-            self.begin_scroll_x(-touch.frame_x);
-            self.begin_scroll_y(-touch.frame_y);
+            let (frame_x, frame_y) = match self.map_frame_xy(touch.frame_x, touch.frame_y) {
+                None => {return false}
+                Some(v) => {v}
+            };
+            self.begin_scroll_x(-frame_x);
+            self.begin_scroll_y(-frame_y);
             self.momentum_info = Some(MomentumInfo {
                 start_time: Instant::now(),
                 start_left: self.element.get_scroll_left(),
@@ -489,8 +502,12 @@ impl ElementBackend for Scroll {
         } else if let Some(e) = event.downcast_mut::<TouchMoveEvent>() {
             let d = &e.0;
             let touch = unsafe { d.touches.get_unchecked(0) };
-            self.update_scroll_x(-touch.frame_x, false);
-            self.update_scroll_y(-touch.frame_y, false);
+            let (frame_x, frame_y) = match self.map_frame_xy(touch.frame_x, touch.frame_y) {
+                None => {return false}
+                Some(v) => {v}
+            };
+            self.update_scroll_x(-frame_x, false);
+            self.update_scroll_y(-frame_y, false);
             let left = self.element.get_scroll_left();
             let top = self.element.get_scroll_top();
             if let Some(momentum_info) = &mut self.momentum_info {
