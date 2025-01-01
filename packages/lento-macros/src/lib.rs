@@ -41,19 +41,28 @@ pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
 
             pub fn as_weak(&self) -> #weak_name {
                 #weak_name {
-                    inner: self.inner.as_weak(),
+                    inner: Some(self.inner.as_weak()),
                 }
             }
         }
 
         #[derive(Clone)]
         pub struct #weak_name {
-            inner: lento::mrc::MrcWeak<#struct_name>,
+            inner: Option<lento::mrc::MrcWeak<#struct_name>>,
         }
 
         impl #weak_name {
+
+            pub fn invalid() -> Self {
+                Self {inner: None}
+            }
+
             pub fn upgrade(&self) -> Result<#ref_name, lento::mrc::UpgradeError> {
-                let inner = self.inner.upgrade()?;
+                let inner = if let Some(inner) = &self.inner {
+                    inner.upgrade()?
+                } else {
+                    return Err(lento::mrc::UpgradeError{});
+                };
                 Ok(
                      #ref_name {
                         inner
@@ -62,7 +71,7 @@ pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
             }
 
             pub fn upgrade_mut<R, F: FnOnce(&mut #ref_name) -> R>(&self, callback: F) -> Option<R> {
-                if let Ok(f) = self.inner.upgrade() {
+                if let Ok(f) = self.inner.as_ref()?.upgrade() {
                     let mut inst = #ref_name {
                         inner: f
                     };

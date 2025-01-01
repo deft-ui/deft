@@ -246,6 +246,7 @@ fn test_text_measure() {
 
 }
 
+#[test]
 fn test_border_performance_gl() {
     let event_loop: EventLoop<()> = EventLoopBuilder::default().build().unwrap();
     struct TestApp {

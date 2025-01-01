@@ -10,8 +10,8 @@ use skia_safe::{Canvas, Color, Paint, Path, Point};
 use tokio::time::Instant;
 use yoga::Direction::LTR;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size, StyleUnit};
-use crate::{backend_as_api, is_mobile_platform, js_call, js_deserialize, js_serialize};
-use crate::animation::{AnimationDef, AnimationInstance, SimpleFrameController};
+use crate::{backend_as_api, is_mobile_platform, js_call, js_deserialize, js_serialize, some_or_return};
+use crate::animation::{AnimationDef, AnimationInstance, SimpleFrameController, WindowAnimationController};
 use crate::base::{CaretDetail, ElementEvent, EventContext, Rect};
 use crate::color::parse_hex_color;
 use crate::element::{ElementBackend, Element, ViewEvent, ElementWeak};
@@ -538,7 +538,8 @@ impl ElementBackend for Scroll {
                         .key_frame(0.0, vec![StyleProp::RowGap(StylePropVal::Custom(0.0)), StyleProp::ColumnGap(StylePropVal::Custom(0.0))])
                         .key_frame(1.0, vec![StyleProp::RowGap(StylePropVal::Custom(1.0)), StyleProp::ColumnGap(StylePropVal::Custom(1.0))])
                         .build();
-                    let frame_controller = SimpleFrameController::new();
+                    let frame = some_or_return!(self.element.get_frame(), false);
+                    let frame_controller = WindowAnimationController::new(frame);
                     let mut animation_instance = AnimationInstance::new(animation, 1000.0 * 1000000.0, 1.0, Box::new(frame_controller));
                     let mut ele = self.element.clone();
                     let timing_func = Bezier::from_cubic_coordinates(0.0, 0.0, 0.17, 0.89, 0.45, 1.0, 1.0, 1.0);

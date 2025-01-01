@@ -1,7 +1,7 @@
 use crate as lento;
 use crate::app::{exit_app, AppEvent, AppEventPayload};
 use crate::base::MouseEventType::{MouseClick, MouseUp};
-use crate::base::{ElementEvent, Event, EventContext, EventHandler, EventListener, EventRegistration, MouseDetail, MouseEventType, ResultWaiter, Touch, TouchDetail, UnsafeFnOnce};
+use crate::base::{Callback, ElementEvent, Event, EventContext, EventHandler, EventListener, EventRegistration, MouseDetail, MouseEventType, ResultWaiter, Touch, TouchDetail, UnsafeFnOnce};
 use crate::canvas_util::CanvasHelper;
 use crate::cursor::search_cursor;
 use crate::element::{Element, ElementWeak, PaintInfo};
@@ -42,7 +42,7 @@ use winit::keyboard::{Key, NamedKey};
 #[cfg(feature = "x11")]
 use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorGrabMode, CursorIcon, Window, WindowAttributes, WindowId};
-use crate::{bind_js_event_listener, is_snapshot_usable};
+use crate::{bind_js_event_listener, is_snapshot_usable, send_app_event};
 use crate::frame_rate::{get_total_frames, next_frame, FRAME_RATE_CONTROLLER};
 use crate::paint::{InvalidArea, PartialInvalidArea, Painter, RenderNode, RenderTree, SkiaPainter, UniqueRect, InvalidRects, RenderOp, Snapshot, SnapshotManager, MatrixCalculator, ClipPath};
 use crate::style::ColorHelper;
@@ -106,6 +106,8 @@ pub struct Frame {
     ime_height: f32,
     background_color: Color,
     pub render_tree: Arc<Mutex<RenderTree>>,
+    renderer_idle: bool,
+    next_frame_callbacks: Vec<Callback>,
 }
 
 pub type FrameEventHandler = EventHandler<FrameWeak>;
@@ -219,6 +221,8 @@ impl Frame {
             repaint_timer_handle: None,
             snapshots: SnapshotManager::new(),
             render_tree: Arc::new(Mutex::new(RenderTree::new())),
+            renderer_idle: true,
+            next_frame_callbacks: Vec::new(),
         };
         let mut handle = Frame {
             inner: Mrc::new(state),
@@ -259,15 +263,7 @@ impl Frame {
             }
         }
         if is_first_invalid {
-            let time_to_wait = next_frame();
-
-            let me = self.as_weak();
-            //TODO use another timer
-            self.repaint_timer_handle = Some(set_timeout_nanos(move || {
-                if let Ok(mut me) = me.upgrade() {
-                    me.update();
-                }
-            }, time_to_wait));
+            send_app_event(AppEvent::Update(self.get_id()));
         }
     }
 
@@ -338,7 +334,7 @@ impl Frame {
         match event {
             WindowEvent::RedrawRequested => {
                 self.invalid(InvalidMode::Full);
-                self.paint();
+                self.update();
             }
             WindowEvent::Resized(_physical_size) => {
                 self.on_resize();
@@ -749,11 +745,19 @@ impl Frame {
     }
 
     pub fn update(&mut self) -> ResultWaiter<bool> {
+        if !self.renderer_idle {
+            return ResultWaiter::new_finished(false);
+        }
+        print_time!("frame update time");
+        let mut frame_callbacks = Vec::new();
+        frame_callbacks.append(&mut self.next_frame_callbacks);
+        for cb in frame_callbacks {
+            cb.call();
+        }
         if self.invalid_area == InvalidArea::None {
             // skip duplicate update
             return ResultWaiter::new_finished(false);
         }
-        print_time!("frame update time");
         let auto_size = !self.attributes.resizable;
         if self.layout_dirty {
             let size = self.window.inner_size();
@@ -853,6 +857,13 @@ impl Frame {
         ctx
     }
 
+    pub fn request_next_frame_callback(&mut self, callback: Callback) {
+        self.next_frame_callbacks.push(callback);
+        if self.next_frame_callbacks.len() == 1 {
+            send_app_event(AppEvent::Update(self.get_id()));
+        }
+    }
+
     fn paint(&mut self) -> ResultWaiter<bool> {
         let size = self.window.inner_size();
         let (width, height) = (size.width, size.height);
@@ -877,7 +888,7 @@ impl Frame {
         let old_snapshots = me.snapshots.clone();
         let snapshots = SnapshotManager::new();
         me.snapshots = snapshots.clone();
-        let viewport = Rect::new(0.0, 0.0, width as f32, height as f32);
+        let viewport = Rect::new(0.0, 0.0, width as f32 / scale_factor, height as f32 / scale_factor);
         let mut render_tree = if let Some(body) = &mut me.body {
             // print_time!("build render nodes time");
             build_render_nodes(body, invalid_area, scale_factor, viewport.clone())
@@ -887,6 +898,8 @@ impl Frame {
         let render_tree = Arc::new(Mutex::new(render_tree));
         self.render_tree = render_tree.clone();
         let waiter_finisher = waiter.clone();
+        let frame_id = self.get_id();
+        self.renderer_idle = false;
         self.window.render_with_result(move |canvas| {
             //print_time!("render time");
             canvas.save();
@@ -906,6 +919,7 @@ impl Frame {
             canvas.restore();
         }, move|r| {
             waiter_finisher.finish(r);
+            send_app_event(AppEvent::RenderIdle(frame_id));
         });
         waiter
     }
@@ -1314,6 +1328,23 @@ pub fn frame_ime_resize(frame_id: i32, height: f32) {
         if let Some(f) = m.get_mut(&frame_id) {
             f.ime_height = height;
             f.mark_dirty_and_update_immediate(true).wait_finish();
+        }
+    });
+}
+
+pub fn frame_on_render_idle(frame_id: i32) {
+    FRAMES.with_borrow_mut(|m| {
+        if let Some(f) = m.get_mut(&frame_id) {
+            f.renderer_idle = true;
+            f.update();
+        }
+    });
+}
+
+pub fn frame_check_update(frame_id: i32) {
+    FRAMES.with_borrow_mut(|m| {
+        if let Some(f) = m.get_mut(&frame_id) {
+            f.update();
         }
     });
 }

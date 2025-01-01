@@ -17,7 +17,7 @@ use winit::window::WindowId;
 use crate::event_loop::{init_event_loop_proxy, run_event_loop_task, run_with_event_loop, AppEventProxy};
 use crate::ext::ext_frame::FRAMES;
 use crate::ext::ext_localstorage::localstorage_flush;
-use crate::frame::{frame_ime_resize, frame_input};
+use crate::frame::{frame_check_update, frame_ime_resize, frame_input, frame_on_render_idle};
 use crate::js::js_engine::JsEngine;
 use crate::js::js_event_loop::{js_init_event_loop, JsEvent, JsEventLoopClosedError};
 use crate::js::js_runtime::JsContext;
@@ -47,6 +47,8 @@ pub enum AppEvent {
     HideSoftInput(i32),
     CommitInput(i32, String),
     ImeResize(i32, f32),
+    Update(i32),
+    RenderIdle(i32),
 }
 
 impl Debug for AppEvent {
@@ -138,6 +140,12 @@ impl ApplicationHandler<AppEventPayload> for App {
                 AppEvent::ImeResize(frame_id, height) => {
                     frame_ime_resize(frame_id, height);
                 },
+                AppEvent::RenderIdle(frame_id) => {
+                    frame_on_render_idle(frame_id);
+                },
+                AppEvent::Update(frame_id) => {
+                    frame_check_update(frame_id);
+                }
             }
             let (lock, cvar) = &*event.lock;
             let mut done = lock.lock().unwrap();

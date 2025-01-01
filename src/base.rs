@@ -99,6 +99,22 @@ impl<T> ResultWaiter<T> {
     }
 }
 
+pub struct Callback {
+    callback: Box<dyn FnOnce() + 'static>,
+}
+
+impl Callback {
+    pub fn from_box(f: Box<dyn FnOnce()>) -> Callback {
+        Self { callback: Box::new(f) }
+    }
+    pub fn new<F: FnOnce() + 'static>(callback: F) -> Self {
+        Self { callback: Box::new(callback) }
+    }
+    pub fn call(self) {
+        (self.callback)()
+    }
+}
+
 pub enum TextAlign {
     Left,
     Right,

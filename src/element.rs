@@ -84,6 +84,8 @@ impl Element {
             inner,
         };
         let ele_weak = ele.inner.as_weak();
+        let weak = ele.as_weak();
+        ele.style.bind_element(weak);
         ele.inner.style.on_changed = Some(Box::new(move |key| {
             if let Ok(mut inner) = ele_weak.upgrade() {
                 inner.backend.handle_style_changed(key);
@@ -106,6 +108,8 @@ impl Element {
 
     pub fn create_shadow(&mut self) {
         self.style = StyleNode::new_with_shadow();
+        let weak = self.as_weak();
+        self.style.bind_element(weak);
     }
 
     #[js_func]
@@ -326,6 +330,9 @@ impl Element {
             None => None,
             Some(p) => Some(p.as_weak()),
         };
+        self.applied_style.clear();
+        self.apply_style();
+
         self.style.update_computed_style(None);
     }
 

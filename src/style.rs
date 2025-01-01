@@ -10,11 +10,12 @@ use skia_safe::{Color, Image, Matrix, Path};
 use yoga::{Align, Direction, Display, Edge, FlexDirection, Justify, Node, Overflow, PositionType, StyleUnit, Wrap};
 use crate::base::Rect;
 use crate::color::parse_hex_color;
-use crate::{compute_style, inherit_color_prop};
-use crate::animation::{AnimationInstance, SimpleFrameController};
+use crate::{compute_style, inherit_color_prop, ok_or_return, some_or_return};
+use crate::animation::{AnimationInstance, SimpleFrameController, WindowAnimationController};
 use crate::border::build_border_paths;
 use crate::cache::CacheValue;
 use crate::animation::ANIMATIONS;
+use crate::element::{Element, ElementWeak};
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::paint::MatrixCalculator;
@@ -295,6 +296,9 @@ impl TranslateLength {
         }
     }
 }
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TranslateParams(TranslateLength, TranslateLength);
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum StyleTransformOp {
@@ -738,6 +742,7 @@ impl AnimationParams {
 }
 
 pub struct StyleNodeInner {
+    element: ElementWeak,
     yoga_node: Node,
     shadow_node: Option<Node>,
 
@@ -806,6 +811,7 @@ impl StyleNode {
     pub fn new() -> Self {
         let transparent = Color::from_argb(0,0,0,0);
         let inner = StyleNodeInner {
+            element: ElementWeak::invalid(),
             yoga_node: Node::new(),
             shadow_node: None,
             parent: None,
@@ -834,6 +840,10 @@ impl StyleNode {
         let mut sn = Self::new();
         sn.inner.shadow_node = Some(Node::new());
         sn
+    }
+
+    pub fn bind_element(&mut self, element: ElementWeak) {
+        self.element = element;
     }
 
     pub fn get_padding(&self) -> (f32, f32, f32, f32) {
@@ -1013,26 +1023,20 @@ impl StyleNode {
             StyleProp::AnimationName(value) => {
                 need_layout = false;
                 let name = value.resolve(&"".to_string());
-                if name != self.animation_params.name {
-                    self.animation_params.name = name;
-                    self.update_animation();
-                }
+                self.animation_params.name = name;
+                self.update_animation();
             }
             StyleProp::AnimationDuration(value) => {
                 need_layout = false;
                 let duration = value.resolve(&0.0);
-                if duration != self.animation_params.duration {
-                    self.animation_params.duration = duration;
-                    self.update_animation();
-                }
+                self.animation_params.duration = duration;
+                self.update_animation();
             }
             StyleProp::AnimationIterationCount(value) => {
                 need_layout = false;
                 let ic = value.resolve(&1.0);
-                if ic != self.animation_params.iteration_count {
-                    self.animation_params.iteration_count = ic;
-                    self.update_animation();
-                }
+                self.animation_params.iteration_count = ic;
+                self.update_animation();
             }
 
             // container node style
@@ -1104,9 +1108,11 @@ impl StyleNode {
         self.animation_instance = if p.name.is_empty() || p.duration <= 0.0 || p.iteration_count <= 0.0  {
             None
         } else {
+            let element = ok_or_return!(self.element.upgrade());
+            let frame = some_or_return!(element.get_frame());
             ANIMATIONS.with_borrow(|m| {
                 let ani = m.get(&p.name)?;
-                let frame_controller = SimpleFrameController::new();
+                let frame_controller = WindowAnimationController::new(frame);
                 let duration = p.duration * 1000000.0;
                 let iteration_count = p.iteration_count;
                 let ani_instance = AnimationInstance::new(ani.clone(), duration, iteration_count, Box::new(frame_controller));

@@ -10,7 +10,10 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::ops::Bound::{Excluded, Included};
 use std::time::SystemTime;
+use tokio::time::Instant;
 use yoga::StyleUnit;
+use crate::base::Callback;
+use crate::frame::FrameWeak;
 
 macro_rules! interpolate_values {
     ($prev: expr, $next: expr, $percent: expr; $($ty: ident => $handler: ident,)* ) => {
@@ -86,6 +89,8 @@ fn interpolate_transform(prev: &StyleTransform, next: &StyleTransform, position:
             let deg = interpolate_f32(p_deg, n_deg, position)?;
             op_list.push(StyleTransformOp::Rotate(deg));
         }
+        println!("Unsupported animation value");
+        //TODO support other transform
     }
     Some(StyleTransform {
         op_list
@@ -139,12 +144,12 @@ pub struct Animation {
 }
 
 pub trait FrameController {
-    fn request_next_frame(&mut self, callback: Box<dyn FnOnce(f32)>);
+    fn request_next_frame(&mut self, callback: Box<dyn FnOnce()>);
 }
 
 pub struct AnimationState {
     animation: Animation,
-    start_time: f32,
+    start_time: Instant,
     duration: f32,
     iteration_count: f32,
     frame_controller: Box<dyn FrameController>,
@@ -212,7 +217,7 @@ impl AnimationInstance {
     pub fn new(animation: Animation, duration: f32, iteration_count: f32, frame_controller: Box<dyn FrameController>) -> Self {
         let state = AnimationState {
             animation,
-            start_time: 0.0,
+            start_time: Instant::now(),
             duration,
             iteration_count,
             frame_controller,
@@ -225,10 +230,10 @@ impl AnimationInstance {
 
     pub fn run(&mut self, renderer: Box<dyn FnMut(Vec<StyleProp>)>) {
         let mut state = self.state.clone();
-        self.state.frame_controller.request_next_frame(Box::new(move |t| {
+        self.state.frame_controller.request_next_frame(Box::new(move || {
             // println!("animation started:{}", t);
-            state.start_time = t;
-            Self::render_frame(state, t, renderer);
+            state.start_time = Instant::now();
+            Self::render_frame(state, renderer);
         }));
     }
 
@@ -237,8 +242,8 @@ impl AnimationInstance {
         self.state.stopped = true;
     }
 
-    fn render_frame(mut state: Mrc<AnimationState>, now: f32, mut renderer: Box<dyn FnMut(Vec<StyleProp>)>) {
-        let elapsed = now - state.start_time;
+    fn render_frame(mut state: Mrc<AnimationState>, mut renderer: Box<dyn FnMut(Vec<StyleProp>)>) {
+        let elapsed = state.start_time.elapsed().as_nanos() as f32;
         let position = elapsed / state.duration;
         let frame = if position >= state.iteration_count || state.stopped {
             Vec::new()
@@ -249,8 +254,8 @@ impl AnimationInstance {
         renderer(frame);
         if !is_ended {
             let s = state.clone();
-            state.frame_controller.request_next_frame(Box::new(|t| {
-                Self::render_frame(s, t, renderer);
+            state.frame_controller.request_next_frame(Box::new(|| {
+                Self::render_frame(s, renderer);
             }))
         } else {
             //TODO notify ended?
@@ -261,6 +266,24 @@ impl AnimationInstance {
 impl Drop for AnimationInstance {
     fn drop(&mut self) {
         self.stop();
+    }
+}
+
+pub struct WindowAnimationController {
+    frame: FrameWeak,
+}
+
+impl WindowAnimationController {
+    pub fn new(frame: FrameWeak) -> Self {
+        Self { frame }
+    }
+}
+
+impl FrameController for WindowAnimationController {
+    fn request_next_frame(&mut self, callback: Box<dyn FnOnce()>) {
+        if let Ok(mut frame) = self.frame.upgrade() {
+            frame.request_next_frame_callback(Callback::from_box(callback));
+        }
     }
 }
 
@@ -281,18 +304,18 @@ impl SimpleFrameController {
 }
 
 impl FrameController for SimpleFrameController {
-    fn request_next_frame(&mut self, callback: Box<dyn FnOnce(f32)>) {
+    fn request_next_frame(&mut self, callback: Box<dyn FnOnce()>) {
         let now = self.timer.elapsed().unwrap().as_nanos();
         let next_frame_time = self.prev_frame_time + 16666667;
         self.prev_frame_time = next_frame_time;
         if next_frame_time > now {
             let sleep_time = (next_frame_time - now) as u64;
             self.timer_handle = Some(set_timeout_nanos(move || {
-                callback(next_frame_time as f32);
+                callback();
             }, sleep_time));
         } else {
             self.timer_handle = Some(set_timeout(move || {
-                callback(now as f32);
+                callback();
             }, 0));
         }
     }
