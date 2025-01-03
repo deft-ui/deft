@@ -8,12 +8,14 @@ use winit::event_loop::ActiveEventLoop;
 #[cfg(feature = "x11")]
 use winit::platform::x11;
 use winit::window::{Window};
-use crate::gl_renderer::GlRenderer;
 
 use glutin::prelude::*;
 use skia_safe::Canvas;
 #[cfg(target_os = "android")]
 use winit::platform::android::activity::AndroidApp;
+use crate::context::RenderContext;
+use crate::gl::gl_renderer::GlRenderer;
+use crate::renderer::Renderer;
 use crate::surface::RenderBackend;
 
 
@@ -158,7 +160,7 @@ impl RenderBackend for SurfaceState {
         &self.window
     }
 
-    fn render(&mut self, renderer: Box<dyn FnOnce(&Canvas) + Send>, callback: Box<dyn FnOnce(bool) + Send + 'static>) {
+    fn render(&mut self, renderer: Renderer, callback: Box<dyn FnOnce(bool) + Send + 'static>) {
         self.render.draw(renderer, callback);
     }
 

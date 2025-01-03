@@ -564,18 +564,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8c02a5121d4ea3eb16a80748c74f5549a5665e4c21333c6098f283870fbdea6"
 
 [[package]]
-name = "filetime"
-version = "0.2.25"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "35c0522e981e68cbfa8c3f978441a5f34b30b96e146b33cd3359176b50fe8586"
-dependencies = [
- "cfg-if",
- "libc",
- "libredox 0.1.3",
- "windows-sys 0.59.0",
-]
-
-[[package]]
 name = "flate2"
 version = "1.0.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -976,17 +964,6 @@ dependencies = [
  "bitflags 2.6.0",
  "libc",
  "redox_syscall 0.4.1",
-]
-
-[[package]]
-name = "libredox"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0ff37bd590ca25063e35af745c343cb7a0271906fb7b37e4813e8f79f00268d"
-dependencies = [
- "bitflags 2.6.0",
- "libc",
- "redox_syscall 0.5.3",
 ]
 
 [[package]]
@@ -1391,7 +1368,7 @@ version = "0.3.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52f0d54bde9774d3a51dcf281a5def240c71996bc6ca05d2c847ec8b2b216166"
 dependencies = [
- "libredox 0.0.2",
+ "libredox",
 ]
 
 [[package]]
@@ -1714,25 +1691,18 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 [[package]]
 name = "skia-bindings"
 version = "0.75.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c06e19e97660b09a381c6eb566849b63556b1a90b8e2c6ba2d146b3f5066847b"
 dependencies = [
  "bindgen",
  "cc",
- "flate2",
  "heck",
- "lazy_static",
  "regex",
  "serde_json",
- "tar",
  "toml",
 ]
 
 [[package]]
 name = "skia-safe"
 version = "0.75.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad6e6f369522471b585c99427720b53aad04016fa4314e0a8cf23f17083a4e4c"
 dependencies = [
  "base64",
  "bitflags 2.6.0",
@@ -1877,17 +1847,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
-]
-
-[[package]]
-name = "tar"
-version = "0.4.41"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb797dad5fb5b76fcf519e702f4a589483b5ef06567f160c392832c1f5e44909"
-dependencies = [
- "filetime",
- "libc",
- "xattr",
 ]
 
 [[package]]
@@ -2693,17 +2652,6 @@ name = "x11rb-protocol"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec107c4503ea0b4a98ef47356329af139c0a4f7750e621cf2973cd3385ebcb3d"
-
-[[package]]
-name = "xattr"
-version = "1.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8da84f1a25939b27f6820d92aed108f83ff920fdf11a7b19366c27c4cda81d4f"
-dependencies = [
- "libc",
- "linux-raw-sys 0.4.14",
- "rustix 0.38.35",
-]
 
 [[package]]
 name = "xcursor"

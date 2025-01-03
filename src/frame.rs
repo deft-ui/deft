@@ -26,13 +26,14 @@ use std::num::NonZeroU32;
 use std::ops::{Deref, DerefMut};
 use std::process::exit;
 use std::rc::Rc;
-use std::slice;
+use std::{env, slice};
 use std::string::ToString;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 use skia_bindings::SkPaint_Style::{Fill, Stroke};
 use skia_safe::canvas::SetMatrix;
 use skia_safe::wrapper::NativeTransmutableWrapper;
+use skia_window::renderer::Renderer;
 use winit::dpi::Position::Logical;
 use winit::dpi::{LogicalPosition, LogicalSize, Position, Size};
 use winit::error::ExternalError;
@@ -900,7 +901,7 @@ impl Frame {
         let waiter_finisher = waiter.clone();
         let frame_id = self.get_id();
         self.renderer_idle = false;
-        self.window.render_with_result(move |canvas| {
+        self.window.render_with_result(Renderer::new(move |canvas, ctx| {
             //print_time!("render time");
             canvas.save();
             if scale_factor != 1.0 {
@@ -917,7 +918,7 @@ impl Frame {
             draw_elements(canvas, &mut render_tree, &mut painter, scale_factor, old_snapshots, snapshots);
 
             canvas.restore();
-        }, move|r| {
+        }), move|r| {
             waiter_finisher.finish(r);
             send_app_event(AppEvent::RenderIdle(frame_id));
         });
@@ -961,10 +962,17 @@ impl Frame {
 
     fn create_window(attributes: WindowAttributes) -> SkiaWindow {
         run_with_event_loop(|el| {
-            //TODO support RenderBackedType parameter#[cfg(not(target_os = "android"))]
-            let backend_type = RenderBackendType::SoftBuffer;
+            //TODO support RenderBackedType parameter
+            #[cfg(not(target_os = "android"))]
+            let default_backend_type = "softbuffer";
             #[cfg(target_os = "android")]
-            let backend_type = RenderBackendType::GL;
+            let default_backend_type = "gl";
+            let backend_type_str = env::var("renderer").unwrap_or(default_backend_type.to_string());
+            let backend_type = match backend_type_str.as_str() {
+                "softbuffer" => RenderBackendType::SoftBuffer,
+                _ => RenderBackendType::GL,
+            };
+            println!("render backend: {:?}", backend_type);
             SkiaWindow::new(el, attributes, backend_type)
         })
     }

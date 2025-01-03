@@ -18,7 +18,7 @@ skia-window = { path = "skia-window" }
 
 bitflags = "2.0"
 lazy_static = "1.4"
-skia-bindings = { version = "0.75.0", default-features = false }
+skia-bindings = { path = "third_party/rust-skia/skia-bindings", default-features = false }
 
 
 ureq = { version = "2.8.0", optional = true }
@@ -58,12 +58,12 @@ production=[]
 native-dialog = "0.7.0"
 
 [target.'cfg(target_os = "android")'.dependencies]
-skia-safe = {version = "0.75.0", features = ["textlayout", "svg", "x11"]}
+skia-safe = {path = "third_party/rust-skia/skia-safe", features = ["textlayout", "svg", "x11"], default-features = false}
 android_logger = "0.11.0"
 [target.'cfg(target_os = "linux")'.dependencies]
-skia-safe = {version = "0.75.0", features = ["textlayout", "svg", "x11"]}
+skia-safe = {path = "third_party/rust-skia/skia-safe", features = ["textlayout", "svg", "x11"], default-features = false}
 [target.'cfg(target_os = "macos")'.dependencies]
-skia-safe = {version = "0.75.0", features = ["textlayout", "svg"]}
+skia-safe = {path = "third_party/rust-skia/skia-safe", features = ["textlayout", "svg"], default-features = false}
 
 [dev-dependencies]
 serial_test = "3.0"

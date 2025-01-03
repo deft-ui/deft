@@ -1,10 +1,16 @@
-use skia_safe::Canvas;
+use crate::context::RenderContext;
+use skia_safe::{Canvas, Data};
 use winit::window::Window;
+use crate::renderer::Renderer;
 
 pub trait RenderBackend {
     fn window(&self) -> &Window;
 
-    fn render(&mut self, renderer: Box<dyn FnOnce(&Canvas) + Send>, callback: Box<dyn FnOnce(bool) + Send + 'static>);
+    fn render(
+        &mut self,
+        renderer: Renderer,
+        callback: Box<dyn FnOnce(bool) + Send + 'static>,
+    );
 
     fn resize(&mut self, width: u32, height: u32);
 }

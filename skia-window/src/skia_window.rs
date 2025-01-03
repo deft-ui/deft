@@ -5,10 +5,10 @@ use winit::event_loop::ActiveEventLoop;
 #[cfg(target_os = "android")]
 use winit::platform::android::activity::AndroidApp;
 use winit::window::{Window, WindowAttributes};
-
-use crate::gl_surface::SurfaceState;
+use crate::gl::SurfaceState;
+use crate::renderer::Renderer;
 #[cfg(not(target_os = "android"))]
-use crate::soft_surface::SoftSurface;
+use crate::softbuffer::SoftSurface;
 use crate::surface::RenderBackend;
 
 pub struct SkiaWindow {
@@ -16,6 +16,7 @@ pub struct SkiaWindow {
     surface_state: Box<dyn RenderBackend>,
 }
 
+#[derive(Debug)]
 pub enum RenderBackendType {
     SoftBuffer,
     GL,
@@ -29,7 +30,7 @@ impl SkiaWindow {
                 #[cfg(target_os = "android")]
                 panic!("Android does not support this backend!");
                 #[cfg(not(target_os = "android"))]
-                Box::new(SurfaceState::new(event_loop, window))
+                Box::new(SoftSurface::new(event_loop, window))
             }
             RenderBackendType::GL => {
                 Box::new(SurfaceState::new(event_loop, window))
@@ -64,12 +65,12 @@ impl SkiaWindow {
         &self.surface_state.window()
     }
 
-    pub fn render_with_result<F: FnOnce(&Canvas) + Send + 'static, C: FnOnce(bool) + Send + 'static>(&mut self, renderer: F, callback: C) {
+    pub fn render_with_result<C: FnOnce(bool) + Send + 'static>(&mut self, renderer: Renderer, callback: C) {
         // self.surface_state.render.draw(renderer);
-        self.surface_state.render(Box::new(renderer), Box::new(callback));
+        self.surface_state.render(renderer, Box::new(callback));
     }
 
-    pub fn render<F: FnOnce(&Canvas) + Send + 'static>(&mut self, renderer: F) {
+    pub fn render(&mut self, renderer: Renderer) {
         // self.surface_state.render.draw(renderer);
         self.render_with_result(renderer, |_| ());
     }

@@ -27,6 +27,7 @@ use skia_safe::gpu::gl::FramebufferInfo;
 use skia_safe::PaintStyle::Stroke;
 use winit::application::ApplicationHandler;
 use winit::window::{Window, WindowAttributes, WindowId};
+use skia_window::renderer::Renderer;
 use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 
 
@@ -45,32 +46,29 @@ impl App {
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let win = SkiaWindow::new(event_loop, WindowAttributes::default(), RenderBackendType::GL);
+        let win = SkiaWindow::new(event_loop, WindowAttributes::default(), RenderBackendType::SoftBuffer);
         self.windows.insert(win.id(), win);
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
-        if let WindowEvent::KeyboardInput { event, .. } = &event {
-            if event.state == ElementState::Released {
-                info!("create window");
-                let mut app = SkiaWindow::new(event_loop, WindowAttributes::default(), RenderBackendType::GL);
-                // app.resumed(event_loop);
-                self.windows.insert(app.id(), app);
-            }
-        }
         if let Some(win) = self.windows.get_mut(&window_id) {
             match event {
                 WindowEvent::RedrawRequested {} => {
-                    win.render(|canvas| {
-                        canvas.clear(Color::from_rgb(0, 0, 0));
-                        let rect = Rect::new(500.0, 500.0, 700.0, 700.0);
-                        let mut paint = Paint::default();
-                        paint.set_style(Stroke);
-                        paint.set_color(Color::from_rgb(255, 255, 255));
-                        canvas.draw_rect(&rect, &paint);
+                    let render = Renderer::new(|canvas, ctx| {
+                        canvas.clear(Color::from_rgb(0, 40, 0));
+                        {
+                            let mut layer = ctx.create_layer(100, 100).unwrap();
+                            let c = layer.canvas();
+                            c.clear(Color::from_rgb(255, 255, 255));
+                            let mut paint = Paint::default();
+                            paint.set_alpha(127);
+                            canvas.draw_image(layer.as_image(), (100, 100), Some(&paint));
+                        }
                     });
+                    win.render(render);
                 }
                 WindowEvent::Resized(size) => {
+                    win.resize_surface(size.width, size.height);
                     win.request_redraw();
                 }
                 _ => {}
