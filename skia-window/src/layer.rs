@@ -9,6 +9,8 @@ pub struct Layer {
     layer: Box<dyn ILayer>,
 }
 
+unsafe impl Send for Layer {}
+
 impl Layer {
     pub fn new(layer: Box<dyn ILayer>) -> Self {
         Layer { layer }

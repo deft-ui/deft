@@ -10,6 +10,8 @@ pub struct RenderContext<'a> {
     context: Box<&'a mut dyn IRenderContext>,
 }
 
+unsafe impl Send for RenderContext<'_> {}
+
 impl<'a> RenderContext<'a> {
     pub fn new(context: &'a mut impl IRenderContext) -> Self {
         Self { context: Box::new(context) }

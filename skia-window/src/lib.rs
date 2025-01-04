@@ -2,12 +2,12 @@
 #![allow(unused)]
 #![allow(unexpected_cfgs)]
 pub mod skia_window;
-#[cfg(not(target_os = "android"))]
 mod surface;
-mod layer;
-mod context;
+pub mod layer;
+pub mod context;
 mod gl;
 pub mod renderer;
+#[cfg(not(target_os = "android"))]
 mod softbuffer;
 
 pub use offscreen_gl_context::*;

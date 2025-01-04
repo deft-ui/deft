@@ -122,7 +122,7 @@ pub fn is_mobile_platform() -> bool {
 }
 
 pub fn is_snapshot_usable() -> bool {
-    false
+    true
 }
 
 #[cfg(target_os = "android")]

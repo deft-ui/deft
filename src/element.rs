@@ -931,6 +931,19 @@ impl Element {
         build_rect_with_radius(self.style.border_radius, bounds.width, bounds.height)
     }
 
+    pub fn get_origin_border_bounds(&self) -> base::Rect {
+        let origin_bounds = self.get_origin_bounds();
+        let border = self.get_border_width();
+        base::Rect::from_skia_rect(
+            Rect::new(
+                origin_bounds.x + border.3,
+                origin_bounds.y + border.0,
+                origin_bounds.right() - border.1,
+                origin_bounds.bottom() - border.2,
+            )
+        )
+    }
+
     pub fn get_content_box_path(&self) -> Path {
         let mut path = Path::new();
         let bounds = self.get_content_bounds();

@@ -6,6 +6,7 @@ use measure_time::print_time;
 use skia_bindings::{SkClipOp, SkPaint_Style, SkPathOp};
 use skia_safe::{scalar, Color, IRect, Image, Matrix, Paint, Path, Point, Rect, Vector};
 use skia_safe::Canvas;
+use skia_window::layer::Layer;
 use crate::base::{Id, IdKey};
 use crate::element::Element;
 use crate::mrc::Mrc;
@@ -37,20 +38,43 @@ impl SnapshotManager {
         let mut store = self.store.lock().unwrap();
         store.remove(&id)
     }
+
+    pub fn with_snapshot_mut<F: FnOnce(&mut Snapshot)>(&self, id: u32, callback: F) {
+        let mut store = self.store.lock().unwrap();
+        if let Some(sn) = store.get_mut(&id) {
+            callback(sn);
+        }
+    }
+
+    pub fn get_snapshot_image(&self, id: u32) -> Option<Image> {
+        let mut store = self.store.lock().unwrap();
+        let mut sn = store.get_mut(&id)?;
+        Some(sn.image.as_image())
+    }
+
+    pub fn take(&self, id: u32, expected_width: usize, expected_height: usize) -> Option<Snapshot> {
+        let mut store = self.store.lock().unwrap();
+        let mut sn = store.remove(&id)?;
+        if sn.width == expected_width && sn.height == expected_height {
+            Some(sn)
+        } else {
+            None
+        }
+    }
 }
 
-#[derive(Clone)]
 pub struct Snapshot {
     id: Id<Snapshot>,
-    pub rect: Rect,
-    pub image: Image,
+    pub image: Layer,
+    pub width: usize,
+    pub height: usize,
 }
 
 impl Snapshot {
-    pub fn new(rect: Rect, image: Image) -> Self {
+    pub fn new(image: Layer, width: usize, height: usize) -> Self {
         let id = Id::next(&SNAPSHOT_ID_KEY);
         println!("Creating snapshot: {}", id);
-        Self { id, rect, image }
+        Self { id, image, width, height }
     }
 }
 
@@ -117,7 +141,8 @@ pub struct RenderNode {
     pub background_color: Color,
     pub children_viewport: Option<Rect>,
     // relative bounds
-    pub reuse_bounds: Option<(f32, f32, Rect)>
+    // pub reuse_bounds: Option<(f32, f32, Rect)>,
+    pub scroll_delta: (f32, f32),
 }
 
 impl RenderNode {

@@ -453,6 +453,15 @@ impl Rect {
         skia_safe::Rect::new(self.x, self.y, self.x + self.width, self.y + self.height)
     }
 
+    pub fn from_skia_rect(rect: skia_safe::Rect) -> Self {
+        Self {
+            x: rect.left,
+            y: rect.top,
+            width: rect.width(),
+            height: rect.height(),
+        }
+    }
+
     #[inline]
     pub fn right(&self) -> f32 {
         self.x + self.width

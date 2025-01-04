@@ -18,7 +18,7 @@ use lento_macros::{event, frame_event, js_func, js_methods, mrc_object};
 use measure_time::print_time;
 use quick_js::{JsValue, ResourceValue};
 use skia_bindings::{SkCanvas_SrcRectConstraint, SkClipOp, SkPathOp, SkRect};
-use skia_safe::{Canvas, Color, ColorType, IRect, Image, ImageInfo, Matrix, Paint, Path, Point, Rect};
+use skia_safe::{Canvas, ClipOp, Color, ColorType, IRect, Image, ImageInfo, Matrix, Paint, Path, Point, Rect};
 use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
@@ -32,7 +32,8 @@ use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 use skia_bindings::SkPaint_Style::{Fill, Stroke};
 use skia_safe::canvas::SetMatrix;
-use skia_safe::wrapper::NativeTransmutableWrapper;
+use skia_safe::wrapper::{NativeTransmutableWrapper, PointerWrapper};
+use skia_window::context::RenderContext;
 use skia_window::renderer::Renderer;
 use winit::dpi::Position::Logical;
 use winit::dpi::{LogicalPosition, LogicalSize, Position, Size};
@@ -909,13 +910,8 @@ impl Frame {
             }
             let mut painter = SkiaPainter::new(canvas);
             let mut render_tree = render_tree.lock().unwrap();
-            if !background_color.is_transparent() {
-                canvas.save();
-                painter.set_invalid_rects(render_tree.invalid_rects_list[0].build(viewport));
-                canvas.clear(background_color);
-                canvas.restore();
-            }
-            draw_elements(canvas, &mut render_tree, &mut painter, scale_factor, old_snapshots, snapshots);
+            canvas.clear(background_color);
+            draw_elements(canvas, ctx, &mut render_tree, scale_factor, old_snapshots, snapshots);
 
             canvas.restore();
         }), move|r| {
@@ -989,31 +985,115 @@ impl WeakWindowHandle {
     }
 }
 
-fn draw_elements(canvas: &Canvas,
+fn draw_elements(root_canvas: &Canvas,
+                 context: &mut RenderContext,
                  tree: &mut RenderTree,
-                 painter: &mut dyn Painter,
                  scale: f32,
                  old_snapshots: SnapshotManager,
                  new_snapshots: SnapshotManager,
 ) {
     let viewport = tree.viewport.clone();
     let mut last_invalid_rects_idx = None;
-    canvas.save();
+    root_canvas.save();
     // let ops = tree.ops.clone();
     println!("render ops length: {}", tree.ops.len());
+    let mut layer_stacks: Vec<Snapshot> = vec![];
+    let tl_width = (viewport.width() * scale)  as usize;
+    let tl_height = (viewport.height() * scale) as usize;
+    let mut temp_layer = context.create_layer(tl_width, tl_height).unwrap();
     for op in &mut tree.ops {
         match op {
             RenderOp::Render(idx) => {
                 let node = &mut tree.nodes[*idx];
-                if last_invalid_rects_idx != Some(node.invalid_rects_idx) {
-                    canvas.restore();
-                    canvas.save();
-                    painter.set_invalid_rects(tree.invalid_rects_list[node.invalid_rects_idx].build(viewport));
-                    last_invalid_rects_idx = Some(node.invalid_rects_idx);
+                {
+                    let canvas = if let Some(sn) = layer_stacks.last_mut() {
+                        sn.image.canvas()
+                    } else {
+                        root_canvas
+                    };
+                    canvas.session(|c| {
+                        let mut painter = SkiaPainter::new(c);
+                        painter.set_invalid_rects(tree.invalid_rects_list[node.invalid_rects_idx].build(viewport));
+                        last_invalid_rects_idx = Some(node.invalid_rects_idx);
+                        draw_element(c, node, &mut painter);
+                    });
                 }
-                canvas.session(|c| {
-                    draw_element(canvas, node, painter);
-                });
+                if node.need_snapshot {
+                    let sn_width = (node.width * scale) as usize;
+                    let sn_height = (node.height * scale) as usize;
+                    let mut snapshot = old_snapshots.take(node.element_id, sn_width, sn_height);
+                    if let Some(old_snapshot) = &mut snapshot {
+                        let (scroll_x, scroll_y) = node.scroll_delta;
+                        let tlc = temp_layer.canvas();
+                        tlc.clear(Color::TRANSPARENT);
+                        tlc.draw_image(&old_snapshot.image.as_image(), (0.0, 0.0), None);
+                        unsafe {
+                            let srf = tlc.surface().unwrap();
+                            let mut ctx = srf.direct_context().unwrap();
+                            ctx.flush_and_submit();
+                        }
+
+                        let old_canvas = old_snapshot.image.canvas();
+                        old_canvas.session(|c| {
+                            c.clear(Color::TRANSPARENT);
+                            //TODO use setMatrix?
+                            let invalid_rect = tree.invalid_rects_list[node.children_invalid_rects_idx].build(viewport);
+                            let invalid_path = invalid_rect.to_path(viewport);
+                            c.clip_path(&invalid_path, ClipOp::Difference, None);
+                            c.concat(&node.total_matrix);
+                            c.translate((-scroll_x, -scroll_y));
+
+                            c.scale((1.0 / scale, 1.0 / scale));
+                            c.draw_image(&temp_layer.as_image(), (0.0, 0.0) , None);
+                        });
+                        /*
+                        let src_rect = Rect::from_xywh(
+                            rect.left * scale,
+                            rect.top * scale,
+                            rect.width() * scale,
+                            rect.height() * scale,
+                        );
+                        let dst_rect = rect.with_offset((img_rect.left - x, img_rect.top - y));
+                        let dst_rect = Rect::from_xywh(
+                            dst_rect.left * scale,
+                            dst_rect.top * scale,
+                            dst_rect.width() * scale,
+                            dst_rect.height() * scale,
+                        );
+                        let ob = node.origin_bounds;
+                        let vp_path = node.children_viewport.as_ref().map(|r| Path::rect(r, None));
+                        canvas.session(|c| {
+                            let children_invalid_rects = tree.invalid_rects_list[node.children_invalid_rects_idx].build(viewport);
+                            let children_invalid_path = children_invalid_rects.to_path(viewport);
+                            c.translate((ob.left, ob.top));
+                            if let Some(vp_path) = vp_path {
+                                c.clip_path(&vp_path, SkClipOp::Intersect, false);
+                            }
+                            c.translate((-ob.left, -ob.top));
+                            c.clip_path(&children_invalid_path, SkClipOp::Difference, false);
+                            c.scale((1.0 / scale, 1.0 / scale));
+                            c.draw_image_rect(img, Some((&src_rect, SkCanvas_SrcRectConstraint::Fast)), &dst_rect, &Paint::default());
+                        });
+                         */
+                    } else {
+                        let mut new_snapshot = context.create_layer(sn_width, sn_height)
+                            .map(|l| Snapshot::new(l, sn_width, sn_height)).unwrap();
+                        let im = node.total_matrix.invert().unwrap();
+                        new_snapshot.image.canvas().scale((scale, scale));
+                        new_snapshot.image.canvas().concat(&im);
+                        snapshot = Some(new_snapshot);
+                    }
+                    let mut snapshot = snapshot.unwrap();
+                    layer_stacks.push(snapshot);
+                };
+                // if true || last_invalid_rects_idx != Some(node.invalid_rects_idx) {
+                //     canvas.restore();
+                //     canvas.save();
+
+                // }
+
+                /*
+
                 if let Some(snapshot) = &old_snapshots.remove(node.element_id) {
                     let (img_rect, img) = (&snapshot.rect, &snapshot.image);
                     if let Some((x, y, rect)) = &node.reuse_bounds {
@@ -1049,13 +1129,44 @@ fn draw_elements(canvas: &Canvas,
                          */
                     }
                 }
+                 */
                 // node.snapshot = None;
             }
             RenderOp::Finish(idx) => {
                 let node = &mut tree.nodes[*idx];
+                if node.need_snapshot {
+                    let mut snapshot = layer_stacks.pop().unwrap();
+                    //TODO check id
+                    let parent_canvas = if let Some(parent_layer) = layer_stacks.last_mut() {
+                        parent_layer.image.canvas()
+                    } else {
+                        root_canvas
+                    };
+                    let img = snapshot.image.as_image();
+                    parent_canvas.session(|c| {
+                        c.concat(&node.total_matrix);
+                        let vp_path = node.children_viewport.as_ref().map(|r| Path::rect(r, None));
+                        if let Some(vp_path) = vp_path {
+                            c.clip_path(&vp_path, SkClipOp::Intersect, false);
+                        }
+                        c.scale((1.0 / scale, 1.0 / scale));
+                        c.draw_image(&img, (0.0, 0.0), None);
+                    });
+                    new_snapshots.insert(node.element_id, snapshot);
+                    // new_snapshots.with_snapshot_mut(*parent_layer_id, |sn| {
+                    //         let canvas = sn.image.canvas();
+                    //         canvas.concat(&node.total_matrix);
+                    //         canvas.draw_image(&img, (0.0, 0.0), None);
+                    //     });
+                    // } else {
+                    //     canvas.concat(&node.total_matrix);
+                    //     canvas.draw_image(&img, (0.0, 0.0), None);
+                    // }
+                }
+
+                /*
                 if is_snapshot_usable() && node.need_snapshot {
                     unimplemented!()
-                    /*
                     unsafe {
                         if let Some(mut surface) = canvas.surface() {
                             //TODO result will be wrong if has transform
@@ -1083,12 +1194,13 @@ fn draw_elements(canvas: &Canvas,
 
                         }
                     }
-                    */
+
                 }
+                 */
             }
         }
     }
-    canvas.restore();
+    root_canvas.restore();
 }
 
 fn draw_element(canvas: &Canvas, node: &mut RenderNode, painter: &mut dyn Painter) {
@@ -1152,6 +1264,16 @@ fn collect_render_nodes(
     let origin_bounds = root.get_origin_bounds().to_skia_rect();
     let border_box_path =  root.get_border_box_path();
 
+    let scroll_delta = if let Some(lpi) = &root.last_paint_info {
+        (root.scroll_left - lpi.scroll_left, root.scroll_top - lpi.scroll_top)
+    } else {
+        (0.0, 0.0)
+    };
+    root.last_paint_info = Some(PaintInfo {
+        scroll_left: root.scroll_left,
+        scroll_top: root.scroll_top,
+    });
+
     root.apply_transform(matrix_calculator);
     //TODO support overflow:visible
     matrix_calculator.intersect_clip_path(&ClipPath::from_path(&border_box_path));
@@ -1185,31 +1307,15 @@ fn collect_render_nodes(
         border_color: root.style.border_color,
         children_viewport: root.get_children_viewport(),
         need_snapshot: root.need_snapshot,
-        reuse_bounds: None,
+        scroll_delta,
+        // reuse_bounds: None,
     };
-    let mut scroll_delta = (0.0, 0.0);
-    if let Some(lpi) = &root.last_paint_info {
-        scroll_delta.0 = root.scroll_left - lpi.scroll_left;
-        scroll_delta.1 = root.scroll_top - lpi.scroll_top;
-    }
-    root.last_paint_info = Some(PaintInfo {
-        scroll_left: root.scroll_left,
-        scroll_top: root.scroll_top,
-    });
+
     if let Some(ir) = &root.invalid_unique_rect {
-        let old_origin_bounds = root.get_origin_padding_bounds();
+        let old_origin_bounds = root.get_origin_border_bounds();
         let reuse_bounds = old_origin_bounds.translate(scroll_delta.0, scroll_delta.1)
             .intersect(&old_origin_bounds)
             .translate(-old_origin_bounds.x, -old_origin_bounds.y).to_skia_rect();
-        if !reuse_bounds.is_empty() {
-            node.reuse_bounds = Some((
-                scroll_delta.0,
-                scroll_delta.1,
-                reuse_bounds
-            ));
-        } else {
-            node.reuse_bounds = None;
-        }
         let mut children_invalid_area = result.invalid_rects_list[invalid_rects_idx].clone();
         children_invalid_area.remove_unique_rect(ir);
         children_invalid_area.offset(-scroll_delta.0, -scroll_delta.1);

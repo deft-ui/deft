@@ -46,7 +46,7 @@ impl App {
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let win = SkiaWindow::new(event_loop, WindowAttributes::default(), RenderBackendType::SoftBuffer);
+        let win = SkiaWindow::new(event_loop, WindowAttributes::default(), RenderBackendType::GL);
         self.windows.insert(win.id(), win);
     }
 
