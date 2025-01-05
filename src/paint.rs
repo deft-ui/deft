@@ -12,6 +12,7 @@ use crate::element::Element;
 use crate::mrc::Mrc;
 use crate::render::RenderFn;
 use crate::renderer::CpuRenderer;
+use crate::some_or_return;
 use crate::style::ColorHelper;
 
 thread_local! {
@@ -84,9 +85,8 @@ impl Drop for Snapshot {
     }
 }
 
+//TODO rename to LayoutTree?
 pub struct RenderTree {
-    pub viewport: Rect,
-    pub invalid_rects_list: Vec<InvalidArea>,
     pub nodes: Vec<RenderNode>,
     pub ops: Vec<RenderOp>,
 }
@@ -94,8 +94,6 @@ pub struct RenderTree {
 impl RenderTree {
     pub fn new() -> Self {
         Self {
-            viewport: Rect::default(),
-            invalid_rects_list: vec![],
             nodes: vec![],
             ops: vec![],
         }
@@ -110,6 +108,15 @@ impl RenderTree {
         None
     }
 
+    pub fn get_mut_by_element_id(&mut self, element_id: u32) -> Option<&mut RenderNode> {
+        for n in self.nodes.iter_mut().rev() {
+            if n.element_id == element_id {
+                return Some(n)
+            }
+        }
+        None
+    }
+
 }
 
 pub enum RenderOp {
@@ -117,54 +124,61 @@ pub enum RenderOp {
     Finish(usize),
 }
 
+pub struct RenderPaintInfo {
+    pub absolute_transformed_visible_path: Path,
+    pub invalid_rects_idx: usize,
+    pub children_invalid_rects_idx: usize,
+    pub border_color: [Color; 4],
+    pub render_fn: Option<RenderFn>,
+    pub background_image: Option<Image>,
+    pub background_color: Color,
+    pub scroll_delta: (f32, f32),
+}
+
 pub struct RenderNode {
     pub element_id: u32,
     // Relative to viewport
     pub absolute_transformed_bounds: Rect,
-    pub absolute_transformed_visible_path: Path,
+
     // Relative to viewport
     pub total_matrix: Matrix,
-    pub invalid_rects_idx: usize,
-    pub children_invalid_rects_idx: usize,
     pub need_snapshot: bool,
     pub width: f32,
     pub height: f32,
-
 
     pub clip_path: ClipPath,
     pub border_box_path: Path,
     pub border_width: (f32, f32, f32, f32),
     pub border_paths: [Path; 4],
-    pub border_color: [Color; 4],
-    pub render_fn: Option<RenderFn>,
-    pub background_image: Option<Image>,
-    pub background_color: Color,
+
     pub children_viewport: Option<Rect>,
     // relative bounds
     // pub reuse_bounds: Option<(f32, f32, Rect)>,
-    pub scroll_delta: (f32, f32),
+    pub paint_info: Option<RenderPaintInfo>,
 }
 
 impl RenderNode {
     pub fn draw_background(&self, canvas: &Canvas) {
-        if let Some(img) = &self.background_image {
+        let pi = some_or_return!(&self.paint_info);
+        if let Some(img) = &pi.background_image {
             canvas.draw_image(img, (0.0, 0.0), Some(&Paint::default()));
-        } else if !self.background_color.is_transparent() {
+        } else if !pi.background_color.is_transparent() {
             let mut paint = Paint::default();
             let (bd_top, bd_right, bd_bottom, bd_left) = self.border_width;
             let width = self.width;
             let height = self.height;
             let rect = Rect::new(bd_left, bd_top, width - bd_right, height - bd_bottom);
 
-            paint.set_color(self.background_color);
+            paint.set_color(pi.background_color);
             paint.set_style(SkPaint_Style::Fill);
             canvas.draw_rect(&rect, &paint);
         }
     }
 
     pub fn draw_border(&self, canvas: &Canvas) {
+        let pi = some_or_return!(&self.paint_info);
         let paths = &self.border_paths;
-        let color = &self.border_color;
+        let color = &pi.border_color;
         for i in 0..4 {
             let p = &paths[i];
             if !p.is_empty() {
