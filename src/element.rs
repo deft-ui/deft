@@ -53,6 +53,7 @@ use crate::js::JsError;
 use crate::layout::LayoutRoot;
 use crate::paint::{MatrixCalculator, Painter, UniqueRect};
 use crate::render::RenderFn;
+use crate::style::border_path::BorderPath;
 
 thread_local! {
     pub static NEXT_ELEMENT_ID: Cell<u32> = Cell::new(1);
@@ -926,9 +927,11 @@ impl Element {
         }
     }
 
-    pub fn get_border_box_path(&self) -> Path {
+    pub fn create_border_path(&self) -> BorderPath {
         let bounds = self.get_bounds();
-        build_rect_with_radius(self.style.border_radius, bounds.width, bounds.height)
+        let border_widths = self.get_border_width();
+        let border_widths = [border_widths.0, border_widths.1, border_widths.2, border_widths.3];
+        BorderPath::new(bounds.width, bounds.height, self.style.border_radius, border_widths)
     }
 
     pub fn get_origin_border_bounds(&self) -> base::Rect {

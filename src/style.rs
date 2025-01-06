@@ -1,3 +1,5 @@
+pub mod border_path;
+
 use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 use std::f32::consts::PI;
@@ -748,7 +750,6 @@ pub struct StyleNodeInner {
 
     parent: Option<MrcWeak<Self>>,
     children: Vec<StyleNode>,
-    border_paths: CacheValue<BorderParams, [Path; 4]>,
 
     // (inherited, computed)
     pub color: PropValue<Color>,
@@ -829,9 +830,6 @@ impl StyleNode {
             on_changed: None,
             animation_renderer: None,
             font_size: PropValue::Inherit,
-            border_paths: CacheValue::new(|p: &BorderParams| {
-                build_border_paths(p.border_width, p.border_radius, p.width, p.height)
-            }),
         };
         Self { inner: Mrc::new(inner) }
     }
@@ -1128,23 +1126,6 @@ impl StyleNode {
                 }));
             }
         }
-    }
-
-    pub fn get_border_paths(&self) -> [Path; 4] {
-        let border_width = [
-            self.get_layout_border_top().de_nan(0.0),
-            self.get_layout_border_right().de_nan(0.0),
-            self.get_layout_border_bottom().de_nan(0.0),
-            self.get_layout_border_left().de_nan(0.0),
-        ];
-        let width = self.get_layout_width().de_nan(0.0);
-        let height = self.get_layout_height().de_nan(0.0);
-        self.border_paths.get(BorderParams {
-            border_width,
-            border_radius: self.border_radius,
-            width,
-            height
-        })
     }
 
     pub fn get_parent(&self) -> Option<StyleNode> {

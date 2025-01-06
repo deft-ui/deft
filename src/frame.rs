@@ -1181,7 +1181,7 @@ fn draw_element(canvas: &Canvas, node: &mut RenderNode, painter: &mut dyn Painte
 
     canvas.session(move |canvas| {
         // set clip path
-        let clip_path = &node.border_box_path;
+        let clip_path = node.border_path.get_box_path();
         canvas.clip_path(&clip_path, SkClipOp::Intersect, false);
 
         // draw background and border
@@ -1239,11 +1239,13 @@ fn collect_render_nodes(
     bounds: Rect,
 ) {
     let origin_bounds = root.get_origin_bounds().to_skia_rect();
-    let border_box_path =  root.get_border_box_path();
+
+    let mut border_path = root.create_border_path();
+    let border_box_path =  border_path.get_box_path();
 
     root.apply_transform(matrix_calculator);
     //TODO support overflow:visible
-    matrix_calculator.intersect_clip_path(&ClipPath::from_path(&border_box_path));
+    matrix_calculator.intersect_clip_path(&ClipPath::from_path(border_box_path));
 
     let total_matrix = matrix_calculator.get_total_matrix();
     let clip_path = matrix_calculator.get_clip_path().clone();
@@ -1263,8 +1265,7 @@ fn collect_render_nodes(
         total_matrix,
         clip_path,
         border_width: root.get_border_width(),
-        border_box_path,
-        border_paths: root.style.get_border_paths(),
+        border_path,
         children_viewport: root.get_children_viewport(),
         need_snapshot: root.need_snapshot,
         paint_info: None,
@@ -1316,7 +1317,7 @@ fn build_render_paint_info(
         scroll_left: root.scroll_left,
         scroll_top: root.scroll_top,
     });
-    let absolute_transformed_visible_path = node.clip_path.clip(&node.border_box_path).with_transform(&node.total_matrix);
+    let absolute_transformed_visible_path = node.clip_path.clip(&node.border_path.get_box_path()).with_transform(&node.total_matrix);
     let paint_info = RenderPaintInfo {
         invalid_rects_idx: *invalid_rects_idx,
         absolute_transformed_visible_path,

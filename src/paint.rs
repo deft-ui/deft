@@ -13,6 +13,7 @@ use crate::mrc::Mrc;
 use crate::render::RenderFn;
 use crate::renderer::CpuRenderer;
 use crate::some_or_return;
+use crate::style::border_path::BorderPath;
 use crate::style::ColorHelper;
 
 thread_local! {
@@ -147,14 +148,13 @@ pub struct RenderNode {
     pub height: f32,
 
     pub clip_path: ClipPath,
-    pub border_box_path: Path,
     pub border_width: (f32, f32, f32, f32),
-    pub border_paths: [Path; 4],
 
     pub children_viewport: Option<Rect>,
     // relative bounds
     // pub reuse_bounds: Option<(f32, f32, Rect)>,
     pub paint_info: Option<RenderPaintInfo>,
+    pub border_path: BorderPath,
 }
 
 impl RenderNode {
@@ -175,9 +175,9 @@ impl RenderNode {
         }
     }
 
-    pub fn draw_border(&self, canvas: &Canvas) {
+    pub fn draw_border(&mut self, canvas: &Canvas) {
         let pi = some_or_return!(&self.paint_info);
-        let paths = &self.border_paths;
+        let paths = self.border_path.get_paths();
         let color = &pi.border_color;
         for i in 0..4 {
             let p = &paths[i];
