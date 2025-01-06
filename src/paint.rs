@@ -86,47 +86,122 @@ impl Drop for Snapshot {
     }
 }
 
+pub struct LayoutNodeMeta {
+    pub children: Vec<usize>,
+}
+
+impl LayoutNodeMeta {
+    pub fn new() -> Self {
+        Self {
+            children: Vec::new(),
+        }
+    }
+}
+
 //TODO rename to LayoutTree?
 pub struct RenderTree {
-    pub nodes: Vec<RenderNode>,
+    nodes: Vec<RenderNode>,
+    element2node: HashMap<u32, usize>,
+    node_meta_list: Vec<LayoutNodeMeta>,
     pub ops: Vec<RenderOp>,
 }
 
 impl RenderTree {
-    pub fn new() -> Self {
+    pub fn new(predicate_count: usize) -> Self {
         Self {
-            nodes: vec![],
-            ops: vec![],
+            nodes: Vec::with_capacity(predicate_count),
+            node_meta_list: Vec::with_capacity(predicate_count),
+            ops: Vec::with_capacity(predicate_count * 2),
+            element2node: HashMap::with_capacity(predicate_count),
         }
     }
 
     pub fn get_by_element_id(&self, element_id: u32) -> Option<&RenderNode> {
-        for n in self.nodes.iter().rev() {
-            if n.element_id == element_id {
-                return Some(n)
-            }
-        }
-        None
+        let node_idx = self.element2node.get(&element_id)?;
+        Some(&self.nodes[*node_idx])
     }
 
     pub fn get_mut_by_element_id(&mut self, element_id: u32) -> Option<&mut RenderNode> {
-        for n in self.nodes.iter_mut().rev() {
-            if n.element_id == element_id {
-                return Some(n)
-            }
-        }
-        None
+        let node_idx = self.element2node.get(&element_id)?;
+        Some(&mut self.nodes[*node_idx])
     }
+
+    pub fn add_node(&mut self, node: RenderNode) -> usize {
+        let idx = self.nodes.len();
+        self.element2node.insert(node.element_id, idx);
+        self.nodes.push(node);
+        self.node_meta_list.push(LayoutNodeMeta::new());
+        idx
+    }
+
+    pub fn update_layout_info_recurse(
+        &mut self,
+        root: &mut Element,
+        matrix_calculator: &mut MatrixCalculator,
+        bounds: Rect,
+    ) {
+        let node_idx = *some_or_return!(self.element2node.get(&root.get_id()));
+        let origin_bounds = root.get_origin_bounds().to_skia_rect();
+
+        let mut border_path = root.create_border_path();
+        let border_box_path =  border_path.get_box_path();
+
+        root.apply_transform(matrix_calculator);
+        //TODO support overflow:visible
+        matrix_calculator.intersect_clip_path(&ClipPath::from_path(border_box_path));
+
+        let total_matrix = matrix_calculator.get_total_matrix();
+        let clip_chain = matrix_calculator.get_clip_chain();
+
+
+        let (transformed_bounds, _) = total_matrix.map_rect(Rect::from_xywh(0.0, 0.0, bounds.width(), bounds.height()));
+        let node = &mut self.nodes[node_idx];
+        node.absolute_transformed_bounds = transformed_bounds;
+        node.width = bounds.width();
+        node.height = bounds.height();
+        node.total_matrix = total_matrix;
+        node.clip_chain = clip_chain;
+        node.border_path = border_path;
+        for mut c in root.get_children() {
+            let child_bounds = c.get_bounds().translate(-root.scroll_left, -root.scroll_top);
+            matrix_calculator.save();
+            matrix_calculator.translate((child_bounds.x, child_bounds.y));
+            self.update_layout_info_recurse(&mut c, matrix_calculator, bounds);
+            matrix_calculator.restore();
+        }
+    }
+
+    pub fn bind_children(&mut self, node_idx: usize, children: Vec<usize>) {
+        self.node_meta_list[node_idx].children = children;
+    }
+
+    pub fn get_node_mut(&mut self, node_idx: usize) -> Option<&mut RenderNode> {
+        self.nodes.get_mut(node_idx)
+    }
+
+    pub fn get_node_mut_unchecked(&mut self, node_idx: usize) -> &mut RenderNode {
+        self.nodes.get_mut(node_idx).unwrap()
+    }
+
+    pub fn nodes(&self) -> &Vec<RenderNode> {
+        &self.nodes
+    }
+
+    pub fn nodes_mut(&mut self) -> &mut Vec<RenderNode> {
+        &mut self.nodes
+    }
+
 
 }
 
+#[derive(Clone)]
 pub enum RenderOp {
     Render(usize),
     Finish(usize),
 }
 
 pub struct RenderPaintInfo {
-    pub absolute_transformed_visible_path: Path,
+    // pub absolute_transformed_visible_path: Option<Path>,
     pub invalid_rects_idx: usize,
     pub children_invalid_rects_idx: usize,
     pub border_color: [Color; 4],
@@ -395,6 +470,9 @@ pub struct ClipChain {
 }
 
 impl ClipChain {
+    pub fn new() -> ClipChain {
+        Self { ops: Vec::new() }
+    }
     pub fn apply(&self, canvas: &Canvas) {
         for op in &self.ops {
             match op {

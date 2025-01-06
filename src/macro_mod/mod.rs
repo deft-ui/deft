@@ -34,3 +34,14 @@ macro_rules! some_or_return {
         }
     }
 }
+
+#[macro_export]
+macro_rules! some_or_continue {
+    ($expr:expr) => {
+        if let Some(v) = $expr {
+            v
+        } else {
+            continue;
+        }
+    };
+}
