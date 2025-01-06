@@ -1176,8 +1176,9 @@ fn draw_elements(root_canvas: &Canvas,
 fn draw_element(canvas: &Canvas, node: &mut RenderNode, painter: &mut dyn Painter) {
     let width = node.width;
     let height = node.height;
-    canvas.concat(&node.total_matrix);
-    node.clip_path.apply(canvas);
+    node.clip_chain.apply(canvas);
+    // canvas.concat(&node.total_matrix);
+    // node.clip_path.apply(canvas);
 
     canvas.session(move |canvas| {
         // set clip path
@@ -1248,7 +1249,7 @@ fn collect_render_nodes(
     matrix_calculator.intersect_clip_path(&ClipPath::from_path(border_box_path));
 
     let total_matrix = matrix_calculator.get_total_matrix();
-    let clip_path = matrix_calculator.get_clip_path().clone();
+    let clip_chain = matrix_calculator.get_clip_chain();
 
 
     let (transformed_bounds, _) = total_matrix.map_rect(Rect::from_xywh(0.0, 0.0, bounds.width(), bounds.height()));
@@ -1263,7 +1264,7 @@ fn collect_render_nodes(
         width: origin_bounds.width(),
         height: origin_bounds.height(),
         total_matrix,
-        clip_path,
+        clip_chain,
         border_width: root.get_border_width(),
         border_path,
         children_viewport: root.get_children_viewport(),
@@ -1317,7 +1318,7 @@ fn build_render_paint_info(
         scroll_left: root.scroll_left,
         scroll_top: root.scroll_top,
     });
-    let absolute_transformed_visible_path = node.clip_path.clip(&node.border_path.get_box_path()).with_transform(&node.total_matrix);
+    let absolute_transformed_visible_path = node.clip_chain.clip(&node.border_path.get_box_path()).with_transform(&node.total_matrix);
     let paint_info = RenderPaintInfo {
         invalid_rects_idx: *invalid_rects_idx,
         absolute_transformed_visible_path,

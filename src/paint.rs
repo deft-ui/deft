@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use measure_time::print_time;
 use skia_bindings::{SkClipOp, SkPaint_Style, SkPathOp};
-use skia_safe::{scalar, Color, IRect, Image, Matrix, Paint, Path, Point, Rect, Vector};
+use skia_safe::{scalar, ClipOp, Color, IRect, Image, Matrix, Paint, Path, Point, Rect, Vector};
 use skia_safe::Canvas;
 use skia_window::layer::Layer;
 use crate::base::{Id, IdKey};
@@ -147,7 +147,7 @@ pub struct RenderNode {
     pub width: f32,
     pub height: f32,
 
-    pub clip_path: ClipPath,
+    pub clip_chain: ClipChain,
     pub border_width: (f32, f32, f32, f32),
 
     pub children_viewport: Option<Rect>,
@@ -390,11 +390,72 @@ impl PartialInvalidArea {
     }
 }
 
+pub struct ClipChain {
+    ops: Vec<CanvasOp>,
+}
+
+impl ClipChain {
+    pub fn apply(&self, canvas: &Canvas) {
+        for op in &self.ops {
+            match op {
+                CanvasOp::IntersectClipPath(cp) => {
+                    cp.apply(canvas);
+                }
+                CanvasOp::Translate(v) => {
+                    canvas.translate(*v);
+                }
+                CanvasOp::Rotate(degree, p) => {
+                    canvas.rotate(*degree, p.clone());
+                }
+                CanvasOp::Scale(sx, sy) => {
+                    canvas.scale((*sx, *sy));
+                }
+            }
+        }
+    }
+
+    pub fn clip(&self, path: &Path) -> Path {
+        //TODO cache
+        let mut clip_path = ClipPath::unlimited();
+        for op in &self.ops {
+            match op {
+                CanvasOp::IntersectClipPath(p) => {
+                    clip_path.intersect(p);
+                }
+                CanvasOp::Translate(vector) => {
+                    clip_path.offset((-vector.x, -vector.y));
+                }
+                CanvasOp::Rotate(degree, p) => {
+                    if let Some(p) = p {
+                        clip_path.transform(&Matrix::rotate_deg_pivot(-degree, *p));
+                    } else {
+                        clip_path.transform(&Matrix::rotate_deg(-degree));
+                    }
+                }
+                CanvasOp::Scale(sx, sy) => {
+                    clip_path.transform(&Matrix::scale((1.0 / sx, 1.0 / sy)));
+                }
+            }
+        }
+        clip_path.clip(path)
+    }
+
+}
+
+#[derive(Clone)]
+pub enum CanvasOp {
+    IntersectClipPath(ClipPath),
+    Translate(Vector),
+    Rotate(f32, Option<Point>),
+    Scale(f32, f32),
+}
+
+
 pub struct MatrixCalculator {
     matrix: Matrix,
-    clip_path: ClipPath,
     cpu_renderer: CpuRenderer,
-    saved_paths: Vec<ClipPath>,
+    ops: Vec<CanvasOp>,
+    saved_ops_sizes: Vec<usize>,
 }
 
 impl MatrixCalculator {
@@ -403,45 +464,46 @@ impl MatrixCalculator {
         Self {
             matrix: Matrix::default(),
             cpu_renderer,
-            clip_path: ClipPath::unlimited(),
-            saved_paths: Vec::new(),
+            saved_ops_sizes: Vec::new(),
+            ops: Vec::new(),
         }
     }
     pub fn intersect_clip_path(&mut self, path: &ClipPath) {
-        self.clip_path.intersect(path);
+        self.ops.push(CanvasOp::IntersectClipPath(path.clone()));
     }
 
     pub fn translate(&mut self, vector: impl Into<Vector>) {
         let vector = vector.into();
         self.cpu_renderer.canvas().translate(vector);
-        self.clip_path.offset((-vector.x, -vector.y));
+        self.ops.push(CanvasOp::Translate(vector));
     }
     pub fn rotate(&mut self, degree: f32, p: Option<Point>) {
         let p = p.into();
         self.cpu_renderer.canvas().rotate(degree, p);
-        if let Some(p) = p {
-            self.clip_path.transform(&Matrix::rotate_deg_pivot(-degree, p));
-        } else {
-            self.clip_path.transform(&Matrix::rotate_deg(-degree));
-        }
+        self.ops.push(CanvasOp::Rotate(degree, p));
     }
     pub fn scale(&mut self, (sx, sy): (scalar, scalar)) {
         self.cpu_renderer.canvas().scale((sx, sy));
-        self.clip_path.transform(&Matrix::scale((1.0 / sx, 1.0 / sy)));
+        self.ops.push(CanvasOp::Scale(sx, sy));
     }
     pub fn get_total_matrix(&mut self) -> Matrix {
         self.cpu_renderer.canvas().total_matrix()
     }
-    pub fn get_clip_path(&mut self) -> &ClipPath {
-        &self.clip_path
+    pub fn get_clip_chain(&mut self) -> ClipChain {
+        ClipChain {
+            ops: self.ops.clone(),
+        }
     }
     pub fn save(&mut self) {
         self.cpu_renderer.canvas().save();
-        self.saved_paths.push(self.clip_path.clone());
+        self.saved_ops_sizes.push(self.ops.len());
     }
     pub fn restore(&mut self) {
         self.cpu_renderer.canvas().restore();
-        self.clip_path = self.saved_paths.pop().unwrap();
+        let saved_size = self.saved_ops_sizes.pop().unwrap();
+        while self.ops.len() > saved_size {
+            self.ops.pop().unwrap();
+        }
     }
 }
 
