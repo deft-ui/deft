@@ -12,7 +12,7 @@ use crate::element::Element;
 use crate::mrc::Mrc;
 use crate::render::RenderFn;
 use crate::renderer::CpuRenderer;
-use crate::some_or_return;
+use crate::{some_or_break, some_or_continue, some_or_return};
 use crate::style::border_path::BorderPath;
 use crate::style::ColorHelper;
 
@@ -104,6 +104,27 @@ pub struct RenderTree {
     element2node: HashMap<u32, usize>,
     node_meta_list: Vec<LayoutNodeMeta>,
     pub ops: Vec<RenderOp>,
+    pub layers: Vec<RenderLayer>,
+}
+
+pub struct RenderLayer {
+    pub root: RenderLayerNode,
+    pub graphic_layer: Option<Layer>,
+    invalid_area: InvalidArea,
+}
+
+impl RenderLayer {
+    pub fn invalid(&mut self, rect: &Rect) {
+        self.invalid_area.add_rect(Some(rect));
+    }
+    pub fn invalid_all(&mut self) {
+        self.invalid_area = InvalidArea::Full;
+    }
+}
+
+pub struct RenderLayerNode {
+    pub node_idx: usize,
+    pub children: Vec<RenderLayerNode>,
 }
 
 impl RenderTree {
@@ -113,6 +134,7 @@ impl RenderTree {
             node_meta_list: Vec::with_capacity(predicate_count),
             ops: Vec::with_capacity(predicate_count * 2),
             element2node: HashMap::with_capacity(predicate_count),
+            layers: Vec::new(),
         }
     }
 
@@ -132,6 +154,58 @@ impl RenderTree {
         self.nodes.push(node);
         self.node_meta_list.push(LayoutNodeMeta::new());
         idx
+    }
+
+    pub fn rebuild_layers(&mut self, root: &mut Element) {
+        let mut layer_roots = Vec::new();
+        layer_roots.push(root.clone());
+        let mut layers = Vec::new();
+        loop {
+            let mut element_root = some_or_break!(layer_roots.pop());
+            let layer_idx = layers.len();
+            let layer_root = self.build_layer_node(layer_idx, &mut element_root, &mut layer_roots, 0.0, 0.0).unwrap();
+            layers.push(RenderLayer {
+                root: layer_root,
+                graphic_layer: None,
+                invalid_area: InvalidArea::Full,
+            });
+        }
+        self.layers = layers;
+    }
+
+    pub fn invalid_element(&mut self, element_id: u32) {
+        let node = some_or_return!(self.get_by_element_id(element_id));
+        let layer_idx = node.layer_idx;
+        let bounds = Rect::from_xywh(node.layer_x, node.layer_y, node.width, node.height);
+        self.layers[layer_idx].invalid(&bounds);
+    }
+
+    fn need_create_layer(element: &Element) -> bool {
+        element.need_snapshot || element.style.transform.is_some()
+    }
+
+    fn build_layer_node(&mut self, layer_idx: usize, root: &mut Element, layer_roots: &mut Vec<Element>, layer_x: f32, layer_y: f32) -> Option<RenderLayerNode> {
+        let node_idx = *self.element2node.get(&root.get_id())?;
+        let node = &mut self.nodes[node_idx];
+        node.layer_idx = layer_idx;
+        node.layer_x = layer_x;
+        node.layer_y = layer_y;
+        let mut children = Vec::new();
+        for mut c in root.get_children() {
+            if Self::need_create_layer(&c) {
+                layer_roots.push(c);
+            } else {
+                let bounds = c.get_bounds().translate(-root.scroll_left, -root.scroll_top);
+                let layer_x = layer_x + bounds.x;
+                let layer_y = layer_y + bounds.y;
+                children.push(self.build_layer_node(layer_idx, &mut c, layer_roots, layer_x, layer_y)?);
+            }
+        }
+
+        Some(RenderLayerNode {
+            node_idx,
+            children,
+        })
     }
 
     pub fn update_layout_info_recurse(
@@ -230,6 +304,9 @@ pub struct RenderNode {
     // pub reuse_bounds: Option<(f32, f32, Rect)>,
     pub paint_info: Option<RenderPaintInfo>,
     pub border_path: BorderPath,
+    pub layer_idx: usize,
+    pub layer_x: f32,
+    pub layer_y: f32,
 }
 
 impl RenderNode {

@@ -46,7 +46,7 @@ use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorGrabMode, CursorIcon, Window, WindowAttributes, WindowId};
 use crate::{bind_js_event_listener, is_snapshot_usable, send_app_event, some_or_continue, some_or_return};
 use crate::frame_rate::{get_total_frames, next_frame, FRAME_RATE_CONTROLLER};
-use crate::paint::{InvalidArea, PartialInvalidArea, Painter, RenderNode, RenderTree, SkiaPainter, UniqueRect, InvalidRects, RenderOp, Snapshot, SnapshotManager, MatrixCalculator, ClipPath, RenderPaintInfo, LayoutNodeMeta, ClipChain};
+use crate::paint::{InvalidArea, PartialInvalidArea, Painter, RenderNode, RenderTree, SkiaPainter, UniqueRect, InvalidRects, RenderOp, Snapshot, SnapshotManager, MatrixCalculator, ClipPath, RenderPaintInfo, LayoutNodeMeta, ClipChain, RenderLayer, RenderLayerNode};
 use crate::style::border_path::BorderPath;
 use crate::style::ColorHelper;
 
@@ -241,6 +241,11 @@ impl Frame {
 
     pub fn remove_unique_invalid_rect(&mut self, rect: &UniqueRect) {
         self.invalid_area.remove_unique_rect(rect);
+    }
+
+    pub fn invalid_element(&mut self, element_id: u32) {
+        let mut rt = self.render_tree.lock().unwrap();
+        rt.invalid_element(element_id);
     }
 
     pub fn invalid(&mut self, mode: InvalidMode) {
@@ -892,7 +897,9 @@ impl Frame {
         let scale_factor = self.window.scale_factor() as f32;
         let background_color = self.background_color;
         let mut me = self.clone();
-        let invalid_area = me.invalid_area.clone();
+        // let invalid_area = me.invalid_area.clone();
+        //TODO fix
+        let invalid_area = InvalidArea::Full;
         let old_snapshots = me.snapshots.clone();
         let snapshots = SnapshotManager::new();
         me.snapshots = snapshots.clone();
@@ -904,6 +911,7 @@ impl Frame {
             let mut render_tree = render_tree.lock().unwrap();
             print_time!("update layout time");
             render_tree.update_layout_info_recurse(body, &mut mc, body.get_bounds().to_skia_rect());
+            render_tree.rebuild_layers(body);
         } else {
             return ResultWaiter::new_finished(false);
         };
@@ -925,7 +933,12 @@ impl Frame {
             let mut painter = SkiaPainter::new(canvas);
             let mut render_tree = render_tree.lock().unwrap();
             canvas.clear(background_color);
-            draw_elements(canvas, ctx, &mut render_tree, invalid_rects_list, scale_factor, old_snapshots, snapshots, &viewport);
+            let mut layers = Vec::new();
+            layers.append(&mut render_tree.layers);
+            for layer in &mut layers {
+                draw_layer(canvas, ctx, &mut render_tree, layer, scale_factor, &viewport);
+            }
+            //draw_elements(canvas, ctx, &mut render_tree, invalid_rects_list, scale_factor, old_snapshots, snapshots, &viewport);
 
             canvas.restore();
         }), move|r| {
@@ -1003,6 +1016,68 @@ impl WeakWindowHandle {
     pub fn upgrade(&self) -> Option<Frame> {
         self.inner.upgrade().map(|i| Frame::from_inner(i)).ok()
     }
+}
+
+fn draw_layer(
+    root_canvas: &Canvas,
+    context: &mut RenderContext,
+    render_tree: &mut RenderTree,
+    layer: &mut RenderLayer,
+    scale: f32,
+    viewport: &Rect,
+) {
+    let mut graphic_layer = if let Some(gl) = layer.graphic_layer.take() {
+        gl
+    } else {
+        let width = (viewport.width() * scale) as usize;
+        let height = (viewport.height() * scale) as usize;
+        let mut gl = context.create_layer(width, height).unwrap();
+        gl.canvas().scale((scale, scale));
+        gl
+    };
+    let layer_canvas = graphic_layer.canvas();
+    draw_node_recurse(layer_canvas, scale, &mut layer.root, render_tree);
+
+    unsafe  {
+        let sf = root_canvas.surface();
+        let sf = sf.unwrap();
+        sf.direct_context().unwrap().flush_and_submit();
+    }
+    let root_node = render_tree.get_node_mut(layer.root.node_idx).unwrap();
+    let matrix = &root_node.total_matrix;
+    root_canvas.save();
+    root_canvas.concat(matrix);
+    root_canvas.scale((1.0 / scale, 1.0 / scale));
+    root_canvas.draw_image(graphic_layer.as_image(), (0.0, 0.0), None);
+    root_canvas.restore();
+    unsafe  {
+        let sf = root_canvas.surface();
+        let sf = sf.unwrap();
+        sf.direct_context().unwrap().flush_and_submit();
+    }
+    layer.graphic_layer = Some(graphic_layer);
+}
+
+fn draw_node_recurse(
+    canvas: &Canvas,
+    scale: f32,
+    layer_node: &mut RenderLayerNode,
+    render_tree: &mut RenderTree,
+) {
+    let node = render_tree.get_node_mut(layer_node.node_idx).unwrap();
+    canvas.save();
+    canvas.translate((node.layer_x, node.layer_y));
+    //TODO support overflow:visible
+    // set clip path
+    let clip_path = node.border_path.get_box_path();
+    canvas.clip_path(&clip_path, SkClipOp::Intersect, false);
+    let mut painter = SkiaPainter::new(canvas);
+    draw_element(canvas, node, &mut painter);
+    canvas.translate((-node.layer_x, -node.layer_y));
+    for c in &mut layer_node.children {
+        draw_node_recurse(canvas, scale, c, render_tree);
+    }
+    canvas.restore();
 }
 
 fn draw_elements(root_canvas: &Canvas,
@@ -1198,14 +1273,12 @@ fn draw_elements(root_canvas: &Canvas,
 fn draw_element(canvas: &Canvas, node: &mut RenderNode, painter: &mut dyn Painter) {
     let width = node.width;
     let height = node.height;
-    node.clip_chain.apply(canvas);
+    //TODO fix clip
+    // node.clip_chain.apply(canvas);
     // canvas.concat(&node.total_matrix);
     // node.clip_path.apply(canvas);
 
     canvas.session(move |canvas| {
-        // set clip path
-        let clip_path = node.border_path.get_box_path();
-        canvas.clip_path(&clip_path, SkClipOp::Intersect, false);
 
         // draw background and border
         node.draw_background(&canvas);
@@ -1265,6 +1338,9 @@ fn collect_render_nodes(
         children_viewport: root.get_children_viewport(),
         need_snapshot: root.need_snapshot,
         paint_info: None,
+        layer_idx: 0,
+        layer_x: 0.0,
+        layer_y: 0.0,
         // reuse_bounds: None,
     };
 

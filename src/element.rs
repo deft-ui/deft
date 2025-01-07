@@ -1010,6 +1010,7 @@ pub struct Element {
 
     layout_root: Option<Box<dyn LayoutRoot>>,
     layout_dirty: bool,
+    //TODO rename
     pub need_snapshot: bool,
 }
 

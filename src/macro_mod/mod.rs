@@ -45,3 +45,14 @@ macro_rules! some_or_continue {
         }
     };
 }
+
+#[macro_export]
+macro_rules! some_or_break {
+    ($expr:expr) => {
+        if let Some(v) = $expr {
+            v
+        } else {
+            break;
+        }
+    };
+}
