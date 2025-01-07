@@ -46,7 +46,7 @@ use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorGrabMode, CursorIcon, Window, WindowAttributes, WindowId};
 use crate::{bind_js_event_listener, is_snapshot_usable, send_app_event, some_or_continue, some_or_return};
 use crate::frame_rate::{get_total_frames, next_frame, FRAME_RATE_CONTROLLER};
-use crate::paint::{InvalidArea, PartialInvalidArea, Painter, RenderNode, RenderTree, SkiaPainter, UniqueRect, InvalidRects, RenderOp, Snapshot, SnapshotManager, MatrixCalculator, ClipPath, RenderPaintInfo, LayoutNodeMeta, ClipChain, RenderLayer, RenderLayerNode};
+use crate::paint::{InvalidArea, PartialInvalidArea, Painter, RenderNode, RenderTree, SkiaPainter, UniqueRect, InvalidRects, RenderOp, Snapshot, SnapshotManager, MatrixCalculator, ClipPath, RenderPaintInfo, LayoutNodeMeta, ClipChain, RenderLayer, RenderLayerNode, RenderData};
 use crate::style::border_path::BorderPath;
 use crate::style::ColorHelper;
 
@@ -99,8 +99,8 @@ pub struct Frame {
     last_drag_over: Option<Element>,
     hover: Option<Element>,
     modifiers: Modifiers,
+    dirty: bool,
     layout_dirty: bool,
-    invalid_area: InvalidArea,
     repaint_timer_handle: Option<TimerHandle>,
     event_registration: EventRegistration<FrameWeak>,
     attributes: WindowAttributes,
@@ -203,7 +203,7 @@ impl Frame {
             hover: None,
             modifiers: Modifiers::default(),
             layout_dirty: false,
-            invalid_area: InvalidArea::None,
+            dirty: false,
             dragging: false,
             last_drag_over: None,
             event_registration: EventRegistration::new(),
@@ -239,38 +239,25 @@ impl Frame {
         self.window = Self::create_window(self.attributes.clone());
     }
 
-    pub fn remove_unique_invalid_rect(&mut self, rect: &UniqueRect) {
-        self.invalid_area.remove_unique_rect(rect);
-    }
-
     pub fn invalid_element(&mut self, element_id: u32) {
-        let mut rt = self.render_tree.lock().unwrap();
-        rt.invalid_element(element_id);
+        {
+            let mut rt = self.render_tree.lock().unwrap();
+            rt.invalid_element(element_id);
+        }
+        self.notify_update();
     }
 
-    pub fn invalid(&mut self, mode: InvalidMode) {
-        let is_first_invalid = self.invalid_area == InvalidArea::None;
-        let snapshot_usable = is_snapshot_usable();
-        match mode {
-            InvalidMode::Full => {
-                self.invalid_area.add_rect(None);
-            }
-            InvalidMode::Rect(r) => {
-                if snapshot_usable {
-                    self.invalid_area.add_rect(Some(r));
-                } else {
-                    self.invalid_area.add_rect(None);
-                }
-            }
-            InvalidMode::UniqueRect(ur) => {
-                if snapshot_usable {
-                    self.invalid_area.add_unique_rect(ur);
-                } else {
-                    self.invalid_area.add_rect(None);
-                }
-            }
+    pub fn scroll_layer(&mut self, element_id: u32, delta: (f32, f32)) {
+        {
+            let mut rt = self.render_tree.lock().unwrap();
+            rt.scroll(element_id, delta);
         }
-        if is_first_invalid {
+        self.notify_update();
+    }
+
+    fn notify_update(&mut self) {
+        if !self.dirty {
+            self.dirty = true;
             send_app_event(AppEvent::Update(self.get_id()));
         }
     }
@@ -279,7 +266,7 @@ impl Frame {
         // Note: Uncomment to debug layout problems
         // if layout_dirty && !self.layout_dirty { crate::trace::print_trace("layout dirty") }
         self.layout_dirty = true;
-        self.invalid(InvalidMode::Full);
+        self.notify_update();
     }
 
     pub fn mark_dirty_and_update_immediate(&mut self, layout_dirty: bool) -> ResultWaiter<bool> {
@@ -341,7 +328,7 @@ impl Frame {
     pub fn handle_event(&mut self, event: WindowEvent) {
         match event {
             WindowEvent::RedrawRequested => {
-                self.invalid(InvalidMode::Full);
+                self.dirty = true;
                 self.update();
             }
             WindowEvent::Resized(_physical_size) => {
@@ -762,7 +749,7 @@ impl Frame {
         for cb in frame_callbacks {
             cb.call();
         }
-        if self.invalid_area == InvalidArea::None {
+        if !self.dirty {
             // skip duplicate update
             return ResultWaiter::new_finished(false);
         }
@@ -803,7 +790,7 @@ impl Frame {
         }
         let r = self.paint();
         self.layout_dirty = false;
-        self.invalid_area = InvalidArea::None;
+        self.dirty = false;
         r
     }
 
@@ -935,11 +922,16 @@ impl Frame {
             canvas.clear(background_color);
             let mut layers = Vec::new();
             layers.append(&mut render_tree.layers);
-            for layer in &mut layers {
-                draw_layer(canvas, ctx, &mut render_tree, layer, scale_factor, &viewport);
+            let mut render_data = ctx.user_context.take::<RenderData>().unwrap_or_else(
+                || RenderData::new()
+            );
+            render_data.layers.clear();
+            for mut layer in layers {
+                draw_layer(canvas, ctx, &mut render_data, &mut render_tree, &mut layer, scale_factor, &viewport);
+                render_tree.layers.push(layer);
             }
             //draw_elements(canvas, ctx, &mut render_tree, invalid_rects_list, scale_factor, old_snapshots, snapshots, &viewport);
-
+            ctx.user_context.set(render_data);
             canvas.restore();
         }), move|r| {
             waiter_finisher.finish(r);
@@ -1021,14 +1013,13 @@ impl WeakWindowHandle {
 fn draw_layer(
     root_canvas: &Canvas,
     context: &mut RenderContext,
+    render_data: &mut RenderData,
     render_tree: &mut RenderTree,
     layer: &mut RenderLayer,
     scale: f32,
     viewport: &Rect,
 ) {
-    let mut graphic_layer = if let Some(gl) = layer.graphic_layer.take() {
-        gl
-    } else {
+    let mut graphic_layer = {
         let width = (viewport.width() * scale) as usize;
         let height = (viewport.height() * scale) as usize;
         let mut gl = context.create_layer(width, height).unwrap();
@@ -1055,7 +1046,7 @@ fn draw_layer(
         let sf = sf.unwrap();
         sf.direct_context().unwrap().flush_and_submit();
     }
-    layer.graphic_layer = Some(graphic_layer);
+    render_data.layers.push(graphic_layer);
 }
 
 fn draw_node_recurse(

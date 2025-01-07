@@ -6,6 +6,7 @@ use measure_time::print_time;
 use skia_bindings::{SkClipOp, SkPaint_Style, SkPathOp};
 use skia_safe::{scalar, ClipOp, Color, IRect, Image, Matrix, Paint, Path, Point, Rect, Vector};
 use skia_safe::Canvas;
+use skia_window::context::{RenderContext, UserContext};
 use skia_window::layer::Layer;
 use crate::base::{Id, IdKey};
 use crate::element::Element;
@@ -24,6 +25,16 @@ thread_local! {
 #[derive(Clone)]
 pub struct SnapshotManager {
     store: Arc<Mutex<HashMap<u32, Snapshot>>>,
+}
+
+pub struct RenderData {
+    pub layers: Vec<Layer>,
+}
+
+impl RenderData {
+    pub fn new() -> Self {
+        Self { layers: vec![] }
+    }
 }
 
 impl SnapshotManager {
@@ -109,8 +120,9 @@ pub struct RenderTree {
 
 pub struct RenderLayer {
     pub root: RenderLayerNode,
-    pub graphic_layer: Option<Layer>,
     invalid_area: InvalidArea,
+    scroll_delta_x: f32,
+    scroll_delta_y: f32,
 }
 
 impl RenderLayer {
@@ -119,6 +131,10 @@ impl RenderLayer {
     }
     pub fn invalid_all(&mut self) {
         self.invalid_area = InvalidArea::Full;
+    }
+    pub fn scroll(&mut self, delta: (f32, f32)) {
+        self.scroll_delta_x += delta.0;
+        self.scroll_delta_y += delta.1;
     }
 }
 
@@ -166,8 +182,9 @@ impl RenderTree {
             let layer_root = self.build_layer_node(layer_idx, &mut element_root, &mut layer_roots, 0.0, 0.0).unwrap();
             layers.push(RenderLayer {
                 root: layer_root,
-                graphic_layer: None,
                 invalid_area: InvalidArea::Full,
+                scroll_delta_y: 0.0,
+                scroll_delta_x: 0.0,
             });
         }
         self.layers = layers;
@@ -178,6 +195,12 @@ impl RenderTree {
         let layer_idx = node.layer_idx;
         let bounds = Rect::from_xywh(node.layer_x, node.layer_y, node.width, node.height);
         self.layers[layer_idx].invalid(&bounds);
+    }
+
+    pub fn scroll(&mut self, element_id: u32, delta: (f32, f32)) {
+        let node = some_or_return!(self.get_by_element_id(element_id));
+        let layer_idx = node.layer_idx;
+        self.layers[layer_idx].scroll(delta);
     }
 
     fn need_create_layer(element: &Element) -> bool {

@@ -245,10 +245,10 @@ impl Element {
         let max_scroll_left = (self.get_real_content_size().0 - width).max(0.0);
         value = value.clamp(0.0, max_scroll_left);
         if value != self.scroll_left {
+            self.scroll_layer((value - self.scroll_left, 0.0));
             self.scroll_left = value;
             //TODO emit on layout updated?
             self.emit_scroll_event();
-            self.mark_unique_dirty();
         }
     }
 
@@ -275,10 +275,10 @@ impl Element {
         let max_scroll_top = (self.get_real_content_size().1 - height).max(0.0);
         value = value.clamp(0.0, max_scroll_top);
         if value != self.scroll_top {
+            self.scroll_layer((0.0, value - self.scroll_top));
             self.scroll_top = value;
             //TODO emit on layout updated?
             self.emit_scroll_event();
-            self.mark_unique_dirty();
         }
     }
 
@@ -812,16 +812,10 @@ impl Element {
         self.event_registration.remove_event_listener(&event_type, id)
     }
 
-    pub fn mark_unique_dirty(&mut self) {
-        let bounds = self.get_origin_bounds();
-        let rect = UniqueRect::from_rect(bounds.to_skia_rect());
+    fn scroll_layer(&mut self, delta: (f32, f32)) {
         self.with_window(|win| {
-            if let Some(old_rect) = &self.invalid_unique_rect {
-                win.remove_unique_invalid_rect(old_rect);
-            }
-            win.invalid(InvalidMode::UniqueRect(&rect));
+            win.scroll_layer(self.id, delta)
         });
-        self.invalid_unique_rect = Some(rect);
     }
 
     pub fn set_as_layout_root(&mut self, layout_root: Option<Box<dyn LayoutRoot>>) {
@@ -849,8 +843,7 @@ impl Element {
             });
         } else {
             self.with_window(|win| {
-                let bounds = self.get_origin_bounds();
-                win.invalid(InvalidMode::Rect(&bounds.to_skia_rect()));
+                win.invalid_element(self.id);
             });
         }
     }

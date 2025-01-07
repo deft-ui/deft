@@ -5,7 +5,7 @@ use skia_safe::{Canvas, ColorType, ImageInfo};
 use softbuffer::{Context, Surface};
 use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window};
-use crate::context::RenderContext;
+use crate::context::{RenderContext, UserContext};
 use crate::renderer::Renderer;
 use crate::softbuffer::context::SoftRenderContext;
 use crate::softbuffer::soft_renderer::SoftRenderer;
@@ -39,7 +39,8 @@ impl RenderBackend for SoftSurface {
 
     fn render(&mut self, draw: Renderer, callback: Box<dyn FnOnce(bool) + Send + 'static>) {
         let mut skia_surface = self.renderer.skia_surface().clone();
-        let mut ctx = RenderContext::new(&mut self.context);
+        let mut user_context = self.context.user_context.take().unwrap();
+        let mut ctx = RenderContext::new(&mut self.context, &mut user_context);
         let canvas = skia_surface.canvas();
         draw.render(canvas, &mut ctx);
         {

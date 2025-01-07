@@ -26,7 +26,7 @@ use skia_safe::wrapper::PointerWrapper;
 #[cfg(glx_backend)]
 use winit::platform::x11;
 use winit::window::Window;
-use crate::context::RenderContext;
+use crate::context::{RenderContext, UserContext};
 use crate::gl::context::GlRenderContext;
 use crate::renderer::Renderer;
 
@@ -49,6 +49,7 @@ struct SurfaceParams {
 }
 
 struct GlContext {
+    user_context: Option<UserContext>,
     surface: Surface,
     render_context: GlRenderContext,
     // surface_params: SurfaceParams,
@@ -135,6 +136,7 @@ impl GlRenderer {
                 gl_surface,
                 render_context,
                 context,
+                user_context: Some(UserContext::new()),
             };
             let mut context = Arc::new(Mutex::new(context));
             let drawer = Arc::new(Mutex::new(None));
@@ -259,7 +261,6 @@ impl RenderContextWrapper {
 
         // let mut context = context.borrow_mut();
         let mut rc = context.render_context.clone();
-        let canvas = context.surface.canvas();
         let callback = {
             // print_time!("draw time");
             let drawer = {
@@ -267,8 +268,11 @@ impl RenderContextWrapper {
                 drawer_arc.take()
             };
             if let Some(mut drawer) = drawer {
-                let mut rc = RenderContext::new(&mut rc);
+                let mut user_context = context.user_context.take().unwrap();
+                let canvas = context.surface.canvas();
+                let mut rc = RenderContext::new(&mut rc, &mut user_context);
                 (drawer.task).render(canvas, &mut rc);
+                context.user_context = Some(user_context);
                 drawer.callback
             } else {
                 return;
