@@ -122,6 +122,10 @@ pub fn is_mobile_platform() -> bool {
     return false;
 }
 
+pub fn show_repaint_area() -> bool {
+    true
+}
+
 pub fn is_snapshot_usable() -> bool {
     true
 }

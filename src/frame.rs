@@ -18,7 +18,7 @@ use lento_macros::{event, frame_event, js_func, js_methods, mrc_object};
 use measure_time::print_time;
 use quick_js::{JsValue, ResourceValue};
 use skia_bindings::{SkCanvas_SrcRectConstraint, SkClipOp, SkPathOp, SkRect};
-use skia_safe::{Canvas, ClipOp, Color, ColorType, Contains, IRect, Image, ImageInfo, Matrix, Paint, Path, Point, Rect};
+use skia_safe::{Canvas, ClipOp, Color, ColorType, Contains, IRect, Image, ImageInfo, Matrix, Paint, PaintStyle, Path, Point, Rect};
 use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
@@ -26,7 +26,7 @@ use std::num::NonZeroU32;
 use std::ops::{Deref, DerefMut};
 use std::process::exit;
 use std::rc::Rc;
-use std::{env, slice};
+use std::{env, mem, slice};
 use std::string::ToString;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
@@ -34,6 +34,7 @@ use skia_bindings::SkPaint_Style::{Fill, Stroke};
 use skia_safe::canvas::SetMatrix;
 use skia_safe::wrapper::{NativeTransmutableWrapper, PointerWrapper};
 use skia_window::context::RenderContext;
+use skia_window::layer::Layer;
 use skia_window::renderer::Renderer;
 use winit::dpi::Position::Logical;
 use winit::dpi::{LogicalPosition, LogicalSize, Position, Size};
@@ -44,9 +45,9 @@ use winit::keyboard::{Key, NamedKey};
 #[cfg(feature = "x11")]
 use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorGrabMode, CursorIcon, Window, WindowAttributes, WindowId};
-use crate::{bind_js_event_listener, is_snapshot_usable, send_app_event, some_or_continue, some_or_return};
+use crate::{bind_js_event_listener, is_snapshot_usable, send_app_event, show_repaint_area, some_or_continue, some_or_return};
 use crate::frame_rate::{get_total_frames, next_frame, FRAME_RATE_CONTROLLER};
-use crate::paint::{InvalidArea, PartialInvalidArea, Painter, RenderNode, RenderTree, SkiaPainter, UniqueRect, InvalidRects, RenderOp, Snapshot, SnapshotManager, MatrixCalculator, ClipPath, RenderPaintInfo, LayoutNodeMeta, ClipChain, RenderLayer, RenderLayerNode, RenderData};
+use crate::paint::{InvalidArea, PartialInvalidArea, Painter, RenderNode, RenderTree, SkiaPainter, UniqueRect, InvalidRects, RenderOp, Snapshot, SnapshotManager, MatrixCalculator, ClipPath, RenderPaintInfo, LayoutNodeMeta, ClipChain, RenderLayer, RenderLayerNode, RenderData, RenderLayerKey};
 use crate::style::border_path::BorderPath;
 use crate::style::ColorHelper;
 
@@ -922,16 +923,14 @@ impl Frame {
             canvas.clear(background_color);
             let mut layers = Vec::new();
             layers.append(&mut render_tree.layers);
-            let mut render_data = ctx.user_context.take::<RenderData>().unwrap_or_else(
-                || RenderData::new()
-            );
-            render_data.layers.clear();
+            let mut render_data = RenderData::take(ctx);
+            let mut old_layers = mem::take(&mut render_data.layers);
             for mut layer in layers {
-                draw_layer(canvas, ctx, &mut render_data, &mut render_tree, &mut layer, scale_factor, &viewport);
+                draw_layer(canvas, ctx, &mut old_layers, &mut render_data, &mut render_tree, &mut layer, scale_factor, &viewport);
                 render_tree.layers.push(layer);
             }
             //draw_elements(canvas, ctx, &mut render_tree, invalid_rects_list, scale_factor, old_snapshots, snapshots, &viewport);
-            ctx.user_context.set(render_data);
+            render_data.put(ctx);
             canvas.restore();
         }), move|r| {
             waiter_finisher.finish(r);
@@ -1013,13 +1012,41 @@ impl WeakWindowHandle {
 fn draw_layer(
     root_canvas: &Canvas,
     context: &mut RenderContext,
+    old_graphic_layers: &mut HashMap<RenderLayerKey, Layer>,
     render_data: &mut RenderData,
     render_tree: &mut RenderTree,
     layer: &mut RenderLayer,
     scale: f32,
     viewport: &Rect,
 ) {
-    let mut graphic_layer = {
+    let mut graphic_layer = if let Some(mut ogl) = old_graphic_layers.remove(&layer.key) {
+        if layer.scroll_delta_x != 0.0 || layer.scroll_delta_y != 0.0 {
+            //TODO optimize size
+            let tp_width = (viewport.width() * scale) as usize;
+            let tp_height = (viewport.height() * scale) as usize;
+            let mut temp_gl = context.create_layer(tp_width, tp_height).unwrap();
+            temp_gl.canvas().draw_image(&ogl.as_image(), (-layer.scroll_delta_x * scale, -layer.scroll_delta_y * scale), None);
+            unsafe  {
+                let sf = root_canvas.surface();
+                let sf = sf.unwrap();
+                sf.direct_context().unwrap().flush_and_submit();
+            }
+            let root_node = render_tree.get_node_mut(layer.root.node_idx).unwrap();
+            ogl.canvas().session(|canvas| {
+                canvas.clip_rect(&Rect::from_xywh(0.0, 0.0, root_node.width, root_node.height), ClipOp::Intersect, false);
+                canvas.scale((1.0 / scale, 1.0 / scale));
+                canvas.draw_image(&temp_gl.as_image(), (0.0, 0.0) , None);
+            });
+            unsafe  {
+                let sf = root_canvas.surface();
+                let sf = sf.unwrap();
+                sf.direct_context().unwrap().flush_and_submit();
+            }
+            layer.scroll_delta_x = 0.0;
+            layer.scroll_delta_y = 0.0;
+        }
+        ogl
+    } else {
         let width = (viewport.width() * scale) as usize;
         let height = (viewport.height() * scale) as usize;
         let mut gl = context.create_layer(width, height).unwrap();
@@ -1027,7 +1054,12 @@ fn draw_layer(
         gl
     };
     let layer_canvas = graphic_layer.canvas();
+    layer_canvas.save();
+    let invalid_path = layer.build_invalid_path(viewport);
+    layer_canvas.clip_path(&invalid_path, ClipOp::Intersect, false);
+    layer_canvas.clear(Color::TRANSPARENT);
     draw_node_recurse(layer_canvas, scale, &mut layer.root, render_tree);
+    layer_canvas.restore();
 
     unsafe  {
         let sf = root_canvas.surface();
@@ -1040,13 +1072,24 @@ fn draw_layer(
     root_canvas.concat(matrix);
     root_canvas.scale((1.0 / scale, 1.0 / scale));
     root_canvas.draw_image(graphic_layer.as_image(), (0.0, 0.0), None);
+    if show_repaint_area() {
+        root_canvas.scale((scale, scale));
+        let path = layer.build_invalid_path(&viewport);
+        if !path.is_empty() {
+            let mut paint = Paint::default();
+            paint.set_style(PaintStyle::Stroke);
+            paint.set_color(Color::from_rgb(200, 0, 0));
+            root_canvas.draw_path(&path, &paint);
+        }
+    }
     root_canvas.restore();
     unsafe  {
         let sf = root_canvas.surface();
         let sf = sf.unwrap();
         sf.direct_context().unwrap().flush_and_submit();
     }
-    render_data.layers.push(graphic_layer);
+    render_data.layers.insert(layer.key.clone(), graphic_layer);
+    layer.reset_invalid_area();
 }
 
 fn draw_node_recurse(
