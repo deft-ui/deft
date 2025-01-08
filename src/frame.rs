@@ -906,7 +906,7 @@ impl Frame {
         let invalid_rects_list = {
             let mut render_tree = render_tree.lock().unwrap();
             print_time!("update repaint time");
-            build_repaint_nodes(&mut render_tree, &mut body, invalid_area, viewport)
+            build_repaint_nodes(&mut render_tree, &mut body, viewport)
         };
         self.render_tree = render_tree.clone();
         let waiter_finisher = waiter.clone();
@@ -1020,6 +1020,7 @@ fn draw_layer(
     viewport: &Rect,
 ) {
     let mut graphic_layer = if let Some(mut ogl) = old_graphic_layers.remove(&layer.key) {
+        //TODO fix
         if layer.scroll_delta_x != 0.0 || layer.scroll_delta_y != 0.0 {
             //TODO optimize size
             let tp_width = (viewport.width() * scale) as usize;
@@ -1031,9 +1032,9 @@ fn draw_layer(
                 let sf = sf.unwrap();
                 sf.direct_context().unwrap().flush_and_submit();
             }
-            let root_node = render_tree.get_node_mut(layer.root.node_idx).unwrap();
             ogl.canvas().session(|canvas| {
-                canvas.clip_rect(&Rect::from_xywh(0.0, 0.0, root_node.width, root_node.height), ClipOp::Intersect, false);
+                canvas.clear(Color::TRANSPARENT);
+                canvas.clip_rect(&Rect::from_xywh(0.0, 0.0, layer.width, layer.height), ClipOp::Intersect, false);
                 canvas.scale((1.0 / scale, 1.0 / scale));
                 canvas.draw_image(&temp_gl.as_image(), (0.0, 0.0) , None);
             });
@@ -1057,8 +1058,9 @@ fn draw_layer(
     layer_canvas.save();
     let invalid_path = layer.build_invalid_path(viewport);
     layer_canvas.clip_path(&invalid_path, ClipOp::Intersect, false);
+    layer_canvas.clip_rect(&Rect::from_xywh(0.0, 0.0, layer.width, layer.height), ClipOp::Intersect, false);
     layer_canvas.clear(Color::TRANSPARENT);
-    draw_node_recurse(layer_canvas, scale, &mut layer.root, render_tree);
+    draw_nodes_recurse(layer_canvas, scale, &mut layer.nodes, render_tree);
     layer_canvas.restore();
 
     unsafe  {
@@ -1066,10 +1068,8 @@ fn draw_layer(
         let sf = sf.unwrap();
         sf.direct_context().unwrap().flush_and_submit();
     }
-    let root_node = render_tree.get_node_mut(layer.root.node_idx).unwrap();
-    let matrix = &root_node.total_matrix;
     root_canvas.save();
-    root_canvas.concat(matrix);
+    root_canvas.concat(&layer.total_matrix);
     root_canvas.scale((1.0 / scale, 1.0 / scale));
     root_canvas.draw_image(graphic_layer.as_image(), (0.0, 0.0), None);
     if show_repaint_area() {
@@ -1092,6 +1092,17 @@ fn draw_layer(
     layer.reset_invalid_area();
 }
 
+fn draw_nodes_recurse(
+    canvas: &Canvas,
+    scale: f32,
+    nodes: &mut Vec<RenderLayerNode>,
+    render_tree: &mut RenderTree,
+) {
+    for n in nodes {
+        draw_node_recurse(canvas, scale, n, render_tree);
+    }
+}
+
 fn draw_node_recurse(
     canvas: &Canvas,
     scale: f32,
@@ -1105,12 +1116,13 @@ fn draw_node_recurse(
     // set clip path
     let clip_path = node.border_path.get_box_path();
     canvas.clip_path(&clip_path, SkClipOp::Intersect, false);
-    let mut painter = SkiaPainter::new(canvas);
-    draw_element(canvas, node, &mut painter);
-    canvas.translate((-node.layer_x, -node.layer_y));
-    for c in &mut layer_node.children {
-        draw_node_recurse(canvas, scale, c, render_tree);
+    if node.paint_info.as_ref().is_some_and(|p| p.need_paint) {
+        node.paint_info.as_mut().unwrap().need_paint = false;
+        let mut painter = SkiaPainter::new(canvas);
+        draw_element(canvas, node, &mut painter);
     }
+    canvas.translate((-node.layer_x, -node.layer_y));
+    draw_nodes_recurse(canvas, scale, &mut layer_node.children, render_tree);
     canvas.restore();
 }
 
@@ -1150,7 +1162,8 @@ fn draw_elements(root_canvas: &Canvas,
                     };
                     let invalid_rects = invalid_rects_list[pi.invalid_rects_idx].build(viewport);
                     last_invalid_rects_idx = Some(pi.invalid_rects_idx);
-                    if invalid_rects.has_intersects(&node.absolute_transformed_bounds) {
+                    let bounds = Rect::from_xywh(node.layer_x, node.layer_y, node.width, node.height);
+                    if  invalid_rects.has_intersects(&bounds) {
                         canvas.session(|c| {
                             let mut painter = SkiaPainter::new(c);
                             painter.set_invalid_rects(invalid_rects);
@@ -1345,15 +1358,10 @@ fn build_render_nodes(root: &mut Element) -> RenderTree {
 fn build_repaint_nodes(
     render_tree: &mut RenderTree,
     root: &mut Element,
-    mut invalid_area: InvalidArea,
     viewport: Rect
 ) -> Vec<InvalidArea> {
-    let viewport_rect = UniqueRect::from_rect(viewport);
-    invalid_area.add_unique_rect(&viewport_rect);
-    root.invalid_unique_rect = Some(viewport_rect);
-    let mut invalid_area_list = vec![invalid_area];
-    update_node_paint_info_recursive(render_tree, root, &mut invalid_area_list, 0, &viewport);
-    invalid_area_list
+    update_node_paint_info_recursive(render_tree, root, &viewport);
+    Vec::new()
 }
 
 fn collect_render_nodes(
@@ -1398,21 +1406,20 @@ fn collect_render_nodes(
 fn update_node_paint_info_recursive(
     tree: &mut RenderTree,
     element: &mut Element,
-    invalid_rects_list: &mut Vec<InvalidArea>,
-    invalid_rects_idx: usize,
     viewport: &Rect,
 ) {
+    let layer_idx = some_or_return!(tree.get_layer_idx(element.get_id()));
+    let invalid_rects = tree.layers[layer_idx].build_invalid_rects(viewport);
     let node = some_or_return!(tree.get_mut_by_element_id(element.get_id()));
-    let invalid_rects_idx = build_render_paint_info(element, invalid_rects_list, invalid_rects_idx, node, viewport);
+    let invalid_rects_idx = build_render_paint_info(element, &invalid_rects, node, viewport);
     for mut n in element.get_children() {
-        update_node_paint_info_recursive(tree, &mut n, invalid_rects_list, invalid_rects_idx, viewport);
+        update_node_paint_info_recursive(tree, &mut n, viewport);
     }
 }
 
 fn build_render_paint_info(
     root: &mut Element,
-    invalid_rects_list: &mut Vec<InvalidArea>,
-    mut invalid_rects_idx: usize,
+    invalid_rects: &InvalidRects,
     node: &mut RenderNode,
     viewport: &Rect,
 ) -> usize {
@@ -1425,11 +1432,12 @@ fn build_render_paint_info(
         scroll_left: root.scroll_left,
         scroll_top: root.scroll_top,
     });
-    let invalid_rects = invalid_rects_list[invalid_rects_idx].build(viewport.clone());
-    if node.paint_info.is_none() || invalid_rects.has_intersects(&node.absolute_transformed_bounds) {
+    let bounds = Rect::from_xywh(node.layer_x, node.layer_y, node.width, node.height);
+    if node.paint_info.is_none() || invalid_rects.has_intersects(&bounds) {
         let paint_info = RenderPaintInfo {
-            invalid_rects_idx,
-            children_invalid_rects_idx: invalid_rects_idx,
+            need_paint: true,
+            invalid_rects_idx: 0,
+            children_invalid_rects_idx: 0,
             render_fn: Some(root.get_backend_mut().render()),
             background_image: root.style.background_image.clone(),
             background_color: root.style.computed_style.background_color,
@@ -1439,7 +1447,9 @@ fn build_render_paint_info(
 
         node.paint_info = Some(paint_info);
     }
+    // node.paint_info.as_mut().unwrap().need_paint = true;
 
+    /*
     if let Some(ir) = &root.invalid_unique_rect {
         let old_origin_bounds = root.get_origin_border_bounds();
         let reuse_bounds = old_origin_bounds.translate(scroll_delta.0, scroll_delta.1)
@@ -1483,6 +1493,8 @@ fn build_render_paint_info(
     }
     node.paint_info.as_mut().unwrap().children_invalid_rects_idx = invalid_rects_idx;
     invalid_rects_idx
+     */
+    0
 }
 
 fn count_elements(root: &Element) -> usize {

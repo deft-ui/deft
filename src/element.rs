@@ -246,6 +246,7 @@ impl Element {
         value = value.clamp(0.0, max_scroll_left);
         if value != self.scroll_left {
             self.scroll_layer((value - self.scroll_left, 0.0));
+            self.mark_dirty(false);
             self.scroll_left = value;
             //TODO emit on layout updated?
             self.emit_scroll_event();
@@ -276,6 +277,7 @@ impl Element {
         value = value.clamp(0.0, max_scroll_top);
         if value != self.scroll_top {
             self.scroll_layer((0.0, value - self.scroll_top));
+            self.mark_dirty(false);
             self.scroll_top = value;
             //TODO emit on layout updated?
             self.emit_scroll_event();

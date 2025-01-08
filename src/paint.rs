@@ -148,10 +148,13 @@ impl RenderLayerKey {
 
 
 pub struct RenderLayer {
-    pub root: RenderLayerNode,
+    pub total_matrix: Matrix,
+    pub width: f32,
+    pub height: f32,
+    pub nodes: Vec<RenderLayerNode>,
     // pub root_element_id: u32,
     pub key: RenderLayerKey,
-    pub invalid_area: InvalidArea,
+    invalid_area: InvalidArea,
     pub scroll_delta_x: f32,
     pub scroll_delta_y: f32,
     // Original position relative to viewport before transform
@@ -171,6 +174,9 @@ impl RenderLayer {
     }
     pub fn build_invalid_path(&self, viewport: &Rect) -> Path {
         self.invalid_area.build(viewport.clone()).to_path(viewport.clone())
+    }
+    pub fn build_invalid_rects(&self, viewport: &Rect) -> InvalidRects {
+        self.invalid_area.build(viewport.clone())
     }
     pub fn reset_invalid_area(&mut self) {
         self.invalid_area = InvalidArea::None;
@@ -203,6 +209,10 @@ impl RenderTree {
         Some(&mut self.nodes[*node_idx])
     }
 
+    pub fn get_layer_idx(&mut self, element_id: u32) -> Option<usize> {
+        self.get_by_element_id(element_id).map(|rn| rn.layer_idx)
+    }
+
     pub fn add_node(&mut self, node: RenderNode) -> usize {
         let idx = self.nodes.len();
         self.element2node.insert(node.element_id, idx);
@@ -226,17 +236,33 @@ impl RenderTree {
         loop {
             let mut layer_root = some_or_break!(layer_roots.pop());
             let (render_layer_type, origin_x, origin_y, mut element_root) = layer_root;
-            let layer_key = RenderLayerKey::new(element_root.get_id(), render_layer_type);
+            let layer_key = RenderLayerKey::new(element_root.get_id(), render_layer_type.clone());
             let layer_idx = layers.len();
             let (mut invalid_area, scroll_delta_x, scroll_delta_y) = {
                 if let Some(mut ol) = old_layers_map.remove(&layer_key) {
+                    if ol.scroll_delta_x != 0.0 || ol.scroll_delta_y != 0.0 {
+                        ol.invalid_area.offset(-ol.scroll_delta_x, -ol.scroll_delta_y);
+                        if ol.scroll_delta_y > 0.0 {
+                            ol.invalid_area.add_rect(Some(&Rect::new(0.0, ol.height - ol.scroll_delta_y, ol.width, ol.height)));
+                        } else if ol.scroll_delta_y < 0.0 {
+                            ol.invalid_area.add_rect(Some(&Rect::new(0.0, 0.0, ol.width, -ol.scroll_delta_y)));
+                        }
+
+                        if ol.scroll_delta_x > 0.0 {
+                            ol.invalid_area.add_rect(Some(&Rect::new(ol.width - ol.scroll_delta_x, 0.0, ol.width, ol.height)));
+                        } else if ol.scroll_delta_x < 0.0 {
+                            ol.invalid_area.add_rect(Some(&Rect::new(0.0, 0.0, -ol.scroll_delta_x, ol.height)));
+                        }
+
+                    }
                     (ol.invalid_area, ol.scroll_delta_x, ol.scroll_delta_y)
                 } else {
                     (InvalidArea::Full, 0.0, 0.0)
                 }
             };
             // Create new layers
-            let layer_root = self.build_layer_node(
+            let mut nodes = Vec::new();
+            self.build_layer_node(
                 layer_idx,
                 &mut element_root,
                 &mut layer_roots,
@@ -246,9 +272,15 @@ impl RenderTree {
                 &mut old_layers_map,
                 origin_x,
                 origin_y,
-            ).unwrap();
+                &mut nodes,
+                render_layer_type,
+            );
+            let root_node = self.get_by_element_id(element_root.get_id()).unwrap();
             layers.push(RenderLayer {
-                root: layer_root,
+                total_matrix: root_node.total_matrix,
+                width: root_node.width,
+                height: root_node.height,
+                nodes,
                 key: layer_key,
                 invalid_area,
                 scroll_delta_y,
@@ -267,13 +299,25 @@ impl RenderTree {
     }
 
     pub fn scroll(&mut self, element_id: u32, delta: (f32, f32)) {
-        let node = some_or_return!(self.get_by_element_id(element_id));
-        let layer_idx = node.layer_idx;
-        self.layers[layer_idx].scroll(delta);
+        // let node = some_or_return!(self.get_by_element_id(element_id));
+        let key = RenderLayerKey::new(element_id, RenderLayerType::Children);
+        for l in &mut self.layers {
+            if l.key == key {
+                l.scroll(delta);
+            }
+        }
     }
 
     fn need_create_layer(element: &Element) -> bool {
         element.need_snapshot || element.style.transform.is_some()
+    }
+
+    fn need_create_root_layer(element: &Element) -> bool {
+        element.style.transform.is_some()
+    }
+
+    fn need_create_children_layer(element: &Element) -> bool {
+        element.need_snapshot
     }
 
     fn build_layer_node(
@@ -287,37 +331,50 @@ impl RenderTree {
         old_layers: &HashMap<RenderLayerKey, RenderLayer>,
         origin_x: f32,
         origin_y: f32,
-    ) -> Option<RenderLayerNode> {
-        let node_idx = *self.element2node.get(&root.get_id())?;
+        result: &mut Vec<RenderLayerNode>,
+        layer_type: RenderLayerType,
+    ) {
+        let node_idx = *some_or_return!(self.element2node.get(&root.get_id()));
         let node = &mut self.nodes[node_idx];
-        node.layer_idx = layer_idx;
-        node.layer_x = layer_x;
-        node.layer_y = layer_y;
         let node_width = node.width;
         let node_height = node.height;
-        let mut children = Vec::new();
-        for mut c in root.get_children() {
-            let bounds = c.get_bounds().translate(-root.scroll_left, -root.scroll_top);
-            let child_layer_x = layer_x + bounds.x;
-            let child_layer_y = layer_y + bounds.y;
-            let child_origin_x = origin_x + bounds.x;
-            let child_origin_y = origin_y + bounds.y;
-            let key = RenderLayerKey::new(c.get_id(), RenderLayerType::Root);
-            if Self::need_create_layer(&c) {
-                if !old_layers.contains_key(&key) {
-                    //Split layer
-                    let rect = Rect::from_xywh(bounds.x, bounds.y, node_width, node_height);
-                    layer_invalid_area.add_rect(Some(&rect));
-                }
-                layer_roots.push((RenderLayerType::Root, child_origin_x, child_origin_y, c));
+        let visit_children = if layer_type == RenderLayerType::Root {
+            node.layer_idx = layer_idx;
+            node.layer_x = layer_x;
+            node.layer_y = layer_y;
+            let need_create_children_layer = Self::need_create_children_layer(root);
+            if need_create_children_layer {
+                layer_roots.push((RenderLayerType::Children, layer_x, layer_y, root.clone()));
+                false
             } else {
-                if let Some(old_layer) = old_layers.get(&key) {
-                    // Merge layer
-                    let mut old_invalid_area = old_layer.invalid_area.clone();
-                    old_invalid_area.offset(old_layer.origin_absolute_pos.0 - origin_x, old_layer.origin_absolute_pos.1 - origin_y);
-                    layer_invalid_area.merge(&old_invalid_area);
-                }
-                children.push(
+                true
+            }
+        } else {
+            true
+        };
+        let mut children = Vec::new();
+        if visit_children {
+            for mut c in root.get_children() {
+                let bounds = c.get_bounds().translate(-root.scroll_left, -root.scroll_top);
+                let child_layer_x = layer_x + bounds.x;
+                let child_layer_y = layer_y + bounds.y;
+                let child_origin_x = origin_x + bounds.x;
+                let child_origin_y = origin_y + bounds.y;
+                let key = RenderLayerKey::new(c.get_id(), RenderLayerType::Root);
+                if Self::need_create_root_layer(&c) {
+                    if !old_layers.contains_key(&key) {
+                        //Split layer
+                        let rect = Rect::from_xywh(bounds.x, bounds.y, node_width, node_height);
+                        layer_invalid_area.add_rect(Some(&rect));
+                    }
+                    layer_roots.push((RenderLayerType::Root, child_origin_x, child_origin_y, c));
+                } else {
+                    if let Some(old_layer) = old_layers.get(&key) {
+                        // Merge layer
+                        let mut old_invalid_area = old_layer.invalid_area.clone();
+                        old_invalid_area.offset(old_layer.origin_absolute_pos.0 - origin_x, old_layer.origin_absolute_pos.1 - origin_y);
+                        layer_invalid_area.merge(&old_invalid_area);
+                    }
                     self.build_layer_node(
                         layer_idx,
                         &mut c,
@@ -327,16 +384,21 @@ impl RenderTree {
                         layer_invalid_area,
                         old_layers,
                         child_origin_x,
-                        child_origin_y
-                    )?
-                );
+                        child_origin_y,
+                        &mut children,
+                        RenderLayerType::Root,
+                    );
+                }
             }
         }
-
-        Some(RenderLayerNode {
-            node_idx,
-            children,
-        })
+        if layer_type == RenderLayerType::Root {
+            result.push(RenderLayerNode {
+                node_idx,
+                children,
+            });
+        } else {
+            result.append(&mut children);
+        }
     }
 
     pub fn update_layout_info_recurse(
@@ -406,8 +468,10 @@ pub enum RenderOp {
 }
 
 pub struct RenderPaintInfo {
+    pub need_paint: bool,
     // pub absolute_transformed_visible_path: Option<Path>,
     pub invalid_rects_idx: usize,
+    //TODO remove
     pub children_invalid_rects_idx: usize,
     pub border_color: [Color; 4],
     pub render_fn: Option<RenderFn>,
