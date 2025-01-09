@@ -398,8 +398,8 @@ impl Scroll {
         let element_id = self.element.get_id();
         let mut frame = self.element.get_frame()?.upgrade().ok()?;
         let mut render_tree = frame.render_tree.lock().unwrap();
-        let rn = render_tree.get_by_element_id(element_id)?;
-        let p = rn.total_matrix.invert()?.map_xy(frame_x, frame_y);
+        let node_matrix = render_tree.get_element_total_matrix(element_id)?;
+        let p = node_matrix.invert()?.map_xy(frame_x, frame_y);
         Some((p.x, p.y))
     }
 

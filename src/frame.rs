@@ -489,7 +489,7 @@ impl Frame {
     }
 
     fn handle_mouse_wheel(&mut self, delta: (f32, f32)) {
-        if let Some(mut target_node) = self.get_node_by_point() {
+        if let Some((mut target_node, _, _)) = self.get_node_by_point() {
             target_node.emit(MouseWheelEvent { cols: delta.0, rows: delta.1 });
         }
 
@@ -505,7 +505,7 @@ impl Frame {
         let render_tree = self.render_tree.clone();
         if let Some((pressing, down_info)) = &mut self.pressing.clone() {
             if dragging {
-                if let Some(target) = &mut target_node {
+                if let Some((target, _, _)) = &mut target_node {
                     if target != pressing {
                         target.emit(DragOverEvent {});
                         self.last_drag_over = Some(target.clone());
@@ -526,7 +526,7 @@ impl Frame {
                 }
             }
             //TODO should emit mouseenter|mouseleave?
-        } else if let Some(mut node) = target_node {
+        } else if let Some((mut node, _, _)) = target_node {
             self.update_cursor(&node);
             if let Some(hover) = &mut self.hover {
                 if hover != &node {
@@ -569,7 +569,7 @@ impl Frame {
         let render_tree = self.render_tree.clone();
         //TODO impl
 
-        if let Some(mut node) = self.get_node_by_point() {
+        if let Some((mut node, _, _)) = self.get_node_by_point() {
             let (e_type, event_type) = match state {
                 ElementState::Pressed =>("mousedown", MouseEventType::MouseDown),
                 ElementState::Released => ("mouseup", MouseEventType::MouseUp),
@@ -617,7 +617,7 @@ impl Frame {
     }
 
     pub fn emit_touch_event(&mut self, identifier: u64, phase: TouchPhase, frame_x: f32, frame_y: f32) -> Option<()> {
-        if let Some(mut node) = self.get_node_by_pos(frame_x, frame_y) {
+        if let Some((mut node, relative_x, relative_y)) = self.get_node_by_pos(frame_x, frame_y) {
             let _e_type = match phase {
                 TouchPhase::Started => "touchstart",
                 TouchPhase::Ended => "touchend",
@@ -627,13 +627,6 @@ impl Frame {
             let node_bounds = node.get_origin_bounds();
             let (border_top, _, _, border_left) = node.get_border_width();
 
-            let Point {x: relative_x, y: relative_y} = {
-                let render_tree = self.render_tree.clone();
-                let render_tree = render_tree.lock().unwrap();
-                let render_node = render_tree.get_by_element_id(node.get_id())?;
-                let inverted_matrix = render_node.total_matrix.invert()?;
-                inverted_matrix.map_xy(frame_x, frame_y)
-            };
             let offset_x = relative_x - border_left;
             let offset_y = relative_y - border_top;
             match phase {
@@ -770,7 +763,8 @@ impl Frame {
             let render_tree = if let Some(body) = &mut self.body {
                 // print_time!("calculate layout, {} x {}", width, height);
                 body.calculate_layout(width, height);
-                let render_tree = build_render_nodes(body);
+                let mut render_tree = build_render_nodes(body);
+                render_tree.update_layout_info_recurse(body, body.get_bounds().to_skia_rect());
                 if auto_size {
                     let (final_width, final_height) = body.get_size();
                     if size.width != final_width as u32 && size.height != final_height as u32 {
@@ -887,10 +881,8 @@ impl Frame {
         let mut render_tree = self.render_tree.clone();
         if let Some(body) = &mut me.body {
             // print_time!("build render nodes time");
-            let mut mc = MatrixCalculator::new();
             let mut render_tree = render_tree.lock().unwrap();
             print_time!("update layout time");
-            render_tree.update_layout_info_recurse(body, &mut mc, body.get_bounds().to_skia_rect());
             render_tree.rebuild_layers(body);
         } else {
             return ResultWaiter::new_finished(false);
@@ -936,7 +928,7 @@ impl Frame {
         physical_len * self.window.scale_factor() as f32
     }
 
-    fn get_node_by_point(&self) -> Option<Element> {
+    fn get_node_by_point(&self) -> Option<(Element, f32, f32)> {
         let x = self.cursor_position.x as f32;
         let y = self.cursor_position.y as f32;
         self.get_node_by_pos(x, y)
@@ -954,19 +946,30 @@ impl Frame {
         None
     }
 
-    fn get_node_by_pos(&self, x: f32, y: f32) -> Option<Element> {
+    fn get_node_by_pos(&self, x: f32, y: f32) -> Option<(Element, f32, f32)> {
         let mut render_tree = self.render_tree.clone();
         let mut render_tree = render_tree.lock().unwrap();
         let body = self.body.clone()?;
-        for n in render_tree.nodes_mut().iter_mut().rev() {
-            let pi = n.paint_info.as_ref()?;
-            if !n.absolute_transformed_bounds.contains(Point::new(x, y)) {
-                continue;
-            }
-            let absolute_transformed_visible_path = Some(n.clip_chain.clip(&n.border_path.get_box_path()).with_transform(&n.total_matrix));
-            let atvp = some_or_continue!(&absolute_transformed_visible_path);
-            if atvp.contains((x, y)) {
-                return self.get_element_by_id(&body, n.element_id);
+        // print_time!("search node time in layers");
+        let mut layer_idx = render_tree.layers.len();
+        for layer in render_tree.layers.iter().rev() {
+            layer_idx -= 1;
+            let im = layer.total_matrix.invert().unwrap();
+            let point = im.map_xy(x, y);
+            if point.x >= 0.0 && point.x <= layer.width && point.y >= 0.0 && point.y <= layer.height {
+                let nodes = render_tree.nodes();
+                for node in nodes.iter().rev() {
+                    let x = point.x;
+                    let y = point.y;
+                    if node.layer_idx == layer_idx && x >= node.layer_x && x <= node.layer_x + node.width && y >= node.layer_y && y <= node.layer_y + node.height {
+                        // println!("found node: {}", node.element_id);
+                        //TODO check border path
+                        return (
+                            self.get_element_by_id(&body, node.element_id)
+                                .map(|e| (e, x - node.layer_x, y - node.layer_y))
+                        );
+                    }
+                }
             }
         }
         None
@@ -1176,11 +1179,8 @@ fn collect_render_nodes(
 ) {
     let mut node = RenderNode {
         element_id: root.get_id(),
-        absolute_transformed_bounds: Rect::new_empty(),
         width: 0.0,
         height: 0.0,
-        total_matrix: Matrix::default(),
-        clip_chain: ClipChain::new(),
         border_width: root.get_border_width(),
         border_path: BorderPath::new(0.0, 0.0, [0.0; 4], [0.0; 4]),
         children_viewport: root.get_children_viewport(),
@@ -1273,14 +1273,11 @@ fn print_tree(node: &Element, padding: &str) {
 fn emit_mouse_event(render_tree: &Arc<Mutex<RenderTree>>, node: &mut Element, event_type_enum: MouseEventType, button: i32, frame_x: f32, frame_y: f32, screen_x: f32, screen_y: f32) {
     let render_tree = render_tree.clone();
     let mut render_tree = render_tree.lock().unwrap();
-    let render_node = match render_tree.get_by_element_id(node.get_id()) {
-        Some(node) => node,
-        None => return,
-    };
+    let node_matrix = some_or_return!(render_tree.get_element_total_matrix(node.get_id()));
     let (border_top, _, _, border_left) = node.get_border_width();
 
     //TODO maybe not inverted?
-    let inverted_matrix = render_node.total_matrix.invert().unwrap();
+    let inverted_matrix = node_matrix.invert().unwrap();
 
     let Point { x: relative_x, y: relative_y } = inverted_matrix.map_xy(frame_x, frame_y);
     let off_x = relative_x - border_left;

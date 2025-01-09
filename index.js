@@ -97,6 +97,9 @@ function batchCreateLabels(container) {
             background: '#ccc',
         })
         lb.setText("label" + i);
+        lb.bindClick(() => {
+            console.log(`clicked label ${i}`)
+        })
         wrapper.addChild(lb);
     }
     container.addChild(wrapper);

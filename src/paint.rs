@@ -122,6 +122,15 @@ impl RenderTree {
         Some(&self.nodes[*node_idx])
     }
 
+    pub fn get_element_total_matrix(&self, element_id: u32) -> Option<Matrix> {
+        let node = self.get_by_element_id(element_id)?;
+        let mut matrix = self.layers[node.layer_idx].total_matrix;
+        let mut mc = MatrixCalculator::new();
+        mc.concat(&matrix);
+        mc.translate((node.layer_x, node.layer_y));
+        Some(mc.get_total_matrix())
+    }
+
     pub fn get_mut_by_element_id(&mut self, element_id: u32) -> Option<&mut RenderNode> {
         let node_idx = self.element2node.get(&element_id)?;
         Some(&mut self.nodes[*node_idx])
@@ -140,7 +149,7 @@ impl RenderTree {
 
     pub fn rebuild_layers(&mut self, root: &mut Element) {
         let mut layer_roots = Vec::new();
-        layer_roots.push((RenderLayerType::Root, 0.0, 0.0, root.clone()));
+        layer_roots.push((RenderLayerType::Root, Matrix::default(), 0.0, 0.0, root.clone()));
         let mut layers = Vec::new();
         let mut old_layers_map = {
             let mut map = HashMap::new();
@@ -152,7 +161,7 @@ impl RenderTree {
         };
         loop {
             let mut layer_root = some_or_break!(layer_roots.pop());
-            let (render_layer_type, origin_x, origin_y, mut element_root) = layer_root;
+            let (render_layer_type, matrix, origin_x, origin_y, mut element_root) = layer_root;
             let layer_key = RenderLayerKey::new(element_root.get_id(), render_layer_type.clone());
             let layer_idx = layers.len();
             let (mut invalid_area, scroll_delta_x, scroll_delta_y) = {
@@ -179,6 +188,8 @@ impl RenderTree {
             };
             // Create new layers
             let mut nodes = Vec::new();
+            let mut matrix_calculator = MatrixCalculator::new();
+            matrix_calculator.concat(&matrix);
             self.build_layer_node(
                 layer_idx,
                 &mut element_root,
@@ -191,10 +202,11 @@ impl RenderTree {
                 origin_y,
                 &mut nodes,
                 render_layer_type,
+                &mut matrix_calculator,
             );
             let root_node = self.get_by_element_id(element_root.get_id()).unwrap();
             layers.push(RenderLayer {
-                total_matrix: root_node.total_matrix,
+                total_matrix: matrix,
                 width: root_node.width,
                 height: root_node.height,
                 nodes,
@@ -237,7 +249,7 @@ impl RenderTree {
         &mut self,
         layer_idx: usize,
         root: &mut Element,
-        layer_roots: &mut Vec<(RenderLayerType, f32, f32, Element)>,
+        layer_roots: &mut Vec<(RenderLayerType, Matrix, f32, f32, Element)>,
         layer_x: f32,
         layer_y: f32,
         layer_invalid_area: &mut InvalidArea,
@@ -246,6 +258,7 @@ impl RenderTree {
         origin_y: f32,
         result: &mut Vec<RenderLayerNode>,
         layer_type: RenderLayerType,
+        matrix_calculator: &mut MatrixCalculator,
     ) {
         let node_idx = *some_or_return!(self.element2node.get(&root.get_id()));
         let node = &mut self.nodes[node_idx];
@@ -257,7 +270,12 @@ impl RenderTree {
             node.layer_y = layer_y;
             let need_create_children_layer = Self::need_create_children_layer(root);
             if need_create_children_layer {
-                layer_roots.push((RenderLayerType::Children, layer_x, layer_y, root.clone()));
+                matrix_calculator.save();
+                matrix_calculator.translate((layer_x, layer_y));
+                let total_matrix = matrix_calculator.get_total_matrix();
+                //TODO layer_xy should be origin_xy?
+                layer_roots.push((RenderLayerType::Children, total_matrix, layer_x, layer_y, root.clone()));
+                matrix_calculator.restore();
                 false
             } else {
                 true
@@ -280,7 +298,12 @@ impl RenderTree {
                         let rect = Rect::from_xywh(bounds.x, bounds.y, node_width, node_height);
                         layer_invalid_area.add_rect(Some(&rect));
                     }
-                    layer_roots.push((RenderLayerType::Root, child_origin_x, child_origin_y, c));
+                    matrix_calculator.save();
+                    matrix_calculator.translate((child_layer_x, child_layer_y));
+                    c.apply_transform(matrix_calculator);
+                    let total_matrix = matrix_calculator.get_total_matrix();
+                    layer_roots.push((RenderLayerType::Root, total_matrix, child_origin_x, child_origin_y, c));
+                    matrix_calculator.restore();
                 } else {
                     if let Some(old_layer) = old_layers.get(&key) {
                         // Merge layer
@@ -300,6 +323,7 @@ impl RenderTree {
                         child_origin_y,
                         &mut children,
                         RenderLayerType::Root,
+                        matrix_calculator,
                     );
                 }
             }
@@ -317,37 +341,25 @@ impl RenderTree {
     pub fn update_layout_info_recurse(
         &mut self,
         root: &mut Element,
-        matrix_calculator: &mut MatrixCalculator,
         bounds: Rect,
     ) {
         let node_idx = *some_or_return!(self.element2node.get(&root.get_id()));
-        let origin_bounds = root.get_origin_bounds().to_skia_rect();
 
         let mut border_path = root.create_border_path();
-        let border_box_path =  border_path.get_box_path();
+        // let border_box_path =  border_path.get_box_path();
 
-        root.apply_transform(matrix_calculator);
         //TODO support overflow:visible
-        matrix_calculator.intersect_clip_path(&ClipPath::from_path(border_box_path));
+        // matrix_calculator.intersect_clip_path(&ClipPath::from_path(border_box_path));
 
-        let total_matrix = matrix_calculator.get_total_matrix();
-        let clip_chain = matrix_calculator.get_clip_chain();
-
-
-        let (transformed_bounds, _) = total_matrix.map_rect(Rect::from_xywh(0.0, 0.0, bounds.width(), bounds.height()));
+        // let (transformed_bounds, _) = total_matrix.map_rect(Rect::from_xywh(0.0, 0.0, bounds.width(), bounds.height()));
         let node = &mut self.nodes[node_idx];
-        node.absolute_transformed_bounds = transformed_bounds;
         node.width = bounds.width();
         node.height = bounds.height();
-        node.total_matrix = total_matrix;
-        node.clip_chain = clip_chain;
+        //TODO update border path when border changed
         node.border_path = border_path;
         for mut c in root.get_children() {
             let child_bounds = c.get_bounds().translate(-root.scroll_left, -root.scroll_top);
-            matrix_calculator.save();
-            matrix_calculator.translate((child_bounds.x, child_bounds.y));
-            self.update_layout_info_recurse(&mut c, matrix_calculator, child_bounds.to_skia_rect());
-            matrix_calculator.restore();
+            self.update_layout_info_recurse(&mut c, child_bounds.to_skia_rect());
         }
     }
 
@@ -388,16 +400,11 @@ pub struct RenderPaintInfo {
 
 pub struct RenderNode {
     pub element_id: u32,
-    // Relative to viewport
-    pub absolute_transformed_bounds: Rect,
 
-    // Relative to viewport
-    pub total_matrix: Matrix,
     pub need_snapshot: bool,
     pub width: f32,
     pub height: f32,
 
-    pub clip_chain: ClipChain,
     pub border_width: (f32, f32, f32, f32),
 
     pub children_viewport: Option<Rect>,
@@ -734,58 +741,40 @@ pub enum CanvasOp {
 
 
 pub struct MatrixCalculator {
-    matrix: Matrix,
     cpu_renderer: CpuRenderer,
-    ops: Vec<CanvasOp>,
-    saved_ops_sizes: Vec<usize>,
 }
 
 impl MatrixCalculator {
     pub fn new() -> MatrixCalculator {
         let cpu_renderer = CpuRenderer::new(1, 1);
         Self {
-            matrix: Matrix::default(),
             cpu_renderer,
-            saved_ops_sizes: Vec::new(),
-            ops: Vec::new(),
         }
     }
-    pub fn intersect_clip_path(&mut self, path: &ClipPath) {
-        self.ops.push(CanvasOp::IntersectClipPath(path.clone()));
+
+    pub fn concat(&mut self, matrix: &Matrix) {
+        self.cpu_renderer.canvas().concat(matrix);
     }
 
     pub fn translate(&mut self, vector: impl Into<Vector>) {
         let vector = vector.into();
         self.cpu_renderer.canvas().translate(vector);
-        self.ops.push(CanvasOp::Translate(vector));
     }
     pub fn rotate(&mut self, degree: f32, p: Option<Point>) {
         let p = p.into();
         self.cpu_renderer.canvas().rotate(degree, p);
-        self.ops.push(CanvasOp::Rotate(degree, p));
     }
     pub fn scale(&mut self, (sx, sy): (scalar, scalar)) {
         self.cpu_renderer.canvas().scale((sx, sy));
-        self.ops.push(CanvasOp::Scale(sx, sy));
     }
     pub fn get_total_matrix(&mut self) -> Matrix {
         self.cpu_renderer.canvas().total_matrix()
     }
-    pub fn get_clip_chain(&mut self) -> ClipChain {
-        ClipChain {
-            ops: self.ops.clone(),
-        }
-    }
     pub fn save(&mut self) {
         self.cpu_renderer.canvas().save();
-        self.saved_ops_sizes.push(self.ops.len());
     }
     pub fn restore(&mut self) {
         self.cpu_renderer.canvas().restore();
-        let saved_size = self.saved_ops_sizes.pop().unwrap();
-        while self.ops.len() > saved_size {
-            self.ops.pop().unwrap();
-        }
     }
 }
 
