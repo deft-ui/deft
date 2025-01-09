@@ -78,31 +78,35 @@ function createLabel(text) {
     return label;
 }
 
+function batchCreateLabels(container) {
+    const wrapper = new ContainerElement();
+    wrapper.setStyle({
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+    })
+    for (let i = 0; i < 2000; i++) {
+        const lb = new LabelElement();
+        lb.setStyle({
+            border: '1 #ccc',
+            borderRadius: 10,
+            marginTop: 10,
+            width: 80,
+            height: 20,
+        });
+        lb.setHoverStyle({
+            background: '#ccc',
+        })
+        lb.setText("label" + i);
+        wrapper.addChild(lb);
+    }
+    container.addChild(wrapper);
+}
+
 function createAddChildrenButton(container) {
     const button = new ButtonElement();
     button.addChild(createLabel("Add children"));
     button.bindClick(() => {
-        const wrapper = new ContainerElement();
-        wrapper.setStyle({
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-        })
-        for (let i = 0; i < 2000; i++) {
-            const lb = new LabelElement();
-            lb.setStyle({
-                border: '1 #ccc',
-                borderRadius: 10,
-                marginTop: 10,
-                width: 80,
-                height: 20,
-            });
-            lb.setHoverStyle({
-                background: '#ccc',
-            })
-            lb.setText("label" + i);
-            wrapper.addChild(lb);
-        }
-        container.addChild(wrapper);
+        batchCreateLabels(container);
         console.log("done");
     });
     return button;
@@ -182,6 +186,7 @@ function main() {
     container.addChild(createTextEdit());
     container.addChild(createEntry());
     container.addChild(createCenterElement());
+    batchCreateLabels(container);
     frame.setBody(container);
 }
 

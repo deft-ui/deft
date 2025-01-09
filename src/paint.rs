@@ -19,12 +19,6 @@ use crate::style::ColorHelper;
 
 thread_local! {
     pub static NEXT_UNIQUE_RECT_ID: Cell<u64> = Cell::new(1);
-    pub static SNAPSHOT_ID_KEY: IdKey = IdKey::new();
-}
-
-#[derive(Clone)]
-pub struct SnapshotManager {
-    store: Arc<Mutex<HashMap<u32, Snapshot>>>,
 }
 
 pub struct RenderData {
@@ -47,84 +41,10 @@ impl RenderData {
     }
 }
 
-impl SnapshotManager {
-    pub fn new() -> SnapshotManager {
-        Self {
-            store: Arc::new(Mutex::new(HashMap::new())),
-        }
-    }
-    pub fn insert(&self, id: u32, snapshot: Snapshot) {
-        let mut store = self.store.lock().unwrap();
-        store.insert(id, snapshot);
-    }
-    pub fn remove(&self, id: u32) -> Option<Snapshot> {
-        let mut store = self.store.lock().unwrap();
-        store.remove(&id)
-    }
-
-    pub fn with_snapshot_mut<F: FnOnce(&mut Snapshot)>(&self, id: u32, callback: F) {
-        let mut store = self.store.lock().unwrap();
-        if let Some(sn) = store.get_mut(&id) {
-            callback(sn);
-        }
-    }
-
-    pub fn get_snapshot_image(&self, id: u32) -> Option<Image> {
-        let mut store = self.store.lock().unwrap();
-        let mut sn = store.get_mut(&id)?;
-        Some(sn.image.as_image())
-    }
-
-    pub fn take(&self, id: u32, expected_width: usize, expected_height: usize) -> Option<Snapshot> {
-        let mut store = self.store.lock().unwrap();
-        let mut sn = store.remove(&id)?;
-        if sn.width == expected_width && sn.height == expected_height {
-            Some(sn)
-        } else {
-            None
-        }
-    }
-}
-
-pub struct Snapshot {
-    id: Id<Snapshot>,
-    pub image: Layer,
-    pub width: usize,
-    pub height: usize,
-}
-
-impl Snapshot {
-    pub fn new(image: Layer, width: usize, height: usize) -> Self {
-        let id = Id::next(&SNAPSHOT_ID_KEY);
-        println!("Creating snapshot: {}", id);
-        Self { id, image, width, height }
-    }
-}
-
-impl Drop for Snapshot {
-    fn drop(&mut self) {
-        println!("Dropping snapshot: {}", self.id);
-    }
-}
-
-pub struct LayoutNodeMeta {
-    pub children: Vec<usize>,
-}
-
-impl LayoutNodeMeta {
-    pub fn new() -> Self {
-        Self {
-            children: Vec::new(),
-        }
-    }
-}
-
 //TODO rename to LayoutTree?
 pub struct RenderTree {
     nodes: Vec<RenderNode>,
     element2node: HashMap<u32, usize>,
-    node_meta_list: Vec<LayoutNodeMeta>,
-    pub ops: Vec<RenderOp>,
     pub layers: Vec<RenderLayer>,
 }
 
@@ -192,8 +112,6 @@ impl RenderTree {
     pub fn new(predicate_count: usize) -> Self {
         Self {
             nodes: Vec::with_capacity(predicate_count),
-            node_meta_list: Vec::with_capacity(predicate_count),
-            ops: Vec::with_capacity(predicate_count * 2),
             element2node: HashMap::with_capacity(predicate_count),
             layers: Vec::new(),
         }
@@ -217,7 +135,6 @@ impl RenderTree {
         let idx = self.nodes.len();
         self.element2node.insert(node.element_id, idx);
         self.nodes.push(node);
-        self.node_meta_list.push(LayoutNodeMeta::new());
         idx
     }
 
@@ -306,10 +223,6 @@ impl RenderTree {
                 l.scroll(delta);
             }
         }
-    }
-
-    fn need_create_layer(element: &Element) -> bool {
-        element.need_snapshot || element.style.transform.is_some()
     }
 
     fn need_create_root_layer(element: &Element) -> bool {
@@ -438,10 +351,6 @@ impl RenderTree {
         }
     }
 
-    pub fn bind_children(&mut self, node_idx: usize, children: Vec<usize>) {
-        self.node_meta_list[node_idx].children = children;
-    }
-
     pub fn get_node_mut(&mut self, node_idx: usize) -> Option<&mut RenderNode> {
         self.nodes.get_mut(node_idx)
     }
@@ -470,9 +379,6 @@ pub enum RenderOp {
 pub struct RenderPaintInfo {
     pub need_paint: bool,
     // pub absolute_transformed_visible_path: Option<Path>,
-    pub invalid_rects_idx: usize,
-    //TODO remove
-    pub children_invalid_rects_idx: usize,
     pub border_color: [Color; 4],
     pub render_fn: Option<RenderFn>,
     pub background_image: Option<Image>,
@@ -1009,5 +915,13 @@ pub fn test_matrix() {
     let invert_matrix = matrix.invert().unwrap();
     let r = invert_matrix.map_xy(d.x, d.y);
     println!("r={}, {}", r.x, r.y);
+
+    {
+        print_time!("map rect time");
+        for i in 0..10000 {
+            let rect=  Rect::from_xywh(0.0, 0.0, i as f32, i as f32);
+            let p = matrix.map_rect(&rect);
+        }
+    }
 
 }

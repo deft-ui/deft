@@ -37,7 +37,7 @@ impl CpuRenderer {
 
 }
 
-#[test]
+/*
 pub fn test_border(canvas: &Canvas) {
     print_time!("draw border time");
     let mut style = StyleNode::new();
@@ -73,3 +73,4 @@ fn test_border_performance() {
     let canvas = render.canvas();
     test_border(canvas);
 }
+ */

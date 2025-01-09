@@ -251,41 +251,6 @@ fn test_text_measure() {
 
 }
 
-#[test]
-fn test_border_performance_gl() {
-    let event_loop: EventLoop<()> = EventLoopBuilder::default().build().unwrap();
-    struct TestApp {
-        window: Option<SkiaWindow>,
-    }
-
-    impl ApplicationHandler for TestApp {
-        fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-            #[cfg(not(target_os = "android"))]
-            let backend_type = RenderBackendType::SoftBuffer;
-            #[cfg(target_os = "android")]
-            let backend_type = RenderBackendType::GL;
-            let mut skia_window = SkiaWindow::new(event_loop, WindowAttributes::default(), backend_type);
-            skia_window.render(|canvas| {
-                crate::renderer::test_border(canvas);
-            });
-            self.window = Some(skia_window);
-        }
-
-        fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
-            if let WindowEvent::RedrawRequested = &event {
-                let win = self.window.as_mut().unwrap();
-                win.render(|canvas| {
-                    crate::renderer::test_border(canvas);
-                })
-            } else if let WindowEvent::Resized(s) = &event {
-                let win = self.window.as_mut().unwrap();
-                win.resize_surface(s.width, s.height);
-            }
-        }
-    }
-    let mut app = TestApp { window: None };
-    event_loop.run_app(&mut app).unwrap();
-}
 
 #[test]
 fn test_layout_mem() {
