@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use measure_time::print_time;
+use sha1::digest::generic_array::functional::FunctionalSequence;
 use skia_bindings::{SkClipOp, SkPaint_Style, SkPathOp};
 use skia_safe::{scalar, ClipOp, Color, IRect, Image, Matrix, Paint, Path, Point, Rect, Vector};
 use skia_safe::Canvas;
@@ -16,6 +17,7 @@ use crate::renderer::CpuRenderer;
 use crate::{some_or_break, some_or_continue, some_or_return};
 use crate::render::paint_layer::PaintLayer;
 use crate::render::paint_node::PaintNode;
+use crate::render::paint_object::{ElementPaintObject, LayerPaintObject, PaintObject};
 use crate::render::paint_tree::PaintTree;
 use crate::style::border_path::BorderPath;
 use crate::style::ColorHelper;
@@ -56,7 +58,9 @@ impl RenderState {
 pub struct RenderTree {
     nodes: Vec<RenderNode>,
     element2node: HashMap<u32, usize>,
-    pub layers: Vec<RenderLayer>,
+    root_render_object: Option<RenderObject>,
+    pub layer_objects: Vec<LayerObjectData>,
+    pub element_objects: Vec<ElementObjectData>,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -77,6 +81,59 @@ impl RenderLayerKey {
     }
 }
 
+pub struct ElementObjectData {
+    pub coord: (f32, f32),
+    pub layer_coord: (f32, f32),
+    pub children_viewport: Option<Rect>,
+    pub border_path: [Path; 4],
+    pub border_box_path: Path,
+    // pub layer_x: f32,
+    // pub layer_y: f32,
+    pub border_color: [Color; 4],
+    pub render_fn: Option<RenderFn>,
+    pub background_image: Option<Image>,
+    pub background_color: Color,
+    pub border_width: (f32, f32, f32, f32),
+    pub width: f32,
+    pub height: f32,
+    pub layer_object_idx: usize,
+    pub element_id: u32,
+}
+
+#[derive(Clone)]
+pub struct ElementObject {
+    pub element_object_idx: usize,
+    pub children: Vec<RenderObject>,
+}
+
+pub struct LayerObjectData {
+    pub matrix: Matrix,
+    pub total_matrix: Matrix,
+    pub width: f32,
+    pub height: f32,
+    pub key: RenderLayerKey,
+    pub invalid_area: InvalidArea,
+    pub scroll_left: f32,
+    pub scroll_top: f32,
+    pub last_scroll_left: f32,
+    pub last_scroll_top: f32,
+    // Original position relative to viewport before transform
+    pub origin_absolute_pos: (f32, f32),
+}
+
+#[derive(Clone)]
+pub struct LayerObject {
+    pub objects: Vec<RenderObject>,
+    // pub root_element_id: u32,
+    pub layer_object_idx: usize,
+}
+
+#[derive(Clone)]
+pub enum RenderObject {
+    Normal(ElementObject),
+    Layer(LayerObject),
+}
+
 
 pub struct RenderLayer {
     pub total_matrix: Matrix,
@@ -94,7 +151,7 @@ pub struct RenderLayer {
     origin_absolute_pos: (f32, f32),
 }
 
-impl RenderLayer {
+impl LayerObjectData {
     pub fn invalid(&mut self, rect: &Rect) {
         self.invalid_area.add_rect(Some(rect));
     }
@@ -129,21 +186,18 @@ impl RenderTree {
         Self {
             nodes: Vec::with_capacity(predicate_count),
             element2node: HashMap::with_capacity(predicate_count),
-            layers: Vec::new(),
+            root_render_object: None,
+            layer_objects: Vec::new(),
+            element_objects: Vec::new(),
         }
     }
 
-    pub fn get_by_element_id(&self, element_id: u32) -> Option<&RenderNode> {
-        let node_idx = self.element2node.get(&element_id)?;
-        Some(&self.nodes[*node_idx])
-    }
-
-    pub fn get_element_total_matrix(&self, element_id: u32) -> Option<Matrix> {
-        let node = self.get_by_element_id(element_id)?;
-        let mut matrix = self.layers[node.layer_idx].total_matrix;
+    pub fn get_element_total_matrix(&self, element: &Element) -> Option<Matrix> {
+        let element_object = self.element_objects.get(element.render_object_idx)?;
+        let layer_object = self.layer_objects.get(element_object.layer_object_idx)?;
         let mut mc = MatrixCalculator::new();
-        mc.concat(&matrix);
-        mc.translate((node.layer_x, node.layer_y));
+        mc.concat(&layer_object.total_matrix);
+        mc.translate(element_object.coord);
         Some(mc.get_total_matrix())
     }
 
@@ -152,8 +206,36 @@ impl RenderTree {
         Some(&mut self.nodes[*node_idx])
     }
 
-    pub fn get_layer_idx(&mut self, element_id: u32) -> Option<usize> {
-        self.get_by_element_id(element_id).map(|rn| rn.layer_idx)
+    pub fn get_element_object_by_pos(&self, x: f32, y: f32) -> Option<(&ElementObjectData, f32, f32)> {
+        self.get_element_object_by_pos_recurse(self.root_render_object.as_ref()?, x, y)
+    }
+
+    fn get_element_object_by_pos_recurse(&self, render_object: &RenderObject, x: f32, y: f32) -> Option<(&ElementObjectData, f32, f32)> {
+        match render_object {
+            RenderObject::Normal(eo) => {
+                let eod = &self.element_objects[eo.element_object_idx];
+                if x >= eod.coord.0 && x <= eod.coord.0 + eod.width
+                    && y >= eod.coord.1 && y <= eod.coord.1 + eod.height {
+                    for c in eo.children.iter().rev() {
+                        let r = some_or_continue!(self.get_element_object_by_pos_recurse(c, x - eod.coord.0, y - eod.coord.1));
+                        return Some(r);
+                    }
+                    Some((eod, x - eod.coord.0, y - eod.coord.1))
+                } else {
+                    None
+                }
+            }
+            RenderObject::Layer(lo) => {
+                let lod = &self.layer_objects[lo.layer_object_idx];
+                let im = lod.total_matrix.invert()?;
+                let Point {x, y} = im.map_xy(x, y);
+                for ro in lo.objects.iter().rev() {
+                    let eo = some_or_continue!(self.get_element_object_by_pos_recurse(ro, x, y));
+                    return Some(eo);
+                }
+                None
+            }
+        }
     }
 
     pub fn add_node(&mut self, node: RenderNode) -> usize {
@@ -163,6 +245,155 @@ impl RenderTree {
         idx
     }
 
+    pub fn rebuild_render_object(&mut self, element: &mut Element) {
+        let mut matrix_calculator = MatrixCalculator::new();
+        let bounds = element.get_bounds();
+        self.root_render_object = Some(self.build_render_object(element, 0.0, 0.0, None, &mut matrix_calculator, 0.0, 0.0, &bounds.to_skia_rect(), true));
+    }
+
+    pub fn build_render_object_children(
+        &mut self,
+        element: &mut Element,
+        origin_x: f32,
+        origin_y: f32,
+        layer_object_idx: Option<usize>,
+        matrix_calculator: &mut MatrixCalculator,
+        layer_x: f32,
+        layer_y: f32,
+    ) -> Vec<RenderObject> {
+        let mut children = Vec::new();
+        let bounds = element.get_bounds();
+        for mut c in element.get_children() {
+            let child_bounds = c.get_bounds().translate(-element.get_scroll_left(), -element.get_scroll_top());
+            matrix_calculator.save();
+            matrix_calculator.translate((child_bounds.x, child_bounds.y));
+            let child_origin_x = origin_x + child_bounds.x;
+            let child_origin_y = origin_y + child_bounds.y;
+            let layer_x = layer_x + child_bounds.x;
+            let layer_y = layer_y + child_bounds.y;
+            children.push(self.build_render_object(&mut c, child_origin_x, child_origin_y, layer_object_idx, matrix_calculator, layer_x, layer_y, &child_bounds.to_skia_rect(), false));
+            matrix_calculator.restore();
+        }
+        let need_create_children_layer = Self::need_create_children_layer(element);
+        if need_create_children_layer {
+            let layer_object_idx = self.layer_objects.len();
+            let layer_object_data = LayerObjectData {
+                matrix: Matrix::default(),
+                total_matrix: matrix_calculator.get_total_matrix(),
+                width: bounds.width,
+                height: bounds.height,
+                key: RenderLayerKey::new(element.get_id(), RenderLayerType::Children),
+                invalid_area: InvalidArea::Full,
+                scroll_left: 0.0,
+                scroll_top: 0.0,
+                last_scroll_left: 0.0,
+                last_scroll_top: 0.0,
+                origin_absolute_pos: (origin_x, origin_y),
+            };
+            self.layer_objects.push(layer_object_data);
+            let children_layer_object = LayerObject {
+                objects: children,
+                layer_object_idx,
+            };
+            children = vec![RenderObject::Layer(children_layer_object)];
+        }
+        children
+    }
+
+    pub fn build_render_object(
+        &mut self,
+        element: &mut Element,
+        origin_x: f32,
+        origin_y: f32,
+        layer_object_idx: Option<usize>,
+        matrix_calculator: &mut MatrixCalculator,
+        layer_x: f32,
+        layer_y: f32,
+        bounds: &Rect,
+        is_root: bool,
+    ) -> RenderObject {
+        let need_create_root_layer = is_root || Self::need_create_root_layer(element);
+        if need_create_root_layer {
+            matrix_calculator.save();
+            let mut mc = MatrixCalculator::new();
+            mc.translate((bounds.left, bounds.top));
+            element.apply_transform(&mut mc);
+            let layer_object_idx = self.layer_objects.len();
+            let layer_object_data = LayerObjectData {
+                matrix: mc.get_total_matrix(),
+                total_matrix: matrix_calculator.get_total_matrix(),
+                width: bounds.width(),
+                height: bounds.height(),
+                key: RenderLayerKey::new(element.get_id(), RenderLayerType::Root),
+                invalid_area: InvalidArea::Full,
+                scroll_left: 0.0,
+                scroll_top: 0.0,
+                last_scroll_left: 0.0,
+                last_scroll_top: 0.0,
+                origin_absolute_pos: (origin_x, origin_y),
+            };
+            self.layer_objects.push(layer_object_data);
+            let obj = self.create_normal_render_object(
+                element,
+                &bounds.with_offset((-bounds.left, -bounds.top)),
+                origin_x,
+                origin_y,
+                0.0,
+                0.0,
+                layer_object_idx,
+                matrix_calculator,
+            );
+            //TODO fix
+            let layer_object = LayerObject {
+                objects: vec![obj],
+                layer_object_idx,
+            };
+            matrix_calculator.restore();
+            RenderObject::Layer(layer_object)
+        } else {
+            self.create_normal_render_object(element, bounds, origin_x, origin_y, layer_x, layer_y, layer_object_idx.unwrap(), matrix_calculator)
+        }
+    }
+
+    fn create_normal_render_object(
+        &mut self,
+        element: &mut Element,
+        bounds: &Rect,
+        origin_x: f32,
+        origin_y: f32,
+        layer_x: f32,
+        layer_y: f32,
+        layer_object_idx: usize,
+        matrix_calculator: &mut MatrixCalculator,
+    ) -> RenderObject {
+        let element_object_idx = self.element_objects.len();
+        element.render_object_idx = element_object_idx;
+        let node = self.get_mut_by_element_id(element.get_id()).unwrap();
+        let element_data = ElementObjectData {
+            element_id: element.get_id(),
+            coord: (bounds.left, bounds.top),
+            children_viewport: node.children_viewport.clone(),
+            border_path: node.border_path.get_paths().clone(),
+            border_box_path: node.border_path.get_box_path().clone(),
+            border_color: element.style.border_color,
+            render_fn: Some(element.get_backend_mut().render()),
+            background_image: element.style.background_image.clone(),
+            background_color: element.style.computed_style.background_color,
+            border_width: node.border_width,
+            width: bounds.width(),
+            height: bounds.height(),
+            layer_object_idx,
+            layer_coord: (layer_x, layer_y),
+        };
+        self.element_objects.push(element_data);
+        let element_obj = ElementObject {
+            element_object_idx,
+            children: self.build_render_object_children(element, origin_x, origin_y, Some(layer_object_idx), matrix_calculator, layer_x, layer_y),
+        };
+        RenderObject::Normal(element_obj)
+    }
+
+    /*
     pub fn rebuild_layers(&mut self, root: &mut Element) {
         let mut layer_roots = Vec::new();
         layer_roots.push((RenderLayerType::Root, Matrix::default(), 0.0, 0.0, root.clone()));
@@ -243,32 +474,26 @@ impl RenderTree {
         }
         self.layers = layers;
     }
+     */
 
-    pub fn invalid_element(&mut self, element_id: u32) {
-        let node = some_or_return!(self.get_by_element_id(element_id));
-        let layer_idx = node.layer_idx;
-        let bounds = Rect::from_xywh(node.layer_x, node.layer_y, node.width, node.height);
-        self.layers[layer_idx].invalid(&bounds);
+    pub fn invalid_element(&mut self, element: &Element) {
+        let eo = some_or_return!(self.element_objects.get(element.render_object_idx));
+        let bounds = Rect::from_xywh(eo.layer_coord.0, eo.layer_coord.1, eo.width, eo.height);
+        let layer_idx = eo.layer_object_idx;
+        let lo = &mut self.layer_objects[layer_idx];
+        lo.invalid(&bounds);
     }
 
-    pub fn update_scroll_left(&mut self, element_id: u32, scroll_left: f32) {
-        // let node = some_or_return!(self.get_by_element_id(element_id));
-        let key = RenderLayerKey::new(element_id, RenderLayerType::Children);
-        for l in &mut self.layers {
-            if l.key == key {
-                l.update_scroll_left(scroll_left);
-            }
-        }
+    pub fn update_scroll_left(&mut self, element: &Element, scroll_left: f32) {
+        let layer_idx = self.element_objects[element.render_object_idx].layer_object_idx;
+        let lo = &mut self.layer_objects[layer_idx];
+        lo.update_scroll_left(scroll_left);
     }
 
-    pub fn update_scroll_top(&mut self, element_id: u32, scroll_top: f32) {
-        // let node = some_or_return!(self.get_by_element_id(element_id));
-        let key = RenderLayerKey::new(element_id, RenderLayerType::Children);
-        for l in &mut self.layers {
-            if l.key == key {
-                l.update_scroll_top(scroll_top);
-            }
-        }
+    pub fn update_scroll_top(&mut self, element: &Element, scroll_top: f32) {
+        let layer_idx = self.element_objects[element.render_object_idx].layer_object_idx;
+        let lo = &mut self.layer_objects[layer_idx];
+        lo.update_scroll_top(scroll_top);
     }
 
     fn need_create_root_layer(element: &Element) -> bool {
@@ -279,6 +504,7 @@ impl RenderTree {
         element.need_snapshot
     }
 
+    /*
     fn build_layer_node(
         &mut self,
         layer_idx: usize,
@@ -371,6 +597,7 @@ impl RenderTree {
             result.append(&mut children);
         }
     }
+     */
 
     pub fn update_layout_info_recurse(
         &mut self,
@@ -395,22 +622,6 @@ impl RenderTree {
             let child_bounds = c.get_bounds().translate(-root.scroll_left, -root.scroll_top);
             self.update_layout_info_recurse(&mut c, child_bounds.to_skia_rect());
         }
-    }
-
-    pub fn get_node_mut(&mut self, node_idx: usize) -> Option<&mut RenderNode> {
-        self.nodes.get_mut(node_idx)
-    }
-
-    pub fn get_node_mut_unchecked(&mut self, node_idx: usize) -> &mut RenderNode {
-        self.nodes.get_mut(node_idx).unwrap()
-    }
-
-    pub fn nodes(&self) -> &Vec<RenderNode> {
-        &self.nodes
-    }
-
-    pub fn nodes_mut(&mut self) -> &mut Vec<RenderNode> {
-        &mut self.nodes
     }
 
     fn build_repaint_node(&mut self, n: &RenderLayerNode) -> Option<PaintNode> {
@@ -459,44 +670,57 @@ impl RenderTree {
         Some(pn)
     }
 
-    fn build_repaint_layer(&mut self, layer_idx: usize, viewport: &Rect) -> PaintLayer {
-        let layer = &mut self.layers[layer_idx];
-        let scroll_left = layer.scroll_left;
-        let scroll_top = layer.scroll_top;
-        let key = layer.key.clone();
-        let width = layer.width;
-        let height = layer.height;
-        let total_matrix = layer.total_matrix;
-        let invalid_path = layer.invalid_area.build(viewport.clone()).to_path(viewport.clone());
-        layer.reset_invalid_area();
-
-        let mut paint_nodes = Vec::new();
-        //TODO do not clone
-        let layer_nodes = layer.nodes.clone();
-        for n in &layer_nodes {
-            let pn = some_or_continue!(self.build_repaint_node(n));
-            paint_nodes.push(pn);
-        }
-        PaintLayer {
-            roots: paint_nodes,
-            scroll_left,
-            scroll_top,
-            key,
-            width,
-            height,
-            total_matrix,
-            invalid_path,
-        }
+    pub fn build_paint_tree(&mut self, viewport: &Rect) -> PaintObject {
+        self.build_paint_object(self.root_render_object.clone().as_mut().unwrap(), viewport)
     }
 
-    pub fn build_repaint_tree(&mut self, viewport: &Rect) -> PaintTree {
-        print_time!("build repaint tree");
-        let mut layers = Vec::new();
-        for idx in 0..self.layers.len() {
-            layers.push(self.build_repaint_layer(idx, viewport));
+    pub fn build_paint_objects(&mut self, render_objects: &mut Vec<RenderObject>, viewport: &Rect) -> Vec<PaintObject> {
+        let mut results = Vec::new();
+        for ro in render_objects {
+            results.push(self.build_paint_object(ro, viewport));
         }
-        PaintTree {
-            layers
+        results
+    }
+
+    pub fn build_paint_object(&mut self, render_object: &mut RenderObject, viewport: &Rect) -> PaintObject {
+        match render_object {
+            RenderObject::Normal(eod) => {
+                let children = self.build_paint_objects(&mut eod.children.clone(), viewport);
+                let eo = &mut self.element_objects[eod.element_object_idx];
+                let epo = ElementPaintObject {
+                    coord: eo.coord,
+                    children,
+                    children_viewport: eo.children_viewport,
+                    border_path: eo.border_path.clone(),
+                    border_box_path: eo.border_box_path.clone(),
+                    border_color: eo.border_color,
+                    render_fn: eo.render_fn.take(),
+                    background_image: eo.background_image.clone(),
+                    background_color: eo.background_color,
+                    border_width: eo.border_width,
+                    width: eo.width,
+                    height: eo.height,
+                    element_id: eo.element_id,
+                };
+                PaintObject::Normal(epo)
+            }
+            RenderObject::Layer(lod) => {
+                let objects = self.build_paint_objects(&mut lod.objects, viewport);
+                let lo = &mut self.layer_objects[lod.layer_object_idx];
+                let lpo = LayerPaintObject {
+                    matrix: lo.matrix.clone(),
+                    width: lo.width,
+                    height: lo.height,
+                    objects,
+                    key: lo.key.clone(),
+                    scroll_left: lo.scroll_left,
+                    scroll_top: lo.scroll_top,
+                    last_scroll_left: lo.last_scroll_left,
+                    last_scroll_top: lo.last_scroll_top,
+                    origin_absolute_pos: lo.origin_absolute_pos,
+                };
+                PaintObject::Layer(lpo)
+            }
         }
     }
 

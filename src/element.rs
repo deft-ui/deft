@@ -816,13 +816,13 @@ impl Element {
 
     fn update_layer_scroll_left(&mut self, scroll_left: f32) {
         self.with_window(|win| {
-            win.update_layer_scroll_left(self.id, scroll_left)
+            win.update_layer_scroll_left(self, scroll_left)
         });
     }
 
     fn update_layer_scroll_top(&mut self, scroll_top: f32) {
         self.with_window(|win| {
-            win.update_layer_scroll_top(self.id, scroll_top)
+            win.update_layer_scroll_top(self, scroll_top)
         });
     }
 
@@ -851,7 +851,7 @@ impl Element {
             });
         } else {
             self.with_window(|win| {
-                win.invalid_element(self.id);
+                win.invalid_element(self);
             });
         }
     }
@@ -1013,6 +1013,7 @@ pub struct Element {
     layout_dirty: bool,
     //TODO rename
     pub need_snapshot: bool,
+    pub render_object_idx: usize,
 }
 
 pub struct PaintInfo {
@@ -1054,6 +1055,7 @@ impl ElementData {
             layout_root: None,
             layout_dirty: true,
             need_snapshot: false,
+            render_object_idx: 0,
         }
     }
 
