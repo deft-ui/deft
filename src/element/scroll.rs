@@ -397,8 +397,7 @@ impl Scroll {
     fn map_frame_xy(&self, frame_x: f32, frame_y: f32) -> Option<(f32, f32)> {
         let element_id = self.element.get_id();
         let mut frame = self.element.get_frame()?.upgrade().ok()?;
-        let mut render_tree = frame.render_tree.lock().unwrap();
-        let node_matrix = render_tree.get_element_total_matrix(element_id)?;
+        let node_matrix = frame.render_tree.get_element_total_matrix(element_id)?;
         let p = node_matrix.invert()?.map_xy(frame_x, frame_y);
         Some((p.x, p.y))
     }

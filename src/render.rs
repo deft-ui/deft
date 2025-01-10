@@ -1,3 +1,7 @@
+pub mod paint_node;
+pub mod paint_layer;
+pub mod paint_tree;
+
 use skia_safe::Canvas;
 
 pub struct RenderFn {

@@ -14,6 +14,9 @@ use crate::mrc::Mrc;
 use crate::render::RenderFn;
 use crate::renderer::CpuRenderer;
 use crate::{some_or_break, some_or_continue, some_or_return};
+use crate::render::paint_layer::PaintLayer;
+use crate::render::paint_node::PaintNode;
+use crate::render::paint_tree::PaintTree;
 use crate::style::border_path::BorderPath;
 use crate::style::ColorHelper;
 
@@ -21,19 +24,27 @@ thread_local! {
     pub static NEXT_UNIQUE_RECT_ID: Cell<u64> = Cell::new(1);
 }
 
-pub struct RenderData {
-    pub layers: HashMap<RenderLayerKey, Layer>,
+pub struct LayerState {
+    pub layer: Layer,
+    pub surface_width: usize,
+    pub surface_height: usize,
+    pub last_scroll_left: f32,
+    pub last_scroll_top: f32,
 }
 
-impl RenderData {
+pub struct RenderState {
+    pub layers: HashMap<RenderLayerKey, LayerState>,
+}
+
+impl RenderState {
 
     fn new() -> Self {
         Self { layers: HashMap::new() }
     }
 
     pub fn take(ctx: &mut RenderContext) -> Self {
-        ctx.user_context.take::<RenderData>().unwrap_or_else(
-            || RenderData::new()
+        ctx.user_context.take::<RenderState>().unwrap_or_else(
+            || RenderState::new()
         )
     }
     pub fn put(self, ctx: &mut RenderContext) {
@@ -75,8 +86,10 @@ pub struct RenderLayer {
     // pub root_element_id: u32,
     pub key: RenderLayerKey,
     invalid_area: InvalidArea,
-    pub scroll_delta_x: f32,
-    pub scroll_delta_y: f32,
+    pub scroll_left: f32,
+    pub scroll_top: f32,
+    pub last_scroll_left: f32,
+    pub last_scroll_top: f32,
     // Original position relative to viewport before transform
     origin_absolute_pos: (f32, f32),
 }
@@ -88,9 +101,11 @@ impl RenderLayer {
     pub fn invalid_all(&mut self) {
         self.invalid_area = InvalidArea::Full;
     }
-    pub fn scroll(&mut self, delta: (f32, f32)) {
-        self.scroll_delta_x += delta.0;
-        self.scroll_delta_y += delta.1;
+    pub fn update_scroll_left(&mut self, scroll_left: f32) {
+        self.scroll_left = scroll_left;
+    }
+    pub fn update_scroll_top(&mut self, scroll_top: f32) {
+        self.scroll_top = scroll_top;
     }
     pub fn build_invalid_path(&self, viewport: &Rect) -> Path {
         self.invalid_area.build(viewport.clone()).to_path(viewport.clone())
@@ -103,6 +118,7 @@ impl RenderLayer {
     }
 }
 
+#[derive(Clone)]
 pub struct RenderLayerNode {
     pub node_idx: usize,
     pub children: Vec<RenderLayerNode>,
@@ -164,26 +180,39 @@ impl RenderTree {
             let (render_layer_type, matrix, origin_x, origin_y, mut element_root) = layer_root;
             let layer_key = RenderLayerKey::new(element_root.get_id(), render_layer_type.clone());
             let layer_idx = layers.len();
-            let (mut invalid_area, scroll_delta_x, scroll_delta_y) = {
-                if let Some(mut ol) = old_layers_map.remove(&layer_key) {
-                    if ol.scroll_delta_x != 0.0 || ol.scroll_delta_y != 0.0 {
-                        ol.invalid_area.offset(-ol.scroll_delta_x, -ol.scroll_delta_y);
-                        if ol.scroll_delta_y > 0.0 {
-                            ol.invalid_area.add_rect(Some(&Rect::new(0.0, ol.height - ol.scroll_delta_y, ol.width, ol.height)));
-                        } else if ol.scroll_delta_y < 0.0 {
-                            ol.invalid_area.add_rect(Some(&Rect::new(0.0, 0.0, ol.width, -ol.scroll_delta_y)));
-                        }
-
-                        if ol.scroll_delta_x > 0.0 {
-                            ol.invalid_area.add_rect(Some(&Rect::new(ol.width - ol.scroll_delta_x, 0.0, ol.width, ol.height)));
-                        } else if ol.scroll_delta_x < 0.0 {
-                            ol.invalid_area.add_rect(Some(&Rect::new(0.0, 0.0, -ol.scroll_delta_x, ol.height)));
-                        }
-
+            let mut ol = if let Some(mut ol) = old_layers_map.remove(&layer_key) {
+                let scroll_delta_x = ol.scroll_left - ol.last_scroll_left;
+                let scroll_delta_y = ol.scroll_top - ol.last_scroll_top;
+                if scroll_delta_x != 0.0 || scroll_delta_y != 0.0 {
+                    ol.invalid_area.offset(-scroll_delta_x, -scroll_delta_y);
+                    if scroll_delta_y > 0.0 {
+                        ol.invalid_area.add_rect(Some(&Rect::new(0.0, ol.height - scroll_delta_y, ol.width, ol.height)));
+                    } else if scroll_delta_y < 0.0 {
+                        ol.invalid_area.add_rect(Some(&Rect::new(0.0, 0.0, ol.width, -scroll_delta_y)));
                     }
-                    (ol.invalid_area, ol.scroll_delta_x, ol.scroll_delta_y)
-                } else {
-                    (InvalidArea::Full, 0.0, 0.0)
+
+                    if scroll_delta_x > 0.0 {
+                        ol.invalid_area.add_rect(Some(&Rect::new(ol.width - scroll_delta_x, 0.0, ol.width, ol.height)));
+                    } else if scroll_delta_x < 0.0 {
+                        ol.invalid_area.add_rect(Some(&Rect::new(0.0, 0.0, -scroll_delta_x, ol.height)));
+                    }
+                }
+                ol.last_scroll_left = ol.scroll_left;
+                ol.last_scroll_top = ol.scroll_top;
+                ol
+            } else {
+                RenderLayer {
+                    total_matrix: Matrix::default(),
+                    width: 0.0,
+                    height: 0.0,
+                    nodes: Vec::new(),
+                    key: layer_key,
+                    invalid_area: InvalidArea::Full,
+                    scroll_left: 0.0,
+                    scroll_top: 0.0,
+                    last_scroll_left: 0.0,
+                    last_scroll_top: 0.0,
+                    origin_absolute_pos: (0.0, 0.0),
                 }
             };
             // Create new layers
@@ -196,7 +225,7 @@ impl RenderTree {
                 &mut layer_roots,
                 0.0,
                 0.0,
-                &mut invalid_area,
+                &mut ol.invalid_area,
                 &mut old_layers_map,
                 origin_x,
                 origin_y,
@@ -205,17 +234,12 @@ impl RenderTree {
                 &mut matrix_calculator,
             );
             let root_node = self.get_by_element_id(element_root.get_id()).unwrap();
-            layers.push(RenderLayer {
-                total_matrix: matrix,
-                width: root_node.width,
-                height: root_node.height,
-                nodes,
-                key: layer_key,
-                invalid_area,
-                scroll_delta_y,
-                scroll_delta_x,
-                origin_absolute_pos: (origin_x, origin_y),
-            });
+            ol.nodes = nodes;
+            ol.total_matrix = matrix;
+            ol.width = root_node.width;
+            ol.height = root_node.height;
+            ol.origin_absolute_pos = (origin_x, origin_y);
+            layers.push(ol);
         }
         self.layers = layers;
     }
@@ -227,12 +251,22 @@ impl RenderTree {
         self.layers[layer_idx].invalid(&bounds);
     }
 
-    pub fn scroll(&mut self, element_id: u32, delta: (f32, f32)) {
+    pub fn update_scroll_left(&mut self, element_id: u32, scroll_left: f32) {
         // let node = some_or_return!(self.get_by_element_id(element_id));
         let key = RenderLayerKey::new(element_id, RenderLayerType::Children);
         for l in &mut self.layers {
             if l.key == key {
-                l.scroll(delta);
+                l.update_scroll_left(scroll_left);
+            }
+        }
+    }
+
+    pub fn update_scroll_top(&mut self, element_id: u32, scroll_top: f32) {
+        // let node = some_or_return!(self.get_by_element_id(element_id));
+        let key = RenderLayerKey::new(element_id, RenderLayerType::Children);
+        for l in &mut self.layers {
+            if l.key == key {
+                l.update_scroll_top(scroll_top);
             }
         }
     }
@@ -379,6 +413,92 @@ impl RenderTree {
         &mut self.nodes
     }
 
+    fn build_repaint_node(&mut self, n: &RenderLayerNode) -> Option<PaintNode> {
+        let node = &mut self.nodes[n.node_idx];
+        if !node.need_repaint {
+            //TODO maybe children need to repaint?
+            return None;
+        }
+        node.need_repaint = false;
+        let border_path = node.border_path.get_paths().clone();
+        let children_viewport = node.children_viewport.clone();
+        let layer_x = node.layer_x;
+        let layer_y = node.layer_y;
+        let border_box_path = node.border_path.get_box_path().clone();
+        let border_width = node.border_width;
+        let width = node.width;
+        let height = node.height;
+
+        let pi = some_or_return!(&mut node.paint_info, None);
+        let border_color = pi.border_color;
+        let render_fn = pi.render_fn.take();
+        let background_image = pi.background_image.clone();
+        let background_color = pi.background_color;
+
+
+        let mut children = Vec::new();
+        for c in &n.children {
+            let cn = some_or_continue!(self.build_repaint_node(c));
+            children.push(cn);
+        }
+        let pn = PaintNode {
+            children_viewport,
+            border_path,
+            border_box_path,
+            layer_x,
+            layer_y,
+            border_color,
+            render_fn,
+            background_image,
+            background_color,
+            children,
+            border_width,
+            width,
+            height,
+        };
+        Some(pn)
+    }
+
+    fn build_repaint_layer(&mut self, layer_idx: usize, viewport: &Rect) -> PaintLayer {
+        let layer = &mut self.layers[layer_idx];
+        let scroll_left = layer.scroll_left;
+        let scroll_top = layer.scroll_top;
+        let key = layer.key.clone();
+        let width = layer.width;
+        let height = layer.height;
+        let total_matrix = layer.total_matrix;
+        let invalid_path = layer.invalid_area.build(viewport.clone()).to_path(viewport.clone());
+        layer.reset_invalid_area();
+
+        let mut paint_nodes = Vec::new();
+        //TODO do not clone
+        let layer_nodes = layer.nodes.clone();
+        for n in &layer_nodes {
+            let pn = some_or_continue!(self.build_repaint_node(n));
+            paint_nodes.push(pn);
+        }
+        PaintLayer {
+            roots: paint_nodes,
+            scroll_left,
+            scroll_top,
+            key,
+            width,
+            height,
+            total_matrix,
+            invalid_path,
+        }
+    }
+
+    pub fn build_repaint_tree(&mut self, viewport: &Rect) -> PaintTree {
+        print_time!("build repaint tree");
+        let mut layers = Vec::new();
+        for idx in 0..self.layers.len() {
+            layers.push(self.build_repaint_layer(idx, viewport));
+        }
+        PaintTree {
+            layers
+        }
+    }
 
 }
 
@@ -389,7 +509,6 @@ pub enum RenderOp {
 }
 
 pub struct RenderPaintInfo {
-    pub need_paint: bool,
     // pub absolute_transformed_visible_path: Option<Path>,
     pub border_color: [Color; 4],
     pub render_fn: Option<RenderFn>,
@@ -416,41 +535,7 @@ pub struct RenderNode {
     //TODO fix root value
     pub layer_x: f32,
     pub layer_y: f32,
-}
-
-impl RenderNode {
-    pub fn draw_background(&self, canvas: &Canvas) {
-        let pi = some_or_return!(&self.paint_info);
-        if let Some(img) = &pi.background_image {
-            canvas.draw_image(img, (0.0, 0.0), Some(&Paint::default()));
-        } else if !pi.background_color.is_transparent() {
-            let mut paint = Paint::default();
-            let (bd_top, bd_right, bd_bottom, bd_left) = self.border_width;
-            let width = self.width;
-            let height = self.height;
-            let rect = Rect::new(bd_left, bd_top, width - bd_right, height - bd_bottom);
-
-            paint.set_color(pi.background_color);
-            paint.set_style(SkPaint_Style::Fill);
-            canvas.draw_rect(&rect, &paint);
-        }
-    }
-
-    pub fn draw_border(&mut self, canvas: &Canvas) {
-        let pi = some_or_return!(&self.paint_info);
-        let paths = self.border_path.get_paths();
-        let color = &pi.border_color;
-        for i in 0..4 {
-            let p = &paths[i];
-            if !p.is_empty() {
-                let mut paint = Paint::default();
-                paint.set_style(SkPaint_Style::Fill);
-                paint.set_anti_alias(true);
-                paint.set_color(color[i]);
-                canvas.draw_path(&p, &paint);
-            }
-        }
-    }
+    pub need_repaint: bool,
 }
 
 pub enum PaintElement {

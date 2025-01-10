@@ -245,7 +245,7 @@ impl Element {
         let max_scroll_left = (self.get_real_content_size().0 - width).max(0.0);
         value = value.clamp(0.0, max_scroll_left);
         if value != self.scroll_left {
-            self.scroll_layer((value - self.scroll_left, 0.0));
+            self.update_layer_scroll_left(value);
             self.mark_dirty(false);
             self.scroll_left = value;
             //TODO emit on layout updated?
@@ -276,7 +276,7 @@ impl Element {
         let max_scroll_top = (self.get_real_content_size().1 - height).max(0.0);
         value = value.clamp(0.0, max_scroll_top);
         if value != self.scroll_top {
-            self.scroll_layer((0.0, value - self.scroll_top));
+            self.update_layer_scroll_top(value);
             self.mark_dirty(false);
             self.scroll_top = value;
             //TODO emit on layout updated?
@@ -814,9 +814,15 @@ impl Element {
         self.event_registration.remove_event_listener(&event_type, id)
     }
 
-    fn scroll_layer(&mut self, delta: (f32, f32)) {
+    fn update_layer_scroll_left(&mut self, scroll_left: f32) {
         self.with_window(|win| {
-            win.scroll_layer(self.id, delta)
+            win.update_layer_scroll_left(self.id, scroll_left)
+        });
+    }
+
+    fn update_layer_scroll_top(&mut self, scroll_top: f32) {
+        self.with_window(|win| {
+            win.update_layer_scroll_top(self.id, scroll_top)
         });
     }
 

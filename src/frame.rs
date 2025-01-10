@@ -47,7 +47,10 @@ use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorGrabMode, CursorIcon, Window, WindowAttributes, WindowId};
 use crate::{bind_js_event_listener, is_snapshot_usable, send_app_event, show_repaint_area, some_or_continue, some_or_return};
 use crate::frame_rate::{get_total_frames, next_frame, FRAME_RATE_CONTROLLER};
-use crate::paint::{InvalidArea, PartialInvalidArea, Painter, RenderNode, RenderTree, SkiaPainter, UniqueRect, InvalidRects, RenderOp, MatrixCalculator, ClipPath, RenderPaintInfo, ClipChain, RenderLayer, RenderLayerNode, RenderData, RenderLayerKey};
+use crate::paint::{InvalidArea, PartialInvalidArea, Painter, RenderNode, RenderTree, SkiaPainter, UniqueRect, InvalidRects, RenderOp, MatrixCalculator, ClipPath, RenderPaintInfo, ClipChain, RenderLayer, RenderLayerNode, RenderState, RenderLayerKey, LayerState};
+use crate::render::paint_layer::PaintLayer;
+use crate::render::paint_node::PaintNode;
+use crate::render::paint_tree::PaintTree;
 use crate::style::border_path::BorderPath;
 use crate::style::ColorHelper;
 
@@ -108,7 +111,7 @@ pub struct Frame {
     init_height: Option<f32>,
     ime_height: f32,
     background_color: Color,
-    pub render_tree: Arc<Mutex<RenderTree>>,
+    pub render_tree: RenderTree,
     renderer_idle: bool,
     next_frame_callbacks: Vec<Callback>,
 }
@@ -222,7 +225,7 @@ impl Frame {
             ime_height: 0.0,
             background_color: Color::from_rgb(0, 0, 0),
             repaint_timer_handle: None,
-            render_tree: Arc::new(Mutex::new(RenderTree::new(0))),
+            render_tree: RenderTree::new(0),
             renderer_idle: true,
             next_frame_callbacks: Vec::new(),
         };
@@ -239,18 +242,17 @@ impl Frame {
     }
 
     pub fn invalid_element(&mut self, element_id: u32) {
-        {
-            let mut rt = self.render_tree.lock().unwrap();
-            rt.invalid_element(element_id);
-        }
+        self.render_tree.invalid_element(element_id);
         self.notify_update();
     }
 
-    pub fn scroll_layer(&mut self, element_id: u32, delta: (f32, f32)) {
-        {
-            let mut rt = self.render_tree.lock().unwrap();
-            rt.scroll(element_id, delta);
-        }
+    pub fn update_layer_scroll_left(&mut self, element_id: u32, scroll_left: f32) {
+        self.render_tree.update_scroll_left(element_id, scroll_left);
+        self.notify_update();
+    }
+
+    pub fn update_layer_scroll_top(&mut self, element_id: u32, scroll_top: f32) {
+        self.render_tree.update_scroll_top(element_id, scroll_top);
         self.notify_update();
     }
 
@@ -502,7 +504,6 @@ impl Frame {
         let screen_y = self.cursor_root_position.y as f32;
         let mut target_node = self.get_node_by_point();
         let dragging = self.dragging;
-        let render_tree = self.render_tree.clone();
         if let Some((pressing, down_info)) = &mut self.pressing.clone() {
             if dragging {
                 if let Some((target, _, _)) = &mut target_node {
@@ -522,18 +523,18 @@ impl Frame {
                     self.dragging = true;
                 } else {
                     self.update_cursor(pressing);
-                    emit_mouse_event(&render_tree, pressing, MouseEventType::MouseMove, 0, frame_x, frame_y, screen_x, screen_y);
+                    emit_mouse_event(&self.render_tree, pressing, MouseEventType::MouseMove, 0, frame_x, frame_y, screen_x, screen_y);
                 }
             }
             //TODO should emit mouseenter|mouseleave?
         } else if let Some((mut node, _, _)) = target_node {
             self.update_cursor(&node);
-            if let Some(hover) = &mut self.hover {
+            if let Some(hover) = &mut self.hover.clone() {
                 if hover != &node {
-                    emit_mouse_event(&render_tree, hover, MouseEventType::MouseLeave, 0, frame_x, frame_y, screen_x, screen_y);
+                    emit_mouse_event(&self.render_tree, hover, MouseEventType::MouseLeave, 0, frame_x, frame_y, screen_x, screen_y);
                     self.mouse_enter_node(node.clone(), frame_x, frame_y, screen_x, screen_y);
                 } else {
-                    emit_mouse_event(&render_tree, &mut node, MouseEventType::MouseMove, 0, frame_x, frame_y, screen_x, screen_y);
+                    emit_mouse_event(&self.render_tree, &mut node, MouseEventType::MouseMove, 0, frame_x, frame_y, screen_x, screen_y);
                 }
             } else {
                 self.mouse_enter_node(node.clone(), frame_x, frame_y, screen_x, screen_y);
@@ -548,8 +549,7 @@ impl Frame {
     }
 
     fn mouse_enter_node(&mut self, mut node: Element, offset_x: f32, offset_y: f32, screen_x: f32, screen_y: f32) {
-        let render_tree = self.render_tree.clone();
-        emit_mouse_event(&render_tree, &mut node, MouseEventType::MouseEnter, 0, offset_x, offset_y, screen_x, screen_y);
+        emit_mouse_event(&self.render_tree, &mut node, MouseEventType::MouseEnter, 0, offset_x, offset_y, screen_x, screen_y);
         self.hover = Some(node);
     }
 
@@ -566,7 +566,6 @@ impl Frame {
         let frame_y = self.cursor_position.y as f32;
         let screen_x = self.cursor_root_position.x as f32;
         let screen_y = self.cursor_root_position.y as f32;
-        let render_tree = self.render_tree.clone();
         //TODO impl
 
         if let Some((mut node, _, _)) = self.get_node_by_point() {
@@ -586,11 +585,11 @@ impl Frame {
                 ElementState::Pressed => {
                     self.focus(node.clone());
                     self.pressing = Some((node.clone(), MouseDownInfo {button, frame_x, frame_y}));
-                    emit_mouse_event(&render_tree, &mut node, event_type, button, frame_x, frame_y, screen_x, screen_y);
+                    emit_mouse_event(&self.render_tree, &mut node, event_type, button, frame_x, frame_y, screen_x, screen_y);
                 }
                 ElementState::Released => {
                     if let Some(mut pressing) = self.pressing.clone() {
-                        emit_mouse_event(&render_tree, &mut pressing.0, MouseUp, button, frame_x, frame_y, screen_x, screen_y);
+                        emit_mouse_event(&self.render_tree, &mut pressing.0, MouseUp, button, frame_x, frame_y, screen_x, screen_y);
                         if pressing.0 == node && pressing.1.button == button {
                             let ty = match mouse_button {
                                 MouseButton::Left => Some(MouseEventType::MouseClick),
@@ -598,19 +597,19 @@ impl Frame {
                                 _ => None
                             };
                             if let Some(ty) = ty {
-                                emit_mouse_event(&render_tree, &mut node, ty, button, frame_x, frame_y, screen_x, screen_y);
+                                emit_mouse_event(&self.render_tree, &mut node, ty, button, frame_x, frame_y, screen_x, screen_y);
                             }
                         }
                         self.release_press();
                     } else {
-                        emit_mouse_event(&render_tree, &mut node, MouseUp, button, frame_x, frame_y, screen_x, screen_y);
+                        emit_mouse_event(&self.render_tree, &mut node, MouseUp, button, frame_x, frame_y, screen_x, screen_y);
                     }
                 }
             }
         }
         if state == ElementState::Released {
-            if let Some(pressing) = &mut self.pressing {
-                emit_mouse_event(&render_tree, &mut pressing.0, MouseUp, pressing.1.button, frame_x, frame_y, screen_x, screen_y);
+            if let Some(pressing) = &mut self.pressing.clone() {
+                emit_mouse_event(&self.render_tree, &mut pressing.0, MouseUp, pressing.1.button, frame_x, frame_y, screen_x, screen_y);
                 self.release_press();
             }
         }
@@ -691,9 +690,8 @@ impl Frame {
                         let mut node = node.clone();
                         self.focus(node.clone());
                         println!("clicked");
-                        let render_tree = self.render_tree.clone();
                         //TODO fix screen_x, screen_y
-                        emit_mouse_event(&render_tree, &mut node, MouseClick, 0, frame_x, frame_y, 0.0, 0.0);
+                        emit_mouse_event(&self.render_tree, &mut node, MouseClick, 0, frame_x, frame_y, 0.0, 0.0);
                     }
                 }
                 TouchPhase::Cancelled => {
@@ -760,7 +758,7 @@ impl Frame {
                 size.height as f32 / scale_factor
             };
             height -= self.ime_height / scale_factor;
-            let render_tree = if let Some(body) = &mut self.body {
+            self.render_tree = if let Some(body) = &mut self.body {
                 // print_time!("calculate layout, {} x {}", width, height);
                 body.calculate_layout(width, height);
                 let mut render_tree = build_render_nodes(body);
@@ -778,7 +776,6 @@ impl Frame {
             } else {
                 RenderTree::new(0)
             };
-            self.render_tree = Arc::new(Mutex::new(render_tree));
             // print_time!("collect element time");
         }
         let r = self.paint();
@@ -878,21 +875,17 @@ impl Frame {
         let background_color = self.background_color;
         let mut me = self.clone();
         let viewport = Rect::new(0.0, 0.0, width as f32 / scale_factor, height as f32 / scale_factor);
-        let mut render_tree = self.render_tree.clone();
         if let Some(body) = &mut me.body {
             // print_time!("build render nodes time");
-            let mut render_tree = render_tree.lock().unwrap();
             print_time!("update layout time");
-            render_tree.rebuild_layers(body);
+            self.render_tree.rebuild_layers(body);
         } else {
             return ResultWaiter::new_finished(false);
         };
-        let invalid_rects_list = {
-            let mut render_tree = render_tree.lock().unwrap();
-            print_time!("update repaint time");
-            build_repaint_nodes(&mut render_tree, &mut body, viewport)
+        let mut paint_tree = {
+            build_repaint_nodes(&mut self.render_tree, &mut body, viewport.clone());
+            self.render_tree.build_repaint_tree(&viewport)
         };
-        self.render_tree = render_tree.clone();
         let waiter_finisher = waiter.clone();
         let frame_id = self.get_id();
         self.renderer_idle = false;
@@ -903,15 +896,13 @@ impl Frame {
                 canvas.scale((scale_factor, scale_factor));
             }
             let mut painter = SkiaPainter::new(canvas);
-            let mut render_tree = render_tree.lock().unwrap();
             canvas.clear(background_color);
             let mut layers = Vec::new();
-            layers.append(&mut render_tree.layers);
-            let mut render_data = RenderData::take(ctx);
+            layers.append(&mut paint_tree.layers);
+            let mut render_data = RenderState::take(ctx);
             let mut old_layers = mem::take(&mut render_data.layers);
             for mut layer in layers {
-                draw_layer(canvas, ctx, &mut old_layers, &mut render_data, &mut render_tree, &mut layer, scale_factor, &viewport);
-                render_tree.layers.push(layer);
+                draw_layer(canvas, ctx, &mut old_layers, &mut render_data, &mut paint_tree, &mut layer, scale_factor, &viewport);
             }
             //draw_elements(canvas, ctx, &mut render_tree, invalid_rects_list, scale_factor, old_snapshots, snapshots, &viewport);
             render_data.put(ctx);
@@ -947,17 +938,15 @@ impl Frame {
     }
 
     fn get_node_by_pos(&self, x: f32, y: f32) -> Option<(Element, f32, f32)> {
-        let mut render_tree = self.render_tree.clone();
-        let mut render_tree = render_tree.lock().unwrap();
         let body = self.body.clone()?;
         // print_time!("search node time in layers");
-        let mut layer_idx = render_tree.layers.len();
-        for layer in render_tree.layers.iter().rev() {
+        let mut layer_idx = self.render_tree.layers.len();
+        for layer in self.render_tree.layers.iter().rev() {
             layer_idx -= 1;
             let im = layer.total_matrix.invert().unwrap();
             let point = im.map_xy(x, y);
             if point.x >= 0.0 && point.x <= layer.width && point.y >= 0.0 && point.y <= layer.height {
-                let nodes = render_tree.nodes();
+                let nodes = self.render_tree.nodes();
                 for node in nodes.iter().rev() {
                     let x = point.x;
                     let y = point.y;
@@ -1007,55 +996,75 @@ impl WeakWindowHandle {
 fn draw_layer(
     root_canvas: &Canvas,
     context: &mut RenderContext,
-    old_graphic_layers: &mut HashMap<RenderLayerKey, Layer>,
-    render_data: &mut RenderData,
-    render_tree: &mut RenderTree,
-    layer: &mut RenderLayer,
+    old_graphic_layers: &mut HashMap<RenderLayerKey, LayerState>,
+    render_data: &mut RenderState,
+    render_tree: &mut PaintTree,
+    layer: &mut PaintLayer,
     scale: f32,
     viewport: &Rect,
 ) {
-    let mut graphic_layer = if let Some(mut ogl) = old_graphic_layers.remove(&layer.key) {
-        //TODO fix
-        if layer.scroll_delta_x != 0.0 || layer.scroll_delta_y != 0.0 {
-            //TODO optimize size
-            let tp_width = (viewport.width() * scale) as usize;
-            let tp_height = (viewport.height() * scale) as usize;
-            let mut temp_gl = context.create_layer(tp_width, tp_height).unwrap();
-            temp_gl.canvas().draw_image(&ogl.as_image(), (-layer.scroll_delta_x * scale, -layer.scroll_delta_y * scale), None);
-            unsafe  {
-                let sf = root_canvas.surface();
-                let sf = sf.unwrap();
-                sf.direct_context().unwrap().flush_and_submit();
+    let max_len = (viewport.width() * viewport.width() + viewport.height() * viewport.height()).sqrt();
+    let surface_width = (f32::min(layer.width, max_len) * scale) as usize;
+    let surface_height = (f32::min(layer.height, max_len) * scale) as usize;
+    if surface_width <= 0 || surface_height <= 0 {
+        return;
+    }
+    let mut graphic_layer = if let Some(mut ogl_state) = old_graphic_layers.remove(&layer.key) {
+        if ogl_state.surface_width != surface_width || ogl_state.surface_height != surface_height {
+            None
+        } else {
+            //TODO fix scroll delta
+            let scroll_delta_x = layer.scroll_left - ogl_state.last_scroll_left;
+            let scroll_delta_y = layer.scroll_top - ogl_state.last_scroll_top;
+            if scroll_delta_x != 0.0 || scroll_delta_y != 0.0 {
+                //TODO optimize size
+                let tp_width = (viewport.width() * scale) as usize;
+                let tp_height = (viewport.height() * scale) as usize;
+                let mut temp_gl = context.create_layer(tp_width, tp_height).unwrap();
+                temp_gl.canvas().session(|canvas| {
+                    canvas.clip_rect(&Rect::new(0.0, 0.0, layer.width * scale, layer.height * scale), ClipOp::Intersect, false);
+                    canvas.draw_image(&ogl_state.layer.as_image(), (-scroll_delta_x * scale, -scroll_delta_y * scale), None);
+                });
+                unsafe {
+                    let sf = root_canvas.surface();
+                    let sf = sf.unwrap();
+                    sf.direct_context().unwrap().flush_and_submit();
+                }
+                ogl_state.layer.canvas().session(|canvas| {
+                    canvas.clear(Color::TRANSPARENT);
+                    canvas.clip_rect(&Rect::from_xywh(0.0, 0.0, layer.width, layer.height), ClipOp::Intersect, false);
+                    canvas.scale((1.0 / scale, 1.0 / scale));
+                    canvas.draw_image(&temp_gl.as_image(), (0.0, 0.0), None);
+                });
+                unsafe {
+                    let sf = root_canvas.surface();
+                    let sf = sf.unwrap();
+                    sf.direct_context().unwrap().flush_and_submit();
+                }
+                ogl_state.last_scroll_left = layer.scroll_left;
+                ogl_state.last_scroll_top = layer.scroll_top;
             }
-            ogl.canvas().session(|canvas| {
-                canvas.clear(Color::TRANSPARENT);
-                canvas.clip_rect(&Rect::from_xywh(0.0, 0.0, layer.width, layer.height), ClipOp::Intersect, false);
-                canvas.scale((1.0 / scale, 1.0 / scale));
-                canvas.draw_image(&temp_gl.as_image(), (0.0, 0.0) , None);
-            });
-            unsafe  {
-                let sf = root_canvas.surface();
-                let sf = sf.unwrap();
-                sf.direct_context().unwrap().flush_and_submit();
-            }
-            layer.scroll_delta_x = 0.0;
-            layer.scroll_delta_y = 0.0;
+            Some(ogl_state)
         }
-        ogl
     } else {
-        let width = (viewport.width() * scale) as usize;
-        let height = (viewport.height() * scale) as usize;
-        let mut gl = context.create_layer(width, height).unwrap();
+        None
+    }.unwrap_or_else(|| {
+        let mut gl = context.create_layer(surface_width, surface_height).unwrap();
         gl.canvas().scale((scale, scale));
-        gl
-    };
-    let layer_canvas = graphic_layer.canvas();
+        LayerState {
+            layer: gl,
+            last_scroll_left: 0.0,
+            last_scroll_top: 0.0,
+            surface_width,
+            surface_height,
+        }
+    });
+    let layer_canvas = graphic_layer.layer.canvas();
     layer_canvas.save();
-    let invalid_path = layer.build_invalid_path(viewport);
-    layer_canvas.clip_path(&invalid_path, ClipOp::Intersect, false);
+    layer_canvas.clip_path(&layer.invalid_path, ClipOp::Intersect, false);
     layer_canvas.clip_rect(&Rect::from_xywh(0.0, 0.0, layer.width, layer.height), ClipOp::Intersect, false);
     layer_canvas.clear(Color::TRANSPARENT);
-    draw_nodes_recurse(layer_canvas, scale, &mut layer.nodes, render_tree);
+    draw_nodes_recurse(layer_canvas, scale, &mut layer.roots, render_tree);
     layer_canvas.restore();
 
     unsafe  {
@@ -1066,10 +1075,10 @@ fn draw_layer(
     root_canvas.save();
     root_canvas.concat(&layer.total_matrix);
     root_canvas.scale((1.0 / scale, 1.0 / scale));
-    root_canvas.draw_image(graphic_layer.as_image(), (0.0, 0.0), None);
+    root_canvas.draw_image(graphic_layer.layer.as_image(), (0.0, 0.0), None);
     if show_repaint_area() {
         root_canvas.scale((scale, scale));
-        let path = layer.build_invalid_path(&viewport);
+        let path = &layer.invalid_path;
         if !path.is_empty() {
             let mut paint = Paint::default();
             paint.set_style(PaintStyle::Stroke);
@@ -1084,14 +1093,13 @@ fn draw_layer(
         sf.direct_context().unwrap().flush_and_submit();
     }
     render_data.layers.insert(layer.key.clone(), graphic_layer);
-    layer.reset_invalid_area();
 }
 
 fn draw_nodes_recurse(
     canvas: &Canvas,
     scale: f32,
-    nodes: &mut Vec<RenderLayerNode>,
-    render_tree: &mut RenderTree,
+    nodes: &mut Vec<PaintNode>,
+    render_tree: &mut PaintTree,
 ) {
     for n in nodes {
         draw_node_recurse(canvas, scale, n, render_tree);
@@ -1101,10 +1109,10 @@ fn draw_nodes_recurse(
 fn draw_node_recurse(
     canvas: &Canvas,
     scale: f32,
-    layer_node: &mut RenderLayerNode,
-    render_tree: &mut RenderTree,
+    node: &mut PaintNode,
+    render_tree: &mut PaintTree,
 ) {
-    let node = render_tree.get_node_mut(layer_node.node_idx).unwrap();
+    // let node = render_tree.get_node_mut(layer_node.node_idx).unwrap();
     canvas.save();
     canvas.translate((node.layer_x, node.layer_y));
     //TODO children viewport
@@ -1114,19 +1122,19 @@ fn draw_node_recurse(
     // }
     //TODO support overflow:visible
     // set clip path
-    let clip_path = node.border_path.get_box_path();
-    canvas.clip_path(&clip_path, SkClipOp::Intersect, false);
-    if node.paint_info.as_ref().is_some_and(|p| p.need_paint) {
-        node.paint_info.as_mut().unwrap().need_paint = false;
+    let clip_path = &node.border_box_path;
+    canvas.clip_path(clip_path, SkClipOp::Intersect, false);
+    // if node.paint_info.as_ref().is_some_and(|p| p.need_paint) {
+    //     node.paint_info.as_mut().unwrap().need_paint = false;
         let mut painter = SkiaPainter::new(canvas);
         draw_element(canvas, node, &mut painter);
-    }
+    // }
     canvas.translate((-node.layer_x, -node.layer_y));
-    draw_nodes_recurse(canvas, scale, &mut layer_node.children, render_tree);
+    draw_nodes_recurse(canvas, scale, &mut node.children, render_tree);
     canvas.restore();
 }
 
-fn draw_element(canvas: &Canvas, node: &mut RenderNode, painter: &mut dyn Painter) {
+fn draw_element(canvas: &Canvas, node: &mut PaintNode, painter: &mut dyn Painter) {
     let width = node.width;
     let height = node.height;
     //TODO fix clip
@@ -1147,8 +1155,8 @@ fn draw_element(canvas: &Canvas, node: &mut RenderNode, painter: &mut dyn Painte
             // let (padding_top, _, _, padding_left) = element.get_padding();
             // draw content box
             canvas.translate((border_left_width, border_top_width));
-            let paint_info = some_or_return!(&mut node.paint_info);
-            if let Some(render_fn) = paint_info.render_fn.take() {
+            // let paint_info = some_or_return!(&mut node.paint_info);
+            if let Some(render_fn) = node.render_fn.take() {
                 render_fn.run(canvas);
             }
         }
@@ -1168,9 +1176,9 @@ fn build_repaint_nodes(
     render_tree: &mut RenderTree,
     root: &mut Element,
     viewport: Rect
-) -> Vec<InvalidArea> {
+) {
+    print_time!("build repaint nodes");
     update_node_paint_info_recursive(render_tree, root, &viewport);
-    Vec::new()
 }
 
 fn collect_render_nodes(
@@ -1189,6 +1197,7 @@ fn collect_render_nodes(
         layer_idx: 0,
         layer_x: 0.0,
         layer_y: 0.0,
+        need_repaint: false,
         // reuse_bounds: None,
     };
 
@@ -1210,7 +1219,7 @@ fn update_node_paint_info_recursive(
     let layer_idx = some_or_return!(tree.get_layer_idx(element.get_id()));
     let invalid_rects = tree.layers[layer_idx].build_invalid_rects(viewport);
     let node = some_or_return!(tree.get_mut_by_element_id(element.get_id()));
-    let invalid_rects_idx = build_render_paint_info(element, &invalid_rects, node, viewport);
+    build_render_paint_info(element, &invalid_rects, node, viewport);
     for mut n in element.get_children() {
         update_node_paint_info_recursive(tree, &mut n, viewport);
     }
@@ -1232,9 +1241,9 @@ fn build_render_paint_info(
         scroll_top: root.scroll_top,
     });
     let bounds = Rect::from_xywh(node.layer_x, node.layer_y, node.width, node.height);
-    if node.paint_info.is_none() || invalid_rects.has_intersects(&bounds) {
+    node.need_repaint = invalid_rects.has_intersects(&bounds);
+    if node.paint_info.is_none() || node.need_repaint {
         let paint_info = RenderPaintInfo {
-            need_paint: true,
             render_fn: Some(root.get_backend_mut().render()),
             background_image: root.style.background_image.clone(),
             background_color: root.style.computed_style.background_color,
@@ -1270,9 +1279,7 @@ fn print_tree(node: &Element, padding: &str) {
     }
 }
 
-fn emit_mouse_event(render_tree: &Arc<Mutex<RenderTree>>, node: &mut Element, event_type_enum: MouseEventType, button: i32, frame_x: f32, frame_y: f32, screen_x: f32, screen_y: f32) {
-    let render_tree = render_tree.clone();
-    let mut render_tree = render_tree.lock().unwrap();
+fn emit_mouse_event(render_tree: &RenderTree, node: &mut Element, event_type_enum: MouseEventType, button: i32, frame_x: f32, frame_y: f32, screen_x: f32, screen_y: f32) {
     let node_matrix = some_or_return!(render_tree.get_element_total_matrix(node.get_id()));
     let (border_top, _, _, border_left) = node.get_border_width();
 
