@@ -1559,7 +1559,7 @@ fn parse_scale_op(value: &str) -> Option<StyleTransformOp> {
 fn parse_translate_op(value: &str) -> Option<StyleTransformOp> {
     let mut values = value.split(",").collect::<Vec<&str>>();
     if values.len() < 2 {
-        values.push(values[0].clone());
+        values.push(values[0]);
     }
     let x = parse_translate_length(values[0].trim())?;
     let y = parse_translate_length(values[1].trim())?;

@@ -1,5 +1,8 @@
+use crate::paint::RenderLayerKey;
 use crate::render::paint_layer::PaintLayer;
+use crate::render::paint_object::PaintObject;
 
 pub struct PaintTree {
-    pub layers: Vec<PaintLayer>,
+    pub all_layer_keys: Vec<RenderLayerKey>,
+    pub root: PaintObject,
 }

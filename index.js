@@ -29,6 +29,7 @@ function createEntry() {
         padding: 5,
         border: "1 #ccc"
     })
+    console.log("entry id:", entry.getId())
     return entry;
 }
 
@@ -47,6 +48,7 @@ function createTextEdit() {
         "border": "1 #ccc"
         // "minWidth": 600,
     });
+    console.log("TextEdit id:", textEdit.getId());
     return textEdit;
 }
 
@@ -66,6 +68,7 @@ function createCenterElement() {
         height: 100,
         transform: 'translate(-50%, -50%)',
         border: '1 #ccc',
+        background: '#ccc',
     });
     outer.addChild(inner);
     console.log("innerId", inner.getId());
@@ -180,6 +183,7 @@ function main() {
         background: "#2a2a2a",
         color: "#FFF",
         padding: 5,
+        gap: 5,
     })
 
     container.addChild(createAddChildrenButton(container));

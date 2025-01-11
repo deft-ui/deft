@@ -27,7 +27,7 @@ use crate::element::textedit::TextEdit;
 use crate::event::{DragOverEventListener, BlurEventListener, BoundsChangeEventListener, CaretChangeEventListener, ClickEventListener, DragStartEventListener, DropEventListener, FocusEventListener, FocusShiftEventListener, KeyDownEventListener, KeyUpEventListener, MouseDownEventListener, MouseEnterEvent, MouseEnterEventListener, MouseLeaveEvent, MouseLeaveEventListener, MouseMoveEventListener, MouseUpEventListener, MouseWheelEventListener, ScrollEvent, ScrollEventListener, TextChangeEventListener, TextUpdateEventListener, TouchCancelEventListener, TouchEndEventListener, TouchMoveEventListener, TouchStartEventListener, BoundsChangeEvent, ContextMenuEventListener};
 use crate::event_loop::{create_event_loop_callback};
 use crate::ext::ext_frame::{VIEW_TYPE_BUTTON, VIEW_TYPE_CONTAINER, VIEW_TYPE_ENTRY, VIEW_TYPE_IMAGE, VIEW_TYPE_LABEL, VIEW_TYPE_SCROLL, VIEW_TYPE_TEXT_EDIT};
-use crate::frame::{Frame, FrameWeak, InvalidMode};
+use crate::frame::{Frame, FrameWeak};
 use crate::img_manager::IMG_MANAGER;
 use crate::js::js_serde::JsValueSerializer;
 use crate::mrc::{Mrc, MrcWeak};
@@ -1013,7 +1013,7 @@ pub struct Element {
     layout_dirty: bool,
     //TODO rename
     pub need_snapshot: bool,
-    pub render_object_idx: usize,
+    pub render_object_idx: Option<usize>,
 }
 
 pub struct PaintInfo {
@@ -1055,7 +1055,7 @@ impl ElementData {
             layout_root: None,
             layout_dirty: true,
             need_snapshot: false,
-            render_object_idx: 0,
+            render_object_idx: None,
         }
     }
 

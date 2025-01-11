@@ -2,6 +2,8 @@ pub mod paint_node;
 pub mod paint_layer;
 pub mod paint_tree;
 pub mod paint_object;
+pub mod layout_tree;
+pub mod painter;
 
 use skia_safe::Canvas;
 

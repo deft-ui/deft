@@ -1,6 +1,6 @@
 use skia_bindings::SkPaint_Style;
 use skia_safe::{Canvas, Color, Image, Matrix, Paint, Path, Rect};
-use crate::paint::{InvalidArea, RenderLayerKey, RenderObject};
+use crate::paint::{InvalidArea, InvalidRects, RenderLayerKey, RenderObject};
 use crate::render::RenderFn;
 use crate::style::ColorHelper;
 
@@ -58,6 +58,7 @@ impl ElementPaintObject {
 
 pub struct LayerPaintObject {
     pub matrix: Matrix,
+    pub total_matrix: Matrix,
     pub width: f32,
     pub height: f32,
     pub objects: Vec<PaintObject>,
@@ -65,10 +66,9 @@ pub struct LayerPaintObject {
     pub key: RenderLayerKey,
     pub scroll_left: f32,
     pub scroll_top: f32,
-    pub last_scroll_left: f32,
-    pub last_scroll_top: f32,
     // Original position relative to viewport before transform
     pub origin_absolute_pos: (f32, f32),
+    pub invalid_rects: InvalidRects,
 }
 
 pub enum PaintObject {
