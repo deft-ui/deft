@@ -50,15 +50,18 @@ pub mod text;
 pub mod paragraph;
 
 use crate as lento;
+use crate::computed::ComputedValue;
 use crate::js::JsError;
 use crate::layout::LayoutRoot;
 use crate::paint::{MatrixCalculator, Painter, RenderTree, UniqueRect};
 use crate::render::paint_tree::PaintTree;
 use crate::render::RenderFn;
 use crate::style::border_path::BorderPath;
+use crate::style_manager::StyleManager;
 
 thread_local! {
     pub static NEXT_ELEMENT_ID: Cell<u32> = Cell::new(1);
+    pub static STYLE_VARS: ComputedValue<String> = ComputedValue::new();
 }
 
 struct ElementJsContext {
@@ -86,6 +89,14 @@ impl Element {
         let mut ele = Self {
             inner,
         };
+        {
+            let ele_weak = ele.as_weak();
+            ele.style_manager.set_style_consumer(move |prop| {
+                if let Ok(mut e) = ele_weak.upgrade() {
+                    e.set_style_prop_internal(prop);
+                }
+            });
+        }
         let ele_weak = ele.inner.as_weak();
         let weak = ele.as_weak();
         ele.style.bind_element(weak);
@@ -98,7 +109,10 @@ impl Element {
         ele.inner.style.animation_renderer = Some(Mrc::new(Box::new(move |styles| {
             if let Ok(inner) = ele_weak.upgrade() {
                 let mut el = Element::from_inner(inner);
-                el.animation_style_props = styles;
+                el.animation_style_props.clear();
+                for st in styles {
+                    el.animation_style_props.insert(st.key().clone(), st);
+                }
                 el.apply_style();
             }
         })));
@@ -330,17 +344,48 @@ impl Element {
 
     pub fn set_parent(&mut self, parent: Option<Element>) {
         self.parent = match parent {
-            None => None,
-            Some(p) => Some(p.as_weak()),
+            None => {
+                self.on_window_changed(&None);
+                None
+            },
+            Some(p) => {
+                self.on_window_changed(&p.get_window());
+                Some(p.as_weak())
+            },
         };
         self.applied_style.clear();
+        let mut el = self.clone();
         self.apply_style();
 
         self.style.update_computed_style(None);
     }
 
     pub fn set_window(&mut self, window: Option<FrameWeak>) {
-        self.window = window;
+        self.window = window.clone();
+        self.on_window_changed(&window);
+    }
+
+    fn get_window(&self) -> Option<FrameWeak> {
+        if let Some(p) = self.get_parent() {
+            p.get_window()
+        } else {
+            self.window.clone()
+        }
+    }
+
+    pub fn on_window_changed(&mut self, window: &Option<FrameWeak>) {
+        self.update_style_variables(window);
+        for mut c in self.get_children() {
+            c.on_window_changed(window);
+        }
+    }
+
+    fn update_style_variables(&mut self, window: &Option<FrameWeak>) {
+        if let Some(win) = &window {
+            if let Ok(win) = win.upgrade() {
+                self.style_manager.bind_style_variables(&win.style_variables);
+            }
+        }
     }
 
     pub fn with_window<F: FnOnce(&mut Frame)>(&self, callback: F) {
@@ -563,17 +608,31 @@ impl Element {
 
     #[js_func]
     pub fn set_style(&mut self, style: JsValue) {
-        self.set_style_props(parse_style_obj(style))
+        self.style_props.clear();
+        self.style_manager.parse_style_obj(style);
     }
 
     pub fn set_style_props(&mut self, styles: Vec<StyleProp>) {
-        self.style_props = styles;
+        // self.style_props.clear();
+        for st in styles {
+            self.set_style_prop_internal(st);
+        }
+        // self.apply_style();
+    }
+
+    fn set_style_prop_internal(&mut self, style: StyleProp) {
+        // println!("setting style {:?}", style);
+        self.style_props.insert(style.key().clone(), style);
         self.apply_style();
     }
 
     #[js_func]
     pub fn set_hover_style(&mut self, style: JsValue) {
-        self.hover_style_props = parse_style_obj(style);
+        let styles = parse_style_obj(style);
+        self.hover_style_props.clear();
+        for st in styles {
+            self.hover_style_props.insert(st.key().clone(), st);
+        }
         if self.hover {
             self.apply_style();
         }
@@ -621,14 +680,14 @@ impl Element {
     fn apply_style(&mut self) {
         let mut style_props = self.style_props.clone();
         if self.hover {
-            for v in &self.hover_style_props {
-                style_props.push(v.clone());
+            for (k, v) in &self.hover_style_props {
+                style_props.insert(k.clone(), v.clone());
             }
         }
-        for v in &self.animation_style_props {
-            style_props.push(v.clone());
+        for (k, v) in &self.animation_style_props {
+            style_props.insert(k.clone(), v.clone());
         }
-        let new_style = style_props;
+        let new_style = style_props.values().map(|t| t.clone()).collect();
 
         let old_style = self.applied_style.clone();
         let mut changed_style_props = Self::calculate_changed_style(&old_style, &new_style);
@@ -1017,9 +1076,9 @@ pub struct Element {
     window: Option<FrameWeak>,
     event_registration: EventRegistration<ElementWeak>,
     pub style: StyleNode,
-    style_props: Vec<StyleProp>,
-    hover_style_props: Vec<StyleProp>,
-    animation_style_props: Vec<StyleProp>,
+    style_props: HashMap<StylePropKey, StyleProp>,
+    hover_style_props: HashMap<StylePropKey, StyleProp>,
+    animation_style_props: HashMap<StylePropKey, StyleProp>,
     hover: bool,
 
     applied_style: Vec<StyleProp>,
@@ -1042,6 +1101,7 @@ pub struct Element {
     pub need_snapshot: bool,
     pub render_object_idx: Option<usize>,
     border_path: BorderPath,
+    style_manager: StyleManager,
 }
 
 pub struct PaintInfo {
@@ -1064,9 +1124,9 @@ impl ElementData {
             window: None,
             event_registration: EventRegistration::new(),
             style: StyleNode::new(),
-            style_props: Vec::new(),
-            hover_style_props: Vec::new(),
-            animation_style_props: Vec::new(),
+            style_props: HashMap::new(),
+            hover_style_props: HashMap::new(),
+            animation_style_props: HashMap::new(),
             applied_style: Vec::new(),
             hover: false,
 
@@ -1085,6 +1145,7 @@ impl ElementData {
             need_snapshot: false,
             render_object_idx: None,
             border_path: BorderPath::new(0.0, 0.0, [0.0; 4], [0.0; 4]),
+            style_manager: StyleManager::new()
         }
     }
 

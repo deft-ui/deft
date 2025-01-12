@@ -46,9 +46,10 @@ use winit::keyboard::{Key, NamedKey};
 use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorGrabMode, CursorIcon, Window, WindowAttributes, WindowId};
 use crate::{bind_js_event_listener, is_snapshot_usable, ok_or_return, send_app_event, show_repaint_area, some_or_continue, some_or_return};
+use crate::computed::ComputedValue;
 use crate::frame_rate::{get_total_frames, next_frame, FRAME_RATE_CONTROLLER};
 use crate::layout::LayoutRoot;
-use crate::paint::{InvalidArea, PartialInvalidArea, Painter, RenderNode, RenderTree, SkiaPainter, UniqueRect, InvalidRects, MatrixCalculator, ClipPath, RenderLayer, RenderLayerNode, RenderState, RenderLayerKey, LayerState};
+use crate::paint::{InvalidArea, PartialInvalidArea, Painter, RenderNode, RenderTree, SkiaPainter, UniqueRect, InvalidRects, MatrixCalculator, RenderLayer, RenderLayerNode, RenderState, RenderLayerKey, LayerState};
 use crate::render::paint_layer::PaintLayer;
 use crate::render::paint_node::PaintNode;
 use crate::render::paint_object::{ElementPaintObject, PaintObject};
@@ -111,6 +112,7 @@ pub struct Frame {
     renderer_idle: bool,
     next_frame_callbacks: Vec<Callback>,
     pub render_tree: RenderTree,
+    pub style_variables: ComputedValue<String>,
 }
 
 pub type FrameEventHandler = EventHandler<FrameWeak>;
@@ -149,7 +151,8 @@ impl Frame {
 
     #[js_func]
     pub fn create(attrs: FrameAttrs) -> Result<Self, Error> {
-        let frame = Frame::create_inner(attrs);
+        let mut frame = Frame::create_inner(attrs);
+        frame.update_ime_height(0.0);
         let window_id = frame.get_window_id();
         FRAMES.with_borrow_mut(|m| m.insert(frame.get_id(), frame.clone()));
         WINDOW_TO_FRAME.with_borrow_mut(|m| m.insert(window_id, frame.as_weak()));
@@ -234,6 +237,7 @@ impl Frame {
             renderer_idle: true,
             next_frame_callbacks: Vec::new(),
             render_tree: RenderTree::new(0),
+            style_variables: ComputedValue::new(),
         };
         let mut handle = Frame {
             inner: Mrc::new(state),
@@ -241,6 +245,12 @@ impl Frame {
         // handle.body.set_window(Some(win.clone()));
         handle.on_resize();
         handle
+    }
+
+    pub fn update_ime_height(&mut self, ime_height: f32) {
+        let ime_height = ime_height / self.window.scale_factor() as f32;
+        self.ime_height = ime_height;
+        self.style_variables.update_value("ime-height", format!("{:.6}", ime_height));
     }
 
     pub fn resume(&mut self) {
@@ -734,7 +744,6 @@ impl Frame {
         } else {
             size.height as f32 / scale_factor
         };
-        height -= self.ime_height / scale_factor;
         print_time!("calculate layout, {} x {}", width, height);
         let body = some_or_return!(&mut self.body);
         body.calculate_layout(width, height);
@@ -1042,8 +1051,8 @@ pub fn frame_input(frame_id: i32, content: String) {
 pub fn frame_ime_resize(frame_id: i32, height: f32) {
     FRAMES.with_borrow_mut(|m| {
         if let Some(f) = m.get_mut(&frame_id) {
-            f.ime_height = height;
-            f.mark_dirty_and_update_immediate(true).wait_finish();
+            f.update_ime_height(height);
+            // f.mark_dirty_and_update_immediate(true).wait_finish();
         }
     });
 }

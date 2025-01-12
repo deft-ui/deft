@@ -391,11 +391,22 @@ macro_rules! define_style_props {
             )*
         }
 
-        #[derive(PartialEq, Eq)]
+        #[derive(Clone, Hash, PartialEq, Eq)]
         pub enum StylePropKey {
             $(
                 $name,
             )*
+        }
+
+        impl StylePropKey {
+            pub fn parse(key: &str) -> Option<Self> {
+                $(
+                    if key == stringify!($name).to_lowercase().as_str() {
+                        return Some(StylePropKey::$name);
+                    }
+                )*
+                None
+            }
         }
 
         impl StyleProp {
@@ -555,7 +566,7 @@ pub fn expand_mixed_style(mixed: HashMap<AllStylePropertyKey, StylePropertyValue
     result
 }
 
-fn parse_box_prop(value: StylePropertyValue) -> (StylePropertyValue, StylePropertyValue, StylePropertyValue, StylePropertyValue) {
+pub fn parse_box_prop(value: StylePropertyValue) -> (StylePropertyValue, StylePropertyValue, StylePropertyValue, StylePropertyValue) {
     match value {
         StylePropertyValue::String(str) => {
             let parts: Vec<&str> = str.split(" ")
