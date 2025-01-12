@@ -26,6 +26,7 @@ use crate::style::ColorHelper;
 
 thread_local! {
     pub static NEXT_UNIQUE_RECT_ID: Cell<u64> = Cell::new(1);
+    pub static RENDER_TREE_ID_KEY: IdKey = IdKey::new();
 }
 
 pub struct LayerState {
@@ -60,6 +61,7 @@ impl RenderState {
 
 //TODO rename to LayoutTree?
 pub struct RenderTree {
+    id: Id<RenderTree>,
     layout_tree: LayoutTree,
     pub element_objects: Vec<ElementObjectData>,
 }
@@ -72,13 +74,14 @@ pub enum RenderLayerType {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct RenderLayerKey {
+    tree_id: Id<RenderTree>,
     root_element_id: u32,
     pub layer_type: RenderLayerType,
 }
 
 impl RenderLayerKey {
-    pub fn new(root_element_id: u32, layer_type: RenderLayerType) -> Self {
-        Self { root_element_id, layer_type }
+    pub fn new(tree_id: Id<RenderTree>, root_element_id: u32, layer_type: RenderLayerType) -> Self {
+        Self { tree_id, root_element_id, layer_type }
     }
 }
 
@@ -86,7 +89,6 @@ pub struct ElementObjectData {
     pub coord: (f32, f32),
     pub layer_coord: (f32, f32),
     pub children_viewport: Option<Rect>,
-    pub border_path: BorderPath,
     // pub layer_x: f32,
     // pub layer_y: f32,
     pub border_color: [Color; 4],
@@ -98,6 +100,7 @@ pub struct ElementObjectData {
     pub height: f32,
     pub layer_object_idx: usize,
     pub element_id: u32,
+    pub element: Element,
 }
 
 #[derive(Clone)]
@@ -185,6 +188,7 @@ pub struct RenderLayerNode {
 impl RenderTree {
     pub fn new(predicate_count: usize) -> Self {
         Self {
+            id: Id::next(&RENDER_TREE_ID_KEY),
             layout_tree: LayoutTree::new(),
             element_objects: Vec::with_capacity(predicate_count),
         }
@@ -233,13 +237,12 @@ impl RenderTree {
 
     pub fn create_node(&mut self, element: &mut Element) {
         let bounds = element.get_bounds();
-        let mut border_path = element.create_border_path();
         let mut el = element.clone();
         let element_data = ElementObjectData {
+            element: element.clone(),
             element_id: element.get_id(),
             coord: (bounds.x, bounds.y),
             children_viewport: element.get_children_viewport(),
-            border_path,
             border_color: element.style.border_color,
             renderer: Box::new(move || el.get_backend_mut().render()),
             background_image: element.style.background_image.clone(),
@@ -256,6 +259,7 @@ impl RenderTree {
     }
 
     pub fn rebuild_render_object(&mut self, element: &mut Element) {
+        print_time!("rebuild render object");
         let old_layout_tree = mem::take(&mut self.layout_tree);
         let mut matrix_calculator = MatrixCalculator::new();
         let bounds = element.get_bounds();
@@ -306,7 +310,7 @@ impl RenderTree {
                 total_matrix: matrix_calculator.get_total_matrix(),
                 width: bounds.width,
                 height: bounds.height,
-                key: RenderLayerKey::new(element.get_id(), RenderLayerType::Children),
+                key: RenderLayerKey::new(self.id, element.get_id(), RenderLayerType::Children),
                 invalid_area: InvalidArea::Full,
                 scroll_left: element.get_scroll_left(),
                 scroll_top: element.get_scroll_top(),
@@ -349,7 +353,7 @@ impl RenderTree {
                 total_matrix: matrix_calculator.get_total_matrix(),
                 width: bounds.width(),
                 height: bounds.height(),
-                key: RenderLayerKey::new(element.get_id(), RenderLayerType::Root),
+                key: RenderLayerKey::new(self.id, element.get_id(), RenderLayerType::Root),
                 invalid_area: InvalidArea::Full,
                 scroll_left: 0.0,
                 scroll_top: 0.0,
@@ -454,6 +458,7 @@ impl RenderTree {
     }
 
     pub fn build_paint_tree(&mut self, viewport: &Rect) -> Option<PaintTree> {
+        print_time!("Building paint tree");
         let invalid_rects = InvalidArea::Full.build(viewport.clone());
         let root = self.build_paint_object(self.layout_tree.root_render_object.clone().as_mut().unwrap(), viewport, &invalid_rects)?;
         Some(PaintTree {
@@ -481,12 +486,15 @@ impl RenderTree {
                     // println!("skipping painting {}", eo.element_id);
                     return None;
                 }
+                let border_path_mut = eo.element.get_border_path_mut();
+                let border_path = border_path_mut.get_paths().clone();
+                let border_box_path = border_path_mut.get_box_path().clone();
                 let epo = ElementPaintObject {
                     coord: eo.coord,
                     children,
                     children_viewport: eo.children_viewport,
-                    border_path: eo.border_path.get_paths().clone(),
-                    border_box_path: eo.border_path.get_box_path().clone(),
+                    border_path,
+                    border_box_path,
                     border_color: eo.border_color,
                     render_fn: Some((eo.renderer)()),
                     background_image: eo.background_image.clone(),

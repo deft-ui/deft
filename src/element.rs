@@ -7,6 +7,7 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Error};
 use lento_macros::{js_func, js_methods, mrc_object};
+use measure_time::print_time;
 use ordered_float::Float;
 use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
@@ -34,7 +35,7 @@ use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::resource_table::ResourceTable;
 use crate::style::{parse_style_obj, ColorHelper, StyleNode, StyleProp, StylePropKey, StyleTransform};
-use crate::{base, bind_js_event_listener, compute_style, js_call, js_call_rust, js_deserialize, js_get_prop, js_serialize, js_weak_value};
+use crate::{base, bind_js_event_listener, compute_style, js_call, js_call_rust, js_deserialize, js_get_prop, js_serialize, js_weak_value, some_or_return};
 
 pub mod container;
 pub mod entry;
@@ -51,7 +52,8 @@ pub mod paragraph;
 use crate as lento;
 use crate::js::JsError;
 use crate::layout::LayoutRoot;
-use crate::paint::{MatrixCalculator, Painter, UniqueRect};
+use crate::paint::{MatrixCalculator, Painter, RenderTree, UniqueRect};
+use crate::render::paint_tree::PaintTree;
 use crate::render::RenderFn;
 use crate::style::border_path::BorderPath;
 
@@ -245,7 +247,6 @@ impl Element {
         let max_scroll_left = (self.get_real_content_size().0 - width).max(0.0);
         value = value.clamp(0.0, max_scroll_left);
         if value != self.scroll_left {
-            self.update_layer_scroll_left(value);
             self.mark_dirty(false);
             self.scroll_left = value;
             //TODO emit on layout updated?
@@ -276,7 +277,6 @@ impl Element {
         let max_scroll_top = (self.get_real_content_size().1 - height).max(0.0);
         value = value.clamp(0.0, max_scroll_top);
         if value != self.scroll_top {
-            self.update_layer_scroll_top(value);
             self.mark_dirty(false);
             self.scroll_top = value;
             //TODO emit on layout updated?
@@ -522,8 +522,12 @@ impl Element {
         // self.mark_all_layout_dirty();
         self.on_before_layout_update();
         self.style.calculate_layout(available_width, available_height, Direction::LTR);
-        self.on_layout_update();
-        self.set_dirty_state_recurse(false);
+        if let Some(lr) = &mut self.layout_root {
+            lr.update_layout();
+            assert_eq!(false, self.layout_dirty);
+        } else {
+            self.on_layout_update();
+        }
     }
 
     pub fn set_border_width(&mut self, width: (f32, f32, f32, f32)) {
@@ -814,18 +818,6 @@ impl Element {
         self.event_registration.remove_event_listener(&event_type, id)
     }
 
-    fn update_layer_scroll_left(&mut self, scroll_left: f32) {
-        self.with_window(|win| {
-            win.update_layer_scroll_left(self, scroll_left)
-        });
-    }
-
-    fn update_layer_scroll_top(&mut self, scroll_top: f32) {
-        self.with_window(|win| {
-            win.update_layer_scroll_top(self, scroll_top)
-        });
-    }
-
     pub fn set_as_layout_root(&mut self, layout_root: Option<Box<dyn LayoutRoot>>) {
         self.layout_root = layout_root;
     }
@@ -837,22 +829,51 @@ impl Element {
 
         if layout_dirty {
             if let Some(layout_root) = &mut self.layout_root {
-                layout_root.mark_layout_dirty();
                 self.set_dirty_state_recurse(true);
-                return;
-            }
-            if let Some(mut parent) = self.get_parent() {
+            } else if let Some(mut parent) = self.get_parent() {
                 parent.mark_dirty(true);
                 return;
+            } else {
+                self.set_dirty_state_recurse(true);
             }
-            self.set_dirty_state_recurse(true);
             self.with_window(|win| {
                 win.invalid_layout();
             });
         } else {
-            self.with_window(|win| {
-                win.invalid_element(self);
+            let el = self.clone();
+            self.request_invalid(&el);
+        }
+    }
+
+    fn request_invalid(&mut self, element: &Element) {
+        if let Some(mut p) = self.get_parent() {
+            p.request_invalid(element);
+        } else {
+            self.with_window(|w| {
+                w.render_tree.invalid_element(element);
+                w.notify_update();
             });
+        }
+    }
+
+    pub fn is_layout_dirty(&self) -> bool {
+        self.layout_dirty
+    }
+
+    pub fn ensure_layout_update(&mut self) {
+        if self.layout_dirty {
+            self.request_layout();
+            assert_eq!(false, self.layout_dirty);
+        }
+    }
+
+    fn request_layout(&mut self) {
+        if let Some(lr) = &mut self.layout_root {
+            lr.update_layout();
+        } else if let Some(mut p) = self.get_parent() {
+            p.request_layout();
+        } else {
+            panic!("Failed to layout elements");
         }
     }
 
@@ -900,10 +921,8 @@ impl Element {
 
 
     pub fn on_layout_update(&mut self) {
+        self.layout_dirty = false;
         let origin_bounds = self.get_origin_bounds();
-        if let Some(layout_root) = &mut self.layout_root {
-            layout_root.on_root_bounds_updated(origin_bounds.to_skia_rect());
-        }
         //TODO emit size change
         let origin_bounds = self.get_origin_bounds();
         if origin_bounds != self.rect {
@@ -923,16 +942,24 @@ impl Element {
         if !origin_bounds.is_empty() {
             // self.backend.handle_origin_bounds_change(&origin_bounds);
             for child in &mut self.get_children() {
-                child.on_layout_update();
+                if let Some(p) = &mut child.layout_root {
+                    p.update_layout();
+                } else {
+                    child.on_layout_update();
+                }
             }
         }
     }
 
-    pub fn create_border_path(&self) -> BorderPath {
+    pub fn get_border_path_mut(&mut self) -> &mut BorderPath {
         let bounds = self.get_bounds();
         let border_widths = self.get_border_width();
         let border_widths = [border_widths.0, border_widths.1, border_widths.2, border_widths.3];
-        BorderPath::new(bounds.width, bounds.height, self.style.border_radius, border_widths)
+        let bp = BorderPath::new(bounds.width, bounds.height, self.style.border_radius, border_widths);
+        if !self.border_path.is_same(&bp) {
+            self.border_path = bp;
+        }
+        &mut self.border_path
     }
 
     pub fn get_origin_border_bounds(&self) -> base::Rect {
@@ -1014,6 +1041,7 @@ pub struct Element {
     //TODO rename
     pub need_snapshot: bool,
     pub render_object_idx: Option<usize>,
+    border_path: BorderPath,
 }
 
 pub struct PaintInfo {
@@ -1056,6 +1084,7 @@ impl ElementData {
             layout_dirty: true,
             need_snapshot: false,
             render_object_idx: None,
+            border_path: BorderPath::new(0.0, 0.0, [0.0; 4], [0.0; 4]),
         }
     }
 

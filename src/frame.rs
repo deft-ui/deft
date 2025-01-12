@@ -45,8 +45,9 @@ use winit::keyboard::{Key, NamedKey};
 #[cfg(feature = "x11")]
 use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorGrabMode, CursorIcon, Window, WindowAttributes, WindowId};
-use crate::{bind_js_event_listener, is_snapshot_usable, send_app_event, show_repaint_area, some_or_continue, some_or_return};
+use crate::{bind_js_event_listener, is_snapshot_usable, ok_or_return, send_app_event, show_repaint_area, some_or_continue, some_or_return};
 use crate::frame_rate::{get_total_frames, next_frame, FRAME_RATE_CONTROLLER};
+use crate::layout::LayoutRoot;
 use crate::paint::{InvalidArea, PartialInvalidArea, Painter, RenderNode, RenderTree, SkiaPainter, UniqueRect, InvalidRects, MatrixCalculator, ClipPath, RenderLayer, RenderLayerNode, RenderState, RenderLayerKey, LayerState};
 use crate::render::paint_layer::PaintLayer;
 use crate::render::paint_node::PaintNode;
@@ -89,7 +90,7 @@ pub struct Frame {
     cursor_position: LogicalPosition<f64>,
     pub(crate) frame_type: FrameType,
     cursor_root_position: LogicalPosition<f64>,
-    body: Option<Element>,
+    pub body: Option<Element>,
     focusing: Option<Element>,
     /// (element, button)
     pressing: Option<(Element, MouseDownInfo)>,
@@ -107,9 +108,9 @@ pub struct Frame {
     init_height: Option<f32>,
     ime_height: f32,
     background_color: Color,
-    pub render_tree: RenderTree,
     renderer_idle: bool,
     next_frame_callbacks: Vec<Callback>,
+    pub render_tree: RenderTree,
 }
 
 pub type FrameEventHandler = EventHandler<FrameWeak>;
@@ -133,6 +134,15 @@ pub struct FrameFocusEvent;
 
 #[frame_event]
 pub struct FrameBlurEvent;
+
+impl LayoutRoot for FrameWeak {
+
+    fn update_layout(&mut self) {
+        let mut frame = ok_or_return!(self.upgrade());
+        frame.update_layout();
+    }
+}
+
 
 #[js_methods]
 impl Frame {
@@ -221,9 +231,9 @@ impl Frame {
             ime_height: 0.0,
             background_color: Color::from_rgb(0, 0, 0),
             repaint_timer_handle: None,
-            render_tree: RenderTree::new(0),
             renderer_idle: true,
             next_frame_callbacks: Vec::new(),
+            render_tree: RenderTree::new(0),
         };
         let mut handle = Frame {
             inner: Mrc::new(state),
@@ -237,22 +247,7 @@ impl Frame {
         self.window = Self::create_window(self.attributes.clone());
     }
 
-    pub fn invalid_element(&mut self, element: &Element) {
-        self.render_tree.invalid_element(element);
-        self.notify_update();
-    }
-
-    pub fn update_layer_scroll_left(&mut self, element: &Element, scroll_left: f32) {
-        self.render_tree.update_scroll_left(element, scroll_left);
-        self.notify_update();
-    }
-
-    pub fn update_layer_scroll_top(&mut self, element: &Element, scroll_top: f32) {
-        self.render_tree.update_scroll_top(element, scroll_top);
-        self.notify_update();
-    }
-
-    fn notify_update(&mut self) {
+    pub fn notify_update(&mut self) {
         if !self.dirty {
             self.dirty = true;
             send_app_event(AppEvent::Update(self.get_id()));
@@ -519,7 +514,7 @@ impl Frame {
                     self.dragging = true;
                 } else {
                     self.update_cursor(pressing);
-                    emit_mouse_event(&self.render_tree, pressing, MouseEventType::MouseMove, 0, frame_x, frame_y, screen_x, screen_y);
+                    self.emit_mouse_event( pressing, MouseEventType::MouseMove, 0, frame_x, frame_y, screen_x, screen_y);
                 }
             }
             //TODO should emit mouseenter|mouseleave?
@@ -527,10 +522,10 @@ impl Frame {
             self.update_cursor(&node);
             if let Some(hover) = &mut self.hover.clone() {
                 if hover != &node {
-                    emit_mouse_event(&self.render_tree, hover, MouseEventType::MouseLeave, 0, frame_x, frame_y, screen_x, screen_y);
+                    self.emit_mouse_event( hover, MouseEventType::MouseLeave, 0, frame_x, frame_y, screen_x, screen_y);
                     self.mouse_enter_node(node.clone(), frame_x, frame_y, screen_x, screen_y);
                 } else {
-                    emit_mouse_event(&self.render_tree, &mut node, MouseEventType::MouseMove, 0, frame_x, frame_y, screen_x, screen_y);
+                    self.emit_mouse_event( &mut node, MouseEventType::MouseMove, 0, frame_x, frame_y, screen_x, screen_y);
                 }
             } else {
                 self.mouse_enter_node(node.clone(), frame_x, frame_y, screen_x, screen_y);
@@ -545,7 +540,7 @@ impl Frame {
     }
 
     fn mouse_enter_node(&mut self, mut node: Element, offset_x: f32, offset_y: f32, screen_x: f32, screen_y: f32) {
-        emit_mouse_event(&self.render_tree, &mut node, MouseEventType::MouseEnter, 0, offset_x, offset_y, screen_x, screen_y);
+        self.emit_mouse_event( &mut node, MouseEventType::MouseEnter, 0, offset_x, offset_y, screen_x, screen_y);
         self.hover = Some(node);
     }
 
@@ -581,11 +576,11 @@ impl Frame {
                 ElementState::Pressed => {
                     self.focus(node.clone());
                     self.pressing = Some((node.clone(), MouseDownInfo {button, frame_x, frame_y}));
-                    emit_mouse_event(&self.render_tree, &mut node, event_type, button, frame_x, frame_y, screen_x, screen_y);
+                    self.emit_mouse_event( &mut node, event_type, button, frame_x, frame_y, screen_x, screen_y);
                 }
                 ElementState::Released => {
                     if let Some(mut pressing) = self.pressing.clone() {
-                        emit_mouse_event(&self.render_tree, &mut pressing.0, MouseUp, button, frame_x, frame_y, screen_x, screen_y);
+                        self.emit_mouse_event( &mut pressing.0, MouseUp, button, frame_x, frame_y, screen_x, screen_y);
                         if pressing.0 == node && pressing.1.button == button {
                             let ty = match mouse_button {
                                 MouseButton::Left => Some(MouseEventType::MouseClick),
@@ -593,19 +588,19 @@ impl Frame {
                                 _ => None
                             };
                             if let Some(ty) = ty {
-                                emit_mouse_event(&self.render_tree, &mut node, ty, button, frame_x, frame_y, screen_x, screen_y);
+                                self.emit_mouse_event( &mut node, ty, button, frame_x, frame_y, screen_x, screen_y);
                             }
                         }
                         self.release_press();
                     } else {
-                        emit_mouse_event(&self.render_tree, &mut node, MouseUp, button, frame_x, frame_y, screen_x, screen_y);
+                        self.emit_mouse_event( &mut node, MouseUp, button, frame_x, frame_y, screen_x, screen_y);
                     }
                 }
             }
         }
         if state == ElementState::Released {
             if let Some(pressing) = &mut self.pressing.clone() {
-                emit_mouse_event(&self.render_tree, &mut pressing.0, MouseUp, pressing.1.button, frame_x, frame_y, screen_x, screen_y);
+                self.emit_mouse_event( &mut pressing.0, MouseUp, pressing.1.button, frame_x, frame_y, screen_x, screen_y);
                 self.release_press();
             }
         }
@@ -687,7 +682,7 @@ impl Frame {
                         self.focus(node.clone());
                         println!("clicked");
                         //TODO fix screen_x, screen_y
-                        emit_mouse_event(&self.render_tree, &mut node, MouseClick, 0, frame_x, frame_y, 0.0, 0.0);
+                        self.emit_mouse_event( &mut node, MouseClick, 0, frame_x, frame_y, 0.0, 0.0);
                     }
                 }
                 TouchPhase::Cancelled => {
@@ -725,6 +720,35 @@ impl Frame {
         }
     }
 
+    fn update_layout(&mut self) {
+        let auto_size = !self.attributes.resizable;
+        let size = self.window.inner_size();
+        let scale_factor = self.window.scale_factor() as f32;
+        let width = if auto_size {
+            self.init_width.unwrap_or(f32::NAN)
+        } else {
+            size.width as f32 / scale_factor
+        };
+        let mut height = if auto_size {
+            self.init_height.unwrap_or(f32::NAN)
+        } else {
+            size.height as f32 / scale_factor
+        };
+        height -= self.ime_height / scale_factor;
+        print_time!("calculate layout, {} x {}", width, height);
+        let body = some_or_return!(&mut self.body);
+        body.calculate_layout(width, height);
+        if auto_size {
+            let (final_width, final_height) = body.get_size();
+            if size.width != final_width as u32 && size.height != final_height as u32 {
+                self.resize(crate::base::Size {
+                    width: final_width,
+                    height: final_height,
+                });
+            }
+        }
+    }
+
     pub fn update(&mut self) -> ResultWaiter<bool> {
         if !self.renderer_idle {
             return ResultWaiter::new_finished(false);
@@ -739,46 +763,11 @@ impl Frame {
             // skip duplicate update
             return ResultWaiter::new_finished(false);
         }
-        let auto_size = !self.attributes.resizable;
         if self.layout_dirty {
-            let size = self.window.inner_size();
-            let scale_factor = self.window.scale_factor() as f32;
-            let width = if auto_size {
-                self.init_width.unwrap_or(f32::NAN)
-            } else {
-                size.width as f32 / scale_factor
-            };
-            let mut height = if auto_size {
-                self.init_height.unwrap_or(f32::NAN)
-            } else {
-                size.height as f32 / scale_factor
-            };
-            height -= self.ime_height / scale_factor;
-            self.render_tree = if let Some(body) = &mut self.body {
-                {
-                    print_time!("calculate layout, {} x {}", width, height);
-                    body.calculate_layout(width, height);
-                }
-                let render_tree = {
-                    print_time!("rebuild layout nodes");
-                    let mut render_tree = build_render_nodes(body);
-                    render_tree.update_layout_info_recurse(body, body.get_bounds().to_skia_rect());
-                    render_tree
-                };
-                if auto_size {
-                    let (final_width, final_height) = body.get_size();
-                    if size.width != final_width as u32 && size.height != final_height as u32 {
-                        self.resize(crate::base::Size {
-                            width: final_width,
-                            height: final_height,
-                        });
-                    }
-                }
-                render_tree
-            } else {
-                RenderTree::new(0)
-            };
-            // print_time!("collect element time");
+            self.update_layout();
+            if let Some(body) = &mut self.body {
+                self.render_tree = build_render_nodes(body);
+            }
         }
         let r = self.paint();
         self.layout_dirty = false;
@@ -865,29 +854,21 @@ impl Frame {
             waiter.finish(false);
             return waiter;
         }
-        let mut body = match self.body.clone() {
-            Some(b) => b,
-            None => {
-                waiter.finish(false);
-                return waiter;
-            },
-        };
         let start = SystemTime::now();
         let scale_factor = self.window.scale_factor() as f32;
         let background_color = self.background_color;
         let mut me = self.clone();
         let viewport = Rect::new(0.0, 0.0, width as f32 / scale_factor, height as f32 / scale_factor);
-        if let Some(body) = &mut me.body {
-            // print_time!("build render nodes time");
-            print_time!("rebuild render object");
-            self.render_tree.rebuild_render_object(body)
+        let mut paint_tree = if let Some(body) = &mut me.body {
+            self.render_tree.update_layout_info_recurse(body, body.get_bounds().to_skia_rect());
+            self.render_tree.rebuild_render_object(body);
+            some_or_return!(
+                self.render_tree.build_paint_tree(&viewport),
+                ResultWaiter::new_finished(false)
+            )
         } else {
             return ResultWaiter::new_finished(false);
         };
-        let mut paint_tree = some_or_return!(
-            self.render_tree.build_paint_tree(&viewport),
-            ResultWaiter::new_finished(false)
-        );
         let waiter_finisher = waiter.clone();
         let frame_id = self.get_id();
         self.renderer_idle = false;
@@ -943,6 +924,39 @@ impl Frame {
         Some((element, x, y))
     }
 
+    fn emit_mouse_event(&mut self, node: &mut Element, event_type_enum: MouseEventType, button: i32, frame_x: f32, frame_y: f32, screen_x: f32, screen_y: f32) {
+        let render_tree = &self.render_tree;
+        let node_matrix = some_or_return!(render_tree.get_element_total_matrix(node));
+        let (border_top, _, _, border_left) = node.get_border_width();
+
+        //TODO maybe not inverted?
+        let inverted_matrix = node_matrix.invert().unwrap();
+
+        let Point { x: relative_x, y: relative_y } = inverted_matrix.map_xy(frame_x, frame_y);
+        let off_x = relative_x - border_left;
+        let off_y = relative_y - border_top;
+
+        let detail = MouseDetail {
+            event_type: event_type_enum,
+            button,
+            offset_x: off_x,
+            offset_y: off_y,
+            frame_x,
+            frame_y,
+            screen_x,
+            screen_y,
+        };
+        match event_type_enum {
+            MouseEventType::MouseDown => node.emit(MouseDownEvent(detail)),
+            MouseEventType::MouseUp => node.emit(MouseUpEvent(detail)),
+            MouseEventType::MouseClick => node.emit(ClickEvent(detail)),
+            MouseEventType::ContextMenu => node.emit(ContextMenuEvent(detail)),
+            MouseEventType::MouseMove => node.emit(MouseMoveEvent(detail)),
+            MouseEventType::MouseEnter => node.emit(MouseEnterEvent(detail)),
+            MouseEventType::MouseLeave => node.emit(MouseLeaveEvent(detail)),
+        }
+    }
+
     fn create_window(attributes: WindowAttributes) -> SkiaWindow {
         run_with_event_loop(|el| {
             //TODO support RenderBackedType parameter
@@ -972,7 +986,7 @@ impl WeakWindowHandle {
     }
 }
 
-fn build_render_nodes(root: &mut Element) -> RenderTree {
+pub fn build_render_nodes(root: &mut Element) -> RenderTree {
     let count = count_elements(root);
     let mut render_tree = RenderTree::new(count);
     root.need_snapshot = true;
@@ -1014,38 +1028,6 @@ fn print_tree(node: &Element, padding: &str) {
             print_tree(&c, &c_padding);
         }
         println!("{}{}", padding, "}");
-    }
-}
-
-fn emit_mouse_event(render_tree: &RenderTree, node: &mut Element, event_type_enum: MouseEventType, button: i32, frame_x: f32, frame_y: f32, screen_x: f32, screen_y: f32) {
-    let node_matrix = some_or_return!(render_tree.get_element_total_matrix(node));
-    let (border_top, _, _, border_left) = node.get_border_width();
-
-    //TODO maybe not inverted?
-    let inverted_matrix = node_matrix.invert().unwrap();
-
-    let Point { x: relative_x, y: relative_y } = inverted_matrix.map_xy(frame_x, frame_y);
-    let off_x = relative_x - border_left;
-    let off_y = relative_y - border_top;
-
-    let detail = MouseDetail {
-        event_type: event_type_enum,
-        button,
-        offset_x: off_x,
-        offset_y: off_y,
-        frame_x,
-        frame_y,
-        screen_x,
-        screen_y,
-    };
-    match event_type_enum {
-        MouseEventType::MouseDown => node.emit(MouseDownEvent(detail)),
-        MouseEventType::MouseUp => node.emit(MouseUpEvent(detail)),
-        MouseEventType::MouseClick => node.emit(ClickEvent(detail)),
-        MouseEventType::ContextMenu => node.emit(ContextMenuEvent(detail)),
-        MouseEventType::MouseMove => node.emit(MouseMoveEvent(detail)),
-        MouseEventType::MouseEnter => node.emit(MouseEnterEvent(detail)),
-        MouseEventType::MouseLeave => node.emit(MouseLeaveEvent(detail)),
     }
 }
 

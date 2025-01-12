@@ -48,7 +48,7 @@ impl ElementPainter {
         }
         for k in &obj.all_layer_keys {
             // println!("Merging layer {:?}", k);
-            let layer = self.layer_state_map.get_mut(&k).unwrap();
+            let layer = some_or_continue!(self.layer_state_map.get_mut(&k));
             let img = layer.layer.as_image();
             canvas.save();
             canvas.concat(&layer.total_matrix);
@@ -163,8 +163,8 @@ impl ElementPainter {
             gl.canvas().scale((scale, scale));
             LayerState {
                 layer: gl,
-                last_scroll_left: 0.0,
-                last_scroll_top: 0.0,
+                last_scroll_left: layer.scroll_left,
+                last_scroll_top: layer.scroll_top,
                 surface_width,
                 surface_height,
                 total_matrix: Matrix::default(),

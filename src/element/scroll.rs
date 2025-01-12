@@ -326,13 +326,18 @@ impl Scroll {
         self.horizontal_move_begin = None;
     }
 
-    fn handle_root_bounds_change(&mut self, bounds: skia_safe::Rect) {
-        let size = (bounds.width(), bounds.height());
-        if size == self.last_layout_size {
+    fn update_layout(&mut self) {
+        if let Some(mut p) = self.element.get_parent() {
+            p.ensure_layout_update();
+        }
+        let bounds = self.element.get_bounds();
+        let size = (bounds.width, bounds.height);
+        if !self.element.layout_dirty && size == self.last_layout_size {
             return;
         }
         self.last_layout_size = size;
         self.do_layout_content();
+        self.element.set_dirty_state_recurse(false);
     }
 
     fn do_layout_content(&mut self) {
@@ -637,15 +642,10 @@ impl Indicator {
 }
 
 impl LayoutRoot for ScrollWeak {
-    fn mark_layout_dirty(&mut self) {
-        if let Ok(mut scroll) = self.upgrade() {
-            scroll.mark_layout_dirty();
-        }
-    }
 
-    fn on_root_bounds_updated(&mut self, bounds: skia_safe::Rect) {
+    fn update_layout(&mut self) {
         if let Ok(mut scroll) = self.upgrade() {
-            scroll.handle_root_bounds_change(bounds);
+            scroll.update_layout();
         }
     }
 }

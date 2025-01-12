@@ -2,7 +2,8 @@ use crate as lento;
 use std::any::{Any, TypeId};
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
+use std::hash::Hash;
 use std::marker::PhantomData;
 use std::rc::Rc;
 use std::str::FromStr;
@@ -30,15 +31,46 @@ impl IdKey {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Id<T> {
     id: usize,
     _phantom: PhantomData<T>,
 }
 
+unsafe impl<T> Send for Id<T> {}
+unsafe impl<T> Sync for Id<T> {}
+
+impl<T> Clone for Id<T> {
+    fn clone(&self) -> Self {
+        Self { id: self.id, _phantom: PhantomData }
+    }
+}
+
+impl<T> Copy for Id<T> {}
+
+impl<T> PartialEq for Id<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl<T> Eq for Id<T> {}
+
+impl<T> Hash for Id<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+
+impl<T> Debug for Id<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&self.id, f)
+    }
+}
+
+
 impl<T> Display for Id<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.id.fmt(f)
+        std::fmt::Display::fmt(&self.id, f)
     }
 }
 
