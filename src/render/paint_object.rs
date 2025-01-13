@@ -20,6 +20,7 @@ pub struct ElementPaintObject {
     pub width: f32,
     pub height: f32,
     pub element_id: u32,
+    pub need_paint: bool,
 }
 
 impl ElementPaintObject {
@@ -64,11 +65,11 @@ pub struct LayerPaintObject {
     pub objects: Vec<PaintObject>,
     // pub root_element_id: u32,
     pub key: RenderLayerKey,
-    pub scroll_left: f32,
-    pub scroll_top: f32,
     // Original position relative to viewport before transform
     pub origin_absolute_pos: (f32, f32),
     pub invalid_rects: InvalidRects,
+    pub surface_bounds: Rect,
+    pub visible_bounds: Rect,
 }
 
 pub enum PaintObject {

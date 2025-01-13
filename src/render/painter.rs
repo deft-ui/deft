@@ -7,12 +7,18 @@ use crate::paint::{InvalidRects, LayerState, RenderLayerKey, RenderState};
 use crate::render::paint_layer::PaintLayer;
 use crate::render::paint_object::{ElementPaintObject, LayerPaintObject, PaintObject};
 use crate::render::paint_tree::PaintTree;
-use crate::{show_repaint_area, some_or_continue};
+use crate::{show_repaint_area, some_or_continue, some_or_return};
+
+enum PaintStep {
+    Elements,
+    Layers,
+}
 
 pub struct ElementPainter {
     scale: f32,
     viewport: Rect,
     layer_state_map: HashMap<RenderLayerKey, LayerState>,
+    paint_step: PaintStep,
 }
 
 impl ElementPainter {
@@ -22,6 +28,7 @@ impl ElementPainter {
             scale: 1.0,
             viewport: Rect::new_empty(),
             layer_state_map: HashMap::new(),
+            paint_step: PaintStep::Elements,
         }
     }
 
@@ -41,17 +48,23 @@ impl ElementPainter {
 
     pub fn draw_root(&mut self, canvas: &Canvas, obj: &mut PaintTree, context: &mut RenderContext) {
         let mut state = mem::take(&mut self.layer_state_map);
+        self.paint_step = PaintStep::Elements;
         self.draw_paint_object(canvas, &mut obj.root, context, &mut state);
         for k in &obj.all_layer_keys {
             let layer = some_or_continue!(state.remove(k));
             self.layer_state_map.insert(k.clone(), layer);
         }
+        self.paint_step = PaintStep::Layers;
+        self.draw_paint_object(canvas, &mut obj.root, context, &mut state);
+
+        /*
         for k in &obj.all_layer_keys {
             // println!("Merging layer {:?}", k);
             let layer = some_or_continue!(self.layer_state_map.get_mut(&k));
             let img = layer.layer.as_image();
             canvas.save();
             canvas.concat(&layer.total_matrix);
+            canvas.translate((layer.surface_bounds.left, layer.surface_bounds.top));
             canvas.scale((1.0 / self.scale, 1.0 / self.scale));
             canvas.draw_image(img, (0.0, 0.0), None);
             if show_repaint_area() {
@@ -71,16 +84,28 @@ impl ElementPainter {
                 sf.direct_context().unwrap().flush_and_submit();
             }
         }
+         */
     }
 
     fn draw_paint_object(&mut self, canvas: &Canvas, obj: &mut PaintObject, context: &mut RenderContext, layer_states: &mut HashMap<RenderLayerKey, LayerState>) {
         match obj {
             PaintObject::Normal(epo) => {
                 // println!("Painting {}", epo.element_id);
+                //TODO optimize
+                if !epo.need_paint && epo.children.is_empty() {
+                    return;
+                }
                 canvas.save();
                 canvas.translate(epo.coord);
                 canvas.clip_path(&epo.border_box_path, ClipOp::Intersect, false);
-                self.draw_element_paint_object(canvas, epo);
+                match self.paint_step {
+                    PaintStep::Elements => {
+                        if epo.need_paint {
+                            self.draw_element_paint_object(canvas, epo);
+                        }
+                    }
+                    PaintStep::Layers => {}
+                }
                 self.draw_paint_objects(canvas, &mut epo.children, context, layer_states);
                 canvas.restore();
             }
@@ -93,7 +118,38 @@ impl ElementPainter {
                 //TODO apply matrix
                 canvas.save();
                 // println!("Updating layer: {:?} , {:?}", lpo.key, lpo.invalid_rects);
-                self.draw_layer(canvas, context, lpo, layer_states);
+                match self.paint_step {
+                    PaintStep::Elements => {
+                        self.draw_layer(canvas, context, lpo, layer_states);
+                    }
+                    PaintStep::Layers => {
+                        canvas.save();
+                        canvas.concat(&lpo.matrix);
+                        if let Some(layer) = self.layer_state_map.get_mut(&lpo.key) {
+                            let img = layer.layer.as_image();
+                            canvas.save();
+                            canvas.translate((layer.surface_bounds.left, layer.surface_bounds.top));
+                            canvas.scale((1.0 / self.scale, 1.0 / self.scale));
+                            canvas.draw_image(img, (0.0, 0.0), None);
+                            canvas.restore();
+
+                            if show_repaint_area() {
+                                canvas.save();
+                                canvas.scale((self.scale, self.scale));
+                                let path = layer.invalid_rects.to_path();
+                                if !path.is_empty() {
+                                    let mut paint = Paint::default();
+                                    paint.set_style(PaintStyle::Stroke);
+                                    paint.set_color(Color::from_rgb(200, 0, 0));
+                                    canvas.draw_path(&path, &paint);
+                                }
+                                canvas.restore();
+                            }
+                        }
+                        self.draw_paint_objects(canvas, &mut lpo.objects, context, layer_states);
+                        canvas.restore();
+                    }
+                }
                 canvas.restore();
                 unsafe  {
                     let sf = canvas.surface();
@@ -113,9 +169,8 @@ impl ElementPainter {
     ) {
         let viewport = &self.viewport;
         let scale = self.scale;
-        let max_len = (viewport.width() * viewport.width() + viewport.height() * viewport.height()).sqrt();
-        let surface_width = (f32::min(layer.width, max_len) * scale) as usize;
-        let surface_height = (f32::min(layer.height, max_len) * scale) as usize;
+        let surface_width = (layer.surface_bounds.width() * scale) as usize;
+        let surface_height = (layer.surface_bounds.height() * scale) as usize;
         if surface_width <= 0 || surface_height <= 0 {
             return;
         }
@@ -124,15 +179,12 @@ impl ElementPainter {
                 None
             } else {
                 //TODO fix scroll delta
-                let scroll_delta_x = layer.scroll_left - ogl_state.last_scroll_left;
-                let scroll_delta_y = layer.scroll_top - ogl_state.last_scroll_top;
+                let scroll_delta_x = layer.surface_bounds.left - ogl_state.surface_bounds.left;
+                let scroll_delta_y = layer.surface_bounds.top - ogl_state.surface_bounds.top;
                 if scroll_delta_x != 0.0 || scroll_delta_y != 0.0 {
-                    //TODO optimize size
-                    let tp_width = (viewport.width() * scale) as usize;
-                    let tp_height = (viewport.height() * scale) as usize;
-                    let mut temp_gl = context.create_layer(tp_width, tp_height).unwrap();
+                    let mut temp_gl = context.create_layer(surface_width, surface_height).unwrap();
                     temp_gl.canvas().session(|canvas| {
-                        canvas.clip_rect(&Rect::new(0.0, 0.0, layer.width * scale, layer.height * scale), ClipOp::Intersect, false);
+                        // canvas.clip_rect(&Rect::new(0.0, 0.0, layer.width * scale, layer.height * scale), ClipOp::Intersect, false);
                         canvas.draw_image(&ogl_state.layer.as_image(), (-scroll_delta_x * scale, -scroll_delta_y * scale), None);
                     });
                     unsafe {
@@ -142,7 +194,7 @@ impl ElementPainter {
                     }
                     ogl_state.layer.canvas().session(|canvas| {
                         canvas.clear(Color::TRANSPARENT);
-                        canvas.clip_rect(&Rect::from_xywh(0.0, 0.0, layer.width, layer.height), ClipOp::Intersect, false);
+                        // canvas.clip_rect(&Rect::from_xywh(0.0, 0.0, layer.width, layer.height), ClipOp::Intersect, false);
                         canvas.scale((1.0 / scale, 1.0 / scale));
                         canvas.draw_image(&temp_gl.as_image(), (0.0, 0.0), None);
                     });
@@ -151,9 +203,8 @@ impl ElementPainter {
                         let sf = sf.unwrap();
                         sf.direct_context().unwrap().flush_and_submit();
                     }
-                    ogl_state.last_scroll_left = layer.scroll_left;
-                    ogl_state.last_scroll_top = layer.scroll_top;
                 }
+                ogl_state.surface_bounds = layer.surface_bounds;
                 Some(ogl_state)
             }
         } else {
@@ -163,18 +214,20 @@ impl ElementPainter {
             gl.canvas().scale((scale, scale));
             LayerState {
                 layer: gl,
-                last_scroll_left: layer.scroll_left,
-                last_scroll_top: layer.scroll_top,
                 surface_width,
                 surface_height,
                 total_matrix: Matrix::default(),
                 invalid_rects: InvalidRects::default(),
+                surface_bounds: layer.surface_bounds,
+                matrix: Matrix::default(),
             }
         });
-        graphic_layer.invalid_rects = layer.invalid_rects.clone();
         graphic_layer.total_matrix = layer.total_matrix.clone();
+        graphic_layer.matrix = layer.matrix.clone();
         let layer_canvas = graphic_layer.layer.canvas();
         layer_canvas.save();
+
+        layer_canvas.translate((-graphic_layer.surface_bounds.left, -graphic_layer.surface_bounds.top));
         if (!layer.invalid_rects.is_empty()) {
             layer_canvas.clip_path(&layer.invalid_rects.to_path(), ClipOp::Intersect, false);
             layer_canvas.clip_rect(&Rect::from_xywh(0.0, 0.0, layer.width, layer.height), ClipOp::Intersect, false);

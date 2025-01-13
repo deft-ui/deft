@@ -16,11 +16,13 @@ impl LayoutTree {
     }
 
     pub fn sync_invalid_area(mut self, new_tree: &mut Self) {
-        self.scroll_invalid_area(new_tree);
+        // self.scroll_invalid_area(new_tree);
         self.merge_invalid_area(new_tree);
         for new_layer in &mut new_tree.layer_objects {
             let layer = some_or_continue!(self.get_layer_object_by_key(&new_layer.key));
             new_layer.invalid_area = layer.invalid_area.clone();
+            new_layer.surface_bounds = layer.surface_bounds.clone();
+            new_layer.visible_bounds = layer.visible_bounds.clone();
         }
     }
 
@@ -28,6 +30,7 @@ impl LayoutTree {
         self.layer_objects.iter().map(|l| l.key.clone()).collect()
     }
 
+    /*
     pub fn scroll_invalid_area(&mut self, new_tree: &Self) {
         for layer in &mut self.layer_objects {
             if let Some(new_layer) = new_tree.get_layer_object_by_key(&layer.key) {
@@ -50,6 +53,7 @@ impl LayoutTree {
             }
         }
     }
+     */
 
     pub fn merge_invalid_area(&mut self, new_tree: &Self) {
         let root = some_or_return!(&self.root_render_object).clone();

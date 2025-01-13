@@ -636,9 +636,12 @@ impl ElementBackend for Text {
                 top += p_height;
                 line_atom_offset += p_atom_count;
                 if let Some(cp) = clip_rect {
-                    if p_bottom < cp.top {
+                    // Simply use p_height as descent/ascent
+                    let descent = p_height;
+                    let ascent = p_height;
+                    if p_bottom + descent < cp.top {
                         continue;
-                    } else if p_top > cp.bottom {
+                    } else if p_top - ascent > cp.bottom {
                         break;
                     }
                 }
