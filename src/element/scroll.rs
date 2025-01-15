@@ -25,9 +25,10 @@ use crate::render::RenderFn;
 use crate::style::{StyleProp, StylePropVal};
 use crate::timer::{set_timeout, TimerHandle};
 
-const MOMENTUM_DURATION: u128 = 200;
+const MOMENTUM_DURATION: f32 = 200.0;
 const MOMENTUM_DISTANCE: f32 = 16.0;
 
+#[derive(Debug)]
 struct MomentumInfo {
     start_time: Instant,
     start_left: f32,
@@ -487,6 +488,7 @@ impl ElementBackend for Scroll {
             self.update_scroll_y(d.frame_y, true);
             return true;
         } else if let Some(e) = event.downcast_mut::<TouchStartEvent>() {
+            // println!("touch start: {:?}", e.0);
             let d = &e.0;
             let touch = unsafe { d.touches.get_unchecked(0) };
             let (frame_x, frame_y) = match self.map_frame_xy(touch.frame_x, touch.frame_y) {
@@ -495,6 +497,7 @@ impl ElementBackend for Scroll {
             };
             self.begin_scroll_x(-frame_x);
             self.begin_scroll_y(-frame_y);
+            println!("touch start: pos {:?}", (frame_x, frame_y));
             self.momentum_info = Some(MomentumInfo {
                 start_time: Instant::now(),
                 start_left: self.element.get_scroll_left(),
@@ -503,6 +506,7 @@ impl ElementBackend for Scroll {
             self.momentum_animation_instance = None;
             return true;
         } else if let Some(e) = event.downcast_mut::<TouchMoveEvent>() {
+            // println!("touch move: {:?}", e.0);
             let d = &e.0;
             let touch = unsafe { d.touches.get_unchecked(0) };
             let (frame_x, frame_y) = match self.map_frame_xy(touch.frame_x, touch.frame_y) {
@@ -513,8 +517,9 @@ impl ElementBackend for Scroll {
             self.update_scroll_y(-frame_y, false);
             let left = self.element.get_scroll_left();
             let top = self.element.get_scroll_top();
+            // println!("touch updated: {:?}", (frame_x, frame_y));
             if let Some(momentum_info) = &mut self.momentum_info {
-                if momentum_info.start_time.elapsed().as_millis() > MOMENTUM_DURATION {
+                if momentum_info.start_time.elapsed().as_millis() as f32 > MOMENTUM_DURATION {
                     momentum_info.start_time = Instant::now();
                     momentum_info.start_left = left;
                     momentum_info.start_top = top;
@@ -522,14 +527,16 @@ impl ElementBackend for Scroll {
             }
             return true;
         } else if let Some(e) = event.downcast_mut::<TouchEndEvent>() {
+            println!("touch end: {:?}", e.0);
             if let Some(momentum_info) = &self.momentum_info {
-                let duration = momentum_info.start_time.elapsed().as_millis();
+                let duration = momentum_info.start_time.elapsed().as_nanos() as f32 / 1000_000.0;
                 let horizontal_distance = self.element.get_scroll_left() - momentum_info.start_left;
                 let vertical_distance = self.element.get_scroll_top() - momentum_info.start_top;
                 let max_distance = f32::max(horizontal_distance.abs(), vertical_distance.abs());
+                // println!("touch end: info{:?}", (duration, vertical_distance));
                 if duration < MOMENTUM_DURATION && max_distance > MOMENTUM_DISTANCE {
-                    let horizontal_speed = horizontal_distance / duration as f32;
-                    let vertical_speed = vertical_distance / duration as f32;
+                    let horizontal_speed = calculate_speed(horizontal_distance, duration);
+                    let vertical_speed = calculate_speed(vertical_distance, duration);
                     // println!("speed: {} {}", horizontal_speed, vertical_speed);
                     let old_left = self.element.get_scroll_left();
                     let old_top = self.element.get_scroll_top();
@@ -647,5 +654,22 @@ impl LayoutRoot for ScrollWeak {
         if let Ok(mut scroll) = self.upgrade() {
             scroll.update_layout();
         }
+    }
+}
+
+fn calculate_speed(distance: f32, duration: f32) -> f32 {
+    let max_speed = 2.0;
+    if distance == 0.0 {
+        return 0.0;
+    }
+    let speed = if duration == 0.0 {
+        max_speed
+    } else {
+        f32::min(distance.abs() / duration as f32, max_speed)
+    };
+    if distance > 0.0 {
+        speed
+    } else {
+        speed * -1.0
     }
 }

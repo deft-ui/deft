@@ -681,7 +681,7 @@ impl Frame {
                     node.emit(TouchMoveEvent(touch_detail));
                 }
                 TouchPhase::Ended => {
-                    println!("touch end:{:?}", &touch_detail);
+                    // println!("touch end:{:?}", &touch_detail);
                     node.emit(TouchEndEvent(touch_detail));
                     if self.touching.max_identifiers == 1
                         && self.touching.times == 1
@@ -762,7 +762,7 @@ impl Frame {
         if !self.renderer_idle {
             return ResultWaiter::new_finished(false);
         }
-        print_time!("frame update time");
+        // print_time!("frame update time");
         let mut frame_callbacks = Vec::new();
         frame_callbacks.append(&mut self.next_frame_callbacks);
         for cb in frame_callbacks {
@@ -882,7 +882,7 @@ impl Frame {
         let frame_id = self.get_id();
         self.renderer_idle = false;
         self.window.render_with_result(Renderer::new(move |canvas, ctx| {
-            //print_time!("render time");
+            print_time!("drawing time");
             canvas.save();
             if scale_factor != 1.0 {
                 canvas.scale((scale_factor, scale_factor));

@@ -167,6 +167,15 @@ fn build_border_clip(left_border_width: f32, border_width: f32, height: f32) -> 
 
 pub fn build_rect_with_radius(radius: [f32; 4], width: f32, height: f32) -> Path {
     let mut p = Path::new();
+    if radius[0] == radius[1] && radius[1] == radius[2] && radius[2] == radius[3] {
+        let rect = Rect::new(0.0, 0.0, width, height);
+        if radius[0] == 0.0 {
+            p.add_rect(rect, None);
+        } else {
+            p.add_round_rect(Rect::new(0.0, 0.0, width, height), (radius[0], radius[0]), None);
+        }
+        return p;
+    }
 
     p.move_to((0.0, radius[0]));
     p.arc_to(Rect::new(0.0, 0.0, radius[0] * 2.0, radius[0] * 2.0), 180.0, 90.0, false);
@@ -175,7 +184,7 @@ pub fn build_rect_with_radius(radius: [f32; 4], width: f32, height: f32) -> Path
     p.arc_to(Rect::new(width - radius[1] * 2.0, 0.0, width, radius[1] * 2.0), 270.0, 90.0, false);
 
     p.line_to((width, height - radius[2]));
-    p.arc_to(Rect::new(width - radius[2] * 2.0, height - radius[3] * 2.0, width, height), 0.0, 90.0, false);
+    p.arc_to(Rect::new(width - radius[2] * 2.0, height - radius[2] * 2.0, width, height), 0.0, 90.0, false);
 
     p.line_to((radius[3], height));
     p.arc_to(Rect::new(0.0, height - radius[3] * 2.0, radius[3] * 2.0, height), 90.0, 90.0, false);
