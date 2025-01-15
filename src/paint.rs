@@ -98,7 +98,7 @@ pub struct ElementObjectData {
     pub border_width: (f32, f32, f32, f32),
     pub width: f32,
     pub height: f32,
-    pub layer_object_idx: usize,
+    pub layer_object_idx: Option<usize>,
     pub element_id: u32,
     pub element: Element,
 }
@@ -196,7 +196,7 @@ impl RenderTree {
 
     pub fn get_element_total_matrix(&self, element: &Element) -> Option<Matrix> {
         let element_object = self.element_objects.get(element.render_object_idx?)?;
-        let layer_object = self.layout_tree.layer_objects.get(element_object.layer_object_idx)?;
+        let layer_object = self.layout_tree.layer_objects.get(element_object.layer_object_idx?)?;
         let mut mc = MatrixCalculator::new();
         mc.concat(&layer_object.total_matrix);
         mc.translate(element_object.coord);
@@ -251,7 +251,7 @@ impl RenderTree {
             width: bounds.width,
             height: bounds.height,
 
-            layer_object_idx: 0,
+            layer_object_idx: None,
             layer_coord: (0.0, 0.0),
         };
         self.element_objects.push(element_data);
@@ -417,7 +417,7 @@ impl RenderTree {
         element_data.background_color = element.style.computed_style.background_color;
         element_data.border_width = element.get_border_width();
         element_data.coord = (bounds.left, bounds.top);
-        element_data.layer_object_idx = layer_object_idx;
+        element_data.layer_object_idx = Some(layer_object_idx);
         element_data.layer_coord = (layer_x, layer_y);
         let element_obj = ElementObject {
             element_object_idx,
@@ -430,23 +430,9 @@ impl RenderTree {
         let render_object_idx = some_or_return!(element.render_object_idx);
         let eo = some_or_return!(self.element_objects.get(render_object_idx));
         let bounds = Rect::from_xywh(eo.layer_coord.0, eo.layer_coord.1, eo.width, eo.height);
-        let layer_idx = eo.layer_object_idx;
+        let layer_idx = some_or_return!(eo.layer_object_idx);
         let lo = &mut self.layout_tree.layer_objects[layer_idx];
         lo.invalid(&bounds);
-    }
-
-    pub fn update_scroll_left(&mut self, element: &Element, scroll_left: f32) {
-        let render_object_idx = some_or_return!(element.render_object_idx);
-        let layer_idx = self.element_objects[render_object_idx].layer_object_idx;
-        let lo = &mut self.layout_tree.layer_objects[layer_idx];
-        lo.update_scroll_left(scroll_left);
-    }
-
-    pub fn update_scroll_top(&mut self, element: &Element, scroll_top: f32) {
-        let render_object_idx = some_or_return!(element.render_object_idx);
-        let layer_idx = self.element_objects[render_object_idx].layer_object_idx;
-        let lo = &mut self.layout_tree.layer_objects[layer_idx];
-        lo.update_scroll_top(scroll_top);
     }
 
     fn need_create_root_layer(element: &Element) -> bool {
