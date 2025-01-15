@@ -49,9 +49,7 @@ use crate::{bind_js_event_listener, is_snapshot_usable, ok_or_return, send_app_e
 use crate::computed::ComputedValue;
 use crate::frame_rate::{get_total_frames, next_frame, FRAME_RATE_CONTROLLER};
 use crate::layout::LayoutRoot;
-use crate::paint::{InvalidArea, PartialInvalidArea, Painter, RenderNode, RenderTree, SkiaPainter, UniqueRect, InvalidRects, MatrixCalculator, RenderLayer, RenderLayerNode, RenderState, RenderLayerKey, LayerState};
-use crate::render::paint_layer::PaintLayer;
-use crate::render::paint_node::PaintNode;
+use crate::paint::{InvalidArea, PartialInvalidArea, Painter, RenderTree, SkiaPainter, UniqueRect, InvalidRects, MatrixCalculator, RenderLayerKey, LayerState};
 use crate::render::paint_object::{ElementPaintObject, PaintObject};
 use crate::render::paint_tree::PaintTree;
 use crate::render::painter::ElementPainter;
@@ -744,7 +742,7 @@ impl Frame {
         } else {
             size.height as f32 / scale_factor
         };
-        print_time!("calculate layout, {} x {}", width, height);
+        // print_time!("calculate layout, {} x {}", width, height);
         let body = some_or_return!(&mut self.body);
         body.calculate_layout(width, height);
         if auto_size {
@@ -857,7 +855,7 @@ impl Frame {
     fn paint(&mut self) -> ResultWaiter<bool> {
         let size = self.window.inner_size();
         let (width, height) = (size.width, size.height);
-        print_time!("paint time: {} {}", width, height);
+        // print_time!("paint time: {} {}", width, height);
         let waiter = ResultWaiter::new();
         if width <= 0 || height <= 0 {
             waiter.finish(false);
@@ -882,7 +880,7 @@ impl Frame {
         let frame_id = self.get_id();
         self.renderer_idle = false;
         self.window.render_with_result(Renderer::new(move |canvas, ctx| {
-            print_time!("drawing time");
+            // print_time!("drawing time");
             canvas.save();
             if scale_factor != 1.0 {
                 canvas.scale((scale_factor, scale_factor));

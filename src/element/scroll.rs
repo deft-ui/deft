@@ -342,7 +342,7 @@ impl Scroll {
     }
 
     fn do_layout_content(&mut self) {
-        print_time!("scroll layout content time");
+        // print_time!("scroll layout content time");
         let (bounds_width, bounds_height) = self.last_layout_size;
         self.layout_content(bounds_width, bounds_height);
 

@@ -285,7 +285,7 @@ impl RenderContextWrapper {
         }
 
         {
-            measure_time::print_time!("swap buffers time");
+            // measure_time::print_time!("swap buffers time");
             if let Err(err) = context.gl_surface.swap_buffers(&context.context) {
                 log::error!("Failed to swap buffers after render: {}", err);
             }

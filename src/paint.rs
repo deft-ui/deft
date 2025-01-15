@@ -17,8 +17,6 @@ use crate::render::RenderFn;
 use crate::renderer::CpuRenderer;
 use crate::{some_or_break, some_or_continue, some_or_return};
 use crate::render::layout_tree::LayoutTree;
-use crate::render::paint_layer::PaintLayer;
-use crate::render::paint_node::PaintNode;
 use crate::render::paint_object::{ElementPaintObject, LayerPaintObject, PaintObject};
 use crate::render::paint_tree::PaintTree;
 use crate::style::border_path::BorderPath;
@@ -37,26 +35,6 @@ pub struct LayerState {
     pub surface_width: usize,
     pub surface_height: usize,
     pub surface_bounds: Rect,
-}
-
-pub struct RenderState {
-    pub layers: HashMap<RenderLayerKey, LayerState>,
-}
-
-impl RenderState {
-
-    fn new() -> Self {
-        Self { layers: HashMap::new() }
-    }
-
-    pub fn take(ctx: &mut RenderContext) -> Self {
-        ctx.user_context.take::<RenderState>().unwrap_or_else(
-            || RenderState::new()
-        )
-    }
-    pub fn put(self, ctx: &mut RenderContext) {
-        ctx.user_context.set(self);
-    }
 }
 
 //TODO rename to LayoutTree?
@@ -135,54 +113,12 @@ pub enum RenderObject {
     Layer(LayerObject),
 }
 
-
-pub struct RenderLayer {
-    pub total_matrix: Matrix,
-    pub width: f32,
-    pub height: f32,
-    pub nodes: Vec<RenderLayerNode>,
-    // pub root_element_id: u32,
-    pub key: RenderLayerKey,
-    invalid_area: InvalidArea,
-    pub scroll_left: f32,
-    pub scroll_top: f32,
-    pub last_scroll_left: f32,
-    pub last_scroll_top: f32,
-    // Original position relative to viewport before transform
-    origin_absolute_pos: (f32, f32),
-}
-
 impl LayerObjectData {
     pub fn invalid(&mut self, rect: &Rect) {
         // println!("Invalid {:?}   {:?}", self.key, rect);
         self.invalid_area.add_rect(Some(rect));
     }
-    pub fn invalid_all(&mut self) {
-        self.invalid_area = InvalidArea::Full;
-    }
-    //TODO remove
-    pub fn update_scroll_left(&mut self, scroll_left: f32) {
-        // self.scroll_left = scroll_left;
-    }
-    //TODO remove
-    pub fn update_scroll_top(&mut self, scroll_top: f32) {
-        // self.scroll_top = scroll_top;
-    }
-    pub fn build_invalid_path(&self, viewport: &Rect) -> Path {
-        self.invalid_area.build(viewport.clone()).to_path()
-    }
-    pub fn build_invalid_rects(&self, viewport: &Rect) -> InvalidRects {
-        self.invalid_area.build(viewport.clone())
-    }
-    pub fn reset_invalid_area(&mut self) {
-        self.invalid_area = InvalidArea::None;
-    }
-}
 
-#[derive(Clone)]
-pub struct RenderLayerNode {
-    pub node_idx: usize,
-    pub children: Vec<RenderLayerNode>,
 }
 
 impl RenderTree {
@@ -259,7 +195,7 @@ impl RenderTree {
     }
 
     pub fn rebuild_render_object(&mut self, element: &mut Element) {
-        print_time!("rebuild render object");
+        // print_time!("rebuild render object");
         let old_layout_tree = mem::take(&mut self.layout_tree);
         let mut matrix_calculator = MatrixCalculator::new();
         let bounds = element.get_bounds();
@@ -460,7 +396,7 @@ impl RenderTree {
     }
 
     pub fn build_paint_tree(&mut self, viewport: &Rect) -> Option<PaintTree> {
-        print_time!("Building paint tree");
+        // print_time!("Building paint tree");
         let invalid_rects = InvalidArea::Full.build(viewport.clone());
         let root = self.build_paint_object(self.layout_tree.root_render_object.clone().as_mut().unwrap(), viewport, &invalid_rects)?;
         Some(PaintTree {
@@ -635,9 +571,6 @@ impl RenderTree {
         }
     }
 
-}
-
-pub struct RenderNode {
 }
 
 #[derive(PartialEq, Debug, Clone)]

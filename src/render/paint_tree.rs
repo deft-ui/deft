@@ -1,5 +1,4 @@
 use crate::paint::RenderLayerKey;
-use crate::render::paint_layer::PaintLayer;
 use crate::render::paint_object::PaintObject;
 
 pub struct PaintTree {
