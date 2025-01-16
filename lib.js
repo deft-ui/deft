@@ -40,6 +40,19 @@ class Navigator {
     }
 }
 
+class Process {
+    /**
+     *
+     * @param code {number}
+     */
+    exit(code) {
+        process_exit(code);
+    }
+    get argv() {
+        return process_argv();
+    }
+}
+
 /**
  * @typedef {IEvent<ResizeDetail>} IResizeEvent
  */
@@ -1537,6 +1550,7 @@ if (workerContext) {
 }
 
 globalThis.navigator = new Navigator();
+globalThis.process = new Process();
 globalThis.Worker = Worker;
 globalThis.WorkerContext = WorkerContext;
 globalThis.Frame = Frame;
