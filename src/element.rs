@@ -248,6 +248,12 @@ impl Element {
         self.cursor
     }
 
+    pub fn get_max_scroll_left(&self) -> f32 {
+        let content_bounds = self.get_content_bounds();
+        let width = content_bounds.width;
+        (self.get_real_content_size().0 - width).max(0.0)
+    }
+
     #[js_func]
     pub fn set_scroll_left(&mut self, mut value: f32) {
         if value.is_nan() {
@@ -276,6 +282,12 @@ impl Element {
     #[js_func]
     pub fn get_scroll_top(&self) -> f32 {
         self.scroll_top
+    }
+
+    pub fn get_max_scroll_top(&self) -> f32 {
+        let content_bounds = self.get_content_bounds();
+        let height = content_bounds.height;
+        (self.get_real_content_size().1 - height).max(0.0)
     }
 
     #[js_func]

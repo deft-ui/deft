@@ -553,19 +553,33 @@ impl ElementBackend for Scroll {
                     let mut animation_instance = AnimationInstance::new(animation, 1000.0 * 1000000.0, 1.0, Box::new(frame_controller));
                     let mut ele = self.element.clone();
                     let timing_func = Bezier::from_cubic_coordinates(0.0, 0.0, 0.17, 0.89, 0.45, 1.0, 1.0, 1.0);
+                    let mut me = self.clone();
                     animation_instance.run(Box::new(move |styles| {
+                        let mut left_stopped = left_dist == 0.0;
+                        let mut top_stooped = top_dist == 0.0;
                         for style in styles {
                             match style {
                                 StyleProp::RowGap(value) => {
                                     let new_left = old_left + left_dist * timing_func.evaluate(TValue::Parametric(value.resolve(&0.0) as f64)).y as f32;
-                                    ele.set_scroll_left(new_left);
+                                    if new_left < 0.0 || new_left > me.element.get_max_scroll_left() {
+                                        left_stopped = true;
+                                    } else {
+                                        ele.set_scroll_left(new_left);
+                                    }
                                 },
                                 StyleProp::ColumnGap(value) => {
                                     let new_top = old_top + top_dist * timing_func.evaluate(TValue::Parametric(value.resolve(&0.0) as f64)).y as f32;
-                                    ele.set_scroll_top(new_top);
+                                    if new_top < 0.0 || new_top > me.element.get_max_scroll_top() {
+                                        top_stooped = true;
+                                    } else {
+                                        ele.set_scroll_top(new_top);
+                                    }
                                 },
                                 _ => {}
                             }
+                        }
+                        if left_stopped && top_stooped {
+                            me.momentum_animation_instance = None;
                         }
                     }));
                     self.momentum_animation_instance = Some(animation_instance);
