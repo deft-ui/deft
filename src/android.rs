@@ -1,7 +1,7 @@
 use std::sync::OnceLock;
 use jni::JNIEnv;
 use jni::objects::{JClass, JString, JValue};
-use jni::sys::{jboolean, jfloat, jlong};
+use jni::sys::{jboolean, jfloat, jint, jlong};
 use winit::platform::android::activity::AndroidApp;
 use crate::app::AppEvent;
 use crate::event_loop::{create_event_loop_proxy};
@@ -24,6 +24,21 @@ pub extern "system" fn Java_fun_kason_lento_InputChannel_send<'local>(mut env: J
         env.get_string(&input).expect("Couldn't get java string!").into();
     println!("receive input:{}", input);
     if let Err(e) = send_app_event(AppEvent::CommitInput(window_id as i32, input)) {
+        println!("send app event error: {:?}", e);
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_fun_kason_lento_InputChannel_sendKey0<'local>(mut env: JNIEnv<'local>,
+                                                                      class: JClass<'local>,
+                                                                      window_id: jlong,
+                                                                      input: JString<'local>,
+                                                                      pressed: jboolean)
+{
+    let input: String =
+        env.get_string(&input).expect("Couldn't get java string!").into();
+    println!("receive key input:{}", input);
+    if let Err(e) = send_app_event(AppEvent::NamedKeyInput(window_id as i32, input, pressed != 0)) {
         println!("send app event error: {:?}", e);
     }
 }

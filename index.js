@@ -193,7 +193,7 @@ function main() {
     container.addChild(createTextEdit());
     container.addChild(createEntry());
     container.addChild(createCenterElement());
-    batchCreateLabels(container);
+    // batchCreateLabels(container);
     frame.setBody(container);
 }
 

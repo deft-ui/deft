@@ -5,7 +5,7 @@ use crate::base::{Callback, ElementEvent, Event, EventContext, EventHandler, Eve
 use crate::canvas_util::CanvasHelper;
 use crate::cursor::search_cursor;
 use crate::element::{Element, ElementWeak, PaintInfo};
-use crate::event::{build_modifier, named_key_to_str, BlurEvent, CaretChangeEventListener, ClickEvent, ContextMenuEvent, DragOverEvent, DragStartEvent, DropEvent, FocusEvent, FocusShiftEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent, MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, TextInputEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT};
+use crate::event::{build_modifier, named_key_to_str, str_to_named_key, BlurEvent, CaretChangeEventListener, ClickEvent, ContextMenuEvent, DragOverEvent, DragStartEvent, DropEvent, FocusEvent, FocusShiftEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent, MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, TextInputEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT};
 use crate::event_loop::{create_event_loop_proxy, run_with_event_loop};
 use crate::ext::common::create_event_handler;
 use crate::ext::ext_frame::{FrameAttrs, FRAMES, FRAME_TYPE_MENU, FRAME_TYPE_NORMAL, MODAL_TO_OWNERS, WINDOW_TO_FRAME};
@@ -335,6 +335,36 @@ impl Frame {
         }
     }
 
+    pub fn handle_key(
+        &mut self, modifiers: u32,
+        named_key: Option<NamedKey>,
+        key: Option<String>,
+        key_str: Option<String>,
+        repeat: bool,
+        pressed: bool,
+    ) {
+        let detail = KeyEventDetail {
+            modifiers ,
+            ctrl_key: modifiers & KEY_MOD_CTRL != 0 ,
+            alt_key:  modifiers & KEY_MOD_ALT != 0,
+            meta_key: modifiers & KEY_MOD_META != 0,
+            shift_key:modifiers & KEY_MOD_SHIFT != 0,
+            named_key,
+            key_str,
+            key,
+            repeat,
+            pressed,
+        };
+
+        if let Some(focusing) = &mut self.focusing {
+            if detail.pressed {
+                focusing.emit(KeyDownEvent(detail));
+            } else {
+                focusing.emit(KeyUpEvent(detail));
+            }
+        }
+    }
+
     pub fn handle_event(&mut self, event: WindowEvent) {
         match event {
             WindowEvent::RedrawRequested => {
@@ -388,26 +418,9 @@ impl Frame {
                 if pressed && named_key == Some(NamedKey::Alt) {
                     modifiers |= KEY_MOD_ALT;
                 }
-                let detail = KeyEventDetail {
-                    modifiers ,
-                    ctrl_key: modifiers & KEY_MOD_CTRL != 0 ,
-                    alt_key:  modifiers & KEY_MOD_ALT != 0,
-                    meta_key: modifiers & KEY_MOD_META != 0,
-                    shift_key:modifiers & KEY_MOD_SHIFT != 0,
-                    named_key,
-                    key_str,
-                    key,
-                    repeat: event.repeat,
-                    pressed: event.state == ElementState::Pressed,
-                };
-
-                if let Some(focusing) = &mut self.focusing {
-                    if detail.pressed {
-                        focusing.emit(KeyDownEvent(detail));
-                    } else {
-                        focusing.emit(KeyUpEvent(detail));
-                    }
-                }
+                let repeat =  event.repeat;
+                let pressed = event.state == ElementState::Pressed;
+                self.handle_key(modifiers, named_key, key, key_str, repeat, pressed);
             }
             WindowEvent::MouseInput { button, state, .. } => {
                 // println!("mouse:{:?}:{:?}", button, state);
@@ -1054,6 +1067,16 @@ pub fn frame_input(frame_id: i32, content: String) {
             f.handle_input(&content);
         }
     });
+}
+
+pub fn frame_send_key(frame_id: i32, key: &str, pressed: bool) {
+    if let Some(k) = str_to_named_key(&key) {
+        FRAMES.with_borrow_mut(|m| {
+            if let Some(f) = m.get_mut(&frame_id) {
+                f.handle_key(0, Some(k), None, None, false, pressed);
+            }
+        });
+    }
 }
 
 pub fn frame_ime_resize(frame_id: i32, height: f32) {
