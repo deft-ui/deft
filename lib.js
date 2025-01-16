@@ -123,6 +123,14 @@ export class Frame {
         Frame_set_visible(this.#frameId, visible);
     }
 
+    requestFullscreen() {
+        Frame_request_fullscreen(this.#frameId);
+    }
+
+    exitFullscreen() {
+        Frame_exit_fullscreen(this.#frameId);
+    }
+
     /**
      *
      * @param callback {(event: IResizeEvent) => void}

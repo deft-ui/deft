@@ -26,7 +26,7 @@ use skia_safe::gpu::{backend_render_targets, SurfaceOrigin};
 use skia_safe::gpu::gl::FramebufferInfo;
 use skia_safe::PaintStyle::Stroke;
 use winit::application::ApplicationHandler;
-use winit::window::{Window, WindowAttributes, WindowId};
+use winit::window::{Fullscreen, Window, WindowAttributes, WindowId};
 use skia_window::renderer::Renderer;
 use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 
@@ -53,6 +53,15 @@ impl ApplicationHandler for App {
     fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
         if let Some(win) = self.windows.get_mut(&window_id) {
             match event {
+                WindowEvent::MouseInput { state, button, .. } => {
+                    if state == ElementState::Pressed {
+                        if win.fullscreen().is_some() {
+                            win.set_fullscreen(None);
+                        } else {
+                            win.set_fullscreen(Some(Fullscreen::Borderless(event_loop.primary_monitor())));
+                        }
+                    }
+                }
                 WindowEvent::RedrawRequested {} => {
                     let render = Renderer::new(|canvas, ctx| {
                         canvas.clear(Color::from_rgb(0, 40, 0));

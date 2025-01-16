@@ -44,7 +44,7 @@ use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use winit::keyboard::{Key, NamedKey};
 #[cfg(feature = "x11")]
 use winit::platform::x11::WindowAttributesExtX11;
-use winit::window::{Cursor, CursorGrabMode, CursorIcon, Window, WindowAttributes, WindowId};
+use winit::window::{Cursor, CursorGrabMode, CursorIcon, Fullscreen, Window, WindowAttributes, WindowId};
 use crate::{bind_js_event_listener, is_snapshot_usable, ok_or_return, send_app_event, show_repaint_area, some_or_continue, some_or_return};
 use crate::computed::ComputedValue;
 use crate::frame_rate::{get_total_frames, next_frame, FRAME_RATE_CONTROLLER};
@@ -312,6 +312,16 @@ impl Frame {
     pub fn set_visible(&mut self, visible: bool) -> Result<(), JsError> {
         self.window.set_visible(visible);
         Ok(())
+    }
+
+    #[js_func]
+    fn request_fullscreen(&mut self) {
+        self.window.set_fullscreen(Some(Fullscreen::Borderless(None)));
+    }
+
+    #[js_func]
+    fn exit_fullscreen(&mut self) {
+        self.window.set_fullscreen(None);
     }
     
     pub fn allow_close(&mut self) -> bool {
