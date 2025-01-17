@@ -75,7 +75,7 @@ impl SkiaTextParagraph {
         let mut pb = ParagraphBuilder::new(&paragraph_style, font_collection);
         let mut text_style = TextStyle::new();
         text_style.set_foreground_paint(&params.paint);
-        text_style.set_font_size(params.font.size());
+        text_style.set_font_size(params.font_size);
 
         pb.push_style(&text_style);
         pb.add_text(&text);

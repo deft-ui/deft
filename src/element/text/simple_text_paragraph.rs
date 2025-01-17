@@ -120,7 +120,7 @@ pub struct SimpleTextParagraph {
 }
 
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TextBlock {
     pub text: String,
     pub style: TextStyle,

@@ -1,5 +1,5 @@
 pub mod typeface_mgr;
-mod simple_paragraph_builder;
+pub mod simple_paragraph_builder;
 
 use std::any::Any;
 use std::cmp::Ordering;
@@ -8,7 +8,7 @@ use std::io::Write;
 use crate as lento;
 use crate::color::parse_hex_color;
 use crate::element::text::text_paragraph::ParagraphRef;
-use crate::element::text::{intersect_range, ColOffset, RowOffset, DEFAULT_TYPE_FACE, FONT_COLLECTION, FONT_MGR};
+use crate::element::text::{intersect_range, ColOffset, RowOffset, FONT_COLLECTION, FONT_MGR};
 use crate::element::{text, Element, ElementBackend, ElementWeak};
 use crate::js::JsError;
 use crate::number::DeNan;
@@ -587,11 +587,6 @@ impl Paragraph {
     ) -> SimpleTextParagraph {
         // let mut text = text.trim_line_endings().to_string();
         // text.push_str(ZERO_WIDTH_WHITESPACE);
-        let mut font_collection = FONT_COLLECTION.with(|f| f.clone());
-        FONT_MGR.with(|fm| {
-            font_collection.set_default_font_manager(Some(fm.clone()), None);
-        });
-        font_collection.set_dynamic_font_manager(get_font_mgr());
         let mut paragraph_style = ParagraphStyle::new();
         paragraph_style.set_text_align(paragraph_params.align);
 
@@ -605,7 +600,7 @@ impl Paragraph {
             paragraph_style.set_strut_style(strut_style);
         }
 
-        let mut pb = SimpleParagraphBuilder::new(&paragraph_params, font_collection);
+        let mut pb = SimpleParagraphBuilder::new(&paragraph_params);
         let p_color = paragraph_params.color;
         for u in units {
             match u {

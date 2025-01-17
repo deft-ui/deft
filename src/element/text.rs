@@ -19,6 +19,8 @@ use crate::element::{ElementBackend, Element, ElementWeak};
 use crate::element::text::skia_text_paragraph::{SkiaTextParagraph};
 use crate::element::text::text_paragraph::{ParagraphData, Line, ParagraphRef, TextParams};
 use crate::{js_call, match_event_type};
+use crate::element::paragraph::ParagraphParams;
+use crate::element::paragraph::simple_paragraph_builder::SimpleParagraphBuilder;
 use crate::element::text::simple_text_paragraph::{SimpleTextParagraph, TextBlock};
 use crate::event::{FocusShiftEvent, TextUpdateEvent};
 use crate::number::DeNan;
@@ -48,7 +50,6 @@ pub struct Text {
 }
 
 thread_local! {
-    pub static DEFAULT_TYPE_FACE: Typeface = default_typeface();
     pub static FONT_MGR: FontMgr = FontMgr::new();
     pub static FONT_COLLECTION: FontCollection = FontCollection::new();
 }
@@ -90,10 +91,11 @@ impl crate::js::FromJsValue for Text {
 impl Text {
     fn new(element: Element) -> Self {
         let text_params = TextParams {
-            font: DEFAULT_TYPE_FACE.with(|tf| Font::from_typeface(tf, 14.0)),
+            font_families: vec![],
             align: TextAlign::Left,
             paint: Paint::default(),
             line_height: None,
+            font_size: 14.0,
         };
         let text = "".to_string();
 
@@ -294,13 +296,13 @@ impl Text {
     }
 
     pub fn set_font_size(&mut self, size: f32) {
-        self.text_params.font.set_size(size);
+        self.text_params.font_size = size;
         self.refresh_lines();
         self.mark_dirty(true);
     }
 
-    pub fn get_font(&self) -> &Font {
-        &self.text_params.font
+    pub fn get_font_size(&self) -> f32 {
+        self.text_params.font_size
     }
 
     pub fn set_align(&mut self, align: TextAlign) {
@@ -365,7 +367,7 @@ impl Text {
     pub fn get_caret_offset_coordinate(&self, char_offset: usize) -> ((f32, f32), (f32, f32)) {
         let (caret_row, caret_col) = self.get_location_by_atom_offset(char_offset);
         let (padding_top, _, _, padding_left) = self.element.get_padding();
-        let caret_height = self.get_font().size();
+        let caret_height = self.get_font_size();
         self.with_lines_mut(|p_list| {
             let mut y_offset = 0f32;
             let mut current_row = 0;
@@ -492,7 +494,7 @@ impl Text {
 
     pub fn get_computed_line_height(&self) -> f32 {
         match &self.text_params.line_height {
-            None => self.get_font().size(),
+            None => self.get_font_size(),
             Some(line_height) => *line_height,
         }
     }
@@ -510,14 +512,23 @@ impl Text {
         for ln in lines {
             // let p = SimpleTextParagraph::new(ln, params);
             let ln = Self::preprocess_text(ln);
+            let paragraph_params = ParagraphParams {
+                text_wrap: Some(false),
+                line_height: params.line_height,
+                align: params.align,
+                color: params.paint.color(),
+                font_size: params.font_size,
+                font_families: params.font_families.clone(),
+            };
+            let mut pb = SimpleParagraphBuilder::new(&paragraph_params);
+
+
             let mut style = TextStyle::default();
             style.set_foreground_paint(&params.paint);
-            let text_block = TextBlock {
-                text: ln.to_string(),
-                font: params.font.clone(),
-                style,
-            };
-            let p = SimpleTextParagraph::new(vec![text_block]);
+            pb.push_style(&style);
+            pb.add_text(ln.to_string());
+
+            let p = pb.build();
             result.push(Line {
                 atom_count: ln.trim_line_endings().chars().count() + 1,
                 paragraph: p,
@@ -563,11 +574,6 @@ impl Text {
 }
 
 
-fn default_typeface() -> Typeface {
-    let font_mgr = FontMgr::new();
-    font_mgr.legacy_make_typeface(None, FontStyle::default()).unwrap()
-}
-
 pub fn intersect_range<T: Ord>(range1: (T, T), range2: (T, T)) -> Option<(T, T)> {
     let start = T::max(range1.0, range2.0);
     let end = T::min(range1.1, range2.1);
@@ -600,7 +606,7 @@ impl ElementBackend for Text {
             },
             StylePropKey::FontSize => {
                 let font_size = self.element.style.computed_style.font_size;
-                self.text_params.font.set_size(font_size);
+                self.text_params.font_size = font_size;
                 self.refresh_lines();
                 self.mark_dirty(true);
             }

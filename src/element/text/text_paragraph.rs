@@ -31,7 +31,8 @@ pub struct Line {
 
 #[derive(Clone)]
 pub struct TextParams {
-    pub font: Font,
+    pub font_families: Vec<String>,
+    pub font_size: f32,
     pub paint: Paint,
     pub line_height: Option<f32>,
     pub align: TextAlign,
