@@ -83,3 +83,7 @@ cfg_aliases = "0.2.1"
 #[[bin]]
 #path="src/lib.rs"
 #name="lento_demo"
+
+[[example]]
+name = "hello"
+crate_type=["cdylib", "lib"]
