@@ -1,10 +1,11 @@
 use crate::base::Rect;
-use crate::paint::{ElementObjectData, LayerObjectData, RenderLayerKey, RenderObject};
+use crate::paint::{ElementObjectData, LayerNode, LayerObjectData, RenderLayerKey, RenderObject};
 use crate::{some_or_continue, some_or_return};
 
 pub struct LayoutTree {
     pub root_render_object: Option<RenderObject>,
     pub layer_objects: Vec<LayerObjectData>,
+    pub layer_node: Option<LayerNode>,
 }
 
 impl LayoutTree {
@@ -12,6 +13,7 @@ impl LayoutTree {
         Self {
             root_render_object: None,
             layer_objects: Vec::new(),
+            layer_node: Default::default(),
         }
     }
 

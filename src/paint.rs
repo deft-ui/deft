@@ -10,6 +10,7 @@ use skia_safe::{scalar, ClipOp, Color, IRect, Image, Matrix, Paint, Path, PathOp
 use skia_safe::Canvas;
 use skia_window::context::{RenderContext, UserContext};
 use skia_window::layer::Layer;
+use yoga::PositionType;
 use crate::base::{Id, IdKey};
 use crate::element::Element;
 use crate::mrc::Mrc;
@@ -113,6 +114,18 @@ pub enum RenderObject {
     Layer(LayerObject),
 }
 
+pub struct NormalNode {
+    element_object_idx: usize,
+    children: Vec<NormalNode>,
+}
+
+#[derive(Default)]
+pub struct LayerNode {
+    layer_object_idx: usize,
+    normal_nodes: Vec<NormalNode>,
+    layer_nodes: Vec<LayerNode>,
+}
+
 impl LayerObjectData {
     pub fn invalid(&mut self, rect: &Rect) {
         // println!("Invalid {:?}   {:?}", self.key, rect);
@@ -140,34 +153,38 @@ impl RenderTree {
     }
 
     pub fn get_element_object_by_pos(&self, x: f32, y: f32) -> Option<(&ElementObjectData, f32, f32)> {
-        self.get_element_object_by_pos_recurse(self.layout_tree.root_render_object.as_ref()?, x, y)
+        self.get_element_object_by_pos_recurse(self.layout_tree.layer_node.as_ref()?, x, y)
     }
 
-    fn get_element_object_by_pos_recurse(&self, render_object: &RenderObject, x: f32, y: f32) -> Option<(&ElementObjectData, f32, f32)> {
-        match render_object {
-            RenderObject::Normal(eo) => {
-                let eod = &self.element_objects[eo.element_object_idx];
-                if x >= eod.coord.0 && x <= eod.coord.0 + eod.width
-                    && y >= eod.coord.1 && y <= eod.coord.1 + eod.height {
-                    for c in eo.children.iter().rev() {
-                        let r = some_or_continue!(self.get_element_object_by_pos_recurse(c, x - eod.coord.0, y - eod.coord.1));
-                        return Some(r);
-                    }
-                    Some((eod, x - eod.coord.0, y - eod.coord.1))
-                } else {
-                    None
-                }
+    fn get_element_object_by_pos_recurse(&self, lo: &LayerNode, x: f32, y: f32) -> Option<(&ElementObjectData, f32, f32)> {
+        let lod = &self.layout_tree.layer_objects[lo.layer_object_idx];
+        let im = lod.matrix.invert()?;
+        let Point {x, y} = im.map_xy(x, y);
+        if x < 0.0 || x > lod.width || y < 0.0 || y > lod.height {
+            return None;
+        }
+        for sub_lo in &lo.layer_nodes {
+            let result = some_or_continue!(self.get_element_object_by_pos_recurse(sub_lo, x, y));
+            return Some(result);
+        }
+        for eo in &lo.normal_nodes {
+            let result = some_or_continue!(self.get_element_object_in_normal_nodes_by_pos_recurse(eo, x, y));
+            return Some(result);
+        }
+        None
+    }
+
+    fn get_element_object_in_normal_nodes_by_pos_recurse(&self, lo: &NormalNode, x: f32, y: f32) -> Option<(&ElementObjectData, f32, f32)> {
+        let eod = &self.element_objects[lo.element_object_idx];
+        if x >= eod.coord.0 && x <= eod.coord.0 + eod.width
+            && y >= eod.coord.1 && y <= eod.coord.1 + eod.height {
+            for c in lo.children.iter().rev() {
+                let r = some_or_continue!(self.get_element_object_in_normal_nodes_by_pos_recurse(c, x - eod.coord.0, y - eod.coord.1));
+                return Some(r);
             }
-            RenderObject::Layer(lo) => {
-                let lod = &self.layout_tree.layer_objects[lo.layer_object_idx];
-                let im = lod.matrix.invert()?;
-                let Point {x, y} = im.map_xy(x, y);
-                for ro in lo.objects.iter().rev() {
-                    let eo = some_or_continue!(self.get_element_object_by_pos_recurse(ro, x, y));
-                    return Some(eo);
-                }
-                None
-            }
+            Some((eod, x - eod.coord.0, y - eod.coord.1))
+        } else {
+            None
         }
     }
 
@@ -199,8 +216,58 @@ impl RenderTree {
         let old_layout_tree = mem::take(&mut self.layout_tree);
         let mut matrix_calculator = MatrixCalculator::new();
         let bounds = element.get_bounds();
-        self.layout_tree.root_render_object = Some(self.build_render_object(element, 0.0, 0.0, None, &mut matrix_calculator, 0.0, 0.0, &bounds.to_skia_rect(), true));
+        let rro = self.build_render_object(element, 0.0, 0.0, None, &mut matrix_calculator, 0.0, 0.0, &bounds.to_skia_rect(), true);
+        if let RenderObject::Layer(lo) = &rro {
+            self.layout_tree.layer_node = Some(self.build_layer_tree(&lo));
+        } else {
+            self.layout_tree.layer_node = None;
+        }
+        self.layout_tree.root_render_object = Some(rro);
         old_layout_tree.sync_invalid_area(&mut self.layout_tree);
+    }
+
+    fn build_layer_tree(&mut self, layer_object: &LayerObject) -> LayerNode {
+        let mut normal_nodes = Vec::new();
+        let mut layer_objects = Vec::new();
+        for c in &layer_object.objects {
+            let nn = some_or_continue!(
+                self.build_normal_node_recurse(c, &mut layer_objects)
+            );
+            normal_nodes.push(nn);
+        }
+        let mut layer_nodes = Vec::with_capacity(layer_objects.len());
+        for lo in layer_objects {
+            layer_nodes.push(self.build_layer_tree(&lo));
+        }
+
+        LayerNode {
+            layer_object_idx: layer_object.layer_object_idx,
+            normal_nodes,
+            layer_nodes,
+        }
+    }
+
+    fn build_normal_node_recurse(&mut self, render_object: &RenderObject, layer_objects: &mut Vec<LayerObject>) -> Option<NormalNode> {
+        match render_object {
+            RenderObject::Normal(eo) => {
+                let mut children = Vec::new();
+                for c in &eo.children {
+                    let child_node = some_or_continue!(
+                        self.build_normal_node_recurse(c, layer_objects)
+                    );
+                    children.push(child_node);
+                }
+                let nn = NormalNode {
+                    element_object_idx: eo.element_object_idx,
+                    children,
+                };
+                Some(nn)
+            }
+            RenderObject::Layer(lo) => {
+                layer_objects.push(lo.clone());
+                None
+            }
+        }
     }
 
     fn build_children_objects(&mut self,
@@ -372,7 +439,11 @@ impl RenderTree {
     }
 
     fn need_create_root_layer(element: &Element) -> bool {
-        element.style.transform.is_some()
+        if element.style.transform.is_some() {
+            return true;
+        }
+        let pos_type = element.style.get_position_type();
+        pos_type == PositionType::Absolute || pos_type == PositionType::Relative
     }
 
     fn need_create_children_layer(element: &Element) -> bool {
