@@ -6,6 +6,7 @@ use std::ops::{Deref, DerefMut};
 
 pub trait IRenderContext {
     fn create_layer(&mut self, width: usize, height: usize) -> Option<Box<dyn ILayer>>;
+    fn flush(&mut self);
 }
 
 pub struct UserContext {
@@ -67,6 +68,10 @@ impl<'a> RenderContext<'a> {
     pub fn create_layer(&mut self, width: usize, height: usize) -> Option<Layer> {
         let layer = self.context.create_layer(width, height)?;
         Some(Layer::new(layer))
+    }
+
+    pub fn flush(&mut self) {
+        self.context.flush();
     }
 
 }

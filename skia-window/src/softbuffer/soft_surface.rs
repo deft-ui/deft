@@ -58,6 +58,7 @@ impl RenderBackend for SoftSurface {
             let _ = skia_surface.canvas().read_pixels(&img_info, buf_ptr, width as usize * 4, (0, 0));
         }
         self.context.win_surface.buffer_mut().unwrap().present().expect("Failed to present the softbuffer buffer");
+        self.context.user_context = Some(user_context);
         callback(true);
     }
 

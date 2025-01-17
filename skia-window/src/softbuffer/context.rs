@@ -30,4 +30,8 @@ impl IRenderContext for SoftRenderContext {
         let layer = SoftLayer::new(width as u32, height as u32);
         Some(Box::new(layer))
     }
+
+    fn flush(&mut self) {
+        // Do nothing
+    }
 }

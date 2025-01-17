@@ -50,4 +50,8 @@ impl IRenderContext for GlRenderContext {
         let layer = GlLayer::new(self.gr_context.clone(), backend_texture, img, surface);
         Some(Box::new(layer))
     }
+
+    fn flush(&mut self) {
+        self.gr_context.flush_and_submit();
+    }
 }

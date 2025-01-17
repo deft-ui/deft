@@ -109,17 +109,14 @@ impl ElementPainter {
                 canvas.restore();
             }
             PaintObject::Layer(lpo) => {
-                unsafe  {
-                    let sf = canvas.surface();
-                    let sf = sf.unwrap();
-                    sf.direct_context().unwrap().flush_and_submit();
-                }
                 //TODO apply matrix
                 canvas.save();
                 // println!("Updating layer: {:?} , {:?}", lpo.key, lpo.invalid_rects);
                 match self.paint_step {
                     PaintStep::Elements => {
+                        context.flush();
                         self.draw_layer(canvas, context, lpo, layer_states);
+                        context.flush();
                     }
                     PaintStep::Layers => {
                         canvas.save();
@@ -150,11 +147,6 @@ impl ElementPainter {
                     }
                 }
                 canvas.restore();
-                unsafe  {
-                    let sf = canvas.surface();
-                    let sf = sf.unwrap();
-                    sf.direct_context().unwrap().flush_and_submit();
-                }
             }
         }
     }
@@ -186,22 +178,15 @@ impl ElementPainter {
                         // canvas.clip_rect(&Rect::new(0.0, 0.0, layer.width * scale, layer.height * scale), ClipOp::Intersect, false);
                         canvas.draw_image(&ogl_state.layer.as_image(), (-scroll_delta_x * scale, -scroll_delta_y * scale), None);
                     });
-                    unsafe {
-                        let sf = root_canvas.surface();
-                        let sf = sf.unwrap();
-                        sf.direct_context().unwrap().flush_and_submit();
-                    }
+                    context.flush();
+
                     ogl_state.layer.canvas().session(|canvas| {
                         canvas.clear(Color::TRANSPARENT);
                         // canvas.clip_rect(&Rect::from_xywh(0.0, 0.0, layer.width, layer.height), ClipOp::Intersect, false);
                         canvas.scale((1.0 / scale, 1.0 / scale));
                         canvas.draw_image(&temp_gl.as_image(), (0.0, 0.0), None);
                     });
-                    unsafe {
-                        let sf = root_canvas.surface();
-                        let sf = sf.unwrap();
-                        sf.direct_context().unwrap().flush_and_submit();
-                    }
+                    context.flush();
                 }
                 ogl_state.surface_bounds = layer.surface_bounds;
                 Some(ogl_state)
