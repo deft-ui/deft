@@ -47,7 +47,7 @@ use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorGrabMode, CursorIcon, Fullscreen, Window, WindowAttributes, WindowId};
 use crate::{bind_js_event_listener, is_snapshot_usable, ok_or_return, send_app_event, show_repaint_area, some_or_continue, some_or_return};
 use crate::computed::ComputedValue;
-use crate::frame_rate::{get_total_frames, next_frame, FRAME_RATE_CONTROLLER};
+use crate::frame_rate::{FrameRateController};
 use crate::layout::LayoutRoot;
 use crate::paint::{InvalidArea, PartialInvalidArea, Painter, RenderTree, SkiaPainter, UniqueRect, InvalidRects, MatrixCalculator, RenderLayerKey, LayerState};
 use crate::render::paint_object::{ElementPaintObject, PaintObject};
@@ -111,6 +111,8 @@ pub struct Frame {
     next_frame_callbacks: Vec<Callback>,
     pub render_tree: RenderTree,
     pub style_variables: ComputedValue<String>,
+    frame_rate_controller: FrameRateController,
+    next_frame_timer_handle: Option<TimerHandle>,
 }
 
 pub type FrameEventHandler = EventHandler<FrameWeak>;
@@ -236,6 +238,8 @@ impl Frame {
             next_frame_callbacks: Vec::new(),
             render_tree: RenderTree::new(0),
             style_variables: ComputedValue::new(),
+            frame_rate_controller: FrameRateController::new(),
+            next_frame_timer_handle: None,
         };
         let mut handle = Frame {
             inner: Mrc::new(state),
@@ -783,6 +787,24 @@ impl Frame {
         if !self.renderer_idle {
             return ResultWaiter::new_finished(false);
         }
+        if self.next_frame_timer_handle.is_some() {
+            return ResultWaiter::new_finished(false);
+        }
+        let sleep_time = self.frame_rate_controller.next_frame();
+        if sleep_time > 0 {
+            let frame_id = self.get_id();
+            let mut me = self.clone();
+            let next_frame_timer_handle = set_timeout_nanos(move || {
+                me.next_frame_timer_handle = None;
+                me.update_force();
+            }, sleep_time);
+            self.next_frame_timer_handle = Some(next_frame_timer_handle);
+            return ResultWaiter::new_finished(false);
+        }
+        self.update_force()
+    }
+
+    fn update_force(&mut self) -> ResultWaiter<bool> {
         // print_time!("frame update time");
         let mut frame_callbacks = Vec::new();
         frame_callbacks.append(&mut self.next_frame_callbacks);
