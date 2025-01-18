@@ -461,7 +461,7 @@ impl RenderTree {
         // let (transformed_bounds, _) = total_matrix.map_rect(Rect::from_xywh(0.0, 0.0, bounds.width(), bounds.height()));
         //TODO update border path when border changed
         for mut c in root.get_children() {
-            let child_bounds = c.get_bounds().translate(-root.scroll_left, -root.scroll_top);
+            let child_bounds = c.get_bounds().translate(-root.get_scroll_left(), -root.get_scroll_top());
             self.update_layout_info_recurse(&mut c, child_bounds.to_skia_rect());
         }
     }

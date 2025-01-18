@@ -42,7 +42,6 @@ pub mod entry;
 pub mod button;
 pub mod scroll;
 pub mod textedit;
-mod scroll_bar;
 pub mod image;
 pub mod label;
 mod edit_history;
@@ -341,11 +340,6 @@ impl Element {
         }
     }
 
-    pub fn with_backend_mut<T, F: FnOnce(&mut T)>(&mut self, callback:F) {
-        let bk = self.get_backend_mut_as::<T>();
-        callback(bk);
-    }
-
     pub fn get_backend_mut(&mut self) -> &mut Box<dyn ElementBackend> {
         &mut self.backend
     }
@@ -439,11 +433,6 @@ impl Element {
         Some(p)
     }
 
-    pub fn contains_point(&self, x: f32, y: f32) -> bool {
-        let clip_path = self.build_clip_path();
-        clip_path.contains((x, y))
-    }
-
     #[js_func]
     pub fn get_size(&self) -> (f32, f32) {
         let layout = self.style.get_layout();
@@ -480,12 +469,6 @@ impl Element {
         }
     }
 
-    pub fn get_relative_bounds(&self, target: &Self) -> base::Rect {
-        let my_origin_bounds = self.get_origin_bounds();
-        let target_origin_bounds = target.get_origin_bounds();
-        my_origin_bounds.translate(-target_origin_bounds.x, -target_origin_bounds.y)
-    }
-
     #[js_func]
     pub fn get_real_content_size(&self) -> (f32, f32) {
         let mut content_width = 0.0;
@@ -502,12 +485,6 @@ impl Element {
     /// content bounds relative to self(border box)
     pub fn get_content_bounds(&self) -> base::Rect {
         self.style.get_content_bounds()
-    }
-
-    pub fn get_origin_padding_bounds(&self) -> base::Rect {
-        let (t, r, b, l) = self.get_border_width();
-        let bounds = self.get_origin_bounds();
-        base::Rect::new(bounds.x + l, bounds.y + t, bounds.width - l - r, bounds.height - t - b)
     }
 
     pub fn get_origin_content_bounds(&self) -> base::Rect {
@@ -560,20 +537,6 @@ impl Element {
         self.children.clone()
     }
 
-    // pub fn get_layout(&self) -> Layout {
-    //     let ml = self.layout.get_layout();
-    //     return if let Some(p) = self.get_parent() {
-    //         let pl = p.get_layout();
-    //         let left = pl.left() + ml.left();
-    //         let right = left + ml.width();
-    //         let top = pl.top() + ml.top();
-    //         let bottom = top + ml.height();
-    //         Layout::new(left, right, top, bottom, ml.width(), ml.height())
-    //     } else {
-    //         ml
-    //     }
-    // }
-
     pub fn calculate_layout(&mut self, available_width: f32, available_height: f32) {
         // mark all children dirty so that custom measure function could be call
         // self.mark_all_layout_dirty();
@@ -585,13 +548,6 @@ impl Element {
         } else {
             self.on_layout_update();
         }
-    }
-
-    pub fn set_border_width(&mut self, width: (f32, f32, f32, f32)) {
-        self.style.set_border(Edge::Top, width.0);
-        self.style.set_border(Edge::Right, width.1);
-        self.style.set_border(Edge::Bottom, width.2);
-        self.style.set_border(Edge::Left, width.3);
     }
 
     pub fn get_border_width(&self) -> (f32, f32, f32, f32) {
@@ -606,16 +562,6 @@ impl Element {
     /// Return the padding of element (order: Top, Right, Bottom, Left)
     pub fn get_padding(&self) -> (f32, f32, f32, f32) {
         self.style.get_padding()
-    }
-
-    pub fn set_border_color(&mut self, color: [Color; 4]) {
-        self.style.border_color = color;
-    }
-
-
-    pub fn set_background_image(&mut self, src: &str) {
-        self.style.background_image = IMG_MANAGER.with(|im| im.get_img(src));
-        self.mark_dirty(true);
     }
 
     #[js_func]
@@ -712,107 +658,6 @@ impl Element {
             }
         });
         self.applied_style = new_style;
-    }
-
-    pub fn set_style_prop(&mut self, key: StylePropKey, value: &str) {
-        if let Some(prop) = StyleProp::parse_value(key, value) {
-            self.set_style_props(vec![prop]);
-        }
-    }
-
-    pub fn set_style_property(&mut self, key: &str, value: &str) {
-        if let Some(prop) = StyleProp::parse(key, value) {
-            self.set_style_props(vec![prop]);
-        }
-        //FIXME remove
-        /*
-        let mut repaint = true;
-        let mut need_layout = true;
-        match name.to_lowercase().as_str() {
-            "color" => {
-                self.layout.color = parse_color(value);
-                self.compute_color();
-                need_layout = false;
-            },
-            "background" | "backgroundcolor" => {
-                self.layout.background_color = parse_color(value);
-                self.compute_background_color();
-                need_layout = false;
-            }
-            "bordertop" => {self.set_border(value, &vec![0])},
-            "borderright" => {self.set_border(value, &vec![1])},
-            "borderbottom" => {self.set_border(value, &vec![2])},
-            "borderleft" => {self.set_border(value, &vec![3])},
-            "border" => {self.set_border(value, &vec![0, 1, 2, 3])}
-            "display" => {self.layout.set_display(parse_display(value))}
-            "width" => self.layout.set_width(parse_length(value)),
-            "height" => self.layout.set_height(parse_length(value)),
-            "maxwidth" => self.layout.set_max_width(parse_length(value)),
-            "maxheight" => self.layout.set_max_height(parse_length(value)),
-            "minwidth" => self.layout.set_min_width(parse_length(value)),
-            "minheight" => self.layout.set_min_height(parse_length(value)),
-            "margintop" => self.layout.set_margin(Edge::Top, parse_length(value)),
-            "marginright" => self.layout.set_margin(Edge::Right, parse_length(value)),
-            "marginbottom" => self.layout.set_margin(Edge::Bottom, parse_length(value)),
-            "marginleft" => self.layout.set_margin(Edge::Left, parse_length(value)),
-            "margin" => {
-                self.layout.set_margin(Edge::Top, parse_length(value));
-                self.layout.set_margin(Edge::Right, parse_length(value));
-                self.layout.set_margin(Edge::Bottom, parse_length(value));
-                self.layout.set_margin(Edge::Left, parse_length(value));
-            },
-            "paddingtop" => self.layout.set_padding(Edge::Top, parse_length(value)),
-            "paddingright" => self.layout.set_padding(Edge::Right, parse_length(value)),
-            "paddingbottom" => self.layout.set_padding(Edge::Bottom, parse_length(value)),
-            "paddingleft" => self.layout.set_padding(Edge::Left, parse_length(value)),
-            "padding" => {
-                self.layout.set_padding(Edge::Top, parse_length(value));
-                self.layout.set_padding(Edge::Right, parse_length(value));
-                self.layout.set_padding(Edge::Bottom, parse_length(value));
-                self.layout.set_padding(Edge::Left, parse_length(value));
-            },
-            "flex" => self.layout.set_flex(parse_float(value)),
-            "flexbasis" => self.layout.set_flex_basis(parse_length(value)),
-            "flexgrow" => self.layout.set_flex_grow(parse_float(value)),
-            "flexshrink" => self.layout.set_flex_shrink(parse_float(value)),
-            "alignself" => self.layout.set_align_self(parse_align(value)),
-            "direction" => self.layout.set_direction(parse_direction(value)),
-            "position" => self.layout.set_position_type(parse_position_type(value)),
-            "overflow" => self.layout.set_overflow(parse_overflow(value)),
-            "borderradius" => {
-                let value = parse_float(value);
-                self.layout.border_radius = [value, value, value, value];
-            }
-            "bordertopleftradius" => {
-                self.layout.border_radius[0] = parse_float(value);
-                println!("{:?}", self.layout.border_radius);
-            },
-            "bordertoprightradius" => self.layout.border_radius[1] = parse_float(value),
-            "borderbottomrightradius" => self.layout.border_radius[2] = parse_float(value),
-            "borderbottomleftradius" => self.layout.border_radius[3] = parse_float(value),
-
-
-            "justifycontent" => self.inner_ele_or_self().layout.set_justify_content(parse_justify(value)),
-            "flexdirection" => self.inner_ele_or_self().layout.set_flex_direction(parse_flex_direction(value)),
-            "aligncontent" => self.inner_ele_or_self().layout.set_align_content(parse_align(value)),
-            "alignitems" => self.inner_ele_or_self().layout.set_align_items(parse_align(value)),
-            "flexwrap" => self.inner_ele_or_self().layout.set_flex_wrap(parse_wrap(value)),
-            "columngap" => self.inner_ele_or_self().layout.set_column_gap(parse_float(value)),
-            "rowgap" => self.inner_ele_or_self().layout.set_row_gap(parse_float(value)),
-            "gap" => {
-                self.inner_ele_or_self().layout.set_column_gap(parse_float(value));
-                self.inner_ele_or_self().layout.set_row_gap(parse_float(value));
-            },
-            //TODO aspectratio , backgroundcolor
-            // right
-            // top
-            // bottom
-            // left
-            _ => repaint = false,
-        }
-        if need_layout || repaint {
-            self.mark_dirty(need_layout);
-        }*/
     }
 
     pub fn register_event_listener<T: 'static, H: EventListener<T, ElementWeak> + 'static>(&mut self, mut listener: H) -> u32 {
@@ -997,6 +842,7 @@ impl Element {
         //TODO emit size change
         let origin_bounds = self.get_origin_bounds();
         if origin_bounds != self.rect {
+            self.rect = origin_bounds.clone();
             // Disable bubble
             let mut ctx = EventContext {
                 target: self.as_weak(),
@@ -1033,42 +879,6 @@ impl Element {
         &mut self.border_path
     }
 
-    pub fn get_origin_border_bounds(&self) -> base::Rect {
-        let origin_bounds = self.get_origin_bounds();
-        let border = self.get_border_width();
-        base::Rect::from_skia_rect(
-            Rect::new(
-                origin_bounds.x + border.3,
-                origin_bounds.y + border.0,
-                origin_bounds.right() - border.1,
-                origin_bounds.bottom() - border.2,
-            )
-        )
-    }
-
-    pub fn get_content_box_path(&self) -> Path {
-        let mut path = Path::new();
-        let bounds = self.get_content_bounds();
-        path.add_rect(&bounds.to_skia_rect(), None);
-        return path;
-    }
-
-    pub fn build_clip_path(&self) -> Path {
-        let origin_bounds = self.get_origin_bounds();
-        let mut clip_path = build_rect_with_radius(self.style.border_radius, origin_bounds.width, origin_bounds.height);
-        if let Some(p) = self.get_parent() {
-            let outer_bounds = p.get_origin_content_bounds();
-            let clip_bounds = outer_bounds.intersect(&origin_bounds).translate(-origin_bounds.x, -origin_bounds.y);
-            //TODO  why none?
-            if let Some(cp) = clip_path.op(&clip_bounds.to_path(), SkPathOp::Intersect) {
-                clip_path = cp;
-            } else {
-                clip_path = Path::new();
-            }
-        }
-        clip_path
-    }
-
 }
 
 impl ElementWeak {
@@ -1097,10 +907,8 @@ pub struct Element {
     // animation_instance: Option<AnimationInstance>,
 
 
-    pub scroll_top: f32,
-    pub scroll_left: f32,
-    pub last_paint_info: Option<PaintInfo>,
-    pub invalid_unique_rect: Option<UniqueRect>,
+    scroll_top: f32,
+    scroll_left: f32,
     draggable: bool,
     cursor: CursorIcon,
     rect: base::Rect,
@@ -1142,10 +950,8 @@ impl ElementData {
             applied_style: Vec::new(),
             hover: false,
 
-            invalid_unique_rect: None,
             scroll_top: 0.0,
             scroll_left: 0.0,
-            last_paint_info: None,
             draggable: false,
             cursor: CursorIcon::Default,
             rect: base::Rect::empty(),

@@ -513,7 +513,6 @@ impl ElementBackend for Entry {
         ele.add_child_view(paragraph_element.clone(), None);
         // base.set_text_wrap(false);
         ele.set_cursor(CursorIcon::Text);
-        ele.set_style_prop(StylePropKey::Height, "24");
         base.set_scroll_x(ScrollBarStrategy::Never);
         base.set_scroll_y(ScrollBarStrategy::Never);
         //TODO not working
