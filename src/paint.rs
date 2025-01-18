@@ -163,7 +163,7 @@ impl RenderTree {
         if x < 0.0 || x > lod.width || y < 0.0 || y > lod.height {
             return None;
         }
-        for sub_lo in &lo.layer_nodes {
+        for sub_lo in lo.layer_nodes.iter().rev() {
             let result = some_or_continue!(self.get_element_object_by_pos_recurse(sub_lo, x, y));
             return Some(result);
         }
