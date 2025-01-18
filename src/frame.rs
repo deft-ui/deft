@@ -835,7 +835,7 @@ impl Frame {
         //TODO unbind when change body
         let myself = self.as_weak();
         body.register_event_listener(CaretChangeEventListener::new(move |detail, e| {
-            myself.upgrade_mut(|myself| {
+            if let Ok(myself) = myself.upgrade_mut() {
                 if myself.focusing == e.target.upgrade().ok() {
                     let origin_ime_rect = &detail.origin_bounds;
                     myself.window.set_ime_cursor_area(Position::Logical(LogicalPosition {
@@ -846,7 +846,7 @@ impl Frame {
                         height: origin_ime_rect.height as f64
                     }));
                 }
-            });
+            }
         }));
         self.body = Some(body);
         self.invalid_layout();

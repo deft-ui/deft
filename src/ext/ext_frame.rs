@@ -84,9 +84,9 @@ pub fn handle_window_event(window_id: WindowId, event: WindowEvent) {
                 let _ = f.close();
             }
         } else {
-            frame.upgrade_mut(|frame| {
+            if let Ok(mut frame) = frame.upgrade_mut() {
                 frame.handle_event(event);
-            });
+            }
         }
     }
 }
@@ -94,9 +94,9 @@ pub fn handle_window_event(window_id: WindowId, event: WindowEvent) {
 impl FrameWeak {
 
     pub fn set_body(&mut self, body: Element) {
-        self.upgrade_mut(|f| {
+        if let Ok(mut f) = self.upgrade_mut() {
             f.set_body(body)
-        });
+        }
     }
 
 }

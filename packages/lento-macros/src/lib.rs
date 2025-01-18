@@ -9,6 +9,7 @@ pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
     let struct_def = parse_macro_input!(struct_def as ItemStruct);
     let weak_name = format_ident!("{}Weak", struct_def.ident);
     let struct_name = format_ident!("{}Data", struct_def.ident);
+    let mut_name = format_ident!("{}RefMut", struct_def.ident);
     let ref_name = struct_def.ident;
     let fields = struct_def.fields;
 
@@ -46,6 +47,25 @@ pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
             }
         }
 
+        pub struct #mut_name<'a> {
+            weak: &'a #weak_name,
+            data: #ref_name,
+        }
+
+        impl<'a> std::ops::Deref for #mut_name<'a> {
+            type Target = #ref_name;
+
+            fn deref(&self) -> &Self::Target {
+                &self.data
+            }
+        }
+
+        impl<'a> std::ops::DerefMut for #mut_name<'a> {
+            fn deref_mut(&mut self) -> &mut Self::Target {
+                &mut self.data
+            }
+        }
+
         #[derive(Clone)]
         pub struct #weak_name {
             inner: Option<lento::mrc::MrcWeak<#struct_name>>,
@@ -70,15 +90,14 @@ pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
                 )
             }
 
-            pub fn upgrade_mut<R, F: FnOnce(&mut #ref_name) -> R>(&self, callback: F) -> Option<R> {
-                if let Ok(f) = self.inner.as_ref()?.upgrade() {
-                    let mut inst = #ref_name {
-                        inner: f
-                    };
-                    Some(callback(&mut inst))
-                } else {
-                    None
-                }
+            pub fn upgrade_mut(&self) -> Result<#mut_name, lento::mrc::UpgradeError> {
+                let data = self.upgrade()?;
+                Ok(
+                    #mut_name {
+                        weak: self,
+                        data,
+                    }
+                )
             }
 
         }

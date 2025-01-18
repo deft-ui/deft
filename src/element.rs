@@ -89,9 +89,9 @@ impl Element {
             inner,
         };
         {
-            let ele_weak = ele.as_weak();
+            let mut ele_weak = ele.as_weak();
             ele.style_manager.set_style_consumer(move |prop| {
-                if let Ok(mut e) = ele_weak.upgrade() {
+                if let Ok(mut e) = ele_weak.upgrade_mut() {
                     e.set_style_prop_internal(prop);
                 }
             });
@@ -398,9 +398,9 @@ impl Element {
         if let Some(p) = self.get_parent() {
             return p.with_window(callback);
         } else if let Some(ww) = &self.window {
-            ww.upgrade_mut(|w| {
-                callback(w);
-            });
+            if let Ok(mut w) = ww.upgrade() {
+                callback(&mut w);
+            }
         }
     }
 

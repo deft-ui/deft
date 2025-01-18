@@ -291,10 +291,10 @@ impl Entry {
         self.caret_visible.set(false);
         self.element.mark_dirty(false);
         if let Some(frame) = self.element.get_frame() {
-            frame.upgrade_mut(|f| {
+            if let Ok(f) = frame.upgrade_mut() {
                 let elp = create_event_loop_proxy();
                 elp.send_event(AppEvent::HideSoftInput(f.get_id())).unwrap();
-            });
+            }
         }
     }
 
@@ -405,10 +405,10 @@ impl Entry {
             }, 500)
         });
         if let Some(frame) = self.element.get_frame() {
-            frame.upgrade_mut(|f| {
+            if let Ok(f) = frame.upgrade_mut() {
                 let elp = create_event_loop_proxy();
                 elp.send_event(AppEvent::ShowSoftInput(f.get_id())).unwrap();
-            });
+            }
         }
     }
 
