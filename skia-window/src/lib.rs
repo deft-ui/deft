@@ -9,5 +9,3 @@ mod gl;
 pub mod renderer;
 #[cfg(not(target_os = "android"))]
 mod softbuffer;
-
-pub use offscreen_gl_context::*;
