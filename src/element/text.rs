@@ -585,7 +585,7 @@ pub fn intersect_range<T: Ord>(range1: (T, T), range2: (T, T)) -> Option<(T, T)>
 }
 
 impl ElementBackend for Text {
-    fn create(mut ele: Element) -> Self {
+    fn create(mut ele: &mut Element) -> Self {
         let mut label = Self::new(ele.clone());
         ele.style.set_context(Some(Context::new(label.paragraph_ref.clone())));
         ele.style.set_measure_func(Some(measure_label));

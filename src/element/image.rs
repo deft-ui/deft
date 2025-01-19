@@ -12,10 +12,10 @@ use skia_safe::svg::Dom;
 use skia_safe::wrapper::PointerWrapper;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 
-use crate::element::{ElementBackend, Element};
+use crate::element::{ElementBackend, Element, ElementWeak};
 use crate::element::label::FONT_MGR;
 use crate::img_manager::IMG_MANAGER;
-use crate::js_call;
+use crate::{js_call, ok_or_return};
 use crate::render::RenderFn;
 
 extern "C" fn measure_image(node_ref: NodeRef, width: f32, _mode: MeasureMode, _height: f32, _height_mode: MeasureMode) -> Size {
@@ -62,7 +62,7 @@ impl ImageSrc {
 
 #[element_backend]
 pub struct Image {
-    element: Element,
+    element: ElementWeak,
     src: String,
     img: ImageSrc,
 }
@@ -94,7 +94,8 @@ impl Image {
             }
         };
         let context = Context::new(self.img.clone());
-        self.element.style.set_context(Some(context));
+        let mut element = ok_or_return!(self.element.upgrade_mut());
+        element.style.set_context(Some(context));
         self.element.mark_dirty(true);
     }
 
@@ -113,10 +114,10 @@ impl Image {
 }
 
 impl ElementBackend for Image {
-    fn create(mut element: Element) -> Self {
+    fn create(mut element: &mut Element) -> Self {
         element.style.set_measure_func(Some(measure_image));
         ImageData {
-            element,
+            element: element.as_weak(),
             src: "".to_string(),
             img: ImageSrc::None,
         }.to_ref()
@@ -128,7 +129,8 @@ impl ElementBackend for Image {
 
     fn render(&mut self) -> RenderFn {
         let (img_width, img_height) = self.img.get_size();
-        let (width, height) = self.element.get_size();
+        let element = self.element.upgrade_mut().unwrap();
+        let (width, height) = element.get_size();
         let img = self.img.clone();
         RenderFn::new(move |canvas| {
             canvas.save();

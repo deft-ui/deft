@@ -1,8 +1,6 @@
-use crate::element::{ElementBackend, Element};
+use crate::element::{ElementBackend, Element, ElementWeak};
 
 pub struct Container {
-    dirty: bool,
-    element: Element,
 }
 
 impl Container {
@@ -10,11 +8,8 @@ impl Container {
 }
 
 impl ElementBackend for Container {
-    fn create(element: Element) -> Self {
-        Self {
-            dirty: false,
-            element,
-        }
+    fn create(element: &mut Element) -> Self {
+        Self {}
     }
 
     fn get_name(&self) -> &str {

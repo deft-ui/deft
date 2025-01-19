@@ -16,7 +16,6 @@ use crate::event::TextUpdateEventListener;
 use crate::style::StylePropKey;
 
 pub struct TextEdit {
-    element: Element,
     container_element: Element,
     entry_element: Element,
     base: Scroll,
@@ -36,8 +35,8 @@ impl TextEdit {
 }
 
 impl ElementBackend for TextEdit {
-    fn create(mut element: Element) -> Self {
-        let mut base = Scroll::create(element.clone());
+    fn create(mut element: &mut Element) -> Self {
+        let mut base = Scroll::create(element);
         let mut container_ele = create_element!(Container, {
             minHeight   =>  "100%",
             paddingLeft =>  "20",
@@ -84,7 +83,6 @@ impl ElementBackend for TextEdit {
         Self {
             entry_element,
             base,
-            element,
             // line_number_font,
             container_element: container_ele,
         }

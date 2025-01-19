@@ -66,7 +66,7 @@ pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
             }
         }
 
-        #[derive(Clone)]
+        #[derive(Clone, PartialEq)]
         pub struct #weak_name {
             inner: Option<lento::mrc::MrcWeak<#struct_name>>,
         }

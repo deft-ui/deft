@@ -10,7 +10,7 @@ use skia_safe::{Canvas, Color, Paint, Path, Point};
 use tokio::time::Instant;
 use yoga::Direction::LTR;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size, StyleUnit};
-use crate::{backend_as_api, is_mobile_platform, js_call, js_deserialize, js_serialize, some_or_return};
+use crate::{backend_as_api, is_mobile_platform, js_call, js_deserialize, js_serialize, ok_or_return, some_or_return};
 use crate::animation::{AnimationDef, AnimationInstance, SimpleFrameController, WindowAnimationController};
 use crate::base::{CaretDetail, ElementEvent, EventContext, Rect};
 use crate::color::parse_hex_color;
@@ -20,6 +20,7 @@ use crate::element::paragraph::ParagraphWeak;
 use crate::element::scroll::ScrollBarStrategy::{Always, Auto, Never};
 use crate::event::{CaretChangeEvent, MouseDownEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent};
 use crate::js::js_runtime::FromJsValue;
+use crate::js::JsError;
 use crate::layout::LayoutRoot;
 use crate::render::RenderFn;
 use crate::style::{StyleProp, StylePropVal};
@@ -101,7 +102,7 @@ extern "C" fn measure_scroll(
 #[element_backend]
 pub struct Scroll {
     scroll_bar_size: f32,
-    element: Element,
+    element: ElementWeak,
     base: Container,
     bar_background_color: Color,
     indicator_color: Color,
@@ -157,8 +158,9 @@ impl Scroll {
     }
 
     //TODO rename
-    pub fn scroll_to_top(&mut self, top: f32) {
-        self.element.set_scroll_top(top);
+    pub fn scroll_to_top(&mut self, top: f32) -> Result<(), JsError> {
+        self.element.upgrade_mut()?.set_scroll_top(top);
+        Ok(())
     }
 
     fn mark_layout_dirty(&mut self) {
@@ -167,15 +169,16 @@ impl Scroll {
     }
 
     fn layout_content(&mut self, bounds_width: f32, bounds_height: f32) {
+        let mut element = ok_or_return!(self.element.upgrade_mut());
         let (width, height) = self.get_body_view_size(bounds_width, bounds_height);
         //TODO fix ltr
         // self.element.style.calculate_shadow_layout(width, height, LTR);
         let layout_width = if self.content_auto_width { f32::NAN } else { width };
         let layout_height = if self.content_auto_height { f32::NAN } else { height };
         // self.element.style.calculate_shadow_layout(f32::NAN, f32::NAN, LTR);
-        self.element.style.calculate_shadow_layout(layout_width, layout_height, LTR);
+        element.style.calculate_shadow_layout(layout_width, layout_height, LTR);
 
-        for child in &mut self.element.get_children().clone() {
+        for child in &mut element.get_children().clone() {
             //TODO remove?
             child.on_layout_update();
         }
@@ -196,9 +199,10 @@ impl Scroll {
     }
 
     fn handle_default_mouse_wheel(&mut self, detail: &MouseWheelEvent) -> bool {
+        let mut element = ok_or_return!(self.element.upgrade_mut(), false);
         if self.is_y_overflow {
-            let new_scroll_top = self.element.get_scroll_top() - 40.0 * detail.rows;
-            self.element.set_scroll_top(new_scroll_top);
+            let new_scroll_top = element.get_scroll_top() - 40.0 * detail.rows;
+            element.set_scroll_top(new_scroll_top);
             true
         } else {
             false
@@ -207,23 +211,27 @@ impl Scroll {
 
     fn handle_caret_change(&mut self, detail: &CaretChangeEvent) {
         // println!("caretchange:{:?}", detail.origin_bounds);
-        let body = &mut self.element;
+        let mut body = ok_or_return!(self.element.upgrade_mut());
         let scroll_origin_bounds = body.get_origin_content_bounds();
 
         let caret_bottom = detail.origin_bounds.bottom();
         let scroll_bottom = scroll_origin_bounds.bottom();
         if  caret_bottom > scroll_bottom  {
-            body.set_scroll_top(body.get_scroll_top() + (caret_bottom - scroll_bottom));
+            let new_scroll_top = body.get_scroll_top() + (caret_bottom - scroll_bottom);
+            body.set_scroll_top(new_scroll_top);
         } else if detail.origin_bounds.y < scroll_origin_bounds.y {
-            body.set_scroll_top(body.get_scroll_top() - (scroll_origin_bounds.y - detail.origin_bounds.y));
+            let new_scroll_top = body.get_scroll_top() - (scroll_origin_bounds.y - detail.origin_bounds.y);
+            body.set_scroll_top(new_scroll_top);
         }
 
         let caret_right = detail.origin_bounds.right();
         let scroll_right = scroll_origin_bounds.right();
         if caret_right > scroll_right {
-            body.set_scroll_left(body.get_scroll_left() + (caret_right - scroll_right));
+            let new_scroll_left = body.get_scroll_left() + (caret_right - scroll_right);
+            body.set_scroll_left(new_scroll_left);
         } else if detail.origin_bounds.x < scroll_origin_bounds.x {
-            body.set_scroll_left(body.get_scroll_left() - (scroll_origin_bounds.x - detail.origin_bounds.x));
+            let new_scroll_left = body.get_scroll_left() - (scroll_origin_bounds.x - detail.origin_bounds.x);
+            body.set_scroll_left(new_scroll_left);
         }
     }
 
@@ -243,7 +251,8 @@ impl Scroll {
     }
 
     fn calculate_vertical_indicator_rect(&self) -> Rect {
-        let indicator = Indicator::new(self.real_content_height, self.vertical_bar_rect.height, self.element.get_scroll_top());
+        let element = ok_or_return!(self.element.upgrade_mut(), Rect::empty());
+        let indicator = Indicator::new(self.real_content_height, self.vertical_bar_rect.height, element.get_scroll_top());
         if self.vertical_bar_rect.is_empty() {
             Rect::empty()
         } else {
@@ -271,10 +280,15 @@ impl Scroll {
     }
 
     fn calculate_horizontal_indicator_rect(&self) -> Rect {
+        let element = ok_or_return!(self.element.upgrade_mut(), Rect::empty());
         if self.horizontal_bar_rect.is_empty() {
             Rect::empty()
         } else {
-            let indicator = Indicator::new(self.real_content_width, self.horizontal_bar_rect.width, self.element.get_scroll_left());
+            let indicator = Indicator::new(
+                self.real_content_width,
+                self.horizontal_bar_rect.width,
+                element.get_scroll_left()
+            );
             Rect::new(
                 indicator.get_indicator_offset(),
                 self.horizontal_bar_rect.y,
@@ -285,11 +299,13 @@ impl Scroll {
     }
 
     fn begin_scroll_y(&mut self, y: f32) {
-        self.vertical_move_begin = Some((y, self.element.get_scroll_top()));
+        let element = ok_or_return!(self.element.upgrade_mut());
+        self.vertical_move_begin = Some((y, element.get_scroll_top()));
     }
 
     fn begin_scroll_x(&mut self, x: f32) {
-        self.horizontal_move_begin = Some((x, self.element.get_scroll_left()));
+        let element = ok_or_return!(self.element.upgrade_mut());
+        self.horizontal_move_begin = Some((x, element.get_scroll_left()));
     }
 
     fn update_scroll_y(&mut self, y: f32, by_scroll_bar: bool) {
@@ -303,7 +319,8 @@ impl Scroll {
             } else {
                 mouse_move_distance
             };
-            self.element.set_scroll_top(begin_top + distance)
+            let mut element = ok_or_return!(self.element.upgrade_mut());
+            element.set_scroll_top(begin_top + distance)
         }
     }
 
@@ -318,7 +335,8 @@ impl Scroll {
             } else {
                 mouse_move_distance
             };
-            self.element.set_scroll_left(begin_left + distance)
+            let mut element = ok_or_return!(self.element.upgrade_mut());
+            element.set_scroll_left(begin_left + distance)
         }
     }
 
@@ -328,26 +346,30 @@ impl Scroll {
     }
 
     fn update_layout(&mut self) {
-        if let Some(mut p) = self.element.get_parent() {
+        let mut element = ok_or_return!(self.element.upgrade_mut());
+        if let Some(mut p) = element.get_parent() {
             p.ensure_layout_update();
         }
-        let bounds = self.element.get_bounds();
+        let bounds = element.get_bounds();
         let size = (bounds.width, bounds.height);
-        if !self.element.layout_dirty && size == self.last_layout_size {
+        if !element.layout_dirty && size == self.last_layout_size {
             return;
         }
         self.last_layout_size = size;
         self.do_layout_content();
-        self.element.set_dirty_state_recurse(false);
+        let mut element = ok_or_return!(self.element.upgrade_mut());
+        element.set_dirty_state_recurse(false);
     }
 
     fn do_layout_content(&mut self) {
+        let element = self.element.clone();
+        let mut element = ok_or_return!(element.upgrade_mut());
         // print_time!("scroll layout content time");
         let (bounds_width, bounds_height) = self.last_layout_size;
         self.layout_content(bounds_width, bounds_height);
 
         let (mut body_width, mut body_height) = self.get_body_view_size(bounds_width, bounds_height);
-        let (mut real_content_width, mut real_content_height) = self.element.get_real_content_size();
+        let (mut real_content_width, mut real_content_height) = element.get_real_content_size();
 
         let old_vertical_bar_visible = !self.vertical_bar_rect.is_empty();
         self.is_y_overflow = real_content_height > body_height;
@@ -362,7 +384,7 @@ impl Scroll {
                 self.layout_content(bounds_width, bounds_height);
             }
             (body_width, body_height) = self.get_body_view_size(bounds_width, bounds_height);
-            (real_content_width, real_content_height) = self.element.get_real_content_size();
+            (real_content_width, real_content_height) = element.get_real_content_size();
         } else if new_vertical_bar_visible {
             self.update_vertical_bar_rect(true, bounds_width, bounds_height);
         }
@@ -381,19 +403,19 @@ impl Scroll {
                 self.layout_content(bounds_width, bounds_height);
             }
             (body_width, body_height) = self.get_body_view_size(bounds_width, bounds_height);
-            (real_content_width, real_content_height) = self.element.get_real_content_size();
+            (real_content_width, real_content_height) = element.get_real_content_size();
         } else if new_horizontal_bar_visible {
             self.update_horizontal_bar_rect(true, bounds_width, bounds_height);
         }
 
         let vbw = self.vertical_bar_rect.width;
         let hbw = self.horizontal_bar_rect.width;
-        self.element.set_child_decoration((0.0, vbw, hbw, 0.0));
+        element.set_child_decoration((0.0, vbw, hbw, 0.0));
         // Update scroll offset
-        let scroll_left = self.element.get_scroll_left();
-        self.element.set_scroll_left(scroll_left);
-        let scroll_top = self.element.get_scroll_top();
-        self.element.set_scroll_top(scroll_top);
+        let scroll_left = element.get_scroll_left();
+        element.set_scroll_left(scroll_left);
+        let scroll_top = element.get_scroll_top();
+        element.set_scroll_top(scroll_top);
         self.real_content_width = real_content_width;
         self.real_content_height = real_content_height;
         self.content_layout_dirty = false;
@@ -401,8 +423,9 @@ impl Scroll {
 
     /// invert transform effect
     fn map_frame_xy(&self, frame_x: f32, frame_y: f32) -> Option<(f32, f32)> {
-        let mut frame = self.element.get_frame()?.upgrade().ok()?;
-        let node_matrix = frame.render_tree.get_element_total_matrix(&self.element)?;
+        let mut element = ok_or_return!(self.element.upgrade_mut(), None);
+        let mut frame = element.get_frame()?.upgrade().ok()?;
+        let node_matrix = frame.render_tree.get_element_total_matrix(&element)?;
         let p = node_matrix.invert()?.map_xy(frame_x, frame_y);
         Some((p.x, p.y))
     }
@@ -410,15 +433,15 @@ impl Scroll {
 }
 
 impl ElementBackend for Scroll {
-    fn create(mut ele: Element) -> Self {
+    fn create(mut ele: &mut Element) -> Self {
         ele.create_shadow();
         ele.need_snapshot = true;
-        let mut base = Container::create(ele.clone());
+        let mut base = Container::create(ele);
         let is_mobile_platform = is_mobile_platform();
 
         let mut inst = ScrollData {
             scroll_bar_size: if is_mobile_platform { 4.0 } else { 14.0 },
-            element: ele.clone(),
+            element: ele.as_weak(),
             base,
             bar_background_color: parse_hex_color(if is_mobile_platform { "0000" } else { "1E1F22" } ).unwrap(),
             indicator_color: parse_hex_color(if is_mobile_platform { "66666644" } else { "444446" }).unwrap(),
@@ -441,9 +464,9 @@ impl ElementBackend for Scroll {
             momentum_animation_instance: None,
             last_layout_size: (f32::NAN, f32::NAN),
         }.to_ref();
-        inst.element.style.set_measure_func(Some(measure_scroll));
+        ele.style.set_measure_func(Some(measure_scroll));
         let weak_ptr = inst.as_weak();
-        inst.element.style.set_context(Some(Context::new(weak_ptr)));
+        ele.style.set_context(Some(Context::new(weak_ptr)));
         ele.set_as_layout_root(Some(Box::new(inst.as_weak())));
         inst
     }
@@ -453,7 +476,9 @@ impl ElementBackend for Scroll {
     }
 
     fn execute_default_behavior(&mut self, event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) -> bool {
-        let is_target_self = ctx.target.upgrade().ok().as_ref() == Some(&self.element);
+        let is_target_self = ctx.target == self.element;
+        let element = self.element.clone();
+        let mut element = ok_or_return!(element.upgrade_mut(), false);
         if let Some(e) = event.downcast_mut::<MouseDownEvent>() {
             let d = e.0;
             if !is_target_self {
@@ -500,8 +525,8 @@ impl ElementBackend for Scroll {
             println!("touch start: pos {:?}", (frame_x, frame_y));
             self.momentum_info = Some(MomentumInfo {
                 start_time: Instant::now(),
-                start_left: self.element.get_scroll_left(),
-                start_top: self.element.get_scroll_top(),
+                start_left: element.get_scroll_left(),
+                start_top: element.get_scroll_top(),
             });
             self.momentum_animation_instance = None;
             return true;
@@ -515,8 +540,8 @@ impl ElementBackend for Scroll {
             };
             self.update_scroll_x(-frame_x, false);
             self.update_scroll_y(-frame_y, false);
-            let left = self.element.get_scroll_left();
-            let top = self.element.get_scroll_top();
+            let left = element.get_scroll_left();
+            let top = element.get_scroll_top();
             // println!("touch updated: {:?}", (frame_x, frame_y));
             if let Some(momentum_info) = &mut self.momentum_info {
                 if momentum_info.start_time.elapsed().as_millis() as f32 > MOMENTUM_DURATION {
@@ -530,16 +555,16 @@ impl ElementBackend for Scroll {
             println!("touch end: {:?}", e.0);
             if let Some(momentum_info) = &self.momentum_info {
                 let duration = momentum_info.start_time.elapsed().as_nanos() as f32 / 1000_000.0;
-                let horizontal_distance = self.element.get_scroll_left() - momentum_info.start_left;
-                let vertical_distance = self.element.get_scroll_top() - momentum_info.start_top;
+                let horizontal_distance = element.get_scroll_left() - momentum_info.start_left;
+                let vertical_distance = element.get_scroll_top() - momentum_info.start_top;
                 let max_distance = f32::max(horizontal_distance.abs(), vertical_distance.abs());
                 // println!("touch end: info{:?}", (duration, vertical_distance));
                 if duration < MOMENTUM_DURATION && max_distance > MOMENTUM_DISTANCE {
                     let horizontal_speed = calculate_speed(horizontal_distance, duration);
                     let vertical_speed = calculate_speed(vertical_distance, duration);
                     // println!("speed: {} {}", horizontal_speed, vertical_speed);
-                    let old_left = self.element.get_scroll_left();
-                    let old_top = self.element.get_scroll_top();
+                    let old_left = element.get_scroll_left();
+                    let old_top = element.get_scroll_top();
                     let left_dist = horizontal_speed / 0.003;
                     let top_dist = vertical_speed / 0.003;
 
@@ -548,20 +573,22 @@ impl ElementBackend for Scroll {
                         .key_frame(0.0, vec![StyleProp::RowGap(StylePropVal::Custom(0.0)), StyleProp::ColumnGap(StylePropVal::Custom(0.0))])
                         .key_frame(1.0, vec![StyleProp::RowGap(StylePropVal::Custom(1.0)), StyleProp::ColumnGap(StylePropVal::Custom(1.0))])
                         .build();
-                    let frame = some_or_return!(self.element.get_frame(), false);
+                    let frame = some_or_return!(element.get_frame(), false);
                     let frame_controller = WindowAnimationController::new(frame);
                     let mut animation_instance = AnimationInstance::new(animation, 1000.0 * 1000000.0, 1.0, Box::new(frame_controller));
                     let mut ele = self.element.clone();
                     let timing_func = Bezier::from_cubic_coordinates(0.0, 0.0, 0.17, 0.89, 0.45, 1.0, 1.0, 1.0);
                     let mut me = self.clone();
+                    let element = self.element.clone();
                     animation_instance.run(Box::new(move |styles| {
                         let mut left_stopped = left_dist == 0.0;
                         let mut top_stooped = top_dist == 0.0;
+                        let mut ele = ok_or_return!(element.upgrade_mut());
                         for style in styles {
                             match style {
                                 StyleProp::RowGap(value) => {
                                     let new_left = old_left + left_dist * timing_func.evaluate(TValue::Parametric(value.resolve(&0.0) as f64)).y as f32;
-                                    if new_left < 0.0 || new_left > me.element.get_max_scroll_left() {
+                                    if new_left < 0.0 || new_left > ele.get_max_scroll_left() {
                                         left_stopped = true;
                                     } else {
                                         ele.set_scroll_left(new_left);
@@ -569,7 +596,7 @@ impl ElementBackend for Scroll {
                                 },
                                 StyleProp::ColumnGap(value) => {
                                     let new_top = old_top + top_dist * timing_func.evaluate(TValue::Parametric(value.resolve(&0.0) as f64)).y as f32;
-                                    if new_top < 0.0 || new_top > me.element.get_max_scroll_top() {
+                                    if new_top < 0.0 || new_top > ele.get_max_scroll_top() {
                                         top_stooped = true;
                                     } else {
                                         ele.set_scroll_top(new_top);
@@ -604,9 +631,10 @@ impl ElementBackend for Scroll {
 
     fn render(&mut self) -> RenderFn {
         let mut me = self.clone();
+        let mut element = ok_or_return!(me.element.upgrade_mut(), RenderFn::empty());
         //TODO use ensure_layout_update?
         if me.content_layout_dirty {
-            let bounds = me.element.get_bounds();
+            let bounds = element.get_bounds();
             me.do_layout_content();
         }
         let mut paint = Paint::default();

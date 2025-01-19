@@ -18,7 +18,7 @@ use crate::base::{CaretDetail, ElementEvent, EventContext, MouseDetail, MouseEve
 use crate::element::{ElementBackend, Element, ElementWeak};
 use crate::element::text::{AtomOffset, Text as Label};
 use crate::number::DeNan;
-use crate::{js_call, match_event, match_event_type, timer};
+use crate::{js_call, match_event, match_event_type, ok_or_return, timer};
 use crate::app::AppEvent;
 use crate::element::edit_history::{EditHistory, EditOpType};
 use crate::element::paragraph::{Paragraph, ParagraphUnit, TextCoord, TextUnit};
@@ -51,7 +51,7 @@ pub struct Entry {
     focusing: bool,
     align: TextAlign,
     multiple_line: bool,
-    element: Element,
+    element: ElementWeak,
     vertical_caret_moving_coord_x: f32,
     edit_history: EditHistory,
     rows: u32,
@@ -249,11 +249,11 @@ impl Entry {
     }
 
     fn emit_caret_change(&mut self) {
-        let mut ele = self.element.clone();
-        let origin_bounds = self.element.get_origin_bounds();
-        let (border_top, _, _, border_left) = self.element.get_padding();
-        let scroll_left = self.element.get_scroll_left();
-        let scroll_top = self.element.get_scroll_top();
+        let mut element = ok_or_return!(self.element.upgrade_mut());
+        let origin_bounds = element.get_origin_bounds();
+        let (border_top, _, _, border_left) = element.get_padding();
+        let scroll_left = element.get_scroll_left();
+        let scroll_top = element.get_scroll_top();
 
         let caret = self.caret;
         let bounds = match self.paragraph.get_char_rect(caret) {
@@ -264,7 +264,8 @@ impl Entry {
         let origin_bounds = bounds
             .translate(origin_bounds.x + border_left, origin_bounds.y + border_top);
 
-        ele.emit(CaretChangeEvent {
+        let mut element = ok_or_return!(self.element.upgrade_mut());
+        element.emit(CaretChangeEvent {
             row: caret.0,
             col: caret.1,
             origin_bounds,
@@ -272,14 +273,14 @@ impl Entry {
         });
     }
 
-    fn caret_tick(caret_visible: Rc<Cell<bool>>, mut context: Element) {
+    fn caret_tick(caret_visible: Rc<Cell<bool>>, mut context: ElementWeak) {
         let visible = caret_visible.get();
         caret_visible.set(!visible);
         context.mark_dirty(false);
     }
 
     fn to_label_position(&self, position: (f32, f32)) -> (f32, f32) {
-        let ele = self.element.clone();
+        let ele = ok_or_return!(self.element.upgrade_mut(), (0.0, 0.0));
         let padding_left = ele.style.get_layout_padding_left().de_nan(0.0);
         let padding_top = ele.style.get_layout_padding_top().de_nan(0.0);
         (position.0 - padding_left, position.1 - padding_top)
@@ -289,8 +290,9 @@ impl Entry {
         self.focusing = false;
         self.caret_timer_handle = None;
         self.caret_visible.set(false);
-        self.element.mark_dirty(false);
-        if let Some(frame) = self.element.get_frame() {
+        let mut element = ok_or_return!(self.element.upgrade_mut());
+        element.mark_dirty(false);
+        if let Some(frame) = element.get_frame() {
             if let Ok(f) = frame.upgrade_mut() {
                 let elp = create_event_loop_proxy();
                 elp.send_event(AppEvent::HideSoftInput(f.get_id())).unwrap();
@@ -395,7 +397,6 @@ impl Entry {
         self.focusing = true;
         // self.emit_caret_change();
         self.caret_visible.set(true);
-        self.element.mark_dirty(false);
         self.caret_timer_handle = Some({
             let caret_visible = self.caret_visible.clone();
             let context = self.element.clone();
@@ -404,7 +405,9 @@ impl Entry {
                 Self::caret_tick(caret_visible.clone(), context.clone());
             }, 500)
         });
-        if let Some(frame) = self.element.get_frame() {
+        let mut element = ok_or_return!(self.element.upgrade_mut());
+        element.mark_dirty(false);
+        if let Some(frame) = element.get_frame() {
             if let Ok(f) = frame.upgrade_mut() {
                 let elp = create_event_loop_proxy();
                 elp.send_event(AppEvent::ShowSoftInput(f.get_id())).unwrap();
@@ -504,8 +507,8 @@ impl Entry {
 
 impl ElementBackend for Entry {
 
-    fn create(mut ele: Element) -> Self {
-        let mut base = Scroll::create(ele.clone());
+    fn create(mut ele: &mut Element) -> Self {
+        let mut base = Scroll::create(ele);
         let mut paragraph_element = Element::create(Paragraph::create);
         let mut paragraph = paragraph_element.get_backend_as::<Paragraph>().clone();
         paragraph.set_text_wrap(false);
@@ -536,7 +539,7 @@ impl ElementBackend for Entry {
             focusing: false,
             align: TextAlign::Left,
             multiple_line: false,
-            element: ele,
+            element: ele.as_weak(),
             vertical_caret_moving_coord_x: 0.0,
             edit_history: EditHistory::new(),
             rows: 5,
@@ -554,11 +557,15 @@ impl ElementBackend for Entry {
     }
 
     fn render(&mut self) -> RenderFn {
-        let ele = &self.element;
-        let children = ele.get_children();
+        let mut element = ok_or_return!(self.element.upgrade_mut(), RenderFn::empty());
+        let children = element.get_children();
         //let paint = self.label.get_paint().clone();
         let mut paint = Paint::default();
-        paint.set_color(self.element.style.computed_style.color);
+        paint.set_color(element.style.computed_style.color);
+        let scroll_left = element.get_scroll_left();
+        let scroll_top = element.get_scroll_top();
+        let padding = element.get_padding();
+
 
         let mut me = self.clone();
         let caret_rect = match me.paragraph.get_char_rect(self.caret) {
@@ -568,9 +575,8 @@ impl ElementBackend for Entry {
         let mut base_render_fn = self.base.render();
         let focusing = self.focusing;
         let caret_visible = self.caret_visible.get();
-        let padding = self.element.get_padding();
-        let x = caret_rect.x - self.element.get_scroll_left() + padding.1;
-        let y = caret_rect.y - self.element.get_scroll_top() + padding.0;
+        let x = caret_rect.x - scroll_left + padding.1;
+        let y = caret_rect.y - scroll_top + padding.0;
 
         RenderFn::new(move |canvas| {
             canvas.save();

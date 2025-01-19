@@ -14,6 +14,13 @@ macro_rules! ok_or_return {
         } else {
             return;
         }
+    };
+    ($expr:expr, $default: expr) => {
+        if let Ok(v) = $expr {
+            v
+        } else {
+            return $default;
+        }
     }
 }
 

@@ -12,14 +12,13 @@ use crate::style::StylePropKey;
 
 pub struct Button {
     base: Container,
-    element: Element,
 }
 
 impl Button {}
 
 impl ElementBackend for Button {
-    fn create(mut element: Element) -> Self {
-        let base = Container::create(element.clone());
+    fn create(element: &mut Element) -> Self {
+        let base = Container::create(element);
 
         element.style.set_margin(Edge::Top, StyleUnit::Point(OrderedFloat(4.0)));
         element.style.set_margin(Edge::Right, StyleUnit::Point(OrderedFloat(4.0)));
@@ -37,7 +36,6 @@ impl ElementBackend for Button {
         element.style.border_color = [color, color, color, color];
         Self {
             base,
-            element: element.clone(),
         }
     }
 

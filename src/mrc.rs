@@ -52,6 +52,12 @@ pub struct MrcWeak<T> {
     ptr: *mut MrcBox<T>,
 }
 
+impl<T> PartialEq for MrcWeak<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.ptr == other.ptr
+    }
+}
+
 //TODO should impl it?
 impl<T> RefUnwindSafe for Mrc<T> {}
 

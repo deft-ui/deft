@@ -653,7 +653,7 @@ impl Paragraph {
 }
 
 impl ElementBackend for Paragraph {
-    fn create(mut element: Element) -> Self
+    fn create(mut element: &mut Element) -> Self
     where
         Self: Sized,
     {

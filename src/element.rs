@@ -35,7 +35,7 @@ use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::resource_table::ResourceTable;
 use crate::style::{parse_style_obj, ColorHelper, StyleNode, StyleProp, StylePropKey, StyleTransform};
-use crate::{base, bind_js_event_listener, compute_style, js_call, js_call_rust, js_deserialize, js_get_prop, js_serialize, js_weak_value, some_or_return};
+use crate::{base, bind_js_event_listener, compute_style, js_auto_upgrade, js_call, js_call_rust, js_deserialize, js_get_prop, js_serialize, js_value, js_weak_value, ok_or_return, some_or_return};
 
 pub mod container;
 pub mod entry;
@@ -82,7 +82,7 @@ pub trait ViewEvent {
 
 #[js_methods]
 impl Element {
-    pub fn create<T: ElementBackend + 'static, F: FnOnce(Element) -> T>(backend: F) -> Self {
+    pub fn create<T: ElementBackend + 'static, F: FnOnce(&mut Element) -> T>(backend: F) -> Self {
         let empty_backend = EmptyElementBackend{};
         let inner =  Mrc::new(ElementData::new(empty_backend));
         let mut ele = Self {
@@ -115,9 +115,8 @@ impl Element {
                 el.apply_style();
             }
         })));
-        let ele_cp = ele.clone();
         // let bk = backend(ele_cp);
-        ele.backend = Box::new(backend(ele_cp));
+        ele.backend = Box::new(backend(&mut ele));
         //ele.backend.bind(ele_cp);
         ele
     }
@@ -887,6 +886,10 @@ impl ElementWeak {
             el.emit(event);
         }
     }
+    pub fn mark_dirty(&mut self, layout_dirty: bool) {
+        let mut ele = ok_or_return!(self.upgrade_mut());
+        ele.mark_dirty(layout_dirty);
+    }
 }
 
 #[mrc_object]
@@ -929,7 +932,9 @@ pub struct PaintInfo {
     pub scroll_top: f32,
 }
 
-js_weak_value!(Element, ElementWeak);
+// js_weak_value!(Element, ElementWeak);
+js_value!(Element);
+js_auto_upgrade!(ElementWeak, Element);
 
 
 impl ElementData {
@@ -974,7 +979,7 @@ pub struct EmptyElementBackend {
 }
 
 impl ElementBackend for EmptyElementBackend {
-    fn create(_ele: Element) -> Self {
+    fn create(_ele: &mut Element) -> Self {
         Self {}
     }
 
@@ -986,7 +991,7 @@ impl ElementBackend for EmptyElementBackend {
 
 pub trait ElementBackend {
 
-    fn create(element: Element) -> Self where Self: Sized;
+    fn create(element: &mut Element) -> Self where Self: Sized;
 
     fn get_name(&self) -> &str;
 

@@ -48,6 +48,26 @@ macro_rules! js_weak_value {
     };
 }
 
+/// Auto upgrade when convert to js value
+#[macro_export]
+macro_rules! js_auto_upgrade {
+    ($weak_type: ty, $ref_type: ty) => {
+        impl lento::js::ToJsValue for $weak_type {
+            fn to_js_value(self) -> Result<lento::js::JsValue, lento::js::ValueError> {
+                if let Ok(e) = self.upgrade() {
+                    Ok(
+                        lento::js::JsValue::Resource(
+                            lento::js::ResourceValue { resource: std::rc::Rc::new(std::cell::RefCell::new(e)) }
+                        )
+                    )
+                } else {
+                    Err(lento::js::ValueError::Internal("failed to upgrade weak reference".to_string()))
+                }
+            }
+        }
+    };
+}
+
 #[macro_export]
 macro_rules! js_serialize {
     ($ty: ty) => {
