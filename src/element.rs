@@ -141,6 +141,15 @@ impl Element {
         self.draggable
     }
 
+    pub fn is_focused(&self) -> bool {
+        if let Some(w) = &self.get_window() {
+            let w = ok_or_return!(w.upgrade_mut(), false);
+            w.is_focusing(self)
+        } else {
+            false
+        }
+    }
+
     #[js_func]
     pub fn create_by_type(view_type: i32, context: JsValue) -> Result<Element, Error> {
         let mut view = match view_type {

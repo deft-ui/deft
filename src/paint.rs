@@ -122,6 +122,7 @@ pub struct NormalNode {
 #[derive(Default)]
 pub struct LayerNode {
     layer_object_idx: usize,
+    // origin_bounds: Rect,
     normal_nodes: Vec<NormalNode>,
     layer_nodes: Vec<LayerNode>,
 }
@@ -156,18 +157,18 @@ impl RenderTree {
         self.get_element_object_by_pos_recurse(self.layout_tree.layer_node.as_ref()?, x, y)
     }
 
-    fn get_element_object_by_pos_recurse(&self, lo: &LayerNode, x: f32, y: f32) -> Option<(&ElementObjectData, f32, f32)> {
+    fn get_element_object_by_pos_recurse(&self, lo: &LayerNode, abs_x: f32, abs_y: f32) -> Option<(&ElementObjectData, f32, f32)> {
         let lod = &self.layout_tree.layer_objects[lo.layer_object_idx];
-        let im = lod.matrix.invert()?;
-        let Point {x, y} = im.map_xy(x, y);
+        let im = lod.total_matrix.invert()?;
+        let Point {x, y} = im.map_xy(abs_x, abs_y);
         if x < 0.0 || x > lod.width || y < 0.0 || y > lod.height {
             return None;
         }
         for sub_lo in lo.layer_nodes.iter().rev() {
-            let result = some_or_continue!(self.get_element_object_by_pos_recurse(sub_lo, x, y));
+            let result = some_or_continue!(self.get_element_object_by_pos_recurse(sub_lo, abs_x, abs_y));
             return Some(result);
         }
-        for eo in &lo.normal_nodes {
+        for eo in lo.normal_nodes.iter().rev() {
             let result = some_or_continue!(self.get_element_object_in_normal_nodes_by_pos_recurse(eo, x, y));
             return Some(result);
         }
@@ -240,8 +241,17 @@ impl RenderTree {
             layer_nodes.push(self.build_layer_tree(&lo));
         }
 
+        // let lo = &self.layout_tree.layer_objects[layer_object.layer_object_idx];
+        // let origin_bounds = Rect::new(
+        //     lo.origin_absolute_pos.0,
+        //     lo.origin_absolute_pos.1,
+        //     lo.width,
+        //     lo.height
+        // );
+
         LayerNode {
             layer_object_idx: layer_object.layer_object_idx,
+            // origin_bounds,
             normal_nodes,
             layer_nodes,
         }
@@ -510,6 +520,7 @@ impl RenderTree {
                     height: eo.height,
                     element_id: eo.element_id,
                     need_paint,
+                    focused: eo.element.is_focused(),
                 };
                 Some(PaintObject::Normal(epo))
             }

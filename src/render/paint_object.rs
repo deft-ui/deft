@@ -1,4 +1,5 @@
 use skia_bindings::SkPaint_Style;
+use skia_bindings::SkPaint_Style::Fill;
 use skia_safe::{Canvas, Color, Image, Matrix, Paint, Path, Rect};
 use crate::paint::{InvalidArea, InvalidRects, RenderLayerKey, RenderObject};
 use crate::render::RenderFn;
@@ -21,6 +22,7 @@ pub struct ElementPaintObject {
     pub height: f32,
     pub element_id: u32,
     pub need_paint: bool,
+    pub focused: bool,
 }
 
 impl ElementPaintObject {
@@ -55,6 +57,16 @@ impl ElementPaintObject {
             }
         }
     }
+
+    pub fn draw_hit_rect(&mut self, canvas: &Canvas) {
+        let rect = Rect::from_xywh(1.0, 1.0, self.width - 2.0, self.height - 2.0);
+        let mut paint = Paint::default();
+        paint.set_color(Color::RED);
+        paint.set_style(SkPaint_Style::Stroke);
+        paint.set_stroke_width(2.0);
+        canvas.draw_rect(&rect, &paint);
+    }
+
 }
 
 pub struct LayerPaintObject {
