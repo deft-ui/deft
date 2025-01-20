@@ -13,7 +13,7 @@ use crate::element::{text, Element, ElementBackend, ElementWeak};
 use crate::js::JsError;
 use crate::number::DeNan;
 use crate::string::StringUtils;
-use crate::style::{parse_color, parse_color_str, parse_optional_color_str, StylePropKey};
+use crate::style::{parse_color_str, parse_optional_color_str, StylePropKey};
 use crate::{js_deserialize, js_serialize, match_event_type};
 use lento_macros::{element_backend, js_methods, mrc_object};
 use rodio::cpal::available_hosts;

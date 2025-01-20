@@ -1,4 +1,3 @@
-use crate::style::PropValue;
 
 #[macro_export]
 macro_rules! backend_as_api {

@@ -22,148 +22,6 @@ use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::paint::MatrixCalculator;
 
-macro_rules! define_props {
-    ($($str: expr => $key: ident, )*; $($union_str: expr => $union_key: ident, )*) => {
-        #[derive(PartialEq, Eq, Hash, Clone, Debug)]
-        pub enum StylePropertyKey {
-            $($key,)*
-        }
-
-        #[derive(PartialEq, Eq, Hash, Clone, Debug)]
-        pub enum CompoundStylePropertyKey {
-            $($union_key,)*
-        }
-
-        #[derive(PartialEq, Eq, Hash, Clone, Debug)]
-        pub enum AllStylePropertyKey {
-            StylePropertyKey(StylePropertyKey),
-            CompoundStylePropertyKey(CompoundStylePropertyKey),
-        }
-
-        impl StylePropertyKey {
-            pub fn from_str(key: &str) -> Option<Self> {
-                let key = key.to_ascii_lowercase();
-                match key.as_str() {
-                    $( $str => Some(StylePropertyKey::$key), )*
-                    _ => {
-                        // println!("invalid key:{}", key);
-                        None
-                    }
-                }
-            }
-
-            pub fn name(&self) -> &'static str {
-                match self {
-                    $( StylePropertyKey::$key => $str , )*
-                    _ => {
-                        // println!("invalid key:{}", key);
-                        unreachable!()
-                    }
-                }
-            }
-        }
-
-        impl CompoundStylePropertyKey {
-            pub fn from_str(key: &str) -> Option<Self> {
-                let key = key.to_ascii_lowercase();
-                match key.as_str() {
-                    $( $union_str => Some(Self::$union_key), )*
-                    _ => {
-                        // println!("invalid key:{}", key);
-                        None
-                    }
-                }
-            }
-        }
-
-        impl AllStylePropertyKey {
-            pub fn from_str(key: &str) -> Option<Self> {
-                let key = key.to_ascii_lowercase();
-                if let Some(v) = StylePropertyKey::from_str(&key) {
-                    Some(AllStylePropertyKey::StylePropertyKey(v))
-                } else if let Some(v) = CompoundStylePropertyKey::from_str(&key) {
-                    Some(AllStylePropertyKey::CompoundStylePropertyKey(v))
-                } else {
-                    println!("invalid key:{}", key);
-                    None
-                }
-            }
-        }
-
-        pub fn get_style_defaults() -> HashMap<StylePropertyKey, StylePropertyValue> {
-            let mut m = HashMap::new();
-            $(
-                m.insert(StylePropertyKey::$key, StylePropertyValue::Invalid);
-            )*
-            m
-        }
-    };
-}
-
-define_props!(
-    "color" => Color,
-
-    "backgroundcolor" => BackgroundColor,
-
-    "bordertop" => BorderTop,
-    "borderright" => BorderRight,
-    "borderbottom" => BorderBottom,
-    "borderleft" => BorderLeft,
-
-    "display" => Display,
-
-    "width" => Width,
-    "height" => Height,
-    "maxwidth" => MaxWidth,
-    "maxheight" => MaxHeight,
-    "minwidth" => MinWidth,
-    "minheight" => MinHeight,
-
-    "margintop" => MarginTop,
-    "marginright" => MarginRight,
-    "marginbottom" => MarginBottom,
-    "marginleft" => MarginLeft,
-
-    "paddingtop" => PaddingTop,
-    "paddingright" => PaddingRight,
-    "paddingbottom" => PaddingBottom,
-    "paddingleft" => PaddingLeft,
-
-    "flex" => Flex,
-    "flexbasis" => FlexBasis,
-    "flexgrow" => FlexGrow,
-    "flexshrink" => FlexShrink,
-    "alignself" => AlignSelf,
-    "direction" => Direction,
-    "position" => Position,
-    "overflow" => Overflow,
-
-    "bordertopleftradius" => BorderTopLeftRadius,
-    "bordertoprightradius" => BorderTopRightRadius,
-    "borderbottomrightradius" => BorderBottomRightRadius,
-    "borderbottomleftradius" => BorderBottomLeftRadius,
-
-    "justifycontent" => JustifyContent,
-    "flexdirection" => FlexDirection,
-    "aligncontent" => AlignContent,
-    "alignitems" => AlignItems,
-    "flexwrap" => FlexWrap,
-    "columngap" => ColumnGap,
-    "rowgap" => RowGap,
-    "left" => Left,
-    "right" => Right,
-    "top" => Top,
-    "bottom" => Bottom,
-    "transform" => Transform,
-    ;
-    "background" => Background,
-    "gap" => Gap,
-    "border" => Border,
-    "margin" => Margin,
-    "padding" => Padding,
-    "borderradius" => BorderRadius,
-);
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum StylePropertyValue {
     Float(f32),
@@ -370,6 +228,7 @@ pub struct ComputedStyleBorder(f32, Color);
 #[derive(Clone, Debug, PartialEq)]
 pub enum StylePropVal<T> {
     Custom(T),
+    Inherit,
     Unset,
 }
 
@@ -516,56 +375,6 @@ define_style_props!(
     AnimationIterationCount => f32,
 );
 
-pub fn expand_mixed_style(mixed: HashMap<AllStylePropertyKey, StylePropertyValue>) -> HashMap<StylePropertyKey, StylePropertyValue> {
-    let mut result = HashMap::new();
-    for (k, v) in mixed {
-        match k {
-            AllStylePropertyKey::StylePropertyKey(k) => {
-                result.insert(k, v);
-            }
-            AllStylePropertyKey::CompoundStylePropertyKey(k) => {
-                match k {
-                    CompoundStylePropertyKey::Background => {
-                        result.insert(StylePropertyKey::BackgroundColor, v);
-                    }
-                    CompoundStylePropertyKey::Gap => {
-                        result.insert(StylePropertyKey::RowGap, v.clone());
-                        result.insert(StylePropertyKey::ColumnGap, v);
-                    }
-                    CompoundStylePropertyKey::Border => {
-                        result.insert(StylePropertyKey::BorderTop, v.clone());
-                        result.insert(StylePropertyKey::BorderRight, v.clone());
-                        result.insert(StylePropertyKey::BorderBottom, v.clone());
-                        result.insert(StylePropertyKey::BorderLeft, v);
-                    }
-                    CompoundStylePropertyKey::Margin => {
-                        let (t, r, b, l) = parse_box_prop(v);
-                        result.insert(StylePropertyKey::MarginTop, t);
-                        result.insert(StylePropertyKey::MarginRight, r);
-                        result.insert(StylePropertyKey::MarginBottom, b);
-                        result.insert(StylePropertyKey::MarginLeft, l);
-                    }
-                    CompoundStylePropertyKey::Padding => {
-                        let (t, r, b, l) = parse_box_prop(v);
-                        result.insert(StylePropertyKey::PaddingTop, t);
-                        result.insert(StylePropertyKey::PaddingRight, r);
-                        result.insert(StylePropertyKey::PaddingBottom, b);
-                        result.insert(StylePropertyKey::PaddingLeft, l);
-                    }
-                    CompoundStylePropertyKey::BorderRadius => {
-                        let (t, r, b, l) = parse_box_prop(v);
-                        result.insert(StylePropertyKey::BorderTopLeftRadius, t);
-                        result.insert(StylePropertyKey::BorderTopRightRadius, r);
-                        result.insert(StylePropertyKey::BorderBottomRightRadius, b);
-                        result.insert(StylePropertyKey::BorderBottomLeftRadius, l);
-                    }
-                }
-            }
-        }
-    }
-    result
-}
-
 pub fn parse_box_prop(value: StylePropertyValue) -> (StylePropertyValue, StylePropertyValue, StylePropertyValue, StylePropertyValue) {
     match value {
         StylePropertyValue::String(str) => {
@@ -624,43 +433,11 @@ impl StylePropertyValue {
         Self::String(value.to_string())
     }
 
-    pub fn to_color(&self, default: ColorPropValue) -> ColorPropValue {
-        match self {
-            StylePropertyValue::String(c) => {
-                parse_color(c)
-            }
-            _ => {
-                default
-            }
-        }
-    }
     pub fn to_str(&self, default: &str) -> String {
         match self {
             StylePropertyValue::Float(f) => { f.to_string() }
             StylePropertyValue::String(s) => { s.to_string() }
             StylePropertyValue::Invalid => default.to_string()
-        }
-    }
-
-    pub fn to_len(&self, default: StyleUnit) -> StyleUnit {
-        match self {
-            StylePropertyValue::Float(f) => {
-                StyleUnit::Point(OrderedFloat(*f))
-            }
-            StylePropertyValue::String(s) => {
-                parse_length(s)
-            }
-            StylePropertyValue::Invalid => {
-                default
-            }
-        }
-    }
-
-    pub fn to_f32(&self, default: f32) -> f32 {
-        match self {
-            StylePropertyValue::Float(f) => {*f}
-            StylePropertyValue::String(s) => {parse_float(s)}
-            StylePropertyValue::Invalid => default,
         }
     }
 
@@ -1151,22 +928,6 @@ impl StyleNode {
         return None
     }
 
-    pub fn parse_border(value: &StylePropVal<StyleBorder>) -> ComputedStyleBorder {
-        let default_border = StyleBorder(StyleUnit::UndefinedValue, StyleColor::Color(Color::TRANSPARENT));
-        let value = value.resolve(&default_border);
-        let color = match value.1 {
-            //TODO fix inherited color?
-            StyleColor::Inherit => {Color::TRANSPARENT}
-            StyleColor::Color(c) => {c}
-        };
-        //TODO fix percent?
-        let width = match value.0 {
-            StyleUnit::Point(f) => {f.0},
-            _ => 0.0,
-        };
-        ComputedStyleBorder(width, color)
-    }
-
     fn set_border(&mut self, value: &StylePropVal<StyleBorder>, edges: &Vec<usize>) {
         let default_border = StyleBorder(StyleUnit::UndefinedValue, StyleColor::Color(Color::TRANSPARENT));
         let value = value.resolve(&default_border);
@@ -1236,19 +997,6 @@ impl StyleNode {
         }
     }
 
-    fn calculate_shadow_layout_auto(&mut self) {
-        let width = self.inner.yoga_node.get_layout_width().de_nan(0.0);
-        let height = self.inner.yoga_node.get_layout_height().de_nan(0.0);
-        if let Some(sl) = &mut self.inner.shadow_node {
-            //TODO fix direction
-            sl.calculate_layout(width, height, Direction::LTR);
-        } else {
-            for c in &mut self.inner.children {
-                c.calculate_shadow_layout_auto();
-            }
-        }
-    }
-
     fn with_container_node_mut<R, F: FnOnce(&mut Node) -> R>(&mut self, callback: F) -> R {
         if let Some(sn) = &mut self.inner.shadow_node {
             callback(sn)
@@ -1264,19 +1012,6 @@ impl StyleNode {
             callback(&self.inner.yoga_node)
         }
     }
-}
-
-pub fn parse_style(style: JsValue) -> HashMap<AllStylePropertyKey, StylePropertyValue> {
-    let mut style_map = HashMap::new();// get_style_defaults();
-    if let Some(obj) = style.get_properties() {
-        //TODO use default style
-        obj.into_iter().for_each(|(k, v)| {
-            if let Some(key) = AllStylePropertyKey::from_str(&k) {
-                style_map.insert(key, StylePropertyValue::from_js_value(v));
-            }
-        });
-    }
-    style_map
 }
 
 pub fn parse_style_obj(style: JsValue) -> Vec<StyleProp> {
@@ -1344,14 +1079,6 @@ pub fn parse_style_obj(style: JsValue) -> Vec<StyleProp> {
     result
 }
 
-pub fn parse_display(str: &str) -> Display {
-    if str.to_lowercase() == "none" {
-        Display::None
-    } else {
-        Display::Flex
-    }
-}
-
 pub fn parse_display2(str: &str) -> Option<Display> {
     match str.to_lowercase().as_str() {
         "none" => Some(Display::None),
@@ -1374,17 +1101,6 @@ pub fn parse_justify(str: &str) -> Justify {
     }
 }
 
-pub fn parse_flex_direction(value: &str) -> FlexDirection {
-    let key = value.to_lowercase();
-    match key.as_str() {
-        "column" => FlexDirection::Column,
-        "column-reverse" => FlexDirection::ColumnReverse,
-        "row" => FlexDirection::Row,
-        "row-reverse" => FlexDirection::RowReverse,
-        _ => FlexDirection::Row,
-    }
-}
-
 pub fn parse_flex_direction2(value: &str) -> Option<FlexDirection> {
     let key = value.to_lowercase();
     let r = match key.as_str() {
@@ -1399,24 +1115,6 @@ pub fn parse_flex_direction2(value: &str) -> Option<FlexDirection> {
 
 pub fn parse_float(value: &str) -> f32 {
     f32::from_str(value).unwrap_or(0.0)
-}
-
-pub fn parse_length(value: &str) -> StyleUnit {
-    //TODO no unwrap
-    return if value.ends_with("%") {
-        let width = f32::from_str(value.strip_suffix("%").unwrap()).unwrap();
-        StyleUnit::Percent(OrderedFloat(width))
-    } else {
-        match f32::from_str(value) {
-            Ok(v) => {
-                StyleUnit::Point(OrderedFloat(v))
-            }
-            Err(err) => {
-                eprintln!("Invalid value:{}", err);
-                StyleUnit::UndefinedValue
-            }
-        }
-    }
 }
 
 pub fn parse_style_unit(value: &str) -> Option<StyleUnit> {
@@ -1435,12 +1133,6 @@ pub fn parse_style_unit(value: &str) -> Option<StyleUnit> {
             }
         }
     }
-}
-
-pub fn parse_color(value: &str) -> ColorPropValue {
-    parse_color_str(value)
-        .map(|c| ColorPropValue::Color(c))
-        .unwrap_or(ColorPropValue::Inherit)
 }
 
 pub fn parse_color_str(value: &str) -> Option<Color> {

@@ -11,7 +11,7 @@ use yoga::{Direction, StyleUnit};
 use crate::app::AppEvent;
 use crate::border::build_border_paths;
 use crate::canvas_util::CanvasHelper;
-use crate::style::{Style, StyleBorder, StyleColor, StyleNode, StyleProp, StylePropertyKey, StylePropertyValue};
+use crate::style::{Style, StyleBorder, StyleColor, StyleNode, StyleProp, StylePropertyValue};
 
 
 //TODO remove
