@@ -356,7 +356,7 @@ impl Element {
         &self.backend
     }
 
-    pub fn set_parent(&mut self, parent: Option<Element>) {
+    fn set_parent_internal(&mut self, parent: Option<Element>) {
         self.parent = match parent {
             None => {
                 self.on_window_changed(&None);
@@ -371,7 +371,6 @@ impl Element {
         let mut el = self.clone();
         self.apply_style();
 
-        self.style.update_computed_style(None);
     }
 
     pub fn set_window(&mut self, window: Option<FrameWeak>) {
@@ -527,14 +526,14 @@ impl Element {
             pos
         };
         self.mark_dirty(true);
-        child.set_parent(Some(self.clone()));
+        child.set_parent_internal(Some(self.clone()));
         child.set_dirty_state_recurse(true);
         self.children.insert(pos as usize, child);
     }
 
     pub fn remove_child_view(&mut self, position: u32) {
         let mut c = self.children.remove(position as usize);
-        c.set_parent(None);
+        c.set_parent_internal(None);
         let mut ele = self.clone();
         let layout = &mut ele.style;
         layout.remove_child(&mut c.style);
@@ -660,7 +659,7 @@ impl Element {
         // println!("changed style props:{:?}", changed_style_props);
 
         changed_style_props.iter().for_each(| e | {
-            let (repaint, need_layout) = self.style.set_style(e);
+            let (repaint, need_layout) = self.style.set_style(e.clone());
             if need_layout || repaint {
                 self.mark_dirty(need_layout);
             }

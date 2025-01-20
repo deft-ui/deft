@@ -1,6 +1,6 @@
 use crate as lento;
 use crate::mrc::Mrc;
-use crate::style::{StyleProp, StylePropVal, StyleTransform, StyleTransformOp};
+use crate::style::{ResolvedStyleProp, ScaleParams, StyleProp, StylePropKey, StylePropVal, StyleTransform, StyleTransformOp, TranslateLength, TranslateParams};
 use crate::timer::{set_timeout, set_timeout_nanos, TimerHandle};
 use crate::{js_value};
 use anyhow::{anyhow, Error};
@@ -13,6 +13,7 @@ use std::time::SystemTime;
 use tokio::time::Instant;
 use yoga::StyleUnit;
 use crate::base::Callback;
+use crate::element::Element;
 use crate::frame::FrameWeak;
 
 macro_rules! interpolate_values {
@@ -34,6 +35,7 @@ macro_rules! interpolate_values {
     };
 }
 
+#[macro_export]
 macro_rules! match_both {
     ($def: path, $expr1: expr, $expr2: expr) => {
         if let $def(e1) = $expr1 {
@@ -85,16 +87,51 @@ fn interpolate_transform(prev: &StyleTransform, next: &StyleTransform, position:
     for i in 0..p_list.len() {
         let p = unsafe { p_list.get_unchecked(i) };
         let n = unsafe { n_list.get_unchecked(i) };
-        if let Some((p_deg, n_deg)) = match_both!(StyleTransformOp::Rotate, p, n) {
-            let deg = interpolate_f32(p_deg, n_deg, position)?;
-            op_list.push(StyleTransformOp::Rotate(deg));
+        if let Some(v) = interpolate_transform_op(p, n, position) {
+            op_list.push(v);
+        } else {
+            println!("Unsupported animation value");
         }
-        println!("Unsupported animation value");
         //TODO support other transform
     }
     Some(StyleTransform {
         op_list
     })
+}
+
+fn interpolate_translate_len(p: &TranslateLength, n: &TranslateLength, position: f32) -> Option<TranslateLength> {
+    if let Some((px, nx)) = match_both!(TranslateLength::Point, p, n) {
+        let x = interpolate_f32(&px, &nx, position)?;
+        Some(TranslateLength::Point(x))
+    } else if let Some((px, nx)) = match_both!(TranslateLength::Percent, p, n) {
+        let x = interpolate_f32(&px, &nx, position)?;
+        Some(TranslateLength::Percent(x))
+    } else {
+        None
+    }
+}
+
+fn interpolate_transform_op(prev: &StyleTransformOp, next: &StyleTransformOp, position: f32) -> Option<StyleTransformOp> {
+    if let Some((p_deg, n_deg)) = match_both!(StyleTransformOp::Rotate, prev, next) {
+        let deg = interpolate_f32(p_deg, n_deg, position)?;
+        Some(StyleTransformOp::Rotate(deg))
+    } else if let Some((pv, nv)) = match_both!(StyleTransformOp::Translate, prev, next) {
+        let (mut px, mut nx) = (pv.0.clone(), nv.0.clone());
+        px.adapt_zero(&mut nx);
+        let (mut py, mut ny) = (pv.1.clone(), nv.1.clone());
+        py.adapt_zero(&mut ny);
+        let x = interpolate_translate_len(&px, &nx, position)?;
+        let y = interpolate_translate_len(&py, &ny, position)?;
+        Some(StyleTransformOp::Translate(TranslateParams(x, y)))
+    } else if let Some((pv, nv)) = match_both!(StyleTransformOp::Scale, prev, next) {
+        let (px, nx) = (pv.0, nv.0);
+        let (py, ny) = (pv.1, nv.1);
+        let x = interpolate_f32(&px, &nx, position)?;
+        let y = interpolate_f32(&py, &ny, position)?;
+        Some(StyleTransformOp::Scale(ScaleParams(x, y)))
+    } else {
+        None
+    }
 }
 
 fn interpolate(pre_position: f32, pre_value: StyleProp, next_position: f32, next_value: StyleProp, current_position: f32) -> Option<StyleProp> {
@@ -140,7 +177,7 @@ pub struct AnimationDef {
 
 #[derive(Clone)]
 pub struct Animation {
-    styles: HashMap<String, BTreeMap<OrderedFloat<f32>, StyleProp>>,
+    styles: HashMap<StylePropKey, BTreeMap<OrderedFloat<f32>, StyleProp>>,
 }
 
 pub trait FrameController {
@@ -175,7 +212,7 @@ impl AnimationDef {
         let mut styles = HashMap::new();
         for (p, key_styles) in &self.key_frames {
             for s in key_styles {
-                let map = styles.entry(s.name().to_string()).or_insert_with(|| BTreeMap::new());
+                let map = styles.entry(s.key()).or_insert_with(|| BTreeMap::new());
                 map.insert(p.clone(), s.clone());
             }
         }
@@ -186,6 +223,27 @@ impl AnimationDef {
 }
 
 impl Animation {
+    pub fn preprocess(&self) -> Animation {
+        let mut styles = HashMap::new();
+        for (p, m) in self.styles.clone() {
+            let mut new_style = BTreeMap::new();
+            for (k, v) in m {
+                new_style.insert(k, Self::preprocess_style(v));
+            }
+            styles.insert(p, new_style);
+        }
+        Animation { styles }
+    }
+
+    fn preprocess_style(style: StyleProp) -> StyleProp {
+        if let StyleProp::Transform(tf) = &style {
+            if let StylePropVal::Custom(tf) = tf {
+                return StyleProp::Transform(StylePropVal::Custom(tf.preprocess()));
+            }
+        }
+        style
+    }
+
     pub fn get_frame(&self, position: f32) -> Vec<StyleProp> {
         //TODO support loop
         if position > 1.0 {

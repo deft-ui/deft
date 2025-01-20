@@ -109,6 +109,7 @@ pub struct Frame {
     background_color: Color,
     renderer_idle: bool,
     next_frame_callbacks: Vec<Callback>,
+    next_paint_callbacks: Vec<Callback>,
     pub render_tree: RenderTree,
     pub style_variables: ComputedValue<String>,
     frame_rate_controller: FrameRateController,
@@ -236,6 +237,7 @@ impl Frame {
             repaint_timer_handle: None,
             renderer_idle: true,
             next_frame_callbacks: Vec::new(),
+            next_paint_callbacks: Vec::new(),
             render_tree: RenderTree::new(0),
             style_variables: ComputedValue::new(),
             frame_rate_controller: FrameRateController::new(),
@@ -907,6 +909,13 @@ impl Frame {
         }
     }
 
+    pub fn request_next_paint_callback(&mut self, callback: Callback) {
+        self.next_paint_callbacks.push(callback);
+        if self.next_paint_callbacks.len() == 1 {
+            send_app_event(AppEvent::Update(self.get_id()));
+        }
+    }
+
     fn paint(&mut self) -> ResultWaiter<bool> {
         let size = self.window.inner_size();
         let (width, height) = (size.width, size.height);
@@ -915,6 +924,11 @@ impl Frame {
         if width <= 0 || height <= 0 {
             waiter.finish(false);
             return waiter;
+        }
+        let mut paint_callbacks = Vec::new();
+        paint_callbacks.append(&mut self.next_paint_callbacks);
+        for cb in paint_callbacks {
+            cb.call();
         }
         let start = SystemTime::now();
         let scale_factor = self.window.scale_factor() as f32;

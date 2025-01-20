@@ -239,14 +239,16 @@ impl RenderTree {
             );
             normal_nodes.push(nn);
         }
-        layer_objects.sort_by(|a, b| {
-            let la = &self.layout_tree.layer_objects[a.layer_object_idx];
-            let lb = &self.layout_tree.layer_objects[b.layer_object_idx];
-            if la.key.layer_type == RenderLayerType::Root && lb.key.layer_type == RenderLayerType::Children {
-                return Ordering::Greater;
-            }
-            return Ordering::Less;
-        });
+        if layer_objects.len() > 1 {
+            layer_objects.sort_by(|a, b| {
+                let la = &self.layout_tree.layer_objects[a.layer_object_idx];
+                let lb = &self.layout_tree.layer_objects[b.layer_object_idx];
+                if la.key.layer_type == RenderLayerType::Root && lb.key.layer_type == RenderLayerType::Children {
+                    return Ordering::Greater;
+                }
+                return a.layer_object_idx.cmp(&b.layer_object_idx);
+            });
+        }
         let mut layer_nodes = Vec::with_capacity(layer_objects.len());
         for lo in layer_objects {
             layer_nodes.push(self.build_layer_tree(&lo));

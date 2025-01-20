@@ -12,15 +12,17 @@ use skia_safe::{Color, Image, Matrix, Path};
 use yoga::{Align, Direction, Display, Edge, FlexDirection, Justify, Node, Overflow, PositionType, StyleUnit, Wrap};
 use crate::base::Rect;
 use crate::color::parse_hex_color;
-use crate::{compute_style, inherit_color_prop, ok_or_return, some_or_return};
+use crate::{compute_style, inherit_color_prop, match_both, ok_or_return, send_app_event, some_or_return};
 use crate::animation::{AnimationInstance, SimpleFrameController, WindowAnimationController};
 use crate::border::build_border_paths;
 use crate::cache::CacheValue;
 use crate::animation::ANIMATIONS;
 use crate::element::{Element, ElementWeak};
+use crate::event_loop::create_event_loop_callback;
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::paint::MatrixCalculator;
+use crate::timer::{set_timeout, TimerHandle};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum StylePropertyValue {
@@ -149,22 +151,46 @@ pub enum TranslateLength {
 }
 
 impl TranslateLength {
+    pub fn adapt_zero(&mut self, other: &mut Self) {
+        if self.is_zero() {
+            match other {
+                TranslateLength::Point(_) => {
+                    *self = TranslateLength::Point(0.0);
+                }
+                TranslateLength::Percent(_) => {
+                    *self = TranslateLength::Percent(0.0);
+                }
+            }
+        } else if other.is_zero() {
+            other.adapt_zero(self)
+        }
+    }
     pub fn to_absolute(&self, block_length: f32) -> f32 {
         match self {
             TranslateLength::Point(p) => { *p }
             TranslateLength::Percent(p) => { *p / 100.0 * block_length }
         }
     }
+
+    fn is_zero(&self) -> bool {
+        match self {
+            TranslateLength::Point(v) => *v == 0.0,
+            TranslateLength::Percent(v) => *v == 0.0,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct TranslateParams(TranslateLength, TranslateLength);
+pub struct TranslateParams(pub TranslateLength, pub TranslateLength);
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ScaleParams(pub f32, pub f32);
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum StyleTransformOp {
     Rotate(f32),
-    Scale(f32, f32),
-    Translate(TranslateLength, TranslateLength),
+    Scale(ScaleParams),
+    Translate(TranslateParams),
 }
 
 impl StyleTransformOp {
@@ -199,16 +225,31 @@ impl StyleTransform {
         }
     }
 
+    pub fn preprocess(&self) -> StyleTransform {
+        let mut list = Vec::new();
+        for op in self.op_list.clone() {
+            if let StyleTransformOp::Translate(params) = op {
+                let (mut tl, mut tl2) = (params.0, params.1);
+                tl.adapt_zero(&mut tl2);
+                list.push(StyleTransformOp::Translate(TranslateParams(tl, tl2)));
+                continue;
+            }
+            list.push(op);
+        }
+        StyleTransform { op_list: list }
+    }
+
     pub fn apply(&self, width: f32, height: f32, mc: &mut MatrixCalculator) {
         for op in &self.op_list {
             match op {
                 StyleTransformOp::Rotate(deg) => {
                     mc.rotate(*deg, None);
                 }
-                StyleTransformOp::Scale(x, y) => {
+                StyleTransformOp::Scale(ScaleParams(x, y)) => {
                     mc.scale((*x, *y));
                 }
-                StyleTransformOp::Translate(x, y) => {
+                StyleTransformOp::Translate(params) => {
+                    let (x, y) = (&params.0, &params.1);
                     let x = x.to_absolute(width);
                     let y = y.to_absolute(height);
                     mc.translate((x, y));
@@ -233,16 +274,18 @@ pub enum StylePropVal<T> {
 }
 
 impl<T: Clone> StylePropVal<T> {
+    //TODO remove
     pub fn resolve(&self, default: &T) -> T {
         match self {
             StylePropVal::Custom(v) => { v.clone() }
             StylePropVal::Unset => { default.clone() }
+            StylePropVal::Inherit => { todo!() }
         }
     }
 }
 
 macro_rules! define_style_props {
-    ($($name: ident => $type: ty, )*) => {
+    ($($name: ident => $type: ty, $compute_type: ty; )*) => {
         #[derive(Clone, Debug, PartialEq)]
         pub enum StyleProp {
             $(
@@ -250,7 +293,31 @@ macro_rules! define_style_props {
             )*
         }
 
-        #[derive(Clone, Hash, PartialEq, Eq)]
+        #[derive(Clone, Debug, PartialEq)]
+        pub enum ResolvedStyleProp {
+            $(
+                $name($type),
+            )*
+        }
+
+        impl ResolvedStyleProp {
+             pub fn key(&self) -> StylePropKey {
+                match self {
+                    $(
+                        Self::$name(_) => StylePropKey::$name,
+                    )*
+                }
+            }
+        }
+
+        #[derive(Clone, Debug, PartialEq)]
+        pub enum ComputedStyleProp {
+            $(
+                $name($compute_type),
+            )*
+        }
+
+        #[derive(Clone, Hash, PartialEq, Eq, Copy)]
         pub enum StylePropKey {
             $(
                 $name,
@@ -282,7 +349,15 @@ macro_rules! define_style_props {
                 let k = key.as_str();
                 $(
                     if k == stringify!($name).to_lowercase().as_str() {
-                        return <$type>::parse_prop_value(value).map(|v| StyleProp::$name(StylePropVal::Custom(v)));
+                        let value_lowercase = value.to_lowercase();
+                        let value_lowercase = value_lowercase.as_str();
+                        if value_lowercase == "inherit" {
+                            return Some(StyleProp::$name(StylePropVal::Inherit));
+                        } else if value_lowercase == "unset" {
+                            return Some(StyleProp::$name(StylePropVal::Unset));
+                        } else {
+                            return <$type>::parse_prop_value(value).map(|v| StyleProp::$name(StylePropVal::Custom(v)));
+                        }
                     }
                 )*
                 return None
@@ -308,71 +383,95 @@ macro_rules! define_style_props {
                     )*
                 }
             }
+            pub fn resolve_value<
+                D: Fn(StylePropKey) -> ResolvedStyleProp,
+                P: Fn(StylePropKey) -> ResolvedStyleProp
+            >(
+                &self,
+                default_value: D,
+                parent_value: P,
+            ) -> ResolvedStyleProp {
+                match self {
+                    $(
+                        Self::$name(v) => {
+                            match v {
+                                StylePropVal::Custom(v) => { ResolvedStyleProp::$name(v.clone()) }
+                                StylePropVal::Unset => {
+                                    default_value(self.key())
+                                }
+                                StylePropVal::Inherit => {
+                                    parent_value(self.key())
+                                }
+                            }
+                        },
+                    )*
+                }
+            }
         }
     };
 }
 
 define_style_props!(
-    Color => PropValue<Color>,
-    BackgroundColor => PropValue<Color>,
-    FontSize        => PropValue<f32>,
-    LineHeight      => PropValue<f32>,
+    Color => Color, Color;
+    BackgroundColor => Color, Color;
+    FontSize        => f32, f32;
+    LineHeight      => f32, f32;
 
-    BorderTop => StyleBorder,
-    BorderRight => StyleBorder,
-    BorderBottom => StyleBorder,
-    BorderLeft => StyleBorder,
+    BorderTop => StyleBorder, StyleBorder;
+    BorderRight => StyleBorder, StyleBorder;
+    BorderBottom => StyleBorder,StyleBorder;
+    BorderLeft => StyleBorder,StyleBorder;
 
-    Display => Display,
+    Display => Display, Display;
 
-    Width => StyleUnit,
-    Height => StyleUnit,
-    MaxWidth => StyleUnit,
-    MaxHeight => StyleUnit,
-    MinWidth => StyleUnit,
-    MinHeight => StyleUnit,
+    Width => StyleUnit, StyleUnit;
+    Height => StyleUnit, StyleUnit;
+    MaxWidth => StyleUnit, StyleUnit;
+    MaxHeight => StyleUnit, StyleUnit;
+    MinWidth => StyleUnit, StyleUnit;
+    MinHeight => StyleUnit, StyleUnit;
 
-    MarginTop => StyleUnit,
-    MarginRight => StyleUnit,
-    MarginBottom => StyleUnit,
-    MarginLeft => StyleUnit,
+    MarginTop => StyleUnit, StyleUnit;
+    MarginRight => StyleUnit, StyleUnit;
+    MarginBottom => StyleUnit, StyleUnit;
+    MarginLeft => StyleUnit, StyleUnit;
 
-    PaddingTop => StyleUnit,
-    PaddingRight => StyleUnit,
-    PaddingBottom => StyleUnit,
-    PaddingLeft => StyleUnit,
+    PaddingTop => StyleUnit, StyleUnit;
+    PaddingRight => StyleUnit, StyleUnit;
+    PaddingBottom => StyleUnit, StyleUnit;
+    PaddingLeft => StyleUnit, StyleUnit;
     //
-    Flex => f32,
-    FlexBasis => StyleUnit,
-    FlexGrow => f32,
-    FlexShrink => f32,
-    AlignSelf => Align,
-    Direction => Direction,
-    Position => PositionType,
-    Overflow => Overflow,
+    Flex => f32, f32;
+    FlexBasis => StyleUnit, StyleUnit;
+    FlexGrow => f32, f32;
+    FlexShrink => f32, f32;
+    AlignSelf => Align, Align;
+    Direction => Direction, Direction;
+    Position => PositionType, PositionType;
+    Overflow => Overflow, Overflow;
 
-    BorderTopLeftRadius => f32,
-    BorderTopRightRadius => f32,
-    BorderBottomRightRadius => f32,
-    BorderBottomLeftRadius => f32,
+    BorderTopLeftRadius => f32, f32;
+    BorderTopRightRadius => f32, f32;
+    BorderBottomRightRadius => f32, f32;
+    BorderBottomLeftRadius => f32, f32;
 
-    JustifyContent => Justify,
-    FlexDirection => FlexDirection,
-    AlignContent => Align,
-    AlignItems => Align,
-    FlexWrap => Wrap,
-    ColumnGap => f32,
-    RowGap => f32,
+    JustifyContent => Justify, Justify;
+    FlexDirection => FlexDirection, FlexDirection;
+    AlignContent => Align, Align;
+    AlignItems => Align, Align;
+    FlexWrap => Wrap, Wrap;
+    ColumnGap => f32, f32;
+    RowGap => f32, f32;
 
-    Top => StyleUnit,
-    Right => StyleUnit,
-    Bottom => StyleUnit,
-    Left => StyleUnit,
+    Top => StyleUnit, StyleUnit;
+    Right => StyleUnit, StyleUnit;
+    Bottom => StyleUnit, StyleUnit;
+    Left => StyleUnit, StyleUnit;
 
-    Transform => StyleTransform,
-    AnimationName => String,
-    AnimationDuration => f32,
-    AnimationIterationCount => f32,
+    Transform => StyleTransform, StyleTransform;
+    AnimationName => String, String;
+    AnimationDuration => f32, f32;
+    AnimationIterationCount => f32, f32;
 );
 
 pub fn parse_box_prop(value: StylePropertyValue) -> (StylePropertyValue, StylePropertyValue, StylePropertyValue, StylePropertyValue) {
@@ -540,19 +639,17 @@ pub struct StyleNodeInner {
     children: Vec<StyleNode>,
 
     // (inherited, computed)
-    pub color: PropValue<Color>,
     pub border_radius: [f32; 4],
     pub border_color: [Color;4],
-    pub background_color: PropValue<Color>,
     pub background_image: Option<Image>,
-    pub line_height: PropValue<f32>,
-    pub font_size: PropValue<f32>,
     pub transform: Option<StyleTransform>,
     pub computed_style: ComputedStyle,
     animation_params: AnimationParams,
     animation_instance: Option<AnimationInstance>,
     pub on_changed: Option<Box<dyn FnMut(StylePropKey)>>,
     pub animation_renderer: Option<Mrc<Box<dyn FnMut(Vec<StyleProp>)>>>,
+    pub style_props: HashMap<StylePropKey, StyleProp>,
+    pub resolved_style_props: HashMap<StylePropKey, ResolvedStyleProp>,
 }
 
 #[derive(PartialEq)]
@@ -607,9 +704,6 @@ impl StyleNode {
             children: Vec::new(),
             border_radius: [0.0, 0.0, 0.0, 0.0],
             border_color: [transparent, transparent, transparent, transparent],
-            background_color: PropValue::Custom(Color::TRANSPARENT),
-            color: PropValue::Inherit,
-            line_height: PropValue::Inherit,
             background_image: None,
             transform: None,
             animation_instance: None,
@@ -617,10 +711,16 @@ impl StyleNode {
             computed_style: ComputedStyle::default(),
             on_changed: None,
             animation_renderer: None,
-            font_size: PropValue::Inherit,
+            resolved_style_props: HashMap::new(),
+            style_props: HashMap::new(),
         };
         inner.yoga_node.set_position_type(PositionType::Static);
-        Self { inner: Mrc::new(inner) }
+        let mut inst = Self { inner: Mrc::new(inner) };
+        inst.set_style(StyleProp::Position(StylePropVal::Custom(PositionType::Static)));
+        inst.set_style(StyleProp::Color(StylePropVal::Inherit));
+        inst.set_style(StyleProp::FontSize(StylePropVal::Inherit));
+        inst.set_style(StyleProp::LineHeight(StylePropVal::Inherit));
+        inst
     }
 
     pub fn new_with_shadow() -> Self {
@@ -657,264 +757,584 @@ impl StyleNode {
         Rect::new(l, t, width - l - r, height - t - b)
     }
 
-    pub fn set_style(&mut self, p: &StyleProp) -> (bool, bool) {
+    fn get_resolved_value(&self, key: StylePropKey) -> ResolvedStyleProp {
+        if let Some(v) = self.resolved_style_props.get(&key) {
+            v.clone()
+        } else {
+            self.get_default_value(key)
+        }
+    }
+
+    fn get_default_value(&self, key: StylePropKey) -> ResolvedStyleProp {
+        let standard_node = Node::new();
+        let default_border = StyleBorder(StyleUnit::UndefinedValue, StyleColor::Color(Color::TRANSPARENT));
+        match key {
+            StylePropKey::Color => {
+                ResolvedStyleProp::Color(Color::BLACK)
+            }
+            StylePropKey::BackgroundColor  =>   {
+                ResolvedStyleProp::BackgroundColor(Color::TRANSPARENT)
+            }
+            StylePropKey::FontSize => {
+                ResolvedStyleProp::FontSize(12.0)
+            }
+            StylePropKey::LineHeight => {
+                //TODO use font-size
+                ResolvedStyleProp::LineHeight(12.0)
+            }
+            StylePropKey::BorderTop  =>   {
+                ResolvedStyleProp::BorderTop(default_border)
+            }
+            StylePropKey::BorderRight  =>   {
+                ResolvedStyleProp::BorderRight(default_border)
+            }
+            StylePropKey::BorderBottom  =>   {
+                ResolvedStyleProp::BorderBottom(default_border)
+            }
+            StylePropKey::BorderLeft  =>   {
+                ResolvedStyleProp::BorderLeft(default_border)
+            }
+            StylePropKey::Display  =>   {
+                ResolvedStyleProp::Display(Display::Flex)
+            }
+            StylePropKey::Width  =>   {
+                ResolvedStyleProp::Width(standard_node.get_style_width())
+            },
+            StylePropKey::Height  =>   {
+                ResolvedStyleProp::Height(standard_node.get_style_height())
+            },
+            StylePropKey::MaxWidth  =>   {
+                ResolvedStyleProp::MaxWidth(standard_node.get_style_max_width())
+            },
+            StylePropKey::MaxHeight  =>   {
+                ResolvedStyleProp::MaxHeight(standard_node.get_style_max_height())
+            },
+            StylePropKey::MinWidth  =>   {
+                ResolvedStyleProp::MinWidth(standard_node.get_style_min_width())
+            },
+            StylePropKey::MinHeight  =>   {
+                ResolvedStyleProp::MinHeight(standard_node.get_style_min_height())
+            },
+            StylePropKey::MarginTop  =>   {
+                ResolvedStyleProp::MarginTop(standard_node.get_style_margin_top())
+            },
+            StylePropKey::MarginRight  =>   {
+                ResolvedStyleProp::MarginRight(standard_node.get_style_margin_right())
+            },
+            StylePropKey::MarginBottom  =>   {
+                ResolvedStyleProp::MarginBottom(standard_node.get_style_margin_bottom())
+            },
+            StylePropKey::MarginLeft  =>   {
+                ResolvedStyleProp::MarginLeft(standard_node.get_style_margin_left())
+            },
+            StylePropKey::PaddingTop  =>   {
+                ResolvedStyleProp::PaddingTop(standard_node.get_style_padding_top())
+            },
+            StylePropKey::PaddingRight  =>   {
+                ResolvedStyleProp::PaddingRight(standard_node.get_style_padding_right())
+            },
+            StylePropKey::PaddingBottom  =>   {
+                ResolvedStyleProp::PaddingBottom(standard_node.get_style_padding_bottom())
+            },
+            StylePropKey::PaddingLeft  =>   {
+                ResolvedStyleProp::PaddingLeft(standard_node.get_style_padding_left())
+            },
+            StylePropKey::Flex  =>   {
+                ResolvedStyleProp::Flex(standard_node.get_flex())
+            },
+            StylePropKey::FlexBasis  =>   {
+                ResolvedStyleProp::FlexBasis(standard_node.get_flex_basis())
+            },
+            StylePropKey::FlexGrow  =>   {
+                ResolvedStyleProp::FlexGrow(standard_node.get_flex_grow())
+            },
+            StylePropKey::FlexShrink  =>   {
+                ResolvedStyleProp::FlexShrink(standard_node.get_flex_shrink())
+            },
+            StylePropKey::AlignSelf  =>   {
+                ResolvedStyleProp::AlignSelf(Align::FlexStart)
+            },
+            StylePropKey::Direction  =>   {
+                ResolvedStyleProp::Direction(Direction::LTR)
+            },
+            StylePropKey::Position  =>   {
+                ResolvedStyleProp::Position(PositionType::Static)
+            },
+            StylePropKey::Top  =>   {
+                ResolvedStyleProp::Top(StyleUnit::UndefinedValue)
+            },
+            StylePropKey::Right  =>   {
+                ResolvedStyleProp::Right(StyleUnit::UndefinedValue)
+            },
+            StylePropKey::Bottom  =>   {
+                ResolvedStyleProp::Bottom(StyleUnit::UndefinedValue)
+            },
+            StylePropKey::Left  =>   {
+                ResolvedStyleProp::Left(StyleUnit::UndefinedValue)
+            },
+            StylePropKey::Overflow  =>   {
+                ResolvedStyleProp::Overflow(Overflow::Hidden)
+            },
+            StylePropKey::BorderTopLeftRadius  =>   {
+                ResolvedStyleProp::BorderTopLeftRadius(0.0)
+            },
+            StylePropKey::BorderTopRightRadius  =>   {
+                ResolvedStyleProp::BorderTopRightRadius(0.0)
+            },
+            StylePropKey::BorderBottomRightRadius  =>   {
+                ResolvedStyleProp::BorderBottomRightRadius(0.0)
+            },
+            StylePropKey::BorderBottomLeftRadius  =>   {
+                ResolvedStyleProp::BorderBottomLeftRadius(0.0)
+            },
+            StylePropKey::Transform  =>   {
+                ResolvedStyleProp::Transform(StyleTransform::empty())
+            }
+            StylePropKey::AnimationName => {
+                ResolvedStyleProp::AnimationName("".to_string())
+            }
+            StylePropKey::AnimationDuration => {
+                ResolvedStyleProp::AnimationDuration(0.0)
+            }
+            StylePropKey::AnimationIterationCount => {
+                ResolvedStyleProp::AnimationIterationCount(1.0)
+            }
+
+            StylePropKey::JustifyContent  =>   {
+                ResolvedStyleProp::JustifyContent(Justify::FlexStart)
+            },
+            StylePropKey::FlexDirection  =>   {
+                ResolvedStyleProp::FlexDirection(FlexDirection::Column)
+            },
+            StylePropKey::AlignContent  =>   {
+                ResolvedStyleProp::AlignContent(Align::FlexStart)
+            },
+            StylePropKey::AlignItems  =>   {
+                ResolvedStyleProp::AlignItems(Align::FlexStart)
+            },
+            StylePropKey::FlexWrap  =>   {
+                ResolvedStyleProp::FlexWrap(Wrap::NoWrap)
+            },
+            StylePropKey::ColumnGap  =>   {
+                ResolvedStyleProp::ColumnGap(0.0)
+            },
+            StylePropKey::RowGap  =>   {
+                ResolvedStyleProp::RowGap(0.0)
+            },
+            //TODO aspectratio
+        }
+    }
+
+    pub fn set_style(&mut self, p: StyleProp) -> (bool, bool) {
+        self.style_props.insert(p.key().clone(), p.clone());
+        let v = p.resolve_value(|k| {
+            self.get_default_value(k)
+        }, |k| {
+            if let Some(p) = self.get_parent() {
+                p.get_resolved_value(k)
+            } else {
+                self.get_default_value(k)
+            }
+        });
+        self.set_resolved_style_prop(v)
+    }
+
+    fn compute_style_prop(&self, p: &ResolvedStyleProp) -> ComputedStyleProp {
+        match p {
+            ResolvedStyleProp::Color(v) => {
+                ComputedStyleProp::Color(v.clone())
+            }
+            ResolvedStyleProp::BackgroundColor(v) => {
+                ComputedStyleProp::BackgroundColor(v.clone())
+            }
+            ResolvedStyleProp::FontSize(v) => {
+                ComputedStyleProp::FontSize(v.clone())
+            }
+            ResolvedStyleProp::LineHeight(v) => {
+                ComputedStyleProp::LineHeight(v.clone())
+            }
+            ResolvedStyleProp::BorderTop(v) => {
+                ComputedStyleProp::BorderTop(v.clone())
+            }
+            ResolvedStyleProp::BorderRight(v) => {
+                ComputedStyleProp::BorderRight(v.clone())
+            }
+            ResolvedStyleProp::BorderBottom(v) => {
+                ComputedStyleProp::BorderBottom(v.clone())
+            }
+            ResolvedStyleProp::BorderLeft(v) => {
+                ComputedStyleProp::BorderLeft(v.clone())
+            }
+            ResolvedStyleProp::Display(v) => {
+                ComputedStyleProp::Display(v.clone())
+            }
+            ResolvedStyleProp::Width(v) => {
+                ComputedStyleProp::Width(v.clone())
+            }
+            ResolvedStyleProp::Height(v) => {
+                ComputedStyleProp::Height(v.clone())
+            }
+            ResolvedStyleProp::MaxWidth(v) => {
+                ComputedStyleProp::MaxWidth(v.clone())
+            }
+            ResolvedStyleProp::MaxHeight(v) => {
+                ComputedStyleProp::MaxHeight(v.clone())
+            }
+            ResolvedStyleProp::MinWidth(v) => {
+                ComputedStyleProp::MinWidth(v.clone())
+            }
+            ResolvedStyleProp::MinHeight(v) => {
+                ComputedStyleProp::MinHeight(v.clone())
+            }
+            ResolvedStyleProp::MarginTop(v) => {
+                ComputedStyleProp::MarginTop(v.clone())
+            }
+            ResolvedStyleProp::MarginRight(v) => {
+                ComputedStyleProp::MarginRight(v.clone())
+            }
+            ResolvedStyleProp::MarginBottom(v) => {
+                ComputedStyleProp::MarginBottom(v.clone())
+            }
+            ResolvedStyleProp::MarginLeft(v) => {
+                ComputedStyleProp::MarginLeft(v.clone())
+            }
+            ResolvedStyleProp::PaddingTop(v) => {
+                ComputedStyleProp::PaddingTop(v.clone())
+            }
+            ResolvedStyleProp::PaddingRight(v) => {
+                ComputedStyleProp::PaddingRight(v.clone())
+            }
+            ResolvedStyleProp::PaddingBottom(v) => {
+                ComputedStyleProp::PaddingBottom(v.clone())
+            }
+            ResolvedStyleProp::PaddingLeft(v) => {
+                ComputedStyleProp::PaddingLeft(v.clone())
+            }
+            ResolvedStyleProp::Flex(v) => {
+                ComputedStyleProp::Flex(v.clone())
+            }
+            ResolvedStyleProp::FlexBasis(v) => {
+                ComputedStyleProp::FlexBasis(v.clone())
+            }
+            ResolvedStyleProp::FlexGrow(v) => {
+                ComputedStyleProp::FlexGrow(v.clone())
+            }
+            ResolvedStyleProp::FlexShrink(v) => {
+                ComputedStyleProp::FlexShrink(v.clone())
+            }
+            ResolvedStyleProp::AlignSelf(v) => {
+                ComputedStyleProp::AlignSelf(v.clone())
+            }
+            ResolvedStyleProp::Direction(v) => {
+                ComputedStyleProp::Direction(v.clone())
+            }
+            ResolvedStyleProp::Position(v) => {
+                ComputedStyleProp::Position(v.clone())
+            }
+            ResolvedStyleProp::Overflow(v) => {
+                ComputedStyleProp::Overflow(v.clone())
+            }
+            ResolvedStyleProp::BorderTopLeftRadius(v) => {
+                ComputedStyleProp::BorderTopLeftRadius(v.clone())
+            }
+            ResolvedStyleProp::BorderTopRightRadius(v) => {
+                ComputedStyleProp::BorderTopRightRadius(v.clone())
+            }
+            ResolvedStyleProp::BorderBottomRightRadius(v) => {
+                ComputedStyleProp::BorderBottomRightRadius(v.clone())
+            }
+            ResolvedStyleProp::BorderBottomLeftRadius(v) => {
+                ComputedStyleProp::BorderBottomLeftRadius(v.clone())
+            }
+            ResolvedStyleProp::JustifyContent(v) => {
+                ComputedStyleProp::JustifyContent(v.clone())
+            }
+            ResolvedStyleProp::FlexDirection(v) => {
+                ComputedStyleProp::FlexDirection(v.clone())
+            }
+            ResolvedStyleProp::AlignContent(v) => {
+                ComputedStyleProp::AlignContent(v.clone())
+            }
+            ResolvedStyleProp::AlignItems(v) => {
+                ComputedStyleProp::AlignItems(v.clone())
+            }
+            ResolvedStyleProp::FlexWrap(v) => {
+                ComputedStyleProp::FlexWrap(v.clone())
+            }
+            ResolvedStyleProp::ColumnGap(v) => {
+                ComputedStyleProp::ColumnGap(v.clone())
+            }
+            ResolvedStyleProp::RowGap(v) => {
+                ComputedStyleProp::RowGap(v.clone())
+            }
+            ResolvedStyleProp::Top(v) => {
+                ComputedStyleProp::Top(v.clone())
+            }
+            ResolvedStyleProp::Right(v) => {
+                ComputedStyleProp::Right(v.clone())
+            }
+            ResolvedStyleProp::Bottom(v) => {
+                ComputedStyleProp::Bottom(v.clone())
+            }
+            ResolvedStyleProp::Left(v) => {
+                ComputedStyleProp::Left(v.clone())
+            }
+            ResolvedStyleProp::Transform(v) => {
+                ComputedStyleProp::Transform(v.clone())
+            }
+            ResolvedStyleProp::AnimationName(v) => {
+                ComputedStyleProp::AnimationName(v.clone())
+            }
+            ResolvedStyleProp::AnimationDuration(v) => {
+                ComputedStyleProp::AnimationDuration(v.clone())
+            }
+            ResolvedStyleProp::AnimationIterationCount(v) => {
+                ComputedStyleProp::AnimationIterationCount(v.clone())
+            }
+        }
+    }
+
+    pub fn set_resolved_style_prop(&mut self, p: ResolvedStyleProp) -> (bool, bool) {
+        let prop_key = p.key();
+        if self.resolved_style_props.get(&prop_key) == Some(&p) {
+            return (false, false);
+        }
+        self.resolved_style_props.insert(prop_key, p.clone());
         let mut repaint = true;
         let mut need_layout = true;
         let mut change_notified = false;
         let standard_node = Node::new();
 
         match p {
-            StyleProp::Color(v) => {
-                self.color = v.resolve(&PropValue::Inherit);
-                self.update_computed_style(Some(StylePropKey::Color));
+            ResolvedStyleProp::Color(v) => {
+                self.computed_style.color = v;
                 need_layout = false;
-                change_notified = true;
             }
-            StyleProp::BackgroundColor (value) =>   {
-                self.background_color = value.resolve(&PropValue::Custom(Color::TRANSPARENT));
-                self.update_computed_style(Some(StylePropKey::BackgroundColor));
+            ResolvedStyleProp::BackgroundColor (value) =>   {
+                self.computed_style.background_color = value;
                 need_layout = false;
-                change_notified = true;
             }
-            StyleProp::FontSize(value) => {
-                self.font_size = value.resolve(&PropValue::Custom(12.0));
-                self.update_computed_style(Some(StylePropKey::FontSize));
-                change_notified = true;
+            ResolvedStyleProp::FontSize(value) => {
+                self.computed_style.font_size = value;
             }
-            StyleProp::LineHeight(value) => {
-                self.line_height = value.resolve(&PropValue::Inherit);
-                self.update_computed_style(Some(StylePropKey::LineHeight));
-                change_notified = true;
+            ResolvedStyleProp::LineHeight(value) => {
+                self.computed_style.line_height = value;
             }
-            StyleProp::BorderTop (value) =>   {
+            ResolvedStyleProp::BorderTop (value) =>   {
                 self.set_border(&value, &vec![0])
             }
-            StyleProp::BorderRight (value) =>   {
+            ResolvedStyleProp::BorderRight (value) =>   {
                 self.set_border(&value, &vec![1])
             }
-            StyleProp::BorderBottom (value) =>   {
+            ResolvedStyleProp::BorderBottom (value) =>   {
                 self.set_border(&value, &vec![2])
             }
-            StyleProp::BorderLeft (value) =>   {
+            ResolvedStyleProp::BorderLeft (value) =>   {
                 self.set_border(&value, &vec![3])
             }
-            StyleProp::Display (value) =>   {
-                self.set_display(value.resolve(&Display::Flex))
+            ResolvedStyleProp::Display (value) =>   {
+                self.set_display(value)
             }
-            StyleProp::Width (value) =>   {
-                self.set_width(value.resolve(&standard_node.get_style_width()))
+            ResolvedStyleProp::Width (value) =>   {
+                self.set_width(value)
             },
-            StyleProp::Height (value) =>   {
-                self.set_height(value.resolve(&standard_node.get_style_height()))
+            ResolvedStyleProp::Height (value) =>   {
+                self.set_height(value)
             },
-            StyleProp::MaxWidth (value) =>   {
-                self.set_max_width(value.resolve(&standard_node.get_style_max_width()))
+            ResolvedStyleProp::MaxWidth (value) =>   {
+                self.set_max_width(value)
             },
-            StyleProp::MaxHeight (value) =>   {
-                self.set_max_height(value.resolve(&standard_node.get_style_max_height()))
+            ResolvedStyleProp::MaxHeight (value) =>   {
+                self.set_max_height(value)
             },
-            StyleProp::MinWidth (value) =>   {
-                self.set_min_width(value.resolve(&standard_node.get_style_min_width()))
+            ResolvedStyleProp::MinWidth (value) =>   {
+                self.set_min_width(value)
             },
-            StyleProp::MinHeight (value) =>   {
-                self.set_min_height(value.resolve(&standard_node.get_style_min_height()))
+            ResolvedStyleProp::MinHeight (value) =>   {
+                self.set_min_height(value)
             },
-            StyleProp::MarginTop (value) =>   {
-                self.set_margin(Edge::Top, value.resolve(&standard_node.get_style_margin_top()))
+            ResolvedStyleProp::MarginTop (value) =>   {
+                self.set_margin(Edge::Top, value)
             },
-            StyleProp::MarginRight (value) =>   {
-                self.set_margin(Edge::Right, value.resolve(&standard_node.get_style_margin_right()))
+            ResolvedStyleProp::MarginRight (value) =>   {
+                self.set_margin(Edge::Right, value)
             },
-            StyleProp::MarginBottom (value) =>   {
-                self.set_margin(Edge::Bottom, value.resolve(&standard_node.get_style_margin_bottom()))
+            ResolvedStyleProp::MarginBottom (value) =>   {
+                self.set_margin(Edge::Bottom, value)
             },
-            StyleProp::MarginLeft (value) =>   {
-                self.set_margin(Edge::Left, value.resolve(&standard_node.get_style_margin_left()))
+            ResolvedStyleProp::MarginLeft (value) =>   {
+                self.set_margin(Edge::Left, value)
             },
-            StyleProp::PaddingTop (value) =>   {
+            ResolvedStyleProp::PaddingTop (value) =>   {
                 self.with_container_node_mut(|n| {
-                    n.set_padding(Edge::Top, value.resolve(&standard_node.get_style_padding_top()))
+                    n.set_padding(Edge::Top, value)
                 })
             },
-            StyleProp::PaddingRight (value) =>   {
+            ResolvedStyleProp::PaddingRight (value) =>   {
                 self.with_container_node_mut(|n| {
-                    n.set_padding(Edge::Right, value.resolve(&standard_node.get_style_padding_right()))
+                    n.set_padding(Edge::Right, value)
                 })
             },
-            StyleProp::PaddingBottom (value) =>   {
+            ResolvedStyleProp::PaddingBottom (value) =>   {
                 self.with_container_node_mut(|n| {
-                    n.set_padding(Edge::Bottom, value.resolve(&standard_node.get_style_padding_bottom()))
+                    n.set_padding(Edge::Bottom, value)
                 })
             },
-            StyleProp::PaddingLeft (value) =>   {
+            ResolvedStyleProp::PaddingLeft (value) =>   {
                 self.with_container_node_mut(|n| {
-                    n.set_padding(Edge::Left, value.resolve(&standard_node.get_style_padding_left()))
+                    n.set_padding(Edge::Left, value)
                 })
             },
-            StyleProp::Flex (value) =>   {
-                self.set_flex(value.resolve(&standard_node.get_flex()))
+            ResolvedStyleProp::Flex (value) =>   {
+                self.set_flex(value)
             },
-            StyleProp::FlexBasis (value) =>   {
-                self.set_flex_basis(value.resolve(&standard_node.get_flex_basis()))
+            ResolvedStyleProp::FlexBasis (value) =>   {
+                self.set_flex_basis(value)
             },
-            StyleProp::FlexGrow (value) =>   {
-                self.set_flex_grow(value.resolve(&standard_node.get_flex_grow()))
+            ResolvedStyleProp::FlexGrow (value) =>   {
+                self.set_flex_grow(value)
             },
-            StyleProp::FlexShrink (value) =>   {
-                self.set_flex_shrink(value.resolve(&standard_node.get_flex_shrink()))
+            ResolvedStyleProp::FlexShrink (value) =>   {
+                self.set_flex_shrink(value)
             },
-            StyleProp::AlignSelf (value) =>   {
-                self.set_align_self(value.resolve(&Align::FlexStart))
+            ResolvedStyleProp::AlignSelf (value) =>   {
+                self.set_align_self(value)
             },
-            StyleProp::Direction (value) =>   {
-                self.set_direction(value.resolve(&Direction::LTR))
+            ResolvedStyleProp::Direction (value) =>   {
+                self.set_direction(value)
             },
-            StyleProp::Position (value) =>   {
-                self.set_position_type(value.resolve(&PositionType::Static))
+            ResolvedStyleProp::Position (value) =>   {
+                self.set_position_type(value)
             },
-            StyleProp::Top (value) =>   {
-                self.yoga_node.set_position(Edge::Top, value.resolve(&StyleUnit::UndefinedValue));
+            ResolvedStyleProp::Top (value) =>   {
+                self.yoga_node.set_position(Edge::Top, value);
             },
-            StyleProp::Right (value) =>   {
-                self.yoga_node.set_position(Edge::Right, value.resolve(&StyleUnit::UndefinedValue));
+            ResolvedStyleProp::Right (value) =>   {
+                self.yoga_node.set_position(Edge::Right, value);
             },
-            StyleProp::Bottom (value) =>   {
-                self.yoga_node.set_position(Edge::Bottom, value.resolve(&StyleUnit::UndefinedValue));
+            ResolvedStyleProp::Bottom (value) =>   {
+                self.yoga_node.set_position(Edge::Bottom, value);
             },
-            StyleProp::Left (value) =>   {
-                self.yoga_node.set_position(Edge::Left, value.resolve(&StyleUnit::UndefinedValue));
+            ResolvedStyleProp::Left (value) =>   {
+                self.yoga_node.set_position(Edge::Left, value);
             },
-            StyleProp::Overflow (value) =>   {
-                self.set_overflow(value.resolve(&Overflow::Hidden))
+            ResolvedStyleProp::Overflow (value) =>   {
+                self.set_overflow(value)
             },
-            StyleProp::BorderTopLeftRadius (value) =>   {
-                self.border_radius[0] = value.resolve(&0.0)
+            ResolvedStyleProp::BorderTopLeftRadius (value) =>   {
+                self.border_radius[0] = value
             },
-            StyleProp::BorderTopRightRadius (value) =>   {
-                self.border_radius[1] = value.resolve(&0.0)
+            ResolvedStyleProp::BorderTopRightRadius (value) =>   {
+                self.border_radius[1] = value
             },
-            StyleProp::BorderBottomRightRadius (value) =>   {
-                self.border_radius[2] = value.resolve(&0.0)
+            ResolvedStyleProp::BorderBottomRightRadius (value) =>   {
+                self.border_radius[2] = value
             },
-            StyleProp::BorderBottomLeftRadius (value) =>   {
-                self.border_radius[3] = value.resolve(&0.0)
+            ResolvedStyleProp::BorderBottomLeftRadius (value) =>   {
+                self.border_radius[3] = value
             },
-            StyleProp::Transform (value) =>   {
+            ResolvedStyleProp::Transform (value) =>   {
                 need_layout = false;
-                if let StylePropVal::Custom(v) = value {
-                    self.transform = Some(v.clone());
-                } else {
-                    self.transform = None;
-                }
+                self.transform = Some(value);
             }
-            StyleProp::AnimationName(value) => {
+            ResolvedStyleProp::AnimationName(value) => {
                 need_layout = false;
-                let name = value.resolve(&"".to_string());
+                let name = value;
                 self.animation_params.name = name;
                 self.update_animation();
             }
-            StyleProp::AnimationDuration(value) => {
+            ResolvedStyleProp::AnimationDuration(value) => {
                 need_layout = false;
-                let duration = value.resolve(&0.0);
+                let duration = value;
                 self.animation_params.duration = duration;
                 self.update_animation();
             }
-            StyleProp::AnimationIterationCount(value) => {
+            ResolvedStyleProp::AnimationIterationCount(value) => {
                 need_layout = false;
-                let ic = value.resolve(&1.0);
+                let ic = value;
                 self.animation_params.iteration_count = ic;
                 self.update_animation();
             }
 
             // container node style
-            StyleProp::JustifyContent (value) =>   {
+            ResolvedStyleProp::JustifyContent (value) =>   {
                 self.with_container_node_mut(|layout| {
-                    layout.set_justify_content(value.resolve(&Justify::FlexStart))
+                    layout.set_justify_content(value)
                 });
             },
-            StyleProp::FlexDirection (value) =>   {
+            ResolvedStyleProp::FlexDirection (value) =>   {
                 self.with_container_node_mut(|layout| {
-                    layout.set_flex_direction(value.resolve(&FlexDirection::Column))
+                    layout.set_flex_direction(value)
                 });
             },
-            StyleProp::AlignContent (value) =>   {
+            ResolvedStyleProp::AlignContent (value) =>   {
                 self.with_container_node_mut(|layout| {
-                    layout.set_align_content(value.resolve(&Align::FlexStart))
+                    layout.set_align_content(value)
                 });
             },
-            StyleProp::AlignItems (value) =>   {
+            ResolvedStyleProp::AlignItems (value) =>   {
                 self.with_container_node_mut(|layout| {
-                    layout.set_align_items(value.resolve(&Align::FlexStart))
+                    layout.set_align_items(value)
                 });
             },
-            StyleProp::FlexWrap (value) =>   {
+            ResolvedStyleProp::FlexWrap (value) =>   {
                 self.with_container_node_mut(|layout| {
-                    layout.set_flex_wrap(value.resolve(&Wrap::NoWrap))
+                    layout.set_flex_wrap(value)
                 });
             },
-            StyleProp::ColumnGap (value) =>   {
+            ResolvedStyleProp::ColumnGap (value) =>   {
                 self.with_container_node_mut(|layout| {
-                    layout.set_column_gap(value.resolve(&0.0))
+                    layout.set_column_gap(value)
                 });
             },
-            StyleProp::RowGap (value) =>   {
+            ResolvedStyleProp::RowGap (value) =>   {
                 self.with_container_node_mut(|layout| {
-                    layout.set_row_gap(value.resolve(&0.0))
+                    layout.set_row_gap(value)
                 });
             },
             //TODO aspectratio
         }
         if !change_notified {
             if let Some(on_changed) = &mut self.on_changed {
-                on_changed(p.key());
+                on_changed(prop_key);
             }
+        }
+        for mut c in self.get_children() {
+            c.resolve_style_prop(prop_key);
         }
 
         return (repaint, need_layout)
     }
 
-
-    pub fn update_computed_style(&mut self, key: Option<StylePropKey>) {
-        let is_update_all = key.is_none();
-        if is_update_all || key == Some(StylePropKey::Color) {
-            compute_style!(Color, self, color, Color::from_rgb(0, 0, 0));
-        }
-        if is_update_all || key == Some(StylePropKey::BackgroundColor) {
-            compute_style!(BackgroundColor, self, background_color, Color::TRANSPARENT);
-        }
-        if is_update_all || key == Some(StylePropKey::FontSize) {
-            compute_style!(FontSize, self, font_size, 12.0);
-        }
-        if is_update_all || key == Some(StylePropKey::LineHeight) {
-            compute_style!(LineHeight, self, line_height, self.computed_style.font_size);
-        }
-    }
-
     fn update_animation(&mut self) {
-        let p = &self.animation_params;
-        self.animation_instance = if p.name.is_empty() || p.duration <= 0.0 || p.iteration_count <= 0.0  {
-            None
-        } else {
-            let element = ok_or_return!(self.element.upgrade());
-            let frame = some_or_return!(element.get_frame());
-            ANIMATIONS.with_borrow(|m| {
-                let ani = m.get(&p.name)?;
-                let frame_controller = WindowAnimationController::new(frame);
-                let duration = p.duration * 1000000.0;
-                let iteration_count = p.iteration_count;
-                let ani_instance = AnimationInstance::new(ani.clone(), duration, iteration_count, Box::new(frame_controller));
-                Some(ani_instance)
-            })
-        };
-        let mut ar = self.animation_renderer.clone();
-        if let Some(ai) = &mut self.animation_instance {
-            if let Some(ar) = &mut ar {
-                let mut ar = ar.clone();
-                ai.run(Box::new(move |styles| {
-                    ar(styles);
-                }));
+        let mut me = self.clone();
+        let task = create_event_loop_callback(move || {
+            let p = &me.animation_params;
+            me.animation_instance = if p.name.is_empty() || p.duration <= 0.0 || p.iteration_count <= 0.0  {
+                None
+            } else {
+                let element = ok_or_return!(me.element.upgrade());
+                let frame = some_or_return!(element.get_frame());
+                ANIMATIONS.with_borrow(|m| {
+                    let ani = m.get(&p.name)?.preprocess();
+                    let frame_controller = WindowAnimationController::new(frame);
+                    let duration = p.duration * 1000000.0;
+                    let iteration_count = p.iteration_count;
+                    let ani_instance = AnimationInstance::new(ani, duration, iteration_count, Box::new(frame_controller));
+                    Some(ani_instance)
+                })
+            };
+            let mut ar = me.animation_renderer.clone();
+            if let Some(ai) = &mut me.animation_instance {
+                if let Some(ar) = &mut ar {
+                    let mut ar = ar.clone();
+                    ai.run(Box::new(move |styles| {
+                        ar(styles);
+                    }));
+                }
             }
-        }
+        });
+        task.call();
     }
 
     pub fn get_parent(&self) -> Option<StyleNode> {
@@ -928,9 +1348,9 @@ impl StyleNode {
         return None
     }
 
-    fn set_border(&mut self, value: &StylePropVal<StyleBorder>, edges: &Vec<usize>) {
-        let default_border = StyleBorder(StyleUnit::UndefinedValue, StyleColor::Color(Color::TRANSPARENT));
-        let value = value.resolve(&default_border);
+    fn set_border(&mut self, value: &StyleBorder, edges: &Vec<usize>) {
+        // let default_border = StyleBorder(StyleUnit::UndefinedValue, StyleColor::Color(Color::TRANSPARENT));
+        // let value = value.resolve(&default_border);
         let color = match value.1 {
             //TODO fix inherited color?
             StyleColor::Inherit => {Color::TRANSPARENT}
@@ -953,7 +1373,20 @@ impl StyleNode {
         child.parent = Some(self.inner.as_weak());
         self.with_container_node_mut(|n| {
             n.insert_child(&mut child.inner.yoga_node, index as usize)
-        })
+        });
+        child.resolve_style_props();
+    }
+
+    fn resolve_style_prop(&mut self, k: StylePropKey) {
+        if let Some(p) = self.style_props.get(&k) {
+            self.set_style(p.clone());
+        }
+    }
+
+    fn resolve_style_props(&mut self) {
+        for (_, p) in self.style_props.clone() {
+            self.set_style(p);
+        }
     }
 
     pub fn get_children(&self) -> Vec<StyleNode> {
@@ -1257,7 +1690,7 @@ fn parse_scale_op(value: &str) -> Option<StyleTransformOp> {
     }
     let x = f32::from_str(values[0].trim()).ok()?;
     let y = f32::from_str(values[1].trim()).ok()?;
-    Some(StyleTransformOp::Scale(x, y))
+    Some(StyleTransformOp::Scale(ScaleParams(x, y)))
 }
 
 fn parse_translate_op(value: &str) -> Option<StyleTransformOp> {
@@ -1267,7 +1700,7 @@ fn parse_translate_op(value: &str) -> Option<StyleTransformOp> {
     }
     let x = parse_translate_length(values[0].trim())?;
     let y = parse_translate_length(values[1].trim())?;
-    Some(StyleTransformOp::Translate(x, y))
+    Some(StyleTransformOp::Translate(TranslateParams(x, y)))
 }
 
 fn parse_translate_length(value: &str) -> Option<TranslateLength> {
@@ -1295,4 +1728,15 @@ fn parse_border(value: &str) -> Option<StyleBorder> {
         }
     }
     Some(StyleBorder(width, StyleColor::Color(color)))
+}
+
+#[test]
+fn test_inherit() {
+    let color = Color::from_rgb(10, 20, 30);
+    let mut p = StyleNode::new();
+    p.set_style(StyleProp::Color(StylePropVal::Custom(color)));
+    let mut c = StyleNode::new();
+    p.insert_child(&mut c, 0);
+    let child_color = c.get_resolved_value(StylePropKey::Color);
+    assert_eq!(child_color, ResolvedStyleProp::Color(color));
 }

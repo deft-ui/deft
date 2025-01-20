@@ -128,10 +128,7 @@ fn test_get_char_bounds() {
         font_size: 14.0,
         font_families: vec!["monospace".to_string()],
     };
-    let font_mgr = FONT_MGR.with(|fm| fm.clone());
-    let mut fm = FONT_COLLECTION.with(|fm| fm.clone());
-    fm.set_default_font_manager(font_mgr, None);
-    let mut pb = SimpleParagraphBuilder::new(&params, fm);
+    let mut pb = SimpleParagraphBuilder::new(&params);
     pb.add_text(format!("{}{}", "12", ZERO_WIDTH_WHITESPACE));
     let mut paragraph = pb.build();
     paragraph.layout(100.0);

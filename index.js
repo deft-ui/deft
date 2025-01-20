@@ -127,11 +127,15 @@ function createAnimationButton() {
     animation_create("rotate", {
         "0": {
             //width: 100,
-            transform: 'rotate(0deg)'
+            transform: 'rotate(0deg)',
+            // transform: 'translate(0, 0)',
+            // transform: 'scale(1, 1)',
         },
         "1": {
             // width: 200,
             transform: 'rotate(360deg)'
+            // transform: 'translate(100%, 0)',
+            // transform: 'scale(2, 2)',
         }
     });
     animationButton.setHoverStyle({
@@ -197,4 +201,9 @@ function main() {
     frame.setBody(container);
 }
 
-main();
+try {
+    main();
+} catch (error) {
+    console.error(error);
+}
+

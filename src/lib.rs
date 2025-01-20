@@ -202,7 +202,8 @@ fn test_layout() {
     let font = DEFAULT_TYPE_FACE.with(|tf| Font::from_typeface(tf, 14.0));
     let paint = Paint::default();
     let params = TextParams {
-        font,
+        font_families: vec![],
+        font_size: 12.0,
         paint,
         line_height: Some(14.0),
         align: Default::default(),
