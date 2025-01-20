@@ -19,7 +19,7 @@ use crate::renderer::CpuRenderer;
 use crate::{some_or_break, some_or_continue, some_or_return};
 use crate::render::layout_tree::LayoutTree;
 use crate::render::paint_object::{ElementPaintObject, LayerPaintObject, PaintObject};
-use crate::render::paint_tree::PaintTree;
+use crate::render::paint_tree::{PaintTree, PaintTreeNew};
 use crate::style::border_path::BorderPath;
 use crate::style::ColorHelper;
 
@@ -99,6 +99,7 @@ pub struct LayerObjectData {
     pub origin_absolute_pos: (f32, f32),
     pub surface_bounds: Rect,
     pub visible_bounds: Rect,
+    pub clip_rect: Option<Rect>,
 }
 
 #[derive(Clone)]
@@ -114,12 +115,13 @@ pub enum RenderObject {
     Layer(LayerObject),
 }
 
+#[derive(Clone)]
 pub struct NormalNode {
     element_object_idx: usize,
     children: Vec<NormalNode>,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct LayerNode {
     layer_object_idx: usize,
     // origin_bounds: Rect,
@@ -319,6 +321,7 @@ impl RenderTree {
         if need_create_children_layer {
             let scroll_left = element.get_scroll_left();
             let scroll_top = element.get_scroll_top();
+            let clip_rect = bounds.translate(-bounds.x + scroll_left, -bounds.y + scroll_top);
             matrix_calculator.save();
 
             let mut matrix = Matrix::default();
@@ -343,6 +346,7 @@ impl RenderTree {
                 //TODO init surface_bounds?
                 surface_bounds: Rect::default(),
                 visible_bounds: Rect::default(),
+                clip_rect: Some(clip_rect.to_skia_rect()),
             };
             self.layout_tree.layer_objects.push(layer_object_data);
             let children_layer_object = LayerObject {
@@ -387,6 +391,7 @@ impl RenderTree {
                 origin_absolute_pos: (origin_x, origin_y),
                 surface_bounds: Rect::default(),
                 visible_bounds: Rect::default(),
+                clip_rect: None,
             };
             self.layout_tree.layer_objects.push(layer_object_data);
             let obj = self.create_normal_render_object(
@@ -476,181 +481,184 @@ impl RenderTree {
         }
     }
 
-    pub fn build_paint_tree(&mut self, viewport: &Rect) -> Option<PaintTree> {
+    pub fn build_paint_tree_new(&mut self, viewport: &Rect) -> Option<PaintTreeNew> {
         // print_time!("Building paint tree");
-        let invalid_rects = InvalidArea::Full.build(viewport.clone());
-        let root = self.build_paint_object(self.layout_tree.root_render_object.clone().as_mut().unwrap(), viewport, &invalid_rects)?;
-        Some(PaintTree {
+        // let invalid_rects = InvalidArea::Full.build(viewport.clone());
+        let root = self.build_layer_node(self.layout_tree.layer_node.clone().as_mut().unwrap(), viewport);
+        Some(PaintTreeNew {
             root,
-            all_layer_keys: self.layout_tree.get_all_layer_keys(),
         })
     }
 
-    pub fn build_paint_objects(&mut self, render_objects: &mut Vec<RenderObject>, viewport: &Rect, invalid_rects: &InvalidRects) -> Vec<PaintObject> {
-        let mut results = Vec::new();
-        for ro in render_objects {
-            let po = some_or_continue!(self.build_paint_object(ro, viewport, invalid_rects));
-            results.push(po);
+
+    fn build_paint_normal_nodes(&mut self, nodes: &Vec<NormalNode>, viewport: &Rect, invalid_rects: &InvalidRects) -> Vec<ElementPaintObject> {
+        let mut result = Vec::with_capacity(nodes.len());
+        for n in nodes {
+            result.push(self.build_paint_normal_node(n, viewport, invalid_rects));
         }
-        results
+        result
     }
 
-    pub fn build_paint_object(&mut self, render_object: &mut RenderObject, viewport: &Rect, invalid_rects: &InvalidRects) -> Option<PaintObject> {
-        match render_object {
-            RenderObject::Normal(eod) => {
-                let children = self.build_paint_objects(&mut eod.children.clone(), viewport, invalid_rects);
-                let eo = &mut self.element_objects[eod.element_object_idx];
+    fn build_paint_normal_node(&mut self, eod: &NormalNode, viewport: &Rect, invalid_rects: &InvalidRects) -> ElementPaintObject {
+        let children = self.build_paint_normal_nodes(&mut eod.children.clone(), viewport, invalid_rects);
+        let eo = &mut self.element_objects[eod.element_object_idx];
 
-                let need_paint = invalid_rects.has_intersects(&Rect::from_xywh(eo.layer_coord.0, eo.layer_coord.1, eo.width, eo.height));
-                let border_path_mut = eo.element.get_border_path_mut();
-                let border_path = border_path_mut.get_paths().clone();
-                let border_box_path = border_path_mut.get_box_path().clone();
-                let epo = ElementPaintObject {
-                    coord: eo.coord,
-                    children,
-                    children_viewport: eo.children_viewport,
-                    border_path,
-                    border_box_path,
-                    border_color: eo.border_color,
-                    render_fn: if need_paint { Some((eo.renderer)()) } else { None },
-                    background_image: eo.background_image.clone(),
-                    background_color: eo.background_color,
-                    border_width: eo.border_width,
-                    width: eo.width,
-                    height: eo.height,
-                    element_id: eo.element_id,
-                    need_paint,
-                    focused: eo.element.is_focused(),
-                };
-                Some(PaintObject::Normal(epo))
-            }
-            RenderObject::Layer(lod) => {
-                let invalid_rects = {
-                    let lo = &mut self.layout_tree.layer_objects[lod.layer_object_idx];
-                    let mut invalid_area = lo.invalid_area.clone();
-                    let layer_path = Path::rect(&Rect::from_xywh(0.0, 0.0, lo.width, lo.height), None);
-                    let im = lo.total_matrix.invert().unwrap();
-                    let mut viewport_path = Path::rect(viewport, None);
-                    let visible_path = viewport_path.transform(&im).op(&layer_path, PathOp::Intersect).unwrap_or(Path::new());
-                    let mut visible_bounds = visible_path.bounds().clone();
-                    visible_bounds.top = visible_bounds.top.floor();
-                    visible_bounds.bottom = visible_bounds.bottom.ceil();
+        let need_paint = invalid_rects.has_intersects(&Rect::from_xywh(eo.layer_coord.0, eo.layer_coord.1, eo.width, eo.height));
+        let border_path_mut = eo.element.get_border_path_mut();
+        let border_path = border_path_mut.get_paths().clone();
+        let border_box_path = border_path_mut.get_box_path().clone();
+        let epo = ElementPaintObject {
+            coord: eo.coord,
+            children,
+            children_viewport: eo.children_viewport,
+            border_path,
+            border_box_path,
+            border_color: eo.border_color,
+            render_fn: if need_paint { Some((eo.renderer)()) } else { None },
+            background_image: eo.background_image.clone(),
+            background_color: eo.background_color,
+            border_width: eo.border_width,
+            width: eo.width,
+            height: eo.height,
+            element_id: eo.element_id,
+            need_paint,
+            focused: eo.element.is_focused(),
+        };
+        epo
+    }
 
-                    let max_len = (viewport.width() * viewport.width() + viewport.height() * viewport.height()).sqrt().ceil();
-                    let max_surface_width = f32::min(lo.width, max_len).ceil();
-                    let max_surface_height = f32::min(lo.height, max_len).ceil();
-                    if lo.surface_bounds.width() != max_surface_width || lo.surface_bounds.height() != max_surface_height {
-                        invalid_area = InvalidArea::Full;
-                        lo.surface_bounds = Rect::from_xywh(
+    pub fn build_layer_node(&mut self, lod: &LayerNode, viewport: &Rect) -> LayerPaintObject {
+        let invalid_rects = {
+            let lo = &mut self.layout_tree.layer_objects[lod.layer_object_idx];
+            let mut invalid_area = lo.invalid_area.clone();
+            let layer_path = Path::rect(&Rect::from_xywh(0.0, 0.0, lo.width, lo.height), None);
+            let im = lo.total_matrix.invert().unwrap();
+            let mut viewport_path = Path::rect(viewport, None);
+            let visible_path = viewport_path.transform(&im).op(&layer_path, PathOp::Intersect).unwrap_or(Path::new());
+            let mut visible_bounds = visible_path.bounds().clone();
+            visible_bounds.top = visible_bounds.top.floor();
+            visible_bounds.bottom = visible_bounds.bottom.ceil();
+
+            let max_len = (viewport.width() * viewport.width() + viewport.height() * viewport.height()).sqrt().ceil();
+            let max_surface_width = f32::min(lo.width, max_len).ceil();
+            let max_surface_height = f32::min(lo.height, max_len).ceil();
+            if lo.surface_bounds.width() != max_surface_width || lo.surface_bounds.height() != max_surface_height {
+                invalid_area = InvalidArea::Full;
+                lo.surface_bounds = Rect::from_xywh(
+                    visible_bounds.left,
+                    visible_bounds.top,
+                    max_surface_width,
+                    max_surface_height,
+                );
+            } else {
+                // Handle visible bound change
+                let mut common_visible_bounds = visible_bounds.clone();
+                if common_visible_bounds.intersect(&lo.visible_bounds) {
+                    if common_visible_bounds.left > visible_bounds.left {
+                        let new_rect = Rect::from_xywh(
                             visible_bounds.left,
                             visible_bounds.top,
-                            max_surface_width,
-                            max_surface_height,
+                            common_visible_bounds.left - visible_bounds.left,
+                            visible_bounds.height()
                         );
-                    } else {
-                        // Handle visible bound change
-                        let mut common_visible_bounds = visible_bounds.clone();
-                        if common_visible_bounds.intersect(&lo.visible_bounds) {
-                            if common_visible_bounds.left > visible_bounds.left {
-                                let new_rect = Rect::from_xywh(
-                                    visible_bounds.left,
-                                    visible_bounds.top,
-                                    common_visible_bounds.left - visible_bounds.left,
-                                    visible_bounds.height()
-                                );
-                                invalid_area.add_rect(Some(&new_rect));
-                            }
-                            if common_visible_bounds.top > visible_bounds.top {
-                                let new_rect = Rect::from_xywh(
-                                    visible_bounds.left,
-                                    visible_bounds.top,
-                                    visible_bounds.width(),
-                                    common_visible_bounds.top - visible_bounds.top,
-                                );
-                                invalid_area.add_rect(Some(&new_rect));
-                            }
-                            if common_visible_bounds.right < visible_bounds.right {
-                                let new_rect = Rect::from_xywh(
-                                    common_visible_bounds.right,
-                                    visible_bounds.top,
-                                    visible_bounds.right - common_visible_bounds.right,
-                                    visible_bounds.height()
-                                );
-                                invalid_area.add_rect(Some(&new_rect));
-                            }
-                            if common_visible_bounds.bottom < visible_bounds.bottom {
-                                let new_rect = Rect::from_xywh(
-                                    visible_bounds.left,
-                                    common_visible_bounds.bottom,
-                                    visible_bounds.width(),
-                                    visible_bounds.bottom - common_visible_bounds.bottom,
-                                );
-                                invalid_area.add_rect(Some(&new_rect));
-                            }
-                        } else {
-                            invalid_area.add_rect(Some(&visible_bounds));
-                        }
-                        // Handle surface change
-                        if lo.surface_bounds.left > visible_bounds.left {
-                            let new_rect = Rect::from_xywh(
-                                visible_bounds.left,
-                                lo.surface_bounds.top,
-                                lo.surface_bounds.left - visible_bounds.left,
-                                lo.surface_bounds.height(),
-                            );
-                            invalid_area.add_rect(Some(&new_rect));
-                            lo.surface_bounds.offset((visible_bounds.left - lo.surface_bounds.left, 0.0));
-                        } else if lo.surface_bounds.right < visible_bounds.right {
-                            let new_rect = Rect::from_xywh(
-                                lo.surface_bounds.right,
-                                lo.surface_bounds.top,
-                                visible_bounds.right - lo.surface_bounds.right,
-                                lo.surface_bounds.height(),
-                            );
-                            invalid_area.add_rect(Some(&new_rect));
-                            lo.surface_bounds.offset((visible_bounds.right - lo.surface_bounds.right, 0.0));
-                        }
-                        if lo.surface_bounds.top > visible_bounds.top {
-                            let new_rect = Rect::from_xywh(
-                                lo.surface_bounds.left,
-                                visible_bounds.top,
-                                lo.surface_bounds.width(),
-                                lo.surface_bounds.top - visible_bounds.top,
-                            );
-                            invalid_area.add_rect(Some(&new_rect));
-                            lo.surface_bounds.offset((0.0, visible_bounds.top - lo.surface_bounds.top));
-                        } else if lo.surface_bounds.bottom < visible_bounds.bottom {
-                            let new_rect = Rect::from_xywh(
-                                lo.surface_bounds.left,
-                                lo.surface_bounds.bottom,
-                                lo.surface_bounds.width(),
-                                visible_bounds.bottom - lo.surface_bounds.bottom,
-                            );
-                            invalid_area.add_rect(Some(&new_rect));
-                            lo.surface_bounds.offset((0.0, visible_bounds.bottom - lo.surface_bounds.bottom));
-                        }
+                        invalid_area.add_rect(Some(&new_rect));
                     }
-                    lo.visible_bounds = visible_bounds.clone();
-                    invalid_area.build(visible_bounds.clone())
-                };
-                let objects = self.build_paint_objects(&mut lod.objects, viewport, &invalid_rects);
-                let lo = &mut self.layout_tree.layer_objects[lod.layer_object_idx];
-                let lpo = LayerPaintObject {
-                    matrix: lo.matrix.clone(),
-                    total_matrix: lo.total_matrix.clone(),
-                    width: lo.width,
-                    height: lo.height,
-                    objects,
-                    key: lo.key.clone(),
-                    origin_absolute_pos: lo.origin_absolute_pos,
-                    visible_bounds: lo.visible_bounds.clone(),
-                    surface_bounds: lo.surface_bounds.clone(),
-                    invalid_rects,
-                };
-                lo.invalid_area = InvalidArea::None;
-                Some(PaintObject::Layer(lpo))
+                    if common_visible_bounds.top > visible_bounds.top {
+                        let new_rect = Rect::from_xywh(
+                            visible_bounds.left,
+                            visible_bounds.top,
+                            visible_bounds.width(),
+                            common_visible_bounds.top - visible_bounds.top,
+                        );
+                        invalid_area.add_rect(Some(&new_rect));
+                    }
+                    if common_visible_bounds.right < visible_bounds.right {
+                        let new_rect = Rect::from_xywh(
+                            common_visible_bounds.right,
+                            visible_bounds.top,
+                            visible_bounds.right - common_visible_bounds.right,
+                            visible_bounds.height()
+                        );
+                        invalid_area.add_rect(Some(&new_rect));
+                    }
+                    if common_visible_bounds.bottom < visible_bounds.bottom {
+                        let new_rect = Rect::from_xywh(
+                            visible_bounds.left,
+                            common_visible_bounds.bottom,
+                            visible_bounds.width(),
+                            visible_bounds.bottom - common_visible_bounds.bottom,
+                        );
+                        invalid_area.add_rect(Some(&new_rect));
+                    }
+                } else {
+                    invalid_area.add_rect(Some(&visible_bounds));
+                }
+                // Handle surface change
+                if lo.surface_bounds.left > visible_bounds.left {
+                    let new_rect = Rect::from_xywh(
+                        visible_bounds.left,
+                        lo.surface_bounds.top,
+                        lo.surface_bounds.left - visible_bounds.left,
+                        lo.surface_bounds.height(),
+                    );
+                    invalid_area.add_rect(Some(&new_rect));
+                    lo.surface_bounds.offset((visible_bounds.left - lo.surface_bounds.left, 0.0));
+                } else if lo.surface_bounds.right < visible_bounds.right {
+                    let new_rect = Rect::from_xywh(
+                        lo.surface_bounds.right,
+                        lo.surface_bounds.top,
+                        visible_bounds.right - lo.surface_bounds.right,
+                        lo.surface_bounds.height(),
+                    );
+                    invalid_area.add_rect(Some(&new_rect));
+                    lo.surface_bounds.offset((visible_bounds.right - lo.surface_bounds.right, 0.0));
+                }
+                if lo.surface_bounds.top > visible_bounds.top {
+                    let new_rect = Rect::from_xywh(
+                        lo.surface_bounds.left,
+                        visible_bounds.top,
+                        lo.surface_bounds.width(),
+                        lo.surface_bounds.top - visible_bounds.top,
+                    );
+                    invalid_area.add_rect(Some(&new_rect));
+                    lo.surface_bounds.offset((0.0, visible_bounds.top - lo.surface_bounds.top));
+                } else if lo.surface_bounds.bottom < visible_bounds.bottom {
+                    let new_rect = Rect::from_xywh(
+                        lo.surface_bounds.left,
+                        lo.surface_bounds.bottom,
+                        lo.surface_bounds.width(),
+                        visible_bounds.bottom - lo.surface_bounds.bottom,
+                    );
+                    invalid_area.add_rect(Some(&new_rect));
+                    lo.surface_bounds.offset((0.0, visible_bounds.bottom - lo.surface_bounds.bottom));
+                }
             }
+            lo.visible_bounds = visible_bounds.clone();
+            invalid_area.build(visible_bounds.clone())
+        };
+        let normal_nodes = self.build_paint_normal_nodes(&lod.normal_nodes, viewport, &invalid_rects);
+        let mut layers = Vec::new();
+        for lo in &lod.layer_nodes {
+            layers.push(self.build_layer_node(lo, viewport));
         }
+
+        let lo = &mut self.layout_tree.layer_objects[lod.layer_object_idx];
+        let lpo = LayerPaintObject {
+            matrix: lo.matrix.clone(),
+            total_matrix: lo.total_matrix.clone(),
+            width: lo.width,
+            height: lo.height,
+            normal_nodes,
+            layer_nodes: layers,
+            key: lo.key.clone(),
+            origin_absolute_pos: lo.origin_absolute_pos,
+            visible_bounds: lo.visible_bounds.clone(),
+            surface_bounds: lo.surface_bounds.clone(),
+            invalid_rects,
+            clip_rect: lo.clip_rect.clone(),
+        };
+        lo.invalid_area = InvalidArea::None;
+        lpo
     }
 
 }

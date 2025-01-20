@@ -127,6 +127,14 @@ pub fn show_repaint_area() -> bool {
     false
 }
 
+pub fn show_focus_hit() -> bool {
+    false
+}
+
+pub fn show_layer_hit() -> bool {
+    false
+}
+
 pub fn is_snapshot_usable() -> bool {
     true
 }

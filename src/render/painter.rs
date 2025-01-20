@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 use std::mem;
+use skia_bindings::SkPaint_Style;
 use skia_safe::{Canvas, ClipOp, Color, Image, Matrix, Paint, PaintStyle, Rect};
 use skia_window::context::RenderContext;
 use crate::canvas_util::CanvasHelper;
 use crate::paint::{InvalidRects, LayerState, RenderLayerKey};
 use crate::render::paint_object::{ElementPaintObject, LayerPaintObject, PaintObject};
-use crate::render::paint_tree::PaintTree;
-use crate::{show_focus_hit, show_repaint_area, some_or_continue, some_or_return};
+use crate::render::paint_tree::{PaintTree, PaintTreeNew};
+use crate::{show_focus_hit, show_layer_hit, show_repaint_area, some_or_continue, some_or_return};
 
 enum PaintStep {
     Elements,
@@ -45,16 +46,9 @@ impl ElementPainter {
         self.viewport = viewport;
     }
 
-    pub fn draw_root(&mut self, canvas: &Canvas, obj: &mut PaintTree, context: &mut RenderContext) {
+    pub fn draw_root(&mut self, canvas: &Canvas, obj: &mut PaintTreeNew, context: &mut RenderContext) {
         let mut state = mem::take(&mut self.layer_state_map);
-        self.paint_step = PaintStep::Elements;
-        self.draw_paint_object(canvas, &mut obj.root, context, &mut state);
-        for k in &obj.all_layer_keys {
-            let layer = some_or_continue!(state.remove(k));
-            self.layer_state_map.insert(k.clone(), layer);
-        }
-        self.paint_step = PaintStep::Layers;
-        self.draw_paint_object(canvas, &mut obj.root, context, &mut state);
+        self.draw_layer(canvas, context, &mut obj.root, &mut state);
 
         /*
         for k in &obj.all_layer_keys {
@@ -86,69 +80,57 @@ impl ElementPainter {
          */
     }
 
-    fn draw_paint_object(&mut self, canvas: &Canvas, obj: &mut PaintObject, context: &mut RenderContext, layer_states: &mut HashMap<RenderLayerKey, LayerState>) {
-        match obj {
-            PaintObject::Normal(epo) => {
-                // println!("Painting {}", epo.element_id);
-                //TODO optimize
-                if !epo.need_paint && epo.children.is_empty() {
-                    return;
-                }
+    fn draw_element_object_recurse(&mut self, canvas: &Canvas, epo: &mut ElementPaintObject, context: &mut RenderContext, layer_states: &mut HashMap<RenderLayerKey, LayerState>) {
+        // println!("Painting {}", epo.element_id);
+        //TODO optimize
+        if !epo.need_paint && epo.children.is_empty() {
+            return;
+        }
+        canvas.save();
+        canvas.translate(epo.coord);
+        canvas.clip_path(&epo.border_box_path, ClipOp::Intersect, false);
+        if epo.need_paint {
+            self.draw_element_paint_object(canvas, epo);
+        }
+        for e in &mut epo.children {
+            self.draw_element_object_recurse(canvas, e, context, layer_states);
+        }
+        canvas.restore();
+    }
+
+    fn submit_layer(&mut self, canvas: &Canvas, context: &mut RenderContext, lpo: &mut LayerPaintObject) {
+        if let Some(layer) = self.layer_state_map.get_mut(&lpo.key) {
+            let img = layer.layer.as_image();
+            canvas.save();
+            canvas.translate((layer.surface_bounds.left, layer.surface_bounds.top));
+            canvas.scale((1.0 / self.scale, 1.0 / self.scale));
+            canvas.draw_image(img, (0.0, 0.0), None);
+            canvas.restore();
+
+            if show_repaint_area() {
                 canvas.save();
-                canvas.translate(epo.coord);
-                canvas.clip_path(&epo.border_box_path, ClipOp::Intersect, false);
-                match self.paint_step {
-                    PaintStep::Elements => {
-                        if epo.need_paint {
-                            self.draw_element_paint_object(canvas, epo);
-                        }
-                    }
-                    PaintStep::Layers => {}
+                canvas.scale((self.scale, self.scale));
+                let path = layer.invalid_rects.to_path();
+                if !path.is_empty() {
+                    let mut paint = Paint::default();
+                    paint.set_style(PaintStyle::Stroke);
+                    paint.set_color(Color::from_rgb(200, 0, 0));
+                    canvas.draw_path(&path, &paint);
                 }
-                self.draw_paint_objects(canvas, &mut epo.children, context, layer_states);
                 canvas.restore();
             }
-            PaintObject::Layer(lpo) => {
-                //TODO apply matrix
-                canvas.save();
-                // println!("Updating layer: {:?} , {:?}", lpo.key, lpo.invalid_rects);
-                match self.paint_step {
-                    PaintStep::Elements => {
-                        context.flush();
-                        self.draw_layer(canvas, context, lpo, layer_states);
-                        context.flush();
-                    }
-                    PaintStep::Layers => {
-                        canvas.save();
-                        canvas.concat(&lpo.matrix);
-                        if let Some(layer) = self.layer_state_map.get_mut(&lpo.key) {
-                            let img = layer.layer.as_image();
-                            canvas.save();
-                            canvas.translate((layer.surface_bounds.left, layer.surface_bounds.top));
-                            canvas.scale((1.0 / self.scale, 1.0 / self.scale));
-                            canvas.draw_image(img, (0.0, 0.0), None);
-                            canvas.restore();
-
-                            if show_repaint_area() {
-                                canvas.save();
-                                canvas.scale((self.scale, self.scale));
-                                let path = layer.invalid_rects.to_path();
-                                if !path.is_empty() {
-                                    let mut paint = Paint::default();
-                                    paint.set_style(PaintStyle::Stroke);
-                                    paint.set_color(Color::from_rgb(200, 0, 0));
-                                    canvas.draw_path(&path, &paint);
-                                }
-                                canvas.restore();
-                            }
-                        }
-                        self.draw_paint_objects(canvas, &mut lpo.objects, context, layer_states);
-                        canvas.restore();
-                    }
-                }
-                canvas.restore();
+            if show_layer_hit() {
+                Self::paint_hit_rect(canvas, lpo.width, lpo.height);
             }
         }
+    }
+
+    fn paint_hit_rect(canvas: &Canvas, width: f32, height: f32) {
+        let rect = Rect::new(0.5, 0.5, width - 1.0, height - 1.0);
+        let mut paint = Paint::default();
+        paint.set_style(SkPaint_Style::Stroke);
+        paint.set_color(Color::RED);
+        canvas.draw_rect(&rect, &paint);
     }
 
     pub fn draw_layer(
@@ -217,16 +199,26 @@ impl ElementPainter {
             layer_canvas.clip_rect(&Rect::from_xywh(0.0, 0.0, layer.width, layer.height), ClipOp::Intersect, false);
             layer_canvas.clear(Color::TRANSPARENT);
         }
-        self.draw_paint_objects(layer_canvas, &mut layer.objects, context, layer_state_map);
-        layer_canvas.restore();
-
-        self.layer_state_map.insert(layer.key.clone(), graphic_layer);
-    }
-
-    fn draw_paint_objects(&mut self, canvas: &Canvas, objs: &mut Vec<PaintObject>, context: &mut RenderContext, layer_states: &mut HashMap<RenderLayerKey, LayerState>) {
-        for obj in objs {
-            self.draw_paint_object(canvas, obj, context, layer_states);
+        for e in &mut layer.normal_nodes {
+            self.draw_element_object_recurse(layer_canvas, e, context, layer_state_map);
         }
+        layer_canvas.restore();
+        context.flush();
+        self.layer_state_map.insert(layer.key.clone(), graphic_layer);
+
+        root_canvas.save();
+        root_canvas.concat(&layer.total_matrix);
+        if let Some(clip_rect) = &layer.clip_rect {
+            root_canvas.clip_rect(&clip_rect, ClipOp::Intersect, false);
+        }
+        self.submit_layer(root_canvas, context, layer);
+        context.flush();
+        root_canvas.concat(&layer.total_matrix.invert().unwrap());
+
+        for l in &mut layer.layer_nodes {
+            self.draw_layer(root_canvas, context, l, layer_state_map);
+        }
+        root_canvas.restore();
     }
 
     fn draw_element_paint_object(&mut self, canvas: &Canvas, node: &mut ElementPaintObject) {

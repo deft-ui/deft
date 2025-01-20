@@ -7,7 +7,7 @@ use crate::style::ColorHelper;
 
 pub struct ElementPaintObject {
     pub coord: (f32, f32),
-    pub children: Vec<PaintObject>,
+    pub children: Vec<ElementPaintObject>,
     pub children_viewport: Option<Rect>,
     pub border_path: [Path; 4],
     pub border_box_path: Path,
@@ -74,7 +74,9 @@ pub struct LayerPaintObject {
     pub total_matrix: Matrix,
     pub width: f32,
     pub height: f32,
-    pub objects: Vec<PaintObject>,
+    // pub objects: Vec<PaintObject>,
+    pub normal_nodes: Vec<ElementPaintObject>,
+    pub layer_nodes: Vec<LayerPaintObject>,
     // pub root_element_id: u32,
     pub key: RenderLayerKey,
     // Original position relative to viewport before transform
@@ -82,6 +84,7 @@ pub struct LayerPaintObject {
     pub invalid_rects: InvalidRects,
     pub surface_bounds: Rect,
     pub visible_bounds: Rect,
+    pub clip_rect: Option<Rect>,
 }
 
 pub enum PaintObject {

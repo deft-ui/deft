@@ -822,7 +822,7 @@ impl DerefMut for StyleNode {
 impl StyleNode {
     pub fn new() -> Self {
         let transparent = Color::from_argb(0,0,0,0);
-        let inner = StyleNodeInner {
+        let mut inner = StyleNodeInner {
             element: ElementWeak::invalid(),
             yoga_node: Node::new(),
             shadow_node: None,
@@ -842,6 +842,7 @@ impl StyleNode {
             animation_renderer: None,
             font_size: PropValue::Inherit,
         };
+        inner.yoga_node.set_position_type(PositionType::Static);
         Self { inner: Mrc::new(inner) }
     }
 

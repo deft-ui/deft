@@ -925,7 +925,7 @@ impl Frame {
             self.render_tree.update_layout_info_recurse(body, body.get_bounds().to_skia_rect());
             self.render_tree.rebuild_render_object(body);
             some_or_return!(
-                self.render_tree.build_paint_tree(&viewport),
+                self.render_tree.build_paint_tree_new(&viewport),
                 ResultWaiter::new_finished(false)
             )
         } else {
