@@ -42,13 +42,16 @@ fn calculate_len(str: &str, width: f32, char_count: usize, available_width: f32,
 }
 
 pub fn calculate_line_char_count(x_pos: &[f32], available_width: f32) -> usize {
-    if x_pos.len() <= 1 || x_pos[1] > available_width {
+    if x_pos.len() <= 1 || x_pos[1] - x_pos[0] > available_width {
         return 0;
     }
     let x_offset = x_pos[0];
     let mut start = 0;
     let mut end = x_pos.len() - 1;
-    while x_pos[end] - x_offset > available_width && end - start > 1 {
+    while x_pos[end] - x_offset > available_width {
+        if end - start == 1 {
+            return start;
+        }
         let mid = (start + end) / 2;
         if x_pos[mid] - x_offset > available_width {
             end = mid;
