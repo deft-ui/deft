@@ -588,19 +588,13 @@ impl ElementBackend for Scroll {
                             match style {
                                 StyleProp::RowGap(value) => {
                                     let new_left = old_left + left_dist * timing_func.evaluate(TValue::Parametric(value.resolve(&0.0) as f64)).y as f32;
-                                    if new_left < 0.0 || new_left > ele.get_max_scroll_left() {
-                                        left_stopped = true;
-                                    } else {
-                                        ele.set_scroll_left(new_left);
-                                    }
+                                    ele.set_scroll_left(new_left);
+                                    left_stopped = new_left < 0.0 || new_left > ele.get_max_scroll_left();
                                 },
                                 StyleProp::ColumnGap(value) => {
                                     let new_top = old_top + top_dist * timing_func.evaluate(TValue::Parametric(value.resolve(&0.0) as f64)).y as f32;
-                                    if new_top < 0.0 || new_top > ele.get_max_scroll_top() {
-                                        top_stooped = true;
-                                    } else {
-                                        ele.set_scroll_top(new_top);
-                                    }
+                                    ele.set_scroll_top(new_top);
+                                    top_stooped = new_top < 0.0 || new_top > ele.get_max_scroll_top();
                                 },
                                 _ => {}
                             }
@@ -700,7 +694,7 @@ impl LayoutRoot for ScrollWeak {
 }
 
 fn calculate_speed(distance: f32, duration: f32) -> f32 {
-    let max_speed = 2.0;
+    let max_speed = 5.0;
     if distance == 0.0 {
         return 0.0;
     }

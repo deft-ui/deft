@@ -210,6 +210,10 @@ impl ElementPainter {
         root_canvas.concat(&layer.total_matrix);
         if let Some(clip_rect) = &layer.clip_rect {
             root_canvas.clip_rect(&clip_rect, ClipOp::Intersect, false);
+        } else {
+            //TODO support overflow
+            let rect = Rect::from_xywh(0.0, 0.0, layer.width, layer.height);
+            root_canvas.clip_rect(&rect, ClipOp::Intersect, false);
         }
         self.submit_layer(root_canvas, context, layer);
         context.flush();
