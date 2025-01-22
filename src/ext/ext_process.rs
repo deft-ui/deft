@@ -2,6 +2,7 @@ use std::env;
 use crate as lento;
 use lento_macros::{js_func, js_methods};
 use crate::app::exit_app;
+use crate::is_mobile_platform;
 
 #[allow(nonstandard_style)]
 pub struct process;
@@ -17,6 +18,11 @@ impl process {
     #[js_func]
     pub fn argv() -> Vec<String> {
         env::args().collect()
+    }
+
+    #[js_func]
+    pub fn is_mobile_platform() -> bool {
+        is_mobile_platform()
     }
 
 }

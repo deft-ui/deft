@@ -51,6 +51,32 @@ class Process {
     get argv() {
         return process_argv();
     }
+    get isMobilePlatform() {
+        return process_is_mobile_platform();
+    }
+}
+
+
+class FileDialog {
+    /**
+     *
+     * @param options {ShowFileDialogOptions}
+     * @returns {Promise<string[]>}
+     */
+    show(options) {
+        return new Promise((resolve, reject) => {
+            dialog_show_file_dialog({
+                dialogType: options.dialogType,
+            }, options.frame?.handle, (result, data) => {
+                if (result) {
+                    resolve(data);
+                } else {
+                    reject(data);
+                }
+            })
+        })
+
+    }
 }
 
 /**
@@ -77,6 +103,10 @@ export class Frame {
     constructor(attrs) {
         this.#frameId = Frame_create(attrs || {});
         this.#eventBinder = new EventBinder(this.#frameId, Frame_bind_js_event_listener, Frame_unbind_js_event_listener, this);
+    }
+
+    get handle() {
+        return this.#frameId
     }
 
     /**
@@ -449,7 +479,7 @@ export class View {
         if (!this.el) {
             throw new Error("Failed to create view:" + el)
         }
-        this.#eventBinder = new EventBinder(this.el, Element_add_js_event_listener, Element_remove_js_event_listener, (target) => {
+        this.#eventBinder = new EventBinder(this.el, Element_add_js_event_listener, Element_remove_js_event_listener, this, (target) => {
             const myContext = Element_get_js_context(target);
             if (myContext) {
                 return CONTEXT2ELEMENT.get(myContext);
@@ -1559,6 +1589,7 @@ if (workerContext) {
 
 globalThis.navigator = new Navigator();
 globalThis.process = new Process();
+globalThis.fileDialog = new FileDialog();
 globalThis.Worker = Worker;
 globalThis.WorkerContext = WorkerContext;
 globalThis.Frame = Frame;

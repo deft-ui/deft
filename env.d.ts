@@ -231,7 +231,9 @@ declare function AudioRef_duration(id): number;
 declare function Base64_encode_str(str: string): string;
 
 declare interface ShowFileDialogOptions {
-    dialogType ?: "single" | "multiple" | "save" | "dir"
+    dialogType ?: "single" | "multiple" | "save" | "dir",
+    //TODO fix type
+    frame ?: any,
 }
 declare function dialog_show_file_dialog(options ?: ShowFileDialogOptions): Promise<string[]>;
 

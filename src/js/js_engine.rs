@@ -22,8 +22,6 @@ use crate::ext::ext_audio::Audio;
 use crate::ext::ext_base64::Base64;
 use crate::ext::ext_clipboard::{clipboard_read_text, clipboard_write_text};
 use crate::ext::ext_console::Console as ExtConsole;
-#[cfg(all(target_os = "windows", target_os = "linux"))]
-use crate::ext::ext_dialog::dialog;
 use crate::ext::ext_env::env;
 use crate::ext::ext_fetch::fetch;
 use crate::ext::ext_frame::{handle_window_event, FRAMES};
@@ -110,8 +108,8 @@ impl JsEngine {
             engine.add_global_functions(SystemTray::create_js_apis());
         }
         engine.add_global_functions(process::create_js_apis());
-        #[cfg(all(target_os = "windows", target_os = "linux"))]
-        engine.add_global_functions(dialog::create_js_apis());
+        #[cfg(any(target_os = "windows", target_os = "linux"))]
+        engine.add_global_functions(crate::ext::ext_dialog::dialog::create_js_apis());
         engine.add_global_functions(Base64::create_js_apis());
         engine.add_global_functions(shell::create_js_apis());
         engine.add_global_functions(Audio::create_js_apis());
@@ -186,6 +184,10 @@ impl JsEngine {
 
     pub fn execute_module(&mut self, module_name: &str) -> Result<(), ExecutionError> {
         self.js_context.execute_module(module_name)
+    }
+
+    pub fn eval_module(&mut self, code: &str, filename: &str) -> Result<JsValue, ExecutionError> {
+        self.js_context.eval_module(code, filename)
     }
 
     pub fn handle_window_event(&mut self, window_id: WindowId, event: WindowEvent) {
