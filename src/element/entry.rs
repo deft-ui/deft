@@ -7,14 +7,14 @@ use anyhow::Error;
 use clipboard::{ClipboardContext, ClipboardProvider};
 use ordered_float::OrderedFloat;
 use quick_js::JsValue;
-use skia_safe::{Canvas, Font, Paint};
+use skia_safe::{Canvas, Color, Font, Paint};
 use skia_safe::textlayout::{TextAlign};
 use skia_safe::wrapper::NativeTransmutableWrapper;
 use winit::keyboard::NamedKey;
 use winit::window::CursorIcon;
-use yoga::StyleUnit;
+use yoga::{PositionType, StyleUnit};
 use lento_macros::{element_backend, js_methods};
-use crate::base::{CaretDetail, ElementEvent, EventContext, MouseDetail, MouseEventType, Rect, TextChangeDetail, TextUpdateDetail};
+use crate::base::{Callback, CaretDetail, ElementEvent, EventContext, MouseDetail, MouseEventType, Rect, TextChangeDetail, TextUpdateDetail};
 use crate::element::{ElementBackend, Element, ElementWeak};
 use crate::element::text::{AtomOffset, Text as Label};
 use crate::number::DeNan;
@@ -26,9 +26,11 @@ use crate::element::scroll::{Scroll, ScrollBarStrategy};
 use crate::element::text::text_paragraph::Line;
 use crate::event::{KEY_MOD_CTRL, KEY_MOD_SHIFT, KeyEventDetail, MouseDownEvent, MouseUpEvent, MouseMoveEvent, KeyDownEvent, CaretChangeEvent, TextUpdateEvent, TextChangeEvent, FocusEvent, BlurEvent, SelectStartEvent, SelectEndEvent, SelectMoveEvent, TextInputEvent, ClickEvent};
 use crate::event_loop::{create_event_loop_callback, create_event_loop_proxy};
+use crate::frame::Frame;
 use crate::render::RenderFn;
 use crate::string::StringUtils;
 use crate::style::{StyleProp, StylePropKey, StylePropVal};
+use crate::style::StyleProp::{BackgroundColor, MinWidth, Position};
 use crate::style::StylePropKey::Height;
 use crate::timer::TimerHandle;
 
@@ -91,8 +93,8 @@ impl Entry {
     pub fn set_multiple_line(&mut self, multiple_line: bool) {
         self.multiple_line = multiple_line;
         self.paragraph.set_text_wrap(multiple_line);
-        self.base.content_auto_width = !multiple_line;
-        self.base.content_auto_height = multiple_line;
+        // self.base.content_auto_width = !multiple_line;
+        // self.base.content_auto_height = multiple_line;
         if multiple_line {
             self.base.set_scroll_y(ScrollBarStrategy::Auto);
         } else {
@@ -241,10 +243,13 @@ impl Entry {
             //TODO do not use loop callback?
             // Note: here use loop callback because of paragraph has not been layout when receive caret change event
             let mut me = self.clone();
-            let callback = create_event_loop_callback(move || {
+            let mut element = ok_or_return!(self.element.upgrade_mut());
+            let callback = Callback::new(move || {
                 me.emit_caret_change();
             });
-            callback.call();
+            element.with_window(|w| {
+                w.request_next_paint_callback(callback);
+            });
         }
     }
 
@@ -510,6 +515,10 @@ impl ElementBackend for Entry {
     fn create(mut ele: &mut Element) -> Self {
         let mut base = Scroll::create(ele);
         let mut paragraph_element = Element::create(Paragraph::create);
+        paragraph_element.set_style_props(vec![
+            Position(StylePropVal::Custom(PositionType::Absolute)),
+            MinWidth(StylePropVal::Custom(StyleUnit::Percent(OrderedFloat(100.0)))),
+        ]);
         let mut paragraph = paragraph_element.get_backend_as::<Paragraph>().clone();
         paragraph.set_text_wrap(false);
         paragraph.add_line(Self::build_line("".to_string()));

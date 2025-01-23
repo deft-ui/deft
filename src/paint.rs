@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use measure_time::print_time;
 use sha1::digest::generic_array::functional::FunctionalSequence;
 use skia_bindings::{SkClipOp, SkPaint_Style, SkPathOp};
-use skia_safe::{scalar, ClipOp, Color, IRect, Image, Matrix, Paint, Path, PathOp, Point, Rect, Vector};
+use skia_safe::{scalar, ClipOp, Color, Contains, IRect, Image, Matrix, Paint, Path, PathOp, Point, Rect, Vector};
 use skia_safe::Canvas;
 use skia_window::context::{RenderContext, UserContext};
 use skia_window::layer::Layer;
@@ -164,7 +164,8 @@ impl RenderTree {
         let lod = &self.layout_tree.layer_objects[lo.layer_object_idx];
         let im = lod.total_matrix.invert()?;
         let Point {x, y} = im.map_xy(abs_x, abs_y);
-        if x < 0.0 || x > lod.width || y < 0.0 || y > lod.height {
+        let rect = lod.clip_rect.unwrap_or(Rect::from_xywh(0.0, 0.0, lod.width, lod.height));
+        if !rect.contains(Point::new(x, y)) {
             return None;
         }
         for sub_lo in lo.layer_nodes.iter().rev() {

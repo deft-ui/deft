@@ -552,9 +552,8 @@ impl Element {
         if let Some(lr) = &mut self.layout_root {
             lr.update_layout();
             assert_eq!(false, self.layout_dirty);
-        } else {
-            self.on_layout_update();
         }
+        self.on_layout_update();
     }
 
     pub fn get_border_width(&self) -> (f32, f32, f32, f32) {
@@ -868,9 +867,8 @@ impl Element {
             for child in &mut self.get_children() {
                 if let Some(p) = &mut child.layout_root {
                     p.update_layout();
-                } else {
-                    child.on_layout_update();
                 }
+                child.on_layout_update();
             }
         }
     }
