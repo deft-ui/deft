@@ -12,13 +12,13 @@ edition = "2021"
 [dependencies]
 lento-macros = { path = "packages/lento-macros", version = "0.1.0" }
 
-quick-js = {path = "third_party/quickjs-rs", package = "lento-quick-js", version = "0.4.2-alpha.0"}
-yoga = { path = "third_party/yoga-rs", package = "lento-yoga", version = "0.4.0" }
-winit = { path = "third_party/winit", package = "lento-winit", version = "0.30.5", features = ["android-native-activity", "rwh_05"] }
+quick-js = {path = "third_party/quickjs-rs", package = "deft-quick-js", version = "0.4.2-alpha.0"}
+yoga = { path = "third_party/yoga-rs", package = "deft-yoga", version = "0.4.0" }
+winit = { path = "third_party/winit", package = "deft-winit", version = "0.30.5", features = ["android-native-activity", "rwh_05"] }
 skia-window = { path = "skia-window", version = "0.1.0" }
 
 lazy_static = "1.4"
-skia-bindings = { path = "third_party/rust-skia/skia-bindings", package = "lento-skia-bindings", version = "0.75.0", default-features = false }
+skia-bindings = {path = "third_party/rust-skia/skia-bindings", package = "deft-skia-bindings", version = "0.81.0", default-features = false }
 
 
 base64 = { version = "0.22.0" }
@@ -56,12 +56,12 @@ x11=[]
 native-dialog = "0.7.0"
 
 [target.'cfg(target_os = "android")'.dependencies]
-skia-safe = {path = "third_party/rust-skia/skia-safe", package = "lento-skia-safe", version = "0.75.0", features = ["textlayout", "svg", "x11"], default-features = false}
+skia-safe = {path = "third_party/rust-skia/skia-safe", package = "deft-skia-safe", version = "0.81.0", features = ["textlayout", "svg", "x11"], default-features = false}
 android_logger = "0.11.0"
 [target.'cfg(target_os = "linux")'.dependencies]
-skia-safe = {path = "third_party/rust-skia/skia-safe", package = "lento-skia-safe", version = "0.75.0", features = ["textlayout", "svg", "x11"], default-features = false}
+skia-safe = {path = "third_party/rust-skia/skia-safe", package = "deft-skia-safe", version = "0.81.0", features = ["textlayout", "svg", "x11"], default-features = false}
 [target.'cfg(target_os = "macos")'.dependencies]
-skia-safe = {path = "third_party/rust-skia/skia-safe", package = "lento-skia-safe", version = "0.75.0", features = ["textlayout", "svg"], default-features = false}
+skia-safe = {path = "third_party/rust-skia/skia-safe", package = "deft-skia-safe", version = "0.81.0", features = ["textlayout", "svg"], default-features = false}
 
 [build-dependencies]
 cfg_aliases = "0.2.1"
