@@ -147,6 +147,10 @@ impl Callback {
     }
 }
 
+pub struct JsValueContext {
+    pub context: JsValue,
+}
+
 pub enum TextAlign {
     Left,
     Right,

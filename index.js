@@ -1,3 +1,10 @@
+function assertEq(expected, actual) {
+    if (expected !== actual) {
+        console.error("assert fail");
+        process.exit(1);
+    }
+}
+
 function runWorker() {
     const worker = new Worker("./worker-index.js");
     worker.bindMessage(data => {
@@ -166,11 +173,18 @@ function createParagraph() {
     return paragraph;
 }
 
+function testFrameHandle(frame) {
+    const handle = frame.handle;
+    const frameFromHandle = Frame.fromHandle(handle);
+    assertEq(frame, frameFromHandle);
+}
+
 function main() {
     runWorker();
     createSystemTray();
     console.log("begin create frame");
     const frame = new Frame();
+    testFrameHandle(frame);
     frame.setTitle("DeftDemo");
     frame.bindResize((e) => {
         console.log("frame resized", e);
@@ -195,15 +209,20 @@ function main() {
     container.addChild(createLabel("测试test"));
     container.addChild(createParagraph());
     container.addChild(createTextEdit());
-    container.addChild(createEntry());
+    const entry = createEntry();
+    container.addChild(entry);
+    assertEq(container, entry.getParent());
     container.addChild(createCenterElement());
     // batchCreateLabels(container);
     frame.setBody(container);
+    assertEq(frame, container.getFrame());
+    assertEq(null, container.getParent());
 }
 
 try {
     main();
 } catch (error) {
-    console.error(error);
+    console.error(error, error.stack);
+    process.exit(1)
 }
 

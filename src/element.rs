@@ -411,6 +411,7 @@ impl Element {
         }
     }
 
+    #[js_func]
     pub fn get_frame(&self) -> Option<FrameWeak> {
         if let Some(p) = self.get_parent() {
             return p.get_frame()
@@ -428,6 +429,7 @@ impl Element {
         }
     }
 
+    #[js_func]
     pub fn get_parent(&self) -> Option<Element> {
         let p = match &self.parent {
             None => return None,

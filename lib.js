@@ -8,9 +8,6 @@ const VT_SCROLL = 7
 const VT_TEXT_EDIT = 8
 const VT_IMAGE = 9;
 
-//Note: CONTEXT2ELEMENT must be an weak map to avoid cyclic references.
-const CONTEXT2ELEMENT = new WeakMap();
-
 class Clipboard {
     /**
      *
@@ -94,19 +91,29 @@ export class Frame {
      */
     #eventBinder;
 
-    #frameId;
+    #frameHandle;
 
     /**
      *
      * @param attrs {FrameAttrs}
      */
     constructor(attrs) {
-        this.#frameId = Frame_create(attrs || {});
-        this.#eventBinder = new EventBinder(this.#frameId, Frame_bind_js_event_listener, Frame_unbind_js_event_listener, this);
+        this.#frameHandle = Frame_create(attrs || {});
+        this.#eventBinder = new EventBinder(this.#frameHandle, Frame_bind_js_event_listener, Frame_unbind_js_event_listener, this);
+        Frame_set_js_context(this.#frameHandle, this);
+    }
+
+    /**
+     *
+     * @param frameHandle
+     * @returns {Frame}
+     */
+    static fromHandle(frameHandle) {
+        return Frame_get_js_context(frameHandle);
     }
 
     get handle() {
-        return this.#frameId
+        return this.#frameHandle
     }
 
     /**
@@ -114,7 +121,7 @@ export class Frame {
      * @param view {View}
      */
     setBody(view) {
-        Frame_set_body(this.#frameId, view.el);
+        Frame_set_body(this.#frameHandle, view.el);
     }
 
     /**
@@ -122,7 +129,7 @@ export class Frame {
      * @param title {string}
      */
     setTitle(title) {
-        Frame_set_title(this.#frameId, title);
+        Frame_set_title(this.#frameHandle, title);
     }
 
     /**
@@ -130,7 +137,7 @@ export class Frame {
      * @param size {Size}
      */
     resize(size) {
-        Frame_resize(this.#frameId, size);
+        Frame_resize(this.#frameHandle, size);
     }
 
     /**
@@ -138,11 +145,11 @@ export class Frame {
      * @param owner {Frame}
      */
     setModal(owner) {
-        Frame_set_modal(this.#frameId, owner.#frameId)
+        Frame_set_modal(this.#frameHandle, owner.#frameHandle)
     }
 
     close() {
-        Frame_close(this.#frameId);
+        Frame_close(this.#frameHandle);
     }
 
     /**
@@ -150,15 +157,15 @@ export class Frame {
      * @param visible {boolean}
      */
     setVisible(visible) {
-        Frame_set_visible(this.#frameId, visible);
+        Frame_set_visible(this.#frameHandle, visible);
     }
 
     requestFullscreen() {
-        Frame_request_fullscreen(this.#frameId);
+        Frame_request_fullscreen(this.#frameHandle);
     }
 
     exitFullscreen() {
-        Frame_exit_fullscreen(this.#frameId);
+        Frame_exit_fullscreen(this.#frameHandle);
     }
 
     /**
@@ -468,8 +475,7 @@ export class View {
      * @param context {object}
      */
     constructor(el, context) {
-        const myContext = context || {};
-        CONTEXT2ELEMENT.set(myContext, this);
+        const myContext = this;
         if (typeof el === "number") {
             this.el = Element_create_by_type(el, myContext);
         } else {
@@ -480,11 +486,15 @@ export class View {
             throw new Error("Failed to create view:" + el)
         }
         this.#eventBinder = new EventBinder(this.el, Element_add_js_event_listener, Element_remove_js_event_listener, this, (target) => {
-            const myContext = Element_get_js_context(target);
-            if (myContext) {
-                return CONTEXT2ELEMENT.get(myContext);
-            }
+            return View.fromHandle(target);
         });
+    }
+
+    static fromHandle(elementHandle) {
+        if (elementHandle) {
+            return Element_get_js_context(elementHandle) || null;
+        }
+        return null;
     }
 
     createEventBinder(target, addEventListenerApi, removeEventListenerApi) {
@@ -509,8 +519,35 @@ export class View {
         return Element_get_id(this.el)
     }
 
+    /**
+     *
+     * @returns {View | null}
+     */
+    getParent() {
+        const eh = Element_get_parent(this.el);
+        return View.fromHandle(eh);
+    }
+
+    /**
+     *
+     * @returns {View}
+     */
+    getRootElement() {
+        let p = this.getParent();
+        if (p == null) {
+            return this;
+        } else {
+            return p.getRootElement();
+        }
+    }
+
     focus() {
         Element_focus(this.el);
+    }
+
+    getFrame() {
+        const frameHandle = Element_get_frame(this.el);
+        return Frame.fromHandle(frameHandle);
     }
 
     /**

@@ -1,7 +1,7 @@
 use crate as deft;
 use crate::app::{exit_app, AppEvent, AppEventPayload};
 use crate::base::MouseEventType::{MouseClick, MouseUp};
-use crate::base::{Callback, ElementEvent, Event, EventContext, EventHandler, EventListener, EventRegistration, MouseDetail, MouseEventType, ResultWaiter, Touch, TouchDetail, UnsafeFnOnce};
+use crate::base::{Callback, ElementEvent, Event, EventContext, EventHandler, EventListener, EventRegistration, JsValueContext, MouseDetail, MouseEventType, ResultWaiter, Touch, TouchDetail, UnsafeFnOnce};
 use crate::canvas_util::CanvasHelper;
 use crate::cursor::search_cursor;
 use crate::element::{Element, ElementWeak, PaintInfo};
@@ -53,6 +53,7 @@ use crate::paint::{InvalidArea, PartialInvalidArea, Painter, RenderTree, SkiaPai
 use crate::render::paint_object::{ElementPaintObject, PaintObject};
 use crate::render::paint_tree::PaintTree;
 use crate::render::painter::ElementPainter;
+use crate::resource_table::ResourceTable;
 use crate::style::border_path::BorderPath;
 use crate::style::ColorHelper;
 
@@ -114,6 +115,7 @@ pub struct Frame {
     pub style_variables: ComputedValue<String>,
     frame_rate_controller: FrameRateController,
     next_frame_timer_handle: Option<TimerHandle>,
+    resource_table: ResourceTable,
 }
 
 pub type FrameEventHandler = EventHandler<FrameWeak>;
@@ -242,6 +244,7 @@ impl Frame {
             style_variables: ComputedValue::new(),
             frame_rate_controller: FrameRateController::new(),
             next_frame_timer_handle: None,
+            resource_table: ResourceTable::new(),
         };
         let mut handle = Frame {
             inner: Mrc::new(state),
@@ -328,6 +331,19 @@ impl Frame {
     #[js_func]
     fn exit_fullscreen(&mut self) {
         self.window.set_fullscreen(None);
+    }
+
+    #[js_func]
+    pub fn set_js_context(&mut self, context: JsValue) {
+        self.resource_table.put(JsValueContext { context });
+    }
+
+    #[js_func]
+    pub fn get_js_context(&self) -> Result<JsValue, Error> {
+        let e = self.resource_table.get::<JsValueContext>()
+            .map(|e| e.context.clone())
+            .unwrap_or(JsValue::Undefined);
+        Ok(e)
     }
     
     pub fn allow_close(&mut self) -> bool {
