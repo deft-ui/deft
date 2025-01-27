@@ -41,6 +41,8 @@ enum ImageSrc {
     None,
 }
 
+unsafe impl Send for ImageSrc {}
+
 impl ImageSrc {
     pub fn get_size(&self) -> (f32, f32) {
         match self {

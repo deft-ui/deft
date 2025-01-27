@@ -24,7 +24,7 @@ winit = { path = "../third_party/winit", package = "deft-winit", version = "0.30
 glutin = "0.31"
 measure_time = "0.8.3"
 raw-window-handle = "0.5.0"
-skia-safe = { path = "../third_party/rust-skia/skia-safe", package = "deft-skia-safe", features = ["textlayout", "svg", "x11", "gl"], default-features = false, version = "0.81.0" }
+skia-safe = { package = "deft-skia-safe", features = ["binary-cache", "textlayout", "svg", "x11", "gl"], default-features = false, version = "0.81.0" }
 gl = "0.14.0"
 # sparkle = { version = "0.1.25" }
 

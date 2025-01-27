@@ -937,18 +937,24 @@ dependencies = [
 [[package]]
 name = "deft-skia-bindings"
 version = "0.81.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "19d3647e603e70dd23dd298baa01edc81647e7c4ef528a8e935acf7f890645d5"
 dependencies = [
  "bindgen 0.71.1",
  "cc",
+ "flate2",
  "heck",
  "regex",
  "serde_json",
+ "tar",
  "toml",
 ]
 
 [[package]]
 name = "deft-skia-safe"
 version = "0.81.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd4c8c7c4caba8c4a869bd48b7d53f7af5872e2b19f58b63a4e91730bbb9b9e4"
 dependencies = [
  "base64",
  "bitflags 2.6.0",
@@ -1208,6 +1214,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "07c6f4c64c1d33a3111c4466f7365ebdcc37c5bd1ea0d62aae2e3d722aacbedb"
 dependencies = [
  "simd-adler32",
+]
+
+[[package]]
+name = "filetime"
+version = "0.2.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "35c0522e981e68cbfa8c3f978441a5f34b30b96e146b33cd3359176b50fe8586"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "libredox",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3558,6 +3576,8 @@ dependencies = [
 [[package]]
 name = "skia-svg-macros"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "044dd2233c9717a74f75197f3e7f0a966db2127c0ffb5e05013b480a9b75b2c7"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3809,6 +3829,17 @@ dependencies = [
  "pkg-config",
  "toml",
  "version-compare",
+]
+
+[[package]]
+name = "tar"
+version = "0.4.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c65998313f8e17d0d553d28f91a0df93e4dbbbf770279c7bc21ca0f09ea1a1f6"
+dependencies = [
+ "filetime",
+ "libc",
+ "xattr",
 ]
 
 [[package]]
@@ -4836,6 +4867,17 @@ name = "x11rb-protocol"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec107c4503ea0b4a98ef47356329af139c0a4f7750e621cf2973cd3385ebcb3d"
+
+[[package]]
+name = "xattr"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e105d177a3871454f754b33bb0ee637ecaaac997446375fd3e5d43a2ed00c909"
+dependencies = [
+ "libc",
+ "linux-raw-sys 0.4.14",
+ "rustix",
+]
 
 [[package]]
 name = "xcb"
