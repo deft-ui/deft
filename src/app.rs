@@ -60,7 +60,7 @@ impl Debug for AppEvent {
     }
 }
 
-pub trait LentoApp {
+pub trait DeftApp {
     fn init_js_engine(&mut self, js_engine: &mut JsEngine) {
         let _ = js_engine;
     }
@@ -70,12 +70,12 @@ pub trait LentoApp {
 
 pub struct App {
     pub js_engine: JsEngine,
-    pub lento_app: Box<dyn LentoApp>,
+    pub deft_app: Box<dyn DeftApp>,
 }
 
 impl App {
-    pub fn new(mut lento_app: Box<dyn LentoApp>, event_loop_proxy: AppEventProxy) -> Self {
-        let module_loader = lento_app.create_module_loader();
+    pub fn new(mut deft_app: Box<dyn DeftApp>, event_loop_proxy: AppEventProxy) -> Self {
+        let module_loader = deft_app.create_module_loader();
         let mut js_engine = JsEngine::new(module_loader);
         js_engine.init_api();
         init_event_loop_proxy(event_loop_proxy.clone());
@@ -83,10 +83,10 @@ impl App {
             event_loop_proxy.send_event(AppEvent::JsEvent(js_event)).map_err(|_| JsEventLoopClosedError {});
             Ok(())
         });
-        lento_app.init_js_engine(&mut js_engine);
+        deft_app.init_js_engine(&mut js_engine);
         Self {
             js_engine,
-            lento_app,
+            deft_app,
         }
     }
 

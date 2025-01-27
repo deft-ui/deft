@@ -1,11 +1,11 @@
-use crate as lento;
+use crate as deft;
 use std::fs::File;
 use std::io::Cursor;
 
 use anyhow::Error;
 use base64::Engine;
 use base64::prelude::*;
-use lento_macros::{element_backend, js_methods};
+use deft_macros::{element_backend, js_methods};
 use quick_js::JsValue;
 use skia_safe::{Canvas};
 use skia_safe::svg::Dom;

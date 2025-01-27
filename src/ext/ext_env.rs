@@ -1,6 +1,6 @@
-use crate as lento;
+use crate as deft;
 use anyhow::Error;
-use lento_macros::js_methods;
+use deft_macros::js_methods;
 use std::env as std_env;
 
 #[allow(nonstandard_style)]

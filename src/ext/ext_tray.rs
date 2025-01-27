@@ -1,4 +1,4 @@
-use crate as lento;
+use crate as deft;
 use crate::app::AppEvent;
 use crate::base::{Event, EventHandler, EventRegistration};
 use crate::event_loop::{create_event_loop_fn_mut, create_event_loop_proxy, AppEventProxy};
@@ -6,7 +6,7 @@ use crate::mrc::Mrc;
 use anyhow::Error;
 use ksni::menu::{CheckmarkItem, StandardItem};
 use ksni::{Handle, Tray};
-use lento_macros::{js_func, js_methods, mrc_object};
+use deft_macros::{js_func, js_methods, mrc_object};
 use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
 use std::cell::Cell;

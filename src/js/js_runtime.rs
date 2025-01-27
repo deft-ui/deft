@@ -74,7 +74,7 @@ impl JsContext {
     }
 
     pub fn execute_main(&mut self) {
-        let module_name = env::var("LENTO_ENTRY").unwrap_or("index.js".to_string());
+        let module_name = env::var("DEFT_ENTRY").unwrap_or("index.js".to_string());
         self.context.execute_module(&module_name).unwrap();
     }
 

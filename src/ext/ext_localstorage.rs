@@ -1,8 +1,8 @@
-use crate as lento;
+use crate as deft;
 use std::cell::RefCell;
 use anyhow::Error;
 use lazy_static::lazy_static;
-use lento_macros::{js_func, js_methods};
+use deft_macros::{js_func, js_methods};
 use crate::data_dir::get_data_path;
 use crate::js::JsError;
 use crate::timer::{set_timeout, TimerHandle};

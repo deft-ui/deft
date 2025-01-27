@@ -1,5 +1,5 @@
-use crate as lento;
-use lento_macros::{js_func, js_methods};
+use crate as deft;
+use deft_macros::{js_func, js_methods};
 
 pub struct Console;
 

@@ -3,5 +3,5 @@
 version = 3
 
 [[package]]
-name = "lento-build"
+name = "deft-build"
 version = "0.1.0"

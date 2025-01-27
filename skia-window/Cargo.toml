@@ -1,6 +1,6 @@
 [package]
 name = "skia-window"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Rendering window with skia"
 license = "MIT"
@@ -20,7 +20,7 @@ wayland = ["glutin/wayland", "winit/wayland", "winit/wayland-dlopen", "winit/way
 
 [dependencies]
 log = "0.4"
-winit = { path = "../third_party/winit", package = "deft-winit", version = "0.30.5", features = ["android-native-activity", "rwh_05"] }
+winit = { package = "deft-winit", version = "0.30.5", features = ["android-native-activity", "rwh_05"] }
 glutin = "0.31"
 measure_time = "0.8.3"
 raw-window-handle = "0.5.0"

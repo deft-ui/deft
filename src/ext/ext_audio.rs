@@ -1,4 +1,4 @@
-use crate as lento;
+use crate as deft;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -8,7 +8,7 @@ use crate::base::{Event, EventRegistration};
 use crate::ext::audio_player::{AudioNotify, AudioServer, AudioSources};
 use crate::{js_deserialize, js_value};
 use anyhow::{anyhow, Error};
-use lento_macros::{js_methods, mrc_object};
+use deft_macros::{js_methods, mrc_object};
 use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
 use crate::js::js_event_loop::{js_create_event_loop_proxy, JsEventLoopProxy};

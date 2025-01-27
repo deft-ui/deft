@@ -1,7 +1,7 @@
-use crate as lento;
+use crate as deft;
 use serde::{Deserialize, Serialize};
 use winit::keyboard::{ModifiersState, NamedKey};
-use lento_macros::event;
+use deft_macros::event;
 use crate::base::{CaretDetail, MouseDetail, Rect, ScrollEventDetail, TextChangeDetail, TextUpdateDetail, TouchDetail};
 use crate::{base, define_event};
 use crate::element::paragraph::TextCoord;

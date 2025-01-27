@@ -1,10 +1,10 @@
 use quick_js::loader::{FsJsModuleLoader, JsModuleLoader};
-use lento::app::LentoApp;
-use lento::bootstrap;
+use deft::app::DeftApp;
+use deft::bootstrap;
 
-struct DefaultLentoApp {}
+struct DefaultDeftApp {}
 
-impl LentoApp for DefaultLentoApp {
+impl DeftApp for DefaultDeftApp {
     fn create_module_loader(&mut self) -> Box<dyn JsModuleLoader + Send + Sync + 'static> {
         let ml = FsJsModuleLoader::new(".");
         Box::new(ml)
@@ -12,6 +12,6 @@ impl LentoApp for DefaultLentoApp {
 }
 
 fn main() {
-    let app = DefaultLentoApp {};
+    let app = DefaultDeftApp {};
     bootstrap(Box::new(app));
 }

@@ -5,7 +5,7 @@ function createLabel(text) {
 }
 
 const frame = new Frame();
-frame.setTitle("LentoDemo");
+frame.setTitle("DeftDemo");
 
 const container = new ScrollElement();
 container.setStyle({

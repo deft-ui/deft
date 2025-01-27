@@ -3,7 +3,7 @@ pub mod text_paragraph;
 pub mod simple_text_paragraph;
 
 use std::any::Any;
-use crate as lento;
+use crate as deft;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -12,7 +12,7 @@ use quick_js::{JsValue, ValueError};
 use skia_safe::{Canvas, Color, Font, FontMgr, FontStyle, Paint, Typeface};
 use skia_safe::textlayout::{FontCollection, TextAlign, TextStyle};
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
-use lento_macros::{js_methods, mrc_object};
+use deft_macros::{js_methods, mrc_object};
 use crate::base::{ElementEvent, EventContext, MouseDetail, MouseEventType, Rect, TextUpdateDetail};
 use crate::color::parse_hex_color;
 use crate::element::{ElementBackend, Element, ElementWeak};

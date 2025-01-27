@@ -1,4 +1,4 @@
-use crate as lento;
+use crate as deft;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
-use lento_macros::{js_methods};
+use deft_macros::{js_methods};
 use crate::{js_serialize, js_value};
 use crate::js::js_serde::JsValueSerializer;
 use crate::js::JsPo;

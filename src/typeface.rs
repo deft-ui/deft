@@ -1,8 +1,8 @@
-use crate as lento;
+use crate as deft;
 use crate::element::paragraph::parse_optional_weight;
 use crate::element::text::FONT_MGR;
 use crate::js_deserialize;
-use lento_macros::js_func;
+use deft_macros::js_func;
 use serde::{Deserialize, Serialize};
 use skia_bindings::SkFontStyle_Slant;
 use skia_safe::font_style::{Weight, Width};

@@ -1,9 +1,9 @@
-use crate as lento;
+use crate as deft;
 use crate::js::js_engine::JsEngine;
 use crate::js::JsError;
 use crate::{js_weak_value};
 use crate::js::js_event_loop::{js_create_event_loop_fn_mut, js_init_event_loop, js_is_in_event_loop, JsEvent, JsEventLoopClosedError};
-use lento_macros::{js_methods, mrc_object, worker_context_event, worker_event};
+use deft_macros::{js_methods, mrc_object, worker_context_event, worker_event};
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::collections::HashMap;

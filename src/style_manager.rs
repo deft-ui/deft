@@ -1,6 +1,6 @@
-use crate as lento;
+use crate as deft;
 use std::collections::HashMap;
-use lento_macros::mrc_object;
+use deft_macros::mrc_object;
 use quick_js::JsValue;
 use skia_safe::wrapper::NativeTransmutableWrapper;
 use crate::computed::{ComputedValue, ComputedValueHandle};

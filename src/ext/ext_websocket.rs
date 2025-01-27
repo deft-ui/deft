@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
-use crate as lento;
+use crate as deft;
 use std::io;
 use std::io::ErrorKind;
 use std::sync::Arc;
@@ -12,7 +12,7 @@ use tokio::net::TcpStream;
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 use tokio_tungstenite::tungstenite::Message;
 use tokio::sync::Mutex;
-use lento_macros::{js_methods, mrc_object};
+use deft_macros::{js_methods, mrc_object};
 use serde::Serialize;
 use crate::{js_value, js_weak_value};
 use crate::js::{JsError, ToJsValue};

@@ -1,10 +1,10 @@
 use std::io;
 use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
-use lento_macros::js_func;
+use deft_macros::js_func;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
-use crate as lento;
+use crate as deft;
 use crate::js::JsPo;
 
 #[derive(Serialize, Deserialize, Debug)]

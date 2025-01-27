@@ -1,4 +1,4 @@
-use crate as lento;
+use crate as deft;
 use std::collections::HashMap;
 use std::str::FromStr;
 use anyhow::Error;
@@ -7,7 +7,7 @@ use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
 use tokio::fs::File;
 use tokio_util::codec::{BytesCodec, FramedRead};
-use lento_macros::{js_func, js_methods};
+use deft_macros::{js_func, js_methods};
 use crate::{js_deserialize, js_serialize};
 
 pub struct HttpOptions {}

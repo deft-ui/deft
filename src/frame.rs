@@ -1,4 +1,4 @@
-use crate as lento;
+use crate as deft;
 use crate::app::{exit_app, AppEvent, AppEventPayload};
 use crate::base::MouseEventType::{MouseClick, MouseUp};
 use crate::base::{Callback, ElementEvent, Event, EventContext, EventHandler, EventListener, EventRegistration, MouseDetail, MouseEventType, ResultWaiter, Touch, TouchDetail, UnsafeFnOnce};
@@ -14,7 +14,7 @@ use crate::mrc::{Mrc, MrcWeak};
 use crate::renderer::CpuRenderer;
 use crate::timer::{set_timeout, set_timeout_nanos, TimerHandle};
 use anyhow::{anyhow, Error};
-use lento_macros::{event, frame_event, js_func, js_methods, mrc_object};
+use deft_macros::{event, frame_event, js_func, js_methods, mrc_object};
 use measure_time::print_time;
 use quick_js::{JsValue, ResourceValue};
 use skia_bindings::{SkCanvas_SrcRectConstraint, SkClipOp, SkPathOp, SkRect};

@@ -1,4 +1,4 @@
-use crate as lento;
+use crate as deft;
 use std::any::Any;
 use std::cell::Cell;
 use std::rc::Rc;
@@ -13,7 +13,7 @@ use skia_safe::wrapper::NativeTransmutableWrapper;
 use winit::keyboard::NamedKey;
 use winit::window::CursorIcon;
 use yoga::{PositionType, StyleUnit};
-use lento_macros::{element_backend, js_methods};
+use deft_macros::{element_backend, js_methods};
 use crate::base::{Callback, CaretDetail, ElementEvent, EventContext, MouseDetail, MouseEventType, Rect, TextChangeDetail, TextUpdateDetail};
 use crate::element::{ElementBackend, Element, ElementWeak};
 use crate::element::text::{AtomOffset, Text as Label};

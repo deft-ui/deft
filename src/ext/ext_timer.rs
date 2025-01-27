@@ -1,10 +1,10 @@
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use anyhow::Error;
-use lento_macros::js_func;
+use deft_macros::js_func;
 use quick_js::{JsValue};
 use crate::timer::{set_interval, set_timeout, TimerHandle};
-use crate as lento;
+use crate as deft;
 use crate::js::JsError;
 
 thread_local! {

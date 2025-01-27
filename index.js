@@ -11,7 +11,7 @@ function createSystemTray() {
         return;
     }
     const tray = new SystemTray();
-    tray.setTitle("LentoTest");
+    tray.setTitle("DeftTest");
     tray.setMenus([{
         id: "test",
         label: "test",
@@ -171,7 +171,7 @@ function main() {
     createSystemTray();
     console.log("begin create frame");
     const frame = new Frame();
-    frame.setTitle("LentoDemo");
+    frame.setTitle("DeftDemo");
     frame.bindResize((e) => {
         console.log("frame resized", e);
     })

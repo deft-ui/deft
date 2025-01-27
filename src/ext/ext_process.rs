@@ -1,6 +1,6 @@
 use std::env;
-use crate as lento;
-use lento_macros::{js_func, js_methods};
+use crate as deft;
+use deft_macros::{js_func, js_methods};
 use crate::app::exit_app;
 use crate::is_mobile_platform;
 

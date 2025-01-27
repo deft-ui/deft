@@ -1,9 +1,9 @@
-use crate as lento;
+use crate as deft;
 use std::io;
 use tokio::fs;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use lento_macros::{js_func, js_methods};
+use deft_macros::{js_func, js_methods};
 use crate::data_dir::get_data_path;
 
 #[allow(nonstandard_style)]

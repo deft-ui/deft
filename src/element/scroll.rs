@@ -1,8 +1,8 @@
-use crate as lento;
+use crate as deft;
 use std::any::Any;
 use std::str::FromStr;
 use bezier_rs::{Bezier, TValue};
-use lento_macros::{element_backend, js_methods};
+use deft_macros::{element_backend, js_methods};
 use measure_time::print_time;
 use quick_js::JsValue;
 use serde::{Deserialize, Serialize};

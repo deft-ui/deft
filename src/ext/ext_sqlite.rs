@@ -1,7 +1,7 @@
-use crate as lento;
+use crate as deft;
 use std::path::Path;
 use futures_util::FutureExt;
-use lento_macros::{js_methods, mrc_object};
+use deft_macros::{js_methods, mrc_object};
 use quick_js::JsValue;
 use rusqlite::{params, Connection, ToSql};
 use rusqlite::types::{ToSqlOutput, Type, Value};

@@ -1,5 +1,5 @@
 [package]
-name = "lento"
+name = "deft"
 readme = "README.md"
 license = "MIT"
 description = "Cross platform ui framework"
@@ -10,11 +10,11 @@ edition = "2021"
 
 
 [dependencies]
-lento-macros = { path = "packages/lento-macros", version = "0.1.0" }
+deft-macros = { path = "packages/deft-macros", version = "0.1.0" }
 
-quick-js = {path = "third_party/quickjs-rs", package = "deft-quick-js", version = "0.4.2-alpha.0"}
-yoga = { path = "third_party/yoga-rs", package = "deft-yoga", version = "0.4.0" }
-winit = { path = "third_party/winit", package = "deft-winit", version = "0.30.5", features = ["android-native-activity", "rwh_05"] }
+quick-js = { package = "deft-quick-js", version = "0.4.2-alpha.0"}
+yoga = { package = "deft-yoga", version = "0.4.0" }
+winit = { package = "deft-winit", version = "0.30.5", features = ["android-native-activity", "rwh_05"] }
 skia-window = { path = "skia-window", version = "0.1.0" }
 
 lazy_static = "1.4"
@@ -67,14 +67,14 @@ skia-safe = {package = "deft-skia-safe", version = "0.81.0", features = ["binary
 cfg_aliases = "0.2.1"
 
 #[lib]
-#name = "lento"
+#name = "deft"
 #path = "src/lib.rs"
 #crate_type=["cdylib", "lib"]
 #proc-macro = true
 #
 #[[bin]]
 #path="src/lib.rs"
-#name="lento_demo"
+#name="deft_demo"
 
 [[example]]
 name = "hello"

@@ -6,7 +6,7 @@ use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 
 use anyhow::{anyhow, Error};
-use lento_macros::{js_func, js_methods, mrc_object};
+use deft_macros::{js_func, js_methods, mrc_object};
 use measure_time::print_time;
 use ordered_float::Float;
 use quick_js::JsValue;
@@ -48,7 +48,7 @@ mod edit_history;
 pub mod text;
 pub mod paragraph;
 
-use crate as lento;
+use crate as deft;
 use crate::computed::ComputedValue;
 use crate::js::JsError;
 use crate::layout::LayoutRoot;

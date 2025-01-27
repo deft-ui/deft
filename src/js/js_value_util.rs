@@ -1,4 +1,4 @@
-use crate as lento;
+use crate as deft;
 use anyhow::Error;
 use quick_js::{JsValue, ValueError};
 use serde::{Deserialize, Serialize};

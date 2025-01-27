@@ -1,4 +1,4 @@
-use crate as lento;
+use crate as deft;
 use std::any::{Any, TypeId};
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;

@@ -1,11 +1,11 @@
 use quick_js::loader::{JsModuleLoader};
-use lento::app::LentoApp;
-use lento::bootstrap;
-use lento::loader::StaticModuleLoader;
+use deft::app::DeftApp;
+use deft::bootstrap;
+use deft::loader::StaticModuleLoader;
 
-struct HelloLentoApp {}
+struct HelloDeftApp {}
 
-impl LentoApp for HelloLentoApp {
+impl DeftApp for HelloDeftApp {
     fn create_module_loader(&mut self) -> Box<dyn JsModuleLoader + Send + Sync + 'static> {
         let mut ml = StaticModuleLoader::new();
         ml.add_module("index.js".to_string(), include_str!("hello.js").to_string());
@@ -14,13 +14,13 @@ impl LentoApp for HelloLentoApp {
 }
 
 fn main() {
-    let app = HelloLentoApp {};
+    let app = HelloDeftApp {};
     bootstrap(Box::new(app));
 }
 
 #[cfg(target_os = "android")]
 #[no_mangle]
 fn android_main(android_app: winit::platform::android::activity::AndroidApp) {
-    let app = HelloLentoApp {};
-    lento::android_bootstrap(android_app, Box::new(app));
+    let app = HelloDeftApp {};
+    deft::android_bootstrap(android_app, Box::new(app));
 }

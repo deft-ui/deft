@@ -1,8 +1,8 @@
-use crate as lento;
+use crate as deft;
 use std::thread;
 use native_dialog::FileDialog;
 use serde::{Deserialize, Serialize};
-use lento_macros::{js_func, js_methods};
+use deft_macros::{js_func, js_methods};
 use quick_js::JsValue;
 use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 use crate::event_loop::create_event_loop_callback;

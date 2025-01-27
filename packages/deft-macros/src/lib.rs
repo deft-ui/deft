@@ -17,11 +17,11 @@ pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
 
         #[derive(Clone, PartialEq)]
         pub struct #ref_name {
-            inner: lento::mrc::Mrc<#struct_name>,
+            inner: deft::mrc::Mrc<#struct_name>,
         }
 
         impl std::ops::Deref for #ref_name {
-            type Target = lento::mrc::Mrc<#struct_name>;
+            type Target = deft::mrc::Mrc<#struct_name>;
 
             fn deref(&self) -> &Self::Target {
                 &self.inner
@@ -36,7 +36,7 @@ pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
 
         impl #ref_name {
 
-            pub fn from_inner(inner: lento::mrc::Mrc<#struct_name>) -> Self {
+            pub fn from_inner(inner: deft::mrc::Mrc<#struct_name>) -> Self {
                 Self { inner }
             }
 
@@ -68,7 +68,7 @@ pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
 
         #[derive(Clone, PartialEq)]
         pub struct #weak_name {
-            inner: Option<lento::mrc::MrcWeak<#struct_name>>,
+            inner: Option<deft::mrc::MrcWeak<#struct_name>>,
         }
 
         impl #weak_name {
@@ -77,11 +77,11 @@ pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
                 Self {inner: None}
             }
 
-            pub fn upgrade(&self) -> Result<#ref_name, lento::mrc::UpgradeError> {
+            pub fn upgrade(&self) -> Result<#ref_name, deft::mrc::UpgradeError> {
                 let inner = if let Some(inner) = &self.inner {
                     inner.upgrade()?
                 } else {
-                    return Err(lento::mrc::UpgradeError{});
+                    return Err(deft::mrc::UpgradeError{});
                 };
                 Ok(
                      #ref_name {
@@ -90,7 +90,7 @@ pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
                 )
             }
 
-            pub fn upgrade_mut(&self) -> Result<#mut_name, lento::mrc::UpgradeError> {
+            pub fn upgrade_mut(&self) -> Result<#mut_name, deft::mrc::UpgradeError> {
                 let data = self.upgrade()?;
                 Ok(
                     #mut_name {
@@ -108,7 +108,7 @@ pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
 
         impl #struct_name {
             pub fn to_ref(self) -> #ref_name {
-                let inner = lento::mrc::Mrc::new(self);
+                let inner = deft::mrc::Mrc::new(self);
                 #ref_name::from_inner(inner)
             }
         }
@@ -125,12 +125,12 @@ pub fn element_backend(_attr: TokenStream, struct_def: TokenStream) -> TokenStre
     let struct_fields = struct_def.fields;
     let q = quote! {
 
-        #[lento_macros::mrc_object]
+        #[deft_macros::mrc_object]
         #visibility struct #struct_name #struct_fields
 
-        impl lento::js::FromJsValue for #struct_name {
-            fn from_js_value(value: lento::js::JsValue) -> Result<Self, lento::js::ValueError> {
-                let element = lento::element::Element::from_js_value(value)?;
+        impl deft::js::FromJsValue for #struct_name {
+            fn from_js_value(value: deft::js::JsValue) -> Result<Self, deft::js::ValueError> {
+                let element = deft::element::Element::from_js_value(value)?;
                 Ok(element.get_backend_as::<#struct_name>().clone())
             }
         }
@@ -140,22 +140,22 @@ pub fn element_backend(_attr: TokenStream, struct_def: TokenStream) -> TokenStre
 
 #[proc_macro_attribute]
 pub fn event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
-    create_event(_attr, struct_def, quote! {lento::element::ElementWeak})
+    create_event(_attr, struct_def, quote! {deft::element::ElementWeak})
 }
 
 #[proc_macro_attribute]
 pub fn frame_event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
-    create_event(_attr, struct_def, quote! {lento::frame::FrameWeak})
+    create_event(_attr, struct_def, quote! {deft::frame::FrameWeak})
 }
 
 #[proc_macro_attribute]
 pub fn worker_event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
-    create_event(_attr, struct_def, quote! {lento::ext::ext_worker::WorkerWeak})
+    create_event(_attr, struct_def, quote! {deft::ext::ext_worker::WorkerWeak})
 }
 
 #[proc_macro_attribute]
 pub fn worker_context_event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
-    create_event(_attr, struct_def, quote! {lento::ext::ext_worker::WorkerContextWeak})
+    create_event(_attr, struct_def, quote! {deft::ext::ext_worker::WorkerContextWeak})
 }
 
 fn create_event(_attr: TokenStream, struct_def: TokenStream, target_type: TokenStream2) -> TokenStream {
@@ -172,30 +172,30 @@ fn create_event(_attr: TokenStream, struct_def: TokenStream, target_type: TokenS
 
     let expanded = quote! {
 
-        pub struct #listener_name(Box<dyn FnMut(&mut #event_name, &mut lento::base::EventContext<#target_type>)>);
+        pub struct #listener_name(Box<dyn FnMut(&mut #event_name, &mut deft::base::EventContext<#target_type>)>);
 
         impl #listener_name {
-            pub fn new<F: FnMut(&mut #event_name, &mut lento::base::EventContext<#target_type>) + 'static>(f: F) -> Self {
+            pub fn new<F: FnMut(&mut #event_name, &mut deft::base::EventContext<#target_type>) + 'static>(f: F) -> Self {
                 Self(Box::new(f))
             }
         }
 
-        impl lento::base::EventListener<#event_name, #target_type> for #listener_name {
-            fn handle_event(&mut self, event: &mut #event_name, ctx: &mut lento::base::EventContext<#target_type>) {
+        impl deft::base::EventListener<#event_name, #target_type> for #listener_name {
+            fn handle_event(&mut self, event: &mut #event_name, ctx: &mut deft::base::EventContext<#target_type>) {
                 (self.0)(event, ctx)
             }
         }
 
-        impl lento::js::FromJsValue for #listener_name {
-            fn from_js_value(value: lento::js::JsValue) -> Result<Self, lento::js::ValueError> {
+        impl deft::js::FromJsValue for #listener_name {
+            fn from_js_value(value: deft::js::JsValue) -> Result<Self, deft::js::ValueError> {
                 let listener = Self::new(move |e, ctx| {
                     let target = ctx.target.clone();
-                    use lento::js::ToJsValue;
+                    use deft::js::ToJsValue;
                     if let Ok(d) = target.to_js_value() {
                         if let Ok(e) = e.clone().to_js_value() {
                             let callback_result = value.call_as_function(vec![e, d]);
                             if let Ok(cb_result) = callback_result {
-                                if let Ok(res) = lento::js::js_value_util::EventResult::from_js_value(cb_result) {
+                                if let Ok(res) = deft::js::js_value_util::EventResult::from_js_value(cb_result) {
                                     if res.propagation_cancelled {
                                         ctx.propagation_cancelled = true;
                                     }
@@ -220,9 +220,9 @@ fn create_event(_attr: TokenStream, struct_def: TokenStream, target_type: TokenS
         pub struct #event_name
             #fields_ts
 
-        lento::js_serialize!(#event_name);
+        deft::js_serialize!(#event_name);
 
-        impl lento::element::ViewEvent for #event_name {
+        impl deft::element::ViewEvent for #event_name {
             fn allow_bubbles(&self) -> bool {
                 true
             }
@@ -295,7 +295,7 @@ pub fn js_methods(_attr: TokenStream, impl_item: TokenStream) -> TokenStream {
         #impl_token #generics #self_ty {
             #(#items)*
 
-            pub fn create_js_apis() -> Vec<Box<dyn lento::js::JsFunc + std::panic::RefUnwindSafe + 'static>> {
+            pub fn create_js_apis() -> Vec<Box<dyn deft::js::JsFunc + std::panic::RefUnwindSafe + 'static>> {
                 vec![#(Box::new(#api_create_expr_list), )*]
             }
 
@@ -320,7 +320,7 @@ fn build_bridge_struct(vis: Visibility, func_name: Ident, args_count: usize, bri
             }
         }
 
-        impl lento::js::JsFunc for #func_name {
+        impl deft::js::JsFunc for #func_name {
 
             fn name(&self) -> &str {
                 #func_name_str
@@ -330,7 +330,7 @@ fn build_bridge_struct(vis: Visibility, func_name: Ident, args_count: usize, bri
                 #args_count
             }
 
-            fn call(&self, js_context: &mut lento::mrc::Mrc<lento::js::JsContext>, args: Vec<lento::js::JsValue>) -> Result<lento::js::JsValue, lento::js::JsCallError> {
+            fn call(&self, js_context: &mut deft::mrc::Mrc<deft::js::JsContext>, args: Vec<deft::js::JsValue>) -> Result<deft::js::JsValue, deft::js::JsCallError> {
                 #bridge_body
             }
         }
@@ -354,7 +354,7 @@ fn build_bridge_body(func_inputs: Vec<FnArg>, asyncness: Option<Async>, struct_n
     for p in params {
         let p_name = format_ident!("_p{}", idx);
         param_expand_stmts.push(quote! {
-            let #p_name = <#p as lento::js::FromJsValue>::from_js_value(args.get(#idx).unwrap().clone())?;
+            let #p_name = <#p as deft::js::FromJsValue>::from_js_value(args.get(#idx).unwrap().clone())?;
         });
         param_list.push(p_name);
         idx += 1;
@@ -365,7 +365,7 @@ fn build_bridge_body(func_inputs: Vec<FnArg>, asyncness: Option<Async>, struct_n
     let call_stmt = if asyncness.is_none() {
         if receiver.is_some() {
             quote! {
-                let mut inst = <#struct_name as lento::js::FromJsValue>::from_js_value(args.get(0).unwrap().clone())?;
+                let mut inst = <#struct_name as deft::js::FromJsValue>::from_js_value(args.get(0).unwrap().clone())?;
                 let r = inst.#func_name( #(#param_list, )* );
             }
         } else {
@@ -376,7 +376,7 @@ fn build_bridge_body(func_inputs: Vec<FnArg>, asyncness: Option<Async>, struct_n
     } else {
         if receiver.is_some() {
             quote! {
-                let mut inst = <#struct_name as lento::js::FromJsValue>::from_js_value(args.get(0).unwrap().clone())?;
+                let mut inst = <#struct_name as deft::js::FromJsValue>::from_js_value(args.get(0).unwrap().clone())?;
                 let r = js_context.create_async_task2(async move {
                     inst.#func_name( #(#param_list, )* ).await
                 });
@@ -390,9 +390,9 @@ fn build_bridge_body(func_inputs: Vec<FnArg>, asyncness: Option<Async>, struct_n
         }
     };
     let result = quote! {
-        use lento::js::FromJsValue;
-        use lento::js::ToJsValue;
-        use lento::js::ToJsCallResult;
+        use deft::js::FromJsValue;
+        use deft::js::ToJsValue;
+        use deft::js::ToJsCallResult;
         #(#param_expand_stmts)*
         #call_stmt
         r.to_js_call_result()

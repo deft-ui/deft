@@ -1,4 +1,4 @@
-use crate as lento;
+use crate as deft;
 use crate::mrc::Mrc;
 use crate::style::{ResolvedStyleProp, ScaleParams, StyleProp, StylePropKey, StylePropVal, StyleTransform, StyleTransformOp, TranslateLength, TranslateParams};
 use crate::timer::{set_timeout, set_timeout_nanos, TimerHandle};

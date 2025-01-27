@@ -3,7 +3,7 @@ use skia_safe::textlayout::{FontCollection, TypefaceFontProvider};
 use skia_safe::wrapper::PointerWrapper;
 use skia_safe::{FontMgr, FontStyle, Typeface};
 use std::collections::HashMap;
-use lento::element::paragraph::typeface_mgr::TypefaceMgr;
+use deft::element::paragraph::typeface_mgr::TypefaceMgr;
 
 pub fn main() {
     print_time!("font");

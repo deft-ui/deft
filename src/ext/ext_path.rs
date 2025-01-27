@@ -1,7 +1,7 @@
-use crate as lento;
+use crate as deft;
 use std::path::PathBuf;
 use anyhow::Error;
-use lento_macros::{js_func, js_methods};
+use deft_macros::{js_func, js_methods};
 
 #[allow(nonstandard_style)]
 pub struct path;
