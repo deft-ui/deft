@@ -1,5 +1,8 @@
 use std::io;
+#[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
+#[cfg(windows)]
+use std::os::windows::fs::MetadataExt;
 use std::path::PathBuf;
 use deft_macros::js_func;
 use serde::{Deserialize, Serialize};
@@ -45,7 +48,7 @@ pub async fn fs_delete_file(path: String) -> io::Result<()> {
 pub async fn fs_stat(path: String) -> io::Result<JsPo<Stat>> {
     let meta = fs::metadata(&path).await?;
     Ok(JsPo::new(Stat {
-        size: meta.size(),
+        size: meta.file_size(),
         is_dir: meta.is_dir(),
         is_file: meta.is_file(),
     }))
