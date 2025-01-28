@@ -48,6 +48,9 @@ pub async fn fs_delete_file(path: String) -> io::Result<()> {
 pub async fn fs_stat(path: String) -> io::Result<JsPo<Stat>> {
     let meta = fs::metadata(&path).await?;
     Ok(JsPo::new(Stat {
+        #[cfg(unix)]
+        size: meta.size(),
+        #[cfg(windows)]
         size: meta.file_size(),
         is_dir: meta.is_dir(),
         is_file: meta.is_file(),
