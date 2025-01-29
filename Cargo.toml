@@ -13,8 +13,8 @@ edition = "2021"
 deft-macros = { path = "packages/deft-macros", version = "0.1.0" }
 
 quick-js = { package = "deft-quick-js", version = "0.4.2-alpha.0"}
-yoga = { package = "deft-yoga", version = "0.4.1" }
-winit = { package = "deft-winit", version = "0.30.7", features = ["android-native-activity", "rwh_05"] }
+yoga = { package = "deft-yoga", version = "0.5.0" }
+winit = { package = "deft-winit", version = "0.30.8", features = ["android-native-activity", "rwh_05"] }
 skia-window = { path = "skia-window", version = "0.1.0" }
 
 lazy_static = "1.4"
@@ -80,4 +80,4 @@ cfg_aliases = "0.2.1"
 
 [[example]]
 name = "hello"
-crate_type=["cdylib", "lib"]
+crate-type=["cdylib", "lib"]

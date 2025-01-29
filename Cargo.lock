@@ -996,9 +996,9 @@ dependencies = [
 
 [[package]]
 name = "deft-winit"
-version = "0.30.7"
+version = "0.30.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2c5929162dffad9d9db5329e282c20ed8a04442d21e65eac7e4a65f1c204a0c"
+checksum = "9d7bc9a0983b04138743ab1224e01ae0daaec4ecd046c9460de57ef6e0942ec2"
 dependencies = [
  "ahash",
  "android-activity",
@@ -1049,9 +1049,9 @@ dependencies = [
 
 [[package]]
 name = "deft-yoga"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5790d6c0afd6bde71a32c2ce2a378eb4a02da536c513773b3a578897cabcd9c"
+checksum = "6d672d20ede167b375a211e45c310d85a16ec58e9c4cad4eb76e2b0efe60bee3"
 dependencies = [
  "bindgen 0.71.1",
  "cc",
