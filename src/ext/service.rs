@@ -97,7 +97,7 @@ impl Service {
                 js_engine.init_api();
                 let r = js_engine.execute_module(module_name.as_str());
                 if let Err(err) = r {
-                    println!("Error executing module: {}", err);
+                    println!("Error executing module: {}, error:{}", module_name, err);
                     return;
                 }
                 js_engine.execute_pending_jobs();

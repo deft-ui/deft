@@ -465,6 +465,11 @@ export class View {
     el
 
     /**
+     * @type {StyleProps}
+     */
+    #style
+
+    /**
      * @type EventBinder
      */
     #eventBinder;
@@ -555,7 +560,16 @@ export class View {
      * @param style {StyleProps}
      */
     setStyle(style) {
+        this.#style = style;
         Element_set_style(this.el, style);
+    }
+
+    /**
+     *
+     * @returns {StyleProps}
+     */
+    getStyle() {
+        return this.#style
     }
 
     setAnimation(animation) {
