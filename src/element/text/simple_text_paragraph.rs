@@ -240,7 +240,6 @@ impl SimpleTextParagraph {
             if ln.char_offset > char_offset {
                 continue;
             }
-            let char_offset = char_offset - ln.char_offset;
             for unit in ln.units.iter().rev() {
                 if unit.char_offset > char_offset {
                     continue;
