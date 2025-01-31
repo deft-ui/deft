@@ -82,6 +82,7 @@ mod layout;
 pub mod render;
 mod computed;
 mod style_manager;
+pub mod winit;
 
 pub use deft_macros::*;
 use rodio::cpal::available_hosts;

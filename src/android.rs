@@ -15,7 +15,7 @@ pub fn init_android_app(app: &AndroidApp) {
 }
 
 #[no_mangle]
-pub extern "system" fn Java_fun_kason_deft_InputChannel_send<'local>(mut env: JNIEnv<'local>,
+pub extern "system" fn Java_deft_DeftActivity_send<'local>(mut env: JNIEnv<'local>,
                                                                      class: JClass<'local>,
                                                                      window_id: jlong,
                                                                      input: JString<'local>)
@@ -29,7 +29,7 @@ pub extern "system" fn Java_fun_kason_deft_InputChannel_send<'local>(mut env: JN
 }
 
 #[no_mangle]
-pub extern "system" fn Java_fun_kason_deft_InputChannel_sendKey0<'local>(mut env: JNIEnv<'local>,
+pub extern "system" fn Java_deft_DeftActivity_sendKey0<'local>(mut env: JNIEnv<'local>,
                                                                       class: JClass<'local>,
                                                                       window_id: jlong,
                                                                       input: JString<'local>,
@@ -44,7 +44,7 @@ pub extern "system" fn Java_fun_kason_deft_InputChannel_sendKey0<'local>(mut env
 }
 
 #[no_mangle]
-pub extern "system" fn Java_fun_kason_deft_InputChannel_imeResize0<'local>(mut env: JNIEnv<'local>,
+pub extern "system" fn Java_deft_DeftActivity_imeResize0<'local>(mut env: JNIEnv<'local>,
                                                                             class: JClass<'local>,
                                                                             window_id: jlong,
                                                                             height: jfloat)

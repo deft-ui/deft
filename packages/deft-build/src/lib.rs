@@ -32,7 +32,7 @@ pub fn generate_static_loader(js_dir: &str, output_dir: &str) {
         let name = file_name.to_str().unwrap();
         code.push_str(&format!("loader.add_module(\"{}\".to_string(), include_str!(\"{}/{}\").to_string());\n", name, canonical_path, name));
     }
-    code.push_str("loader\n");
+    code.push_str("Box::new(loader)\n");
     code.push_str("}");
     write_code(code.as_str(), output_dir);
 }
