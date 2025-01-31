@@ -8,7 +8,7 @@ use tokio::runtime::Builder;
 use winit::event::{DeviceEvent, DeviceId, WindowEvent};
 use winit::window::{CursorGrabMode, WindowId};
 
-use crate::app::exit_app;
+use crate::app::{exit_app, IApp, App};
 use crate::console::Console;
 use crate::element::Element;
 use crate::element::entry::Entry;
@@ -45,6 +45,7 @@ use crate::typeface::typeface_create;
 
 pub struct JsEngine {
     pub js_context: Mrc<JsContext>,
+    pub app: App,
 }
 
 struct JsFuncCallback {
@@ -79,8 +80,11 @@ impl Callback<()> for JsFuncCallback {
 
 impl JsEngine {
 
-    pub fn new(loader: Box<dyn JsModuleLoader + Send + Sync + 'static>) -> Self {
-        let loader = SharedModuleLoader::new(loader);
+    pub fn new(mut app: App) -> Self {
+        let loader = {
+            let mut app = app.app_impl.lock().unwrap();
+            SharedModuleLoader::new(app.create_module_loader())
+        };
         let runtime = Builder::new_multi_thread()
             .worker_threads(4)
             .enable_all()
@@ -94,6 +98,7 @@ impl JsEngine {
 
         let engine = Self {
             js_context,
+            app: app.clone(),
         };
 
         engine.add_global_functions(ExtConsole::create_js_apis());
@@ -144,11 +149,7 @@ impl JsEngine {
         engine.add_global_func(clipboard_write_text::new());
         engine.add_global_func(clipboard_read_text::new());
 
-        Worker::init_js_api(WorkerInitParams {
-            module_loader_creator: Box::new(move || {
-                Box::new(loader.clone())
-            })
-        });
+        Worker::init_js_api(WorkerInitParams { app });
         engine.add_global_functions(Worker::create_js_apis());
         engine
     }

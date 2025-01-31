@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-use crate::app::{App, AppEvent, AppEventPayload, DeftApp};
+use crate::app::{WinitApp, AppEvent, AppEventPayload, IApp, App};
 use crate::data_dir::get_data_path;
 use crate::element::label::{AttributeText, DEFAULT_TYPE_FACE};
 use crate::element::text::text_paragraph::TextParams;
@@ -96,17 +96,17 @@ use crate::text::break_lines;
 
 pub static APP_EVENT_PROXY: OnceLock<AppEventProxy> = OnceLock::new();
 
-fn run_event_loop(event_loop: EventLoop<AppEventPayload>, deft_app: Box<dyn DeftApp>) {
+fn run_event_loop(event_loop: EventLoop<AppEventPayload>, deft_app: App) {
     let el_proxy = AppEventProxy::new(event_loop.create_proxy());
     {
         let el_proxy = el_proxy.clone();
         APP_EVENT_PROXY.get_or_init(move || el_proxy);
     }
-    let mut app = App::new(deft_app, el_proxy);
+    let mut app = WinitApp::new(deft_app, el_proxy);
     event_loop.run_app(&mut app).unwrap();
 }
 
-pub fn bootstrap(deft_app: Box<dyn DeftApp>) {
+pub fn bootstrap(deft_app: App) {
     let event_loop: EventLoop<AppEventPayload> = EventLoop::with_user_event().build().unwrap();
     run_event_loop(event_loop, deft_app);
 }
@@ -142,7 +142,7 @@ pub fn is_snapshot_usable() -> bool {
 
 #[cfg(target_os = "android")]
 #[no_mangle]
-pub fn android_bootstrap(app: AndroidApp, deft_app: Box<dyn DeftApp>) {
+pub fn android_bootstrap(app: AndroidApp, deft_app: App) {
     use winit::platform::android::EventLoopBuilderExtAndroid;
     android::init_android_app(&app);
 

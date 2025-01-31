@@ -16,6 +16,7 @@ use crate::{bind_js_event_listener};
 use crate::js::ToJsValue;
 use quick_js::{Callback, JsValue};
 use quick_js::loader::JsModuleLoader;
+use crate::app::{IApp, App};
 use crate::ext::service::Service;
 
 thread_local! {
@@ -47,7 +48,12 @@ pub struct WorkerContextMessageEvent {
 }
 
 pub struct WorkerInitParams {
-    pub module_loader_creator: Box<dyn FnMut() -> Box<dyn JsModuleLoader + Send + Sync + 'static>>,
+    pub app: App,
+}
+
+pub struct WorkerParams {
+    pub worker_app: Option<Box<dyn IApp + Send + 'static>>,
+    pub module_loader: Box<dyn JsModuleLoader + Send + Sync + 'static>,
 }
 
 #[derive(Clone)]
@@ -81,11 +87,13 @@ impl Worker {
 
     #[js_func]
     pub fn create(module_name: String) -> Result<Self, JsError> {
-        let loader = WORKER_INIT_PARAMS.with_borrow_mut(|p| {
-            p.as_mut().map(|p| (p.module_loader_creator)())
+        let init_params = WORKER_INIT_PARAMS.with_borrow_mut(|p| {
+            p.as_mut().map(|p| {
+                p.app.clone()
+            })
         });
-        if let Some(loader) = loader {
-            Self::build(loader, module_name)
+        if let Some(app) = init_params {
+            Self::build(app, module_name)
         } else {
             Err(JsError::from_str("No worker loader found"))
         }
@@ -97,9 +105,9 @@ impl Worker {
         Self::bind_service(service)
     }
 
-    fn build(module_loader: Box<dyn JsModuleLoader + Send + Sync + 'static>, module_name: String) -> Result<Self, JsError>{
+    fn build(app: App, module_name: String) -> Result<Self, JsError>{
         let mut service = Service::new();
-        service.start(module_loader, module_name);
+        service.start(app, module_name);
         Self::bind_service(service)
     }
 

@@ -2,7 +2,7 @@ use std::cell::{Cell, RefCell};
 use std::ptr::null_mut;
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
 use winit::event_loop::{ActiveEventLoop, EventLoopClosed, EventLoopProxy};
-use crate::app::{App, AppEvent, AppEventPayload};
+use crate::app::{WinitApp, AppEvent, AppEventPayload};
 use crate::base::{UnsafeFnMut, UnsafeFnOnce};
 
 thread_local! {

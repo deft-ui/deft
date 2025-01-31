@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use crate::ext::ext_worker::{SharedModuleLoader, WorkerContext, JS_WORKER_CONTEXTS};
+use crate::ext::ext_worker::{SharedModuleLoader, WorkerContext, WorkerParams, JS_WORKER_CONTEXTS};
 use crate::js::js_engine::JsEngine;
 use crate::js::js_event_loop::{js_init_event_loop, JsEvent, JsEventLoopClosedError};
 use crate::js::ToJsValue;
@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::sync::mpsc::{SendError, Sender};
 use std::sync::{Arc, LazyLock, Mutex, OnceLock};
 use std::thread;
+use crate::app::{IApp, App};
 use crate::id_generator::IdGenerator;
 use crate::id_hash_map::IdHashMap;
 
@@ -58,19 +59,23 @@ impl Service {
         service
     }
 
-    pub fn start(&mut self, module_loader: Box<dyn JsModuleLoader + Send + Sync + 'static>, module_name: String) {
+    pub fn start(&mut self, app: App, module_name: String) {
         let (sender, receiver) = std::sync::mpsc::channel();
         {
             let mut sender_holder = self.sender.lock().unwrap();
             sender_holder.replace(sender.clone());
         }
         let msg_handlers = self.msg_handlers.clone();
+        let module_loader = {
+            let mut app = app.app_impl.lock().unwrap();
+            app.create_module_loader()
+        };
         let shared_module_loader = SharedModuleLoader::new(module_loader);
         let module_loader = shared_module_loader.clone();
         let _ = thread::Builder::new()
             .name("js-worker".to_string())
             .spawn(move || {
-                let mut js_engine = JsEngine::new(Box::new(module_loader));
+                let mut js_engine = JsEngine::new(app.clone());
 
                 js_init_event_loop(move |js_event| {
                     sender.send(js_event).map_err(|_| JsEventLoopClosedError {})
@@ -95,6 +100,11 @@ impl Service {
                 js_engine.add_global_functions(WorkerContext::create_js_apis());
 
                 js_engine.init_api();
+                {
+                    let mut app = app.app_impl.lock().unwrap();
+                    app.init_js_engine(&mut js_engine);
+                }
+
                 let r = js_engine.execute_module(module_name.as_str());
                 if let Err(err) = r {
                     println!("Error executing module: {}, error:{}", module_name, err);

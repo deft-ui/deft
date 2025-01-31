@@ -60,7 +60,7 @@ impl Debug for AppEvent {
     }
 }
 
-pub trait DeftApp {
+pub trait IApp {
     fn init_js_engine(&mut self, js_engine: &mut JsEngine) {
         let _ = js_engine;
     }
@@ -68,25 +68,38 @@ pub trait DeftApp {
 }
 
 
-pub struct App {
+pub struct WinitApp {
     pub js_engine: JsEngine,
-    pub deft_app: Box<dyn DeftApp>,
+}
+
+#[derive(Clone)]
+pub struct App {
+    pub app_impl: Arc<Mutex<Box<dyn IApp + Send + Sync>>>,
 }
 
 impl App {
-    pub fn new(mut deft_app: Box<dyn DeftApp>, event_loop_proxy: AppEventProxy) -> Self {
-        let module_loader = deft_app.create_module_loader();
-        let mut js_engine = JsEngine::new(module_loader);
+    pub fn new<A: IApp + Send + Sync + 'static>(app: A) -> Self {
+        Self {
+            app_impl: Arc::new(Mutex::new(Box::new(app))),
+        }
+    }
+}
+
+impl WinitApp {
+    pub fn new(mut app: App, event_loop_proxy: AppEventProxy) -> Self {
+        let mut js_engine = JsEngine::new(app.clone());
         js_engine.init_api();
         init_event_loop_proxy(event_loop_proxy.clone());
         let js_event_loop = js_init_event_loop(move |js_event| {
             event_loop_proxy.send_event(AppEvent::JsEvent(js_event)).map_err(|_| JsEventLoopClosedError {});
             Ok(())
         });
-        deft_app.init_js_engine(&mut js_engine);
+        {
+            let mut app = app.app_impl.lock().unwrap();
+            app.init_js_engine(&mut js_engine);
+        }
         Self {
             js_engine,
-            deft_app,
         }
     }
 
@@ -96,7 +109,7 @@ impl App {
 
 }
 
-impl ApplicationHandler<AppEventPayload> for App {
+impl ApplicationHandler<AppEventPayload> for WinitApp {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         run_event_loop_task(event_loop, move || {
             let uninitialized = FRAMES.with(|m| m.borrow().is_empty());
