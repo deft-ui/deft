@@ -324,7 +324,7 @@ impl Paragraph {
     fn layout(&mut self, mut available_width: Option<f32>) {
         let mut layout_width = f32::NAN;
         if self.params.text_wrap.unwrap_or(false) {
-            layout_width = self.element.style.get_layout_width();
+            layout_width = self.element.style.get_content_bounds().width;
         } else {
             available_width = available_width.map(|_| f32::NAN);
         }

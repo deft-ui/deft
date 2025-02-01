@@ -113,6 +113,11 @@ impl Entry {
     }
 
     #[js_func]
+    pub fn set_auto_height(&mut self, value: bool) {
+        self.base.set_auto_height(value);
+    }
+
+    #[js_func]
     pub fn set_selection_by_char_offset(&mut self, start: usize, end: usize) {
         if let Some(start_caret) = self.paragraph.get_text_coord_by_char_offset(start) {
             if let Some(end_caret) = self.paragraph.get_text_coord_by_char_offset(end) {
@@ -145,13 +150,13 @@ impl Entry {
     // }
 
     fn update_default_size(&mut self) {
-        if self.multiple_line {
-            let (_, line_height) = self.paragraph.measure_line(Self::build_line("a".to_string()));
-            let expected_height = (self.rows as f32 * line_height);
-            self.base.set_default_height(Some(expected_height));
-        } else {
-            self.base.set_default_height(None);
-        }
+        // if self.multiple_line {
+        //     let (_, line_height) = self.paragraph.measure_line(Self::build_line("a".to_string()));
+        //     let expected_height = (self.rows as f32 * line_height);
+        //     self.base.set_default_height(Some(expected_height));
+        // } else {
+        //     self.base.set_default_height(None);
+        // }
     }
 
     fn move_caret(&mut self, mut delta: isize) {

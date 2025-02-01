@@ -752,9 +752,17 @@ impl Element {
         }
 
         if layout_dirty {
+            let parent = self.get_parent();
             if let Some(layout_root) = &mut self.layout_root {
+                let should_propagate_dirty = layout_root.should_propagate_dirty();
                 self.set_dirty_state_recurse(true);
-            } else if let Some(mut parent) = self.get_parent() {
+                if should_propagate_dirty {
+                    if let Some(mut p) = parent {
+                        p.mark_dirty(true);
+                        return;
+                    }
+                }
+            } else if let Some(mut parent) = parent {
                 parent.mark_dirty(true);
                 return;
             } else {

@@ -121,6 +121,7 @@ pub struct Scroll {
     real_content_width: f32,
     real_content_height: f32,
     content_layout_dirty: bool,
+    auto_height: bool,
     pub content_auto_width: bool,
     pub content_auto_height: bool,
     default_width: Option<f32>,
@@ -147,6 +148,11 @@ impl Scroll {
         self.element.mark_dirty(true);
     }
 
+    pub fn set_auto_height(&mut self, value: bool) {
+        self.auto_height = value;
+        self.element.mark_dirty(true);
+    }
+
     pub fn set_default_height(&mut self, value: Option<f32>) {
         self.default_height = value;
         self.element.mark_dirty(true)
@@ -165,7 +171,8 @@ impl Scroll {
 
     fn mark_layout_dirty(&mut self) {
         self.content_layout_dirty = true;
-        self.element.mark_dirty(false);
+        let auto_height = self.auto_height;
+        self.element.mark_dirty(auto_height);
     }
 
     fn layout_content(&mut self, bounds_width: f32, bounds_height: f32) {
@@ -463,6 +470,7 @@ impl ElementBackend for Scroll {
             momentum_info: None,
             momentum_animation_instance: None,
             last_layout_size: (f32::NAN, f32::NAN),
+            auto_height: false,
         }.to_ref();
         ele.style.set_measure_func(Some(measure_scroll));
         let weak_ptr = inst.as_weak();
@@ -689,6 +697,14 @@ impl LayoutRoot for ScrollWeak {
     fn update_layout(&mut self) {
         if let Ok(mut scroll) = self.upgrade() {
             scroll.update_layout();
+        }
+    }
+
+    fn should_propagate_dirty(&self) -> bool {
+        if let Ok(mut scroll) = self.upgrade() {
+            scroll.auto_height
+        } else {
+            true
         }
     }
 }

@@ -146,6 +146,11 @@ impl LayoutRoot for FrameWeak {
         let mut frame = ok_or_return!(self.upgrade());
         frame.update_layout();
     }
+
+    fn should_propagate_dirty(&self) -> bool {
+        false
+    }
+    
 }
 
 

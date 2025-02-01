@@ -1092,6 +1092,14 @@ export class EntryElement extends View {
 
     /**
      *
+     * @param value {boolean}
+     */
+    setAutoHeight(value) {
+        Entry_set_auto_height(this.el, value);
+    }
+
+    /**
+     *
      * @returns {string}
      */
     getText() {
