@@ -461,9 +461,9 @@ impl Text {
 
     pub fn with_lines_mut<R, F: FnOnce(&mut Vec<Line>) -> R>(&self, callback: F) -> R {
         let layout = &self.element.style;
-        let content_width = layout.get_layout_width()
-            - layout.get_layout_padding_left().de_nan(0.0)
-            - layout.get_layout_padding_right().de_nan(0.0);
+        let content_width = layout.yoga_node.get_layout_width()
+            - layout.yoga_node.get_layout_padding_left().de_nan(0.0)
+            - layout.yoga_node.get_layout_padding_right().de_nan(0.0);
 
         let mut pi = self.paragraph_ref.data.borrow_mut();
         let p = pi.get_line(content_width);
@@ -587,8 +587,8 @@ pub fn intersect_range<T: Ord>(range1: (T, T), range2: (T, T)) -> Option<(T, T)>
 impl ElementBackend for Text {
     fn create(mut ele: &mut Element) -> Self {
         let mut label = Self::new(ele.clone());
-        ele.style.set_context(Some(Context::new(label.paragraph_ref.clone())));
-        ele.style.set_measure_func(Some(measure_label));
+        ele.style.yoga_node.set_context(Some(Context::new(label.paragraph_ref.clone())));
+        ele.style.yoga_node.set_measure_func(Some(measure_label));
         label
     }
 

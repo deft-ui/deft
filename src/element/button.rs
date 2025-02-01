@@ -20,18 +20,18 @@ impl ElementBackend for Button {
     fn create(element: &mut Element) -> Self {
         let base = Container::create(element);
 
-        element.style.set_margin(Edge::Top, StyleUnit::Point(OrderedFloat(4.0)));
-        element.style.set_margin(Edge::Right, StyleUnit::Point(OrderedFloat(4.0)));
-        element.style.set_margin(Edge::Bottom, StyleUnit::Point(OrderedFloat(4.0)));
-        element.style.set_margin(Edge::Left, StyleUnit::Point(OrderedFloat(4.0)));
+        element.style.yoga_node.set_margin(Edge::Top, StyleUnit::Point(OrderedFloat(4.0)));
+        element.style.yoga_node.set_margin(Edge::Right, StyleUnit::Point(OrderedFloat(4.0)));
+        element.style.yoga_node.set_margin(Edge::Bottom, StyleUnit::Point(OrderedFloat(4.0)));
+        element.style.yoga_node.set_margin(Edge::Left, StyleUnit::Point(OrderedFloat(4.0)));
 
-        element.style.set_padding(Edge::Left, StyleUnit::Point(OrderedFloat(4.0)));
-        element.style.set_padding(Edge::Right, StyleUnit::Point(OrderedFloat(4.0)));
+        element.style.yoga_node.set_padding(Edge::Left, StyleUnit::Point(OrderedFloat(4.0)));
+        element.style.yoga_node.set_padding(Edge::Right, StyleUnit::Point(OrderedFloat(4.0)));
 
-        element.style.set_border(Edge::Top, 1.0);
-        element.style.set_border(Edge::Right, 1.0);
-        element.style.set_border(Edge::Bottom, 1.0);
-        element.style.set_border(Edge::Left, 1.0);
+        element.style.yoga_node.set_border(Edge::Top, 1.0);
+        element.style.yoga_node.set_border(Edge::Right, 1.0);
+        element.style.yoga_node.set_border(Edge::Bottom, 1.0);
+        element.style.yoga_node.set_border(Edge::Left, 1.0);
         let color = Color::from_rgb(128, 128, 128);
         element.style.border_color = [color, color, color, color];
         Self {

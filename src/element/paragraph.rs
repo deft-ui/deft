@@ -686,8 +686,8 @@ impl ElementBackend for Paragraph {
         .to_ref();
         element
             .style
-            .set_context(Some(Context::new(this.as_weak())));
-        element.style.set_measure_func(Some(measure_paragraph));
+            .yoga_node.set_context(Some(Context::new(this.as_weak())));
+        element.style.yoga_node.set_measure_func(Some(measure_paragraph));
         this
     }
 
@@ -717,6 +717,7 @@ impl ElementBackend for Paragraph {
     }
 
     fn render(&mut self) -> RenderFn {
+        let padding = self.element.get_padding();
         let mut p = self.clone();
         p.layout(None);
 
@@ -730,6 +731,7 @@ impl ElementBackend for Paragraph {
         let selection_fg = self.selection_fg.clone();
 
         RenderFn::new(move |canvas| {
+            canvas.translate((padding.3, padding.0));
             let clip_rect = canvas.local_clip_bounds();
             for ln in &mut lines {
                 let ln_row = consumed_rows; consumed_rows += 1;

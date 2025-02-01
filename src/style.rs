@@ -1,11 +1,13 @@
 pub mod border_path;
 
+use crate as deft;
 use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 use std::f32::consts::PI;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use anyhow::{anyhow, Error};
+use deft_macros::mrc_object;
 use ordered_float::{Float, OrderedFloat};
 use quick_js::JsValue;
 use skia_safe::{Color, Image, Matrix, Path};
@@ -630,10 +632,47 @@ impl AnimationParams {
     }
 }
 
-pub struct StyleNodeInner {
+#[derive(PartialEq)]
+struct BorderParams {
+    border_width: [f32; 4],
+    border_radius: [f32; 4],
+    width: f32,
+    height: f32,
+}
+
+#[derive(PartialEq, Clone)]
+pub struct YogaNode {
+    node: Mrc<Node>,
+}
+
+impl YogaNode {
+    pub fn new() -> Self {
+        Self {
+            node: Mrc::new(Node::new()),
+        }
+    }
+}
+
+impl Deref for YogaNode {
+    type Target = Node;
+
+    fn deref(&self) -> &Self::Target {
+        &self.node
+    }
+}
+
+impl DerefMut for YogaNode {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.node
+    }
+}
+
+
+#[mrc_object]
+pub struct StyleNode {
     element: ElementWeak,
-    yoga_node: Node,
-    shadow_node: Option<Node>,
+    pub yoga_node: YogaNode,
+    shadow_node: Option<YogaNode>,
 
     parent: Option<MrcWeak<Self>>,
     children: Vec<StyleNode>,
@@ -652,53 +691,13 @@ pub struct StyleNodeInner {
     pub resolved_style_props: HashMap<StylePropKey, ResolvedStyleProp>,
 }
 
-#[derive(PartialEq)]
-struct BorderParams {
-    border_width: [f32; 4],
-    border_radius: [f32; 4],
-    width: f32,
-    height: f32,
-}
-
-impl Deref for StyleNodeInner {
-    type Target = Node;
-
-    fn deref(&self) -> &Self::Target {
-        &self.yoga_node
-    }
-}
-
-impl DerefMut for StyleNodeInner {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.yoga_node
-    }
-}
-
-#[derive(Clone, PartialEq)]
-pub struct StyleNode {
-    inner: Mrc<StyleNodeInner>,
-}
-
-impl Deref for StyleNode {
-    type Target = StyleNodeInner;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl DerefMut for StyleNode {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
-    }
-}
 
 impl StyleNode {
     pub fn new() -> Self {
         let transparent = Color::from_argb(0,0,0,0);
-        let mut inner = StyleNodeInner {
+        let mut inner = StyleNodeData {
             element: ElementWeak::invalid(),
-            yoga_node: Node::new(),
+            yoga_node: YogaNode::new(),
             shadow_node: None,
             parent: None,
             children: Vec::new(),
@@ -715,7 +714,7 @@ impl StyleNode {
             style_props: HashMap::new(),
         };
         inner.yoga_node.set_position_type(PositionType::Static);
-        let mut inst = Self { inner: Mrc::new(inner) };
+        let mut inst = inner.to_ref();
         inst.set_style(StyleProp::Position(StylePropVal::Custom(PositionType::Static)));
         inst.set_style(StyleProp::Color(StylePropVal::Inherit));
         inst.set_style(StyleProp::FontSize(StylePropVal::Inherit));
@@ -725,7 +724,7 @@ impl StyleNode {
 
     pub fn new_with_shadow() -> Self {
         let mut sn = Self::new();
-        sn.inner.shadow_node = Some(Node::new());
+        sn.inner.shadow_node = Some(YogaNode::new());
         sn
     }
 
@@ -745,12 +744,12 @@ impl StyleNode {
     }
 
     pub fn get_content_bounds(&self) -> Rect {
-        let l = self.get_layout_padding_left().de_nan(0.0);
-        let r = self.get_layout_padding_right().de_nan(0.0);
-        let t = self.get_layout_padding_top().de_nan(0.0);
-        let b = self.get_layout_padding_bottom().de_nan(0.0);
-        let width = self.get_layout_width();
-        let height = self.get_layout_height();
+        let l = self.yoga_node.get_layout_padding_left().de_nan(0.0);
+        let r = self.yoga_node.get_layout_padding_right().de_nan(0.0);
+        let t = self.yoga_node.get_layout_padding_top().de_nan(0.0);
+        let b = self.yoga_node.get_layout_padding_bottom().de_nan(0.0);
+        let width = self.yoga_node.get_layout_width();
+        let height = self.yoga_node.get_layout_height();
         // let (width, height) = self.with_container_node(|n| {
         //     (n.get_layout_width().de_nan(0.0), n.get_layout_height().de_nan(0.0))
         // });
@@ -1133,37 +1132,37 @@ impl StyleNode {
                 self.set_border(&value, &vec![3])
             }
             ResolvedStyleProp::Display (value) =>   {
-                self.set_display(value)
+                self.yoga_node.set_display(value)
             }
             ResolvedStyleProp::Width (value) =>   {
-                self.set_width(value)
+                self.yoga_node.set_width(value)
             },
             ResolvedStyleProp::Height (value) =>   {
-                self.set_height(value)
+                self.yoga_node.set_height(value)
             },
             ResolvedStyleProp::MaxWidth (value) =>   {
-                self.set_max_width(value)
+                self.yoga_node.set_max_width(value)
             },
             ResolvedStyleProp::MaxHeight (value) =>   {
-                self.set_max_height(value)
+                self.yoga_node.set_max_height(value)
             },
             ResolvedStyleProp::MinWidth (value) =>   {
-                self.set_min_width(value)
+                self.yoga_node.set_min_width(value)
             },
             ResolvedStyleProp::MinHeight (value) =>   {
-                self.set_min_height(value)
+                self.yoga_node.set_min_height(value)
             },
             ResolvedStyleProp::MarginTop (value) =>   {
-                self.set_margin(Edge::Top, value)
+                self.yoga_node.set_margin(Edge::Top, value)
             },
             ResolvedStyleProp::MarginRight (value) =>   {
-                self.set_margin(Edge::Right, value)
+                self.yoga_node.set_margin(Edge::Right, value)
             },
             ResolvedStyleProp::MarginBottom (value) =>   {
-                self.set_margin(Edge::Bottom, value)
+                self.yoga_node.set_margin(Edge::Bottom, value)
             },
             ResolvedStyleProp::MarginLeft (value) =>   {
-                self.set_margin(Edge::Left, value)
+                self.yoga_node.set_margin(Edge::Left, value)
             },
             ResolvedStyleProp::PaddingTop (value) =>   {
                 self.with_container_node_mut(|n| {
@@ -1186,25 +1185,25 @@ impl StyleNode {
                 })
             },
             ResolvedStyleProp::Flex (value) =>   {
-                self.set_flex(value)
+                self.yoga_node.set_flex(value)
             },
             ResolvedStyleProp::FlexBasis (value) =>   {
-                self.set_flex_basis(value)
+                self.yoga_node.set_flex_basis(value)
             },
             ResolvedStyleProp::FlexGrow (value) =>   {
-                self.set_flex_grow(value)
+                self.yoga_node.set_flex_grow(value)
             },
             ResolvedStyleProp::FlexShrink (value) =>   {
-                self.set_flex_shrink(value)
+                self.yoga_node.set_flex_shrink(value)
             },
             ResolvedStyleProp::AlignSelf (value) =>   {
-                self.set_align_self(value)
+                self.yoga_node.set_align_self(value)
             },
             ResolvedStyleProp::Direction (value) =>   {
-                self.set_direction(value)
+                self.yoga_node.set_direction(value)
             },
             ResolvedStyleProp::Position (value) =>   {
-                self.set_position_type(value)
+                self.yoga_node.set_position_type(value)
             },
             ResolvedStyleProp::Top (value) =>   {
                 self.yoga_node.set_position(Edge::Top, value);
@@ -1219,7 +1218,7 @@ impl StyleNode {
                 self.yoga_node.set_position(Edge::Left, value);
             },
             ResolvedStyleProp::Overflow (value) =>   {
-                self.set_overflow(value)
+                self.yoga_node.set_overflow(value)
             },
             ResolvedStyleProp::BorderTopLeftRadius (value) =>   {
                 self.border_radius[0] = value
@@ -1364,7 +1363,7 @@ impl StyleNode {
         for index in edges {
             self.border_color[*index] = color;
             let edges_list = [Edge::Top, Edge::Right, Edge::Bottom, Edge::Left];
-            self.inner.set_border(edges_list[*index], width);
+            self.yoga_node.set_border(edges_list[*index], width);
         }
     }
 

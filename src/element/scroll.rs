@@ -472,9 +472,9 @@ impl ElementBackend for Scroll {
             last_layout_size: (f32::NAN, f32::NAN),
             auto_height: false,
         }.to_ref();
-        ele.style.set_measure_func(Some(measure_scroll));
+        ele.style.yoga_node.set_measure_func(Some(measure_scroll));
         let weak_ptr = inst.as_weak();
-        ele.style.set_context(Some(Context::new(weak_ptr)));
+        ele.style.yoga_node.set_context(Some(Context::new(weak_ptr)));
         ele.set_as_layout_root(Some(Box::new(inst.as_weak())));
         inst
     }

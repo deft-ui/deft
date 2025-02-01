@@ -97,7 +97,7 @@ impl Image {
         };
         let context = Context::new(self.img.clone());
         let mut element = ok_or_return!(self.element.upgrade_mut());
-        element.style.set_context(Some(context));
+        element.style.yoga_node.set_context(Some(context));
         self.element.mark_dirty(true);
     }
 
@@ -117,7 +117,7 @@ impl Image {
 
 impl ElementBackend for Image {
     fn create(mut element: &mut Element) -> Self {
-        element.style.set_measure_func(Some(measure_image));
+        element.style.yoga_node.set_measure_func(Some(measure_image));
         ImageData {
             element: element.as_weak(),
             src: "".to_string(),

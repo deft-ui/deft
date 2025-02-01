@@ -30,7 +30,7 @@ use crate::frame::Frame;
 use crate::render::RenderFn;
 use crate::string::StringUtils;
 use crate::style::{StyleProp, StylePropKey, StylePropVal};
-use crate::style::StyleProp::{BackgroundColor, MinWidth, Position};
+use crate::style::StyleProp::{BackgroundColor, Left, MinWidth, Position, Top};
 use crate::style::StylePropKey::Height;
 use crate::timer::TimerHandle;
 
@@ -218,13 +218,7 @@ impl Entry {
     }
 
     fn update_caret_by_offset_coordinate(&mut self, x: f32, y: f32, is_kb_vertical: bool) {
-        let position = if self.multiple_line {
-            (x, y)
-        } else {
-            (x, 0.0)
-        };
-
-        let text_coord = self.paragraph.get_text_coord_by_pixel_coord(position);
+        let text_coord = self.paragraph.get_text_coord_by_pixel_coord((x, y));
         self.update_caret_value(text_coord, is_kb_vertical);
     }
 
@@ -291,8 +285,8 @@ impl Entry {
 
     fn to_label_position(&self, position: (f32, f32)) -> (f32, f32) {
         let ele = ok_or_return!(self.element.upgrade_mut(), (0.0, 0.0));
-        let padding_left = ele.style.get_layout_padding_left().de_nan(0.0);
-        let padding_top = ele.style.get_layout_padding_top().de_nan(0.0);
+        let padding_left = ele.style.yoga_node.get_layout_padding_left().de_nan(0.0);
+        let padding_top = ele.style.yoga_node.get_layout_padding_top().de_nan(0.0);
         (position.0 - padding_left, position.1 - padding_top)
     }
 
@@ -522,7 +516,10 @@ impl ElementBackend for Entry {
         let mut paragraph_element = Element::create(Paragraph::create);
         paragraph_element.set_style_props(vec![
             Position(StylePropVal::Custom(PositionType::Absolute)),
+            Left(StylePropVal::Custom(StyleUnit::Point(OrderedFloat(0.0)))),
+            Top(StylePropVal::Custom(StyleUnit::Point(OrderedFloat(0.0)))),
             MinWidth(StylePropVal::Custom(StyleUnit::Percent(OrderedFloat(100.0)))),
+            // BackgroundColor(StylePropVal::Custom(Color::from_argb(80,80, 80, 80))),
         ]);
         let mut paragraph = paragraph_element.get_backend_as::<Paragraph>().clone();
         paragraph.set_text_wrap(false);
@@ -578,7 +575,7 @@ impl ElementBackend for Entry {
         paint.set_color(element.style.computed_style.color);
         let scroll_left = element.get_scroll_left();
         let scroll_top = element.get_scroll_top();
-        let padding = element.get_padding();
+        let paragraph_padding = self.paragraph_element.get_padding();
 
 
         let mut me = self.clone();
@@ -589,8 +586,8 @@ impl ElementBackend for Entry {
         let mut base_render_fn = self.base.render();
         let focusing = self.focusing;
         let caret_visible = self.caret_visible.get();
-        let x = caret_rect.x - scroll_left + padding.1;
-        let y = caret_rect.y - scroll_top + padding.0;
+        let x = caret_rect.x - scroll_left + paragraph_padding.1;
+        let y = caret_rect.y - scroll_top + paragraph_padding.0;
 
         RenderFn::new(move |canvas| {
             canvas.save();
@@ -636,6 +633,24 @@ impl ElementBackend for Entry {
     fn handle_origin_bounds_change(&mut self, bounds: &Rect) {
         self.base.handle_origin_bounds_change(bounds);
         //self.update_paint_offset(bounds.width, bounds.height);
+    }
+
+    fn accept_style(&mut self, style: &StyleProp) -> bool {
+        let key = style.key();
+        match key {
+            StylePropKey::PaddingTop
+            | StylePropKey::PaddingRight
+            | StylePropKey::PaddingBottom
+            | StylePropKey::PaddingLeft
+            => {
+                self.paragraph_element.set_style_prop_internal(style.clone());
+                return false;
+            },
+            _ => {
+
+            }
+        }
+        self.base.accept_style(style)
     }
 
 }

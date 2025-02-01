@@ -469,7 +469,7 @@ impl RenderTree {
         if element.style.transform.is_some() {
             return true;
         }
-        let pos_type = element.style.get_position_type();
+        let pos_type = element.style.yoga_node.get_position_type();
         pos_type == PositionType::Absolute || pos_type == PositionType::Relative
     }
 

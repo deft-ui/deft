@@ -444,7 +444,7 @@ impl Element {
 
     #[js_func]
     pub fn get_size(&self) -> (f32, f32) {
-        let layout = self.style.get_layout();
+        let layout = self.style.yoga_node.get_layout();
         (layout.width().nan_to_zero(), layout.height().nan_to_zero())
     }
 
@@ -465,7 +465,7 @@ impl Element {
 
     /// bounds relative to parent
     pub fn get_bounds(&self) -> base::Rect {
-        let ml = self.style.get_layout();
+        let ml = self.style.yoga_node.get_layout();
         base::Rect::from_layout(&ml)
     }
 
@@ -560,10 +560,10 @@ impl Element {
 
     pub fn get_border_width(&self) -> (f32, f32, f32, f32) {
         (
-            self.style.get_style_border_top().de_nan(0.0),
-            self.style.get_style_border_right().de_nan(0.0),
-            self.style.get_style_border_bottom().de_nan(0.0),
-            self.style.get_style_border_left().de_nan(0.0),
+            self.style.yoga_node.get_style_border_top().de_nan(0.0),
+            self.style.yoga_node.get_style_border_right().de_nan(0.0),
+            self.style.yoga_node.get_style_border_bottom().de_nan(0.0),
+            self.style.yoga_node.get_style_border_left().de_nan(0.0),
         )
     }
 
@@ -588,8 +588,10 @@ impl Element {
 
     fn set_style_prop_internal(&mut self, style: StyleProp) {
         // println!("setting style {:?}", style);
-        self.style_props.insert(style.key().clone(), style);
-        self.apply_style();
+        if self.backend.accept_style(&style) {
+            self.style_props.insert(style.key().clone(), style);
+            self.apply_style();
+        }
     }
 
     #[js_func]
@@ -747,8 +749,8 @@ impl Element {
     }
 
     pub fn mark_dirty(&mut self, layout_dirty: bool) {
-        if layout_dirty && self.style.get_own_context_mut().is_some() {
-            self.style.mark_dirty();
+        if layout_dirty && self.style.yoga_node.get_own_context_mut().is_some() {
+            self.style.yoga_node.mark_dirty();
         }
 
         if layout_dirty {
@@ -1029,6 +1031,10 @@ pub trait ElementBackend {
     }
 
     fn handle_origin_bounds_change(&mut self, _bounds: &base::Rect) {}
+
+    fn accept_style(&mut self, style: &StyleProp) -> bool {
+        true
+    }
 
 }
 
