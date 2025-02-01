@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 pub fn auto_generate_loader() {
+    println!("cargo:rerun-if-env-changed=DEFT_JS_URL");
     println!("cargo:rerun-if-env-changed=DEFT_JS_DIR");
     if let Ok(js_dir) = env::var("DEFT_JS_DIR") {
         generate_static_loader(js_dir.as_str(), "target/deft_js_loader.in");

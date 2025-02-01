@@ -2,8 +2,9 @@ use std::sync::OnceLock;
 use jni::JNIEnv;
 use jni::objects::{JClass, JString, JValue};
 use jni::sys::{jboolean, jfloat, jint, jlong};
+use skia_safe::Rect;
 use winit::platform::android::activity::AndroidApp;
-use crate::app::AppEvent;
+use crate::app::{AppEvent, InsetType};
 use crate::event_loop::{create_event_loop_proxy};
 use crate::send_app_event;
 
@@ -44,16 +45,21 @@ pub extern "system" fn Java_deft_DeftActivity_sendKey0<'local>(mut env: JNIEnv<'
 }
 
 #[no_mangle]
-pub extern "system" fn Java_deft_DeftActivity_imeResize0<'local>(mut env: JNIEnv<'local>,
-                                                                            class: JClass<'local>,
-                                                                            window_id: jlong,
-                                                                            height: jfloat)
+pub extern "system" fn Java_deft_DeftActivity_setInset0<'local>(mut env: JNIEnv<'local>,
+                                                                 class: JClass<'local>,
+                                                                 window_id: jlong,
+                                                                 inset_type: jint,
+                                                                 top: jfloat,
+                                                                 right: jfloat,
+                                                                 bottom: jfloat,
+                                                                 left: jfloat,)
 {
-    match send_app_event(AppEvent::ImeResize(window_id as i32, height as f32)) {
-        Err(e) => {
-            println!("send app event error: {:?}", e);
-        }
-        Ok(r) => {r.wait()}
+    if let Some(ty) = InsetType::from_i32(inset_type) {
+        let rect = Rect::new(left, top, right, bottom);
+        println!("setInset0,{} {:?}, {:?}", window_id, ty, rect);
+        send_app_event(AppEvent::SetInset(window_id as i32, ty, rect));
+    } else {
+        println!("unknown inset type: {:?}", inset_type);
     }
 }
 

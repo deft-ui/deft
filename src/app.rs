@@ -4,6 +4,7 @@ use std::thread;
 use anyhow::Error;
 use jni::objects::JValue;
 use jni::sys::{jboolean, jlong};
+use skia_safe::Rect;
 use crate::js::loader::JsModuleLoader;
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, WindowEvent};
@@ -17,7 +18,7 @@ use winit::window::WindowId;
 use crate::event_loop::{init_event_loop_proxy, run_event_loop_task, run_with_event_loop, AppEventProxy};
 use crate::ext::ext_frame::FRAMES;
 use crate::ext::ext_localstorage::localstorage_flush;
-use crate::frame::{frame_check_update, frame_ime_resize, frame_input, frame_on_render_idle, frame_send_key};
+use crate::frame::{frame_check_update, frame_input, frame_on_render_idle, frame_send_key, frame_update_inset};
 use crate::js::js_engine::JsEngine;
 use crate::js::js_event_loop::{js_init_event_loop, JsEvent, JsEventLoopClosedError};
 use crate::js::js_runtime::JsContext;
@@ -40,14 +41,33 @@ impl AppEventPayload {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+pub enum InsetType {
+    StatusBar,
+    Ime,
+    Navigation,
+}
+
+impl InsetType {
+    pub fn from_i32(ty: i32) -> Option<InsetType> {
+        match ty {
+            1 => Some(InsetType::StatusBar),
+            2 => Some(InsetType::Navigation),
+            8 => Some(InsetType::Ime),
+            _ => None,
+        }
+    }
+}
+
 pub enum AppEvent {
+    BindWindow(i32),
     Callback(Box<dyn FnOnce() + Send + Sync>),
     JsEvent(JsEvent),
     ShowSoftInput(i32),
     HideSoftInput(i32),
     CommitInput(i32, String),
     NamedKeyInput(i32, String, bool),
-    ImeResize(i32, f32),
+    SetInset(i32, InsetType, Rect),
     Update(i32),
     RenderIdle(i32),
 }
@@ -128,6 +148,12 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEventPayload) {
         run_event_loop_task(event_loop, move || {
             match event.event {
+                AppEvent::BindWindow(id) => {
+                    println!("bindWindow {} Start", id);
+                    #[cfg(target_os = "android")]
+                    bind_deft_window(event_loop.android_app().clone(), id).unwrap();
+                    println!("bindWindow {} Done", id);
+                }
                 AppEvent::Callback(callback) => {
                     callback();
                 },
@@ -154,8 +180,8 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
                 AppEvent::NamedKeyInput(frame_id, key, pressed) => {
                     frame_send_key(frame_id, &key, pressed);
                 }
-                AppEvent::ImeResize(frame_id, height) => {
-                    frame_ime_resize(frame_id, height);
+                AppEvent::SetInset(frame_id, ty, rect) => {
+                    frame_update_inset(frame_id, ty, rect);
                 },
                 AppEvent::RenderIdle(frame_id) => {
                     frame_on_render_idle(frame_id);
@@ -173,6 +199,7 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
+        // println!("onWindowEvent: {:?}", event);
         run_event_loop_task(event_loop, move || {
             self.js_engine.handle_window_event(window_id, event);
             self.execute_pending_jobs();
@@ -180,6 +207,7 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
     }
 
     fn device_event(&mut self, event_loop: &ActiveEventLoop, device_id: DeviceId, event: DeviceEvent) {
+        // println!("onDeviceEvent: {:?}", event);
         run_event_loop_task(event_loop, move || {
             self.js_engine.handle_device_event(device_id, event);
             self.execute_pending_jobs();
@@ -193,6 +221,20 @@ pub fn exit_app(code: i32) -> Result<(), Error> {
     run_with_event_loop(|el| {
         el.exit();
     });
+    Ok(())
+}
+
+#[cfg(target_os = "android")]
+pub fn bind_deft_window(app: AndroidApp, frame_id: i32) -> Result<(), jni::errors::Error> {
+    use jni::JavaVM;
+    use jni::objects::JObject;
+    let vm = unsafe { JavaVM::from_raw(app.vm_as_ptr() as _)? };
+    let activity = unsafe { JObject::from_raw(app.activity_as_ptr() as _) };
+    let mut env = vm.attach_current_thread()?;
+    let frame_id = frame_id as jlong;
+    env.call_method(&activity, "bindDeftWindow", "(J)V", &[
+        JValue::Long(frame_id)
+    ])?.v()?;
     Ok(())
 }
 

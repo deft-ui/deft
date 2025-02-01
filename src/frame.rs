@@ -1,5 +1,5 @@
 use crate as deft;
-use crate::app::{exit_app, AppEvent, AppEventPayload};
+use crate::app::{exit_app, AppEvent, AppEventPayload, InsetType};
 use crate::base::MouseEventType::{MouseClick, MouseUp};
 use crate::base::{Callback, ElementEvent, Event, EventContext, EventHandler, EventListener, EventRegistration, JsValueContext, MouseDetail, MouseEventType, ResultWaiter, Touch, TouchDetail, UnsafeFnOnce};
 use crate::canvas_util::CanvasHelper;
@@ -106,7 +106,6 @@ pub struct Frame {
     attributes: WindowAttributes,
     init_width: Option<f32>,
     init_height: Option<f32>,
-    ime_height: f32,
     background_color: Color,
     renderer_idle: bool,
     next_frame_callbacks: Vec<Callback>,
@@ -160,7 +159,10 @@ impl Frame {
     #[js_func]
     pub fn create(attrs: FrameAttrs) -> Result<Self, Error> {
         let mut frame = Frame::create_inner(attrs);
-        frame.update_ime_height(0.0);
+        send_app_event(AppEvent::BindWindow(frame.get_id())).unwrap();
+        frame.update_inset(InsetType::Ime, Rect::new_empty());
+        frame.update_inset(InsetType::Navigation, Rect::new_empty());
+        frame.update_inset(InsetType::StatusBar, Rect::new_empty());
         let window_id = frame.get_window_id();
         FRAMES.with_borrow_mut(|m| m.insert(frame.get_id(), frame.clone()));
         WINDOW_TO_FRAME.with_borrow_mut(|m| m.insert(window_id, frame.as_weak()));
@@ -239,7 +241,6 @@ impl Frame {
             frame_type,
             init_width: attrs.width,
             init_height: attrs.height,
-            ime_height: 0.0,
             background_color: Color::from_rgb(0, 0, 0),
             repaint_timer_handle: None,
             renderer_idle: true,
@@ -259,10 +260,21 @@ impl Frame {
         handle
     }
 
-    pub fn update_ime_height(&mut self, ime_height: f32) {
-        let ime_height = ime_height / self.window.scale_factor() as f32;
-        self.ime_height = ime_height;
-        self.style_variables.update_value("ime-height", format!("{:.6}", ime_height));
+    pub fn update_inset(&mut self, ty: InsetType, rect: Rect) {
+        let name = match ty {
+            InsetType::Ime => {
+                "ime-height"
+            }
+            InsetType::StatusBar => {
+                "status-height"
+            }
+            InsetType::Navigation => {
+                "navigation-height"
+            }
+        };
+        let height = rect.height() / self.window.scale_factor() as f32;
+        println!("updating style variable: {} {}", name, height);
+        self.style_variables.update_value(name, format!("{:.6}", height));
     }
 
     pub fn resume(&mut self) {
@@ -1146,10 +1158,10 @@ pub fn frame_send_key(frame_id: i32, key: &str, pressed: bool) {
     }
 }
 
-pub fn frame_ime_resize(frame_id: i32, height: f32) {
+pub fn frame_update_inset(frame_id: i32, ty: InsetType, rect: Rect) {
     FRAMES.with_borrow_mut(|m| {
         if let Some(f) = m.get_mut(&frame_id) {
-            f.update_ime_height(height);
+            f.update_inset(ty, rect);
             // f.mark_dirty_and_update_immediate(true).wait_finish();
         }
     });
