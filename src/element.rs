@@ -35,7 +35,7 @@ use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::resource_table::ResourceTable;
 use crate::style::{parse_style_obj, ColorHelper, StyleNode, StyleProp, StylePropKey, StyleTransform};
-use crate::{base, bind_js_event_listener, compute_style, js_auto_upgrade, js_call, js_call_rust, js_deserialize, js_get_prop, js_serialize, js_value, js_weak_value, ok_or_return, some_or_return};
+use crate::{base, bind_js_event_listener, compute_style, js_auto_upgrade, js_call, js_call_rust, js_deserialize, js_get_prop, js_serialize, js_value, js_weak_value, ok_or_return, send_app_event, some_or_return};
 
 pub mod container;
 pub mod entry;
@@ -49,6 +49,7 @@ pub mod text;
 pub mod paragraph;
 
 use crate as deft;
+use crate::app::AppEvent;
 use crate::computed::ComputedValue;
 use crate::js::JsError;
 use crate::layout::LayoutRoot;
@@ -376,6 +377,7 @@ impl Element {
     pub fn set_window(&mut self, window: Option<FrameWeak>) {
         self.window = window.clone();
         self.on_window_changed(&window);
+        self.process_auto_focus();
     }
 
     fn get_window(&self) -> Option<FrameWeak> {
@@ -446,6 +448,11 @@ impl Element {
     pub fn get_size(&self) -> (f32, f32) {
         let layout = self.style.yoga_node.get_layout();
         (layout.width().nan_to_zero(), layout.height().nan_to_zero())
+    }
+
+    #[js_func]
+    pub fn set_auto_focus(&mut self, auto_focus: bool) {
+        self.auto_focus = auto_focus;
     }
 
     fn compute_length(&self, length: StyleUnit, parent_length: Option<f32>) -> Option<f32> {
@@ -530,7 +537,28 @@ impl Element {
         self.mark_dirty(true);
         child.set_parent_internal(Some(self.clone()));
         child.set_dirty_state_recurse(true);
-        self.children.insert(pos as usize, child);
+        self.children.insert(pos as usize, child.clone());
+        child.process_auto_focus();
+    }
+
+    fn process_auto_focus(&self) {
+        let mut focus_element = self.find_auto_focus_element();
+        if let Some(mut fe) = focus_element {
+            fe.focus();
+        }
+    }
+
+    fn find_auto_focus_element(&self) -> Option<Element> {
+        for c in self.children.iter().rev() {
+            if let Some(fc) = c.find_auto_focus_element() {
+                return Some(fc);
+            }
+        }
+        if self.auto_focus {
+            Some(self.clone())
+        } else {
+            None
+        }
     }
 
     pub fn remove_child_view(&mut self, position: u32) {
@@ -540,6 +568,11 @@ impl Element {
         let layout = &mut ele.style;
         layout.remove_child(&mut c.style);
         ele.mark_dirty(true);
+        if let Some(frame) = self.get_frame() {
+            if let Ok(mut f) = frame.upgrade_mut() {
+                f.on_element_removed(&c);
+            }
+        }
     }
 
     pub fn get_children(&self) -> Vec<Element> {
@@ -923,6 +956,7 @@ pub struct Element {
     hover_style_props: HashMap<StylePropKey, StyleProp>,
     animation_style_props: HashMap<StylePropKey, StyleProp>,
     hover: bool,
+    auto_focus: bool,
 
     applied_style: Vec<StyleProp>,
     // animation_instance: Option<AnimationInstance>,
@@ -986,7 +1020,8 @@ impl ElementData {
             need_snapshot: false,
             render_object_idx: None,
             border_path: BorderPath::new(0.0, 0.0, [0.0; 4], [0.0; 4]),
-            style_manager: StyleManager::new()
+            style_manager: StyleManager::new(),
+            auto_focus: false,
         }
     }
 

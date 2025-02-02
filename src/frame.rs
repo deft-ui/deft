@@ -551,6 +551,14 @@ impl Frame {
         self.event_registration.remove_event_listener(&event_type, id)
     }
 
+    pub fn on_element_removed(&mut self, element: &Element) {
+        if let Some(f) = &self.focusing {
+            if f.get_frame().is_none() {
+                self.focusing = self.body.clone();
+            }
+        }
+    }
+
     fn handle_mouse_wheel(&mut self, delta: (f32, f32)) {
         if let Some((mut target_node, _, _)) = self.get_node_by_point() {
             target_node.emit(MouseWheelEvent { cols: delta.0, rows: delta.1 });
@@ -875,7 +883,9 @@ impl Frame {
     #[js_func]
     pub fn set_body(&mut self, mut body: Element) {
         body.set_window(Some(self.as_weak()));
-        self.focusing = Some(body.clone());
+        if self.focusing.is_none() {
+            self.focusing = Some(body.clone());
+        }
 
         //TODO unbind when change body
         let myself = self.as_weak();
@@ -1152,7 +1162,7 @@ pub fn frame_send_key(frame_id: i32, key: &str, pressed: bool) {
     if let Some(k) = str_to_named_key(&key) {
         FRAMES.with_borrow_mut(|m| {
             if let Some(f) = m.get_mut(&frame_id) {
-                f.handle_key(0, Some(k), None, None, false, pressed);
+                f.handle_key(0, Some(k), Some(key.to_string()), None, false, pressed);
             }
         });
     }

@@ -7,11 +7,12 @@ use std::str::FromStr;
 pub fn auto_generate_loader() {
     println!("cargo:rerun-if-env-changed=DEFT_JS_URL");
     println!("cargo:rerun-if-env-changed=DEFT_JS_DIR");
+    let out_file = format!("{}/js_loader.code", env::var("OUT_DIR").unwrap());
     if let Ok(js_dir) = env::var("DEFT_JS_DIR") {
-        generate_static_loader(js_dir.as_str(), "target/deft_js_loader.in");
+        generate_static_loader(js_dir.as_str(), out_file.as_str());
     } else {
         let js_url = env::var("DEFT_JS_URL").unwrap_or("http://localhost:7800".to_string());
-        generate_dev_loader(js_url.as_str(), "target/deft_js_loader.in");
+        generate_dev_loader(js_url.as_str(), out_file.as_str());
     }
 }
 

@@ -47,6 +47,7 @@ function createTextEdit() {
     textEdit.setText("1\n12\n测试\n123\n1234");
     textEdit.setMultipleLine(true);
     textEdit.setAutoHeight(true);
+    textEdit.setAutoFocus(true);
 
     textEdit.setStyle({
         padding: 10,

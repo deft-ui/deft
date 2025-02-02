@@ -805,6 +805,14 @@ export class View {
         this.#eventBinder.bindEvent(type, callback);
     }
 
+    /**
+     *
+     * @param value {boolean}
+     */
+    setAutoFocus(value) {
+        Element_set_auto_focus(this.el, value);
+    }
+
     toString() {
         return this.el + "@" + this.constructor.name
     }
