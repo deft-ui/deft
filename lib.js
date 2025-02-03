@@ -126,10 +126,10 @@ export class Window {
 
     /**
      *
-     * @param view {View}
+     * @param element {Element}
      */
-    setBody(view) {
-        Window_set_body(this.#windowHandle, view.el);
+    setBody(element) {
+        Window_set_body(this.#windowHandle, element.handle);
     }
 
     /**
@@ -462,7 +462,7 @@ export class SystemTray {
     }
 
 }
-export class View {
+export class Element {
     /**
      * @type {ContainerBasedElement}
      */
@@ -470,7 +470,7 @@ export class View {
     /**
      * @type number
      */
-    el
+    handle
 
     /**
      * @type {StyleProps}
@@ -490,16 +490,16 @@ export class View {
     constructor(el, context) {
         const myContext = this;
         if (typeof el === "number") {
-            this.el = Element_create_by_type(el, myContext);
+            this.handle = Element_create_by_type(el, myContext);
         } else {
             Element_set_js_context(el, myContext);
-            this.el = el;
+            this.handle = el;
         }
-        if (!this.el) {
-            throw new Error("Failed to create view:" + el)
+        if (!this.handle) {
+            throw new Error("Failed to create element:" + el)
         }
-        this.#eventBinder = new EventBinder(this.el, Element_add_js_event_listener, Element_remove_js_event_listener, this, (target) => {
-            return View.fromHandle(target);
+        this.#eventBinder = new EventBinder(this.handle, Element_add_js_event_listener, Element_remove_js_event_listener, this, (target) => {
+            return Element.fromHandle(target);
         });
     }
 
@@ -513,7 +513,7 @@ export class View {
     createEventBinder(target, addEventListenerApi, removeEventListenerApi) {
         if (!removeEventListenerApi) {
             removeEventListenerApi = (_t, listenerId) => {
-                Element_remove_js_event_listener(this.el, listenerId);
+                Element_remove_js_event_listener(this.handle, listenerId);
             }
         }
         return new EventBinder(target, addEventListenerApi, removeEventListenerApi, this, (target) => {
@@ -529,21 +529,21 @@ export class View {
      * @returns {number}
      */
     getId() {
-        return Element_get_id(this.el)
+        return Element_get_id(this.handle)
     }
 
     /**
      *
-     * @returns {View | null}
+     * @returns {Element | null}
      */
     getParent() {
-        const eh = Element_get_parent(this.el);
-        return View.fromHandle(eh);
+        const eh = Element_get_parent(this.handle);
+        return Element.fromHandle(eh);
     }
 
     /**
      *
-     * @returns {View}
+     * @returns {Element}
      */
     getRootElement() {
         let p = this.getParent();
@@ -555,11 +555,11 @@ export class View {
     }
 
     focus() {
-        Element_focus(this.el);
+        Element_focus(this.handle);
     }
 
     getWindow() {
-        const windowHandle = Element_get_window(this.el);
+        const windowHandle = Element_get_window(this.handle);
         return Window.fromHandle(windowHandle);
     }
 
@@ -569,7 +569,7 @@ export class View {
      */
     setStyle(style) {
         this.#style = style;
-        Element_set_style(this.el, style);
+        Element_set_style(this.handle, style);
     }
 
     /**
@@ -581,7 +581,7 @@ export class View {
     }
 
     setAnimation(animation) {
-        Element_set_animation(this.el, animation);
+        Element_set_animation(this.handle, animation);
     }
 
     /**
@@ -589,7 +589,7 @@ export class View {
      * @param style {StyleProps}
      */
     setHoverStyle(style) {
-        Element_set_hover_style(this.el, style);
+        Element_set_hover_style(this.handle, style);
     }
 
     /**
@@ -597,7 +597,7 @@ export class View {
      * @param value {number}
      */
     setScrollTop(value) {
-        Element_set_scroll_top(this.el, value);
+        Element_set_scroll_top(this.handle, value);
     }
 
     /**
@@ -605,7 +605,7 @@ export class View {
      * @param value {number}
      */
     setScrollLeft(value) {
-        Element_set_scroll_left(this.el, value);
+        Element_set_scroll_left(this.handle, value);
     }
 
 
@@ -614,7 +614,7 @@ export class View {
      * @param value {boolean}
      */
     setDraggable(value) {
-        Element_set_draggable(this.el, value);
+        Element_set_draggable(this.handle, value);
     }
 
     /**
@@ -622,7 +622,7 @@ export class View {
      * @param value {string}
      */
     setCursor(value) {
-        Element_set_cursor(this.el, value);
+        Element_set_cursor(this.handle, value);
     }
 
     /**
@@ -630,7 +630,7 @@ export class View {
      * @returns {[number, number]}
      */
     getSize() {
-        return Element_get_size(this.el);
+        return Element_get_size(this.handle);
     }
 
     /**
@@ -638,7 +638,7 @@ export class View {
      * @returns {[number, number]}
      */
     getContentSize() {
-        return Element_get_real_content_size(this.el);
+        return Element_get_real_content_size(this.handle);
     }
 
     /**
@@ -646,7 +646,7 @@ export class View {
      * @returns {ElementRect}
      */
     getBoundingClientRect() {
-        return Element_get_bounding_client_rect(this.el);
+        return Element_get_bounding_client_rect(this.handle);
     }
 
     /**
@@ -654,7 +654,7 @@ export class View {
      * @returns {number}
      */
     getScrollTop() {
-        return Element_get_scroll_top(this.el);
+        return Element_get_scroll_top(this.handle);
     }
 
     /**
@@ -662,7 +662,7 @@ export class View {
      * @returns {number}
      */
     getScrollLeft() {
-        return Element_get_scroll_left(this.el);
+        return Element_get_scroll_left(this.handle);
     }
 
     /**
@@ -670,7 +670,7 @@ export class View {
      * @returns {number}
      */
     getScrollHeight() {
-        return Element_get_scroll_height(this.el);
+        return Element_get_scroll_height(this.handle);
     }
 
     /**
@@ -678,7 +678,7 @@ export class View {
      * @returns {number}
      */
     getScrollWidth() {
-        return Element_scroll_width(this.el);
+        return Element_scroll_width(this.handle);
     }
 
     /**
@@ -818,11 +818,11 @@ export class View {
      * @param value {boolean}
      */
     setAutoFocus(value) {
-        Element_set_auto_focus(this.el, value);
+        Element_set_auto_focus(this.handle, value);
     }
 
     toString() {
-        return this.el + "@" + this.constructor.name
+        return this.handle + "@" + this.constructor.name
     }
 
 }
@@ -878,7 +878,7 @@ export class Audio {
 
 }
 
-export class LabelElement extends View {
+export class LabelElement extends Element {
     constructor() {
         super(VT_LABEL);
     }
@@ -888,7 +888,7 @@ export class LabelElement extends View {
      * @param wrap {boolean}
      */
     setTextWrap(wrap) {
-        Text_set_text_wrap(this.el, wrap);
+        Text_set_text_wrap(this.handle, wrap);
     }
 
     /**
@@ -896,7 +896,7 @@ export class LabelElement extends View {
      * @param text {string}
      */
     setText(text) {
-        Text_set_text(this.el, text);
+        Text_set_text(this.handle, text);
     }
 
     /**
@@ -904,7 +904,7 @@ export class LabelElement extends View {
      * @param align {"left" | "right" | "center"}
      */
     setAlign(align) {
-        Element_set_property(this.el, "align", align);
+        Element_set_property(this.handle, "align", align);
     }
 
     /**
@@ -912,7 +912,7 @@ export class LabelElement extends View {
      * @param selection {number[]}
      */
     setSelection(selection) {
-        Text_set_selection(this.el, selection);
+        Text_set_selection(this.handle, selection);
     }
 
     /**
@@ -930,7 +930,7 @@ export class LabelElement extends View {
      * @returns {number}
      */
     getLineBeginOffset(line) {
-        return Text_get_line_begin_offset(this.el, line);
+        return Text_get_line_begin_offset(this.handle, line);
     }
 
     /**
@@ -939,7 +939,7 @@ export class LabelElement extends View {
      * @param text {string}
      */
     insertLine(line, text) {
-        Text_insert_line(this.el, line, text);
+        Text_insert_line(this.handle, line, text);
     }
 
     /**
@@ -948,7 +948,7 @@ export class LabelElement extends View {
      * @param newText {string}
      */
     updateLine(line, newText) {
-        Text_update_line(this.el, line, newText);
+        Text_update_line(this.handle, line, newText);
     }
 
     /**
@@ -956,7 +956,7 @@ export class LabelElement extends View {
      * @param line {number}
      */
     deleteLine(line) {
-        Text_delete_line(this.el, line);
+        Text_delete_line(this.handle, line);
     }
 
     /**
@@ -966,7 +966,7 @@ export class LabelElement extends View {
      * @return {number}
      */
     getCaretOffsetByCursor(row, col) {
-        return Text_get_atom_offset_by_location(this.el, [row, col]);
+        return Text_get_atom_offset_by_location(this.handle, [row, col]);
     }
 
 }
@@ -983,7 +983,7 @@ export class LabelElement extends View {
  *   backgroundColor ?: string
  * }} ParagraphUnit
  */
-export class ParagraphElement extends View {
+export class ParagraphElement extends Element {
     #paragraph;
     constructor() {
         const p = Paragraph_new_element();
@@ -1049,17 +1049,17 @@ export class ParagraphElement extends View {
 
 }
 
-export class ImageElement extends View {
+export class ImageElement extends Element {
     constructor() {
         super(VT_IMAGE);
     }
     setSrc(src) {
-        Image_set_src(this.el, src);
+        Image_set_src(this.handle, src);
     }
 }
 
 
-export class EntryElement extends View {
+export class EntryElement extends Element {
     constructor() {
         super(VT_ENTRY);
     }
@@ -1069,7 +1069,7 @@ export class EntryElement extends View {
      * @param align {"left"|"right"|"center"}
      */
     setAlign(align) {
-        Element_set_property(this.el, "align", align);
+        Element_set_property(this.handle, "align", align);
     }
 
     /**
@@ -1077,7 +1077,7 @@ export class EntryElement extends View {
      * @param text {string}
      */
     setText(text) {
-        Entry_set_text(this.el, text);
+        Entry_set_text(this.handle, text);
     }
 
     /**
@@ -1086,7 +1086,7 @@ export class EntryElement extends View {
      * @param end {number}
      */
     setSelectionByCharOffset(start, end) {
-        Entry_set_selection_by_char_offset(this.el, start, end)
+        Entry_set_selection_by_char_offset(this.handle, start, end)
     }
 
     /**
@@ -1094,7 +1094,7 @@ export class EntryElement extends View {
      * @param charOffset {number}
      */
     setCaretByCharOffset(charOffset) {
-        Entry_set_caret_by_char_offset(this.el, charOffset);
+        Entry_set_caret_by_char_offset(this.handle, charOffset);
     }
 
     /**
@@ -1102,7 +1102,7 @@ export class EntryElement extends View {
      * @param multipleLine {boolean}
      */
     setMultipleLine(multipleLine) {
-        Entry_set_multiple_line(this.el, multipleLine)
+        Entry_set_multiple_line(this.handle, multipleLine)
         // Element_set_property(this.el, "multipleline", String(multipleLine));
     }
 
@@ -1111,7 +1111,7 @@ export class EntryElement extends View {
      * @param value {boolean}
      */
     setAutoHeight(value) {
-        Entry_set_auto_height(this.el, value);
+        Entry_set_auto_height(this.handle, value);
     }
 
     /**
@@ -1119,7 +1119,7 @@ export class EntryElement extends View {
      * @returns {string}
      */
     getText() {
-        return Entry_get_text(this.el);
+        return Entry_get_text(this.handle);
     }
 
     /**
@@ -1127,7 +1127,7 @@ export class EntryElement extends View {
      * @param rows {number}
      */
     setRows(rows) {
-        Entry_set_rows(this.el, rows);
+        Entry_set_rows(this.handle, rows);
     }
 
     bindTextChange(callback) {
@@ -1136,7 +1136,7 @@ export class EntryElement extends View {
 
 }
 
-export class TextEditElement extends View {
+export class TextEditElement extends Element {
     constructor() {
         super(VT_TEXT_EDIT);
     }
@@ -1146,7 +1146,7 @@ export class TextEditElement extends View {
      * @param align {"left"|"right"|"center"}
      */
     setAlign(align) {
-        Element_set_property(this.el, "align", align);
+        Element_set_property(this.handle, "align", align);
     }
 
     /**
@@ -1154,7 +1154,7 @@ export class TextEditElement extends View {
      * @param text {string}
      */
     setText(text) {
-        Element_set_property(this.el, "text", text);
+        Element_set_property(this.handle, "text", text);
     }
 
     /**
@@ -1162,7 +1162,7 @@ export class TextEditElement extends View {
      * @returns {string}
      */
     getText() {
-        return Element_get_property(this.el, "text");
+        return Element_get_property(this.handle, "text");
     }
 
     /**
@@ -1170,7 +1170,7 @@ export class TextEditElement extends View {
      * @param selection {[number, number]}
      */
     setSelection(selection) {
-        Element_set_property(this.el, "selection", selection);
+        Element_set_property(this.handle, "selection", selection);
     }
 
     /**
@@ -1178,7 +1178,7 @@ export class TextEditElement extends View {
      * @param caret {number}
      */
     setCaret(caret) {
-        Element_set_property(this.el, "caret", caret);
+        Element_set_property(this.handle, "caret", caret);
     }
 
     /**
@@ -1186,7 +1186,7 @@ export class TextEditElement extends View {
      * @param top {number}
      */
     scrollToTop(top) {
-        Element_set_property(this.el, "scroll_to_top", top);
+        Element_set_property(this.handle, "scroll_to_top", top);
     }
 
     bindTextChange(callback) {
@@ -1199,12 +1199,12 @@ export class TextEditElement extends View {
 
 }
 
-class ContainerBasedElement extends View {
+class ContainerBasedElement extends Element {
     #children = [];
     
     /**
      *
-     * @param child {View}
+     * @param child {Element}
      * @param index {number}
      */
     addChild(child, index= -1) {
@@ -1223,18 +1223,18 @@ class ContainerBasedElement extends View {
         }
         child.parent = this;
         if (typeof index === "number" && index >= 0 && index < this.#children.length) {
-            Element_add_child(this.el, child.el, index);
+            Element_add_child(this.handle, child.handle, index);
             this.#children.splice(index, 0, child);
         } else {
-            Element_add_child(this.el, child.el, -1);
+            Element_add_child(this.handle, child.handle, -1);
             this.#children.push(child);
         }
     }
 
     /**
      *
-     * @param newNode {View}
-     * @param referenceNode {View}
+     * @param newNode {Element}
+     * @param referenceNode {Element}
      */
     addChildBefore(newNode, referenceNode) {
         const index = this.#children.indexOf(referenceNode);
@@ -1243,8 +1243,8 @@ class ContainerBasedElement extends View {
 
     /**
      *
-     * @param newNode {View}
-     * @param referenceNode {View}
+     * @param newNode {Element}
+     * @param referenceNode {Element}
      */
     addChildAfter(newNode, referenceNode) {
         const index = this.#children.indexOf(referenceNode);
@@ -1257,13 +1257,13 @@ class ContainerBasedElement extends View {
 
     /**
      *
-     * @param child {View}
+     * @param child {Element}
      */
     removeChild(child) {
         const index = this.#children.indexOf(child);
         if (index >= 0) {
             child.parent = null;
-            Element_remove_child(this.el, index);
+            Element_remove_child(this.handle, index);
             this.#children.splice(index, 1);
         } else {
             console.log("remove child failed")
@@ -1293,7 +1293,7 @@ export class ScrollElement extends ContainerBasedElement {
      * @param value {"auto"|"always"|"never"}
      */
     setScrollX(value) {
-        Scroll_set_scroll_x(this.el, value);
+        Scroll_set_scroll_x(this.handle, value);
     }
 
     /**
@@ -1301,13 +1301,13 @@ export class ScrollElement extends ContainerBasedElement {
      * @param value {"auto"|"always"|"never"}
      */
     setScrollY(value) {
-        Scroll_set_scroll_y(this.el, value);
+        Scroll_set_scroll_y(this.handle, value);
     }
 
     scrollBy(value) {
         value.x = value.x || 0;
         value.y = value.y || 0;
-        Element_scroll_by(this.el, value);
+        Element_scroll_by(this.handle, value);
     }
 
 }
@@ -1674,7 +1674,7 @@ globalThis.Window = Window;
 if (globalThis.SystemTray_create) {
     globalThis.SystemTray = SystemTray;
 }
-globalThis.View = View;
+globalThis.Element = Element;
 globalThis.ContainerElement = ContainerElement;
 globalThis.ScrollElement = ScrollElement;
 globalThis.LabelElement = LabelElement;
@@ -1702,8 +1702,8 @@ globalThis.localStorage = localStorage;
  * @template T
  * @typedef {{
  *     detail: T,
- *     target: View,
- *     currentTarget: View,
+ *     target: Element,
+ *     currentTarget: Element,
  *     stopPropagation(): void,
  *     preventDefault(): void,
  * }} IEvent<T>
