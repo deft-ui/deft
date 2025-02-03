@@ -1,15 +1,29 @@
-use std::env;
 use crate as deft;
-use deft_macros::{js_func, js_methods};
 use crate::app::exit_app;
 use crate::is_mobile_platform;
+use crate::js::js_engine::JsEngine;
+use deft_macros::{js_func, js_methods};
+use quick_js::exception::HostPromiseRejectionTracker;
+use quick_js::JsValue;
+use std::env;
+
+struct UserPromiseRejectionTracker {
+    handler: JsValue,
+}
+
+impl HostPromiseRejectionTracker for UserPromiseRejectionTracker {
+    fn track_promise_rejection(&mut self, promise: JsValue, reason: JsValue, is_handled: bool) {
+        if let Err(e) = self.handler.call_as_function(vec![reason, promise]) {
+            println!("Failed to call user promise rejection handler: {:?}", e);
+        }
+    }
+}
 
 #[allow(nonstandard_style)]
 pub struct process;
 
 #[js_methods]
 impl process {
-
     #[js_func]
     pub fn exit(code: i32) {
         exit_app(code);
@@ -25,4 +39,10 @@ impl process {
         is_mobile_platform()
     }
 
+    #[js_func]
+    pub fn set_promise_rejection_tracker(handler: JsValue) {
+        let mut js_engine = JsEngine::get();
+        let tracker = UserPromiseRejectionTracker { handler };
+        js_engine.js_context.set_promise_rejection_tracker(tracker);
+    }
 }

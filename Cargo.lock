@@ -954,9 +954,9 @@ dependencies = [
 
 [[package]]
 name = "deft-quick-js"
-version = "0.4.2-alpha.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd039b0b1ba8493f4695e2c9e561bda792ddda08c1bae9b113c601aa721d5091"
+checksum = "389ecea899555ce64495aaf0de2cb84b60959705bb08f8aa37648ba2623cdce7"
 dependencies = [
  "anyhow",
  "chrono",

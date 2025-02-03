@@ -26,7 +26,7 @@ class Clipboard {
         clipboard_write_text(text);
     }
 }
-class Navigator {
+export class Navigator {
 
     /**
      * @var {Clipboard}
@@ -37,7 +37,7 @@ class Navigator {
     }
 }
 
-class Process {
+export class Process {
     /**
      *
      * @param code {number}
@@ -51,10 +51,18 @@ class Process {
     get isMobilePlatform() {
         return process_is_mobile_platform();
     }
+
+    /**
+     *
+     * @param handler {Function}
+     */
+    setPromiseRejectionTracker(handler) {
+        process_set_promise_rejection_tracker(handler);
+    }
 }
 
 
-class FileDialog {
+export class FileDialog {
     /**
      *
      * @param options {ShowFileDialogOptions}
@@ -1656,6 +1664,9 @@ if (workerContext) {
 
 globalThis.navigator = new Navigator();
 globalThis.process = new Process();
+globalThis.process.setPromiseRejectionTracker(error => {
+    console.error('uncaught promise error', error);
+});
 globalThis.fileDialog = new FileDialog();
 globalThis.Worker = Worker;
 globalThis.WorkerContext = WorkerContext;

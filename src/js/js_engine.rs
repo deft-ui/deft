@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::fmt::Debug;
 use std::panic::RefUnwindSafe;
 
@@ -43,6 +44,10 @@ use crate::js::js_runtime::JsContext;
 use crate::mrc::Mrc;
 use crate::typeface::typeface_create;
 
+thread_local! {
+    static JS_ENGINE: RefCell<Option<Mrc<JsEngine>>> = RefCell::new(None);
+}
+
 pub struct JsEngine {
     pub js_context: Mrc<JsContext>,
     pub app: App,
@@ -80,7 +85,15 @@ impl Callback<()> for JsFuncCallback {
 
 impl JsEngine {
 
-    pub fn new(mut app: App) -> Self {
+    pub fn get() -> Mrc<JsEngine> {
+        JS_ENGINE.with(|e| {
+            let e = e.borrow();
+            let js_engine = e.as_ref().expect("js engine not initialized");
+            js_engine.clone()
+        })
+    }
+
+    pub fn init(mut app: App) {
         let loader = {
             let mut app = app.app_impl.lock().unwrap();
             SharedModuleLoader::new(app.create_module_loader())
@@ -151,7 +164,7 @@ impl JsEngine {
 
         Worker::init_js_api(WorkerInitParams { app });
         engine.add_global_functions(Worker::create_js_apis());
-        engine
+        JS_ENGINE.with(|e| *e.borrow_mut() = Some(Mrc::new(engine)));
     }
 
     pub fn init_api(&self) {

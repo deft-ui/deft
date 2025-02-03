@@ -89,7 +89,7 @@ pub trait IApp {
 
 
 pub struct WinitApp {
-    pub js_engine: JsEngine,
+    pub js_engine: Mrc<JsEngine>,
 }
 
 #[derive(Clone)]
@@ -107,7 +107,8 @@ impl App {
 
 impl WinitApp {
     pub fn new(mut app: App, event_loop_proxy: AppEventProxy) -> Self {
-        let mut js_engine = JsEngine::new(app.clone());
+        JsEngine::init(app.clone());
+        let mut js_engine = JsEngine::get();
         js_engine.init_api();
         init_event_loop_proxy(event_loop_proxy.clone());
         let js_event_loop = js_init_event_loop(move |js_event| {
