@@ -145,7 +145,7 @@ pub fn event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn frame_event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
-    create_event(_attr, struct_def, quote! {deft::frame::FrameWeak})
+    create_event(_attr, struct_def, quote! {deft::window::WindowWeak})
 }
 
 #[proc_macro_attribute]

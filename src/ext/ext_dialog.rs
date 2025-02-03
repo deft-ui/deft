@@ -7,7 +7,7 @@ use quick_js::JsValue;
 use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 use crate::event_loop::create_event_loop_callback;
 use crate::ext::promise::Promise;
-use crate::frame::Frame;
+use crate::window::Window;
 use crate::js::js_event_loop::js_create_event_loop_fn_mut;
 use crate::js_deserialize;
 
@@ -30,10 +30,10 @@ pub struct dialog;
 impl dialog {
 
     #[js_func]
-    pub fn show_file_dialog(options: FileDialogOptions, frame: Option<Frame>, callback: JsValue) {
+    pub fn show_file_dialog(options: FileDialogOptions, window: Option<Window>, callback: JsValue) {
         let mut owner = None;
-        if let Some(frame) = frame {
-            owner = Some(DialogHandle(frame.window.raw_window_handle()));
+        if let Some(window) = window {
+            owner = Some(DialogHandle(window.window.raw_window_handle()));
         }
 
         let mut success = {

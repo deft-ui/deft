@@ -18,7 +18,7 @@ use winit::window::WindowId;
 use crate::event_loop::{init_event_loop_proxy, run_event_loop_task, run_with_event_loop, AppEventProxy};
 use crate::ext::ext_frame::FRAMES;
 use crate::ext::ext_localstorage::localstorage_flush;
-use crate::frame::{frame_check_update, frame_input, frame_on_render_idle, frame_send_key, frame_update_inset};
+use crate::window::{frame_check_update, frame_input, frame_on_render_idle, frame_send_key, frame_update_inset};
 use crate::js::js_engine::JsEngine;
 use crate::js::js_event_loop::{js_init_event_loop, JsEvent, JsEventLoopClosedError};
 use crate::js::js_runtime::JsContext;

@@ -1313,10 +1313,10 @@ impl StyleNode {
                 None
             } else {
                 let element = ok_or_return!(me.element.upgrade());
-                let frame = some_or_return!(element.get_frame());
+                let window = some_or_return!(element.get_window());
                 ANIMATIONS.with_borrow(|m| {
                     let ani = m.get(&p.name)?.preprocess();
-                    let frame_controller = WindowAnimationController::new(frame);
+                    let frame_controller = WindowAnimationController::new(window);
                     let duration = p.duration * 1000000.0;
                     let iteration_count = p.iteration_count;
                     let ani_instance = AnimationInstance::new(ani, duration, iteration_count, Box::new(frame_controller));

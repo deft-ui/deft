@@ -429,11 +429,11 @@ impl Scroll {
     }
 
     /// invert transform effect
-    fn map_frame_xy(&self, frame_x: f32, frame_y: f32) -> Option<(f32, f32)> {
+    fn map_frame_xy(&self, window_x: f32, window_y: f32) -> Option<(f32, f32)> {
         let mut element = ok_or_return!(self.element.upgrade_mut(), None);
-        let mut frame = element.get_frame()?.upgrade().ok()?;
-        let node_matrix = frame.render_tree.get_element_total_matrix(&element)?;
-        let p = node_matrix.invert()?.map_xy(frame_x, frame_y);
+        let mut window = element.get_window()?.upgrade().ok()?;
+        let node_matrix = window.render_tree.get_element_total_matrix(&element)?;
+        let p = node_matrix.invert()?.map_xy(window_x, window_y);
         Some((p.x, p.y))
     }
 
@@ -496,7 +496,7 @@ impl ElementBackend for Scroll {
             if is_in_vertical_bar {
                 let indicator_rect = self.calculate_vertical_indicator_rect();
                 if indicator_rect.contains_point(d.offset_x, d.offset_y) {
-                    self.begin_scroll_y(d.frame_y);
+                    self.begin_scroll_y(d.window_y);
                 } else {
                     //TODO scroll page
                 }
@@ -506,7 +506,7 @@ impl ElementBackend for Scroll {
             if is_in_horizontal_bar {
                 let indicator_rect = self.calculate_horizontal_indicator_rect();
                 if indicator_rect.contains_point(d.offset_x, d.offset_y) {
-                    self.begin_scroll_x(d.frame_x);
+                    self.begin_scroll_x(d.window_x);
                 } else {
                     //TODO scroll page
                 }
@@ -517,20 +517,20 @@ impl ElementBackend for Scroll {
             return true;
         } else if let Some(e) = event.downcast_mut::<MouseMoveEvent>() {
             let d = e.0;
-            self.update_scroll_x(d.frame_x, true);
-            self.update_scroll_y(d.frame_y, true);
+            self.update_scroll_x(d.window_x, true);
+            self.update_scroll_y(d.window_y, true);
             return true;
         } else if let Some(e) = event.downcast_mut::<TouchStartEvent>() {
             // println!("touch start: {:?}", e.0);
             let d = &e.0;
             let touch = unsafe { d.touches.get_unchecked(0) };
-            let (frame_x, frame_y) = match self.map_frame_xy(touch.frame_x, touch.frame_y) {
+            let (window_x, window_y) = match self.map_frame_xy(touch.window_x, touch.window_y) {
                 None => {return false}
                 Some(v) => {v}
             };
-            self.begin_scroll_x(-frame_x);
-            self.begin_scroll_y(-frame_y);
-            println!("touch start: pos {:?}", (frame_x, frame_y));
+            self.begin_scroll_x(-window_x);
+            self.begin_scroll_y(-window_y);
+            println!("touch start: pos {:?}", (window_x, window_y));
             self.momentum_info = Some(MomentumInfo {
                 start_time: Instant::now(),
                 start_left: element.get_scroll_left(),
@@ -542,15 +542,15 @@ impl ElementBackend for Scroll {
             // println!("touch move: {:?}", e.0);
             let d = &e.0;
             let touch = unsafe { d.touches.get_unchecked(0) };
-            let (frame_x, frame_y) = match self.map_frame_xy(touch.frame_x, touch.frame_y) {
+            let (window_x, window_y) = match self.map_frame_xy(touch.window_x, touch.window_y) {
                 None => {return false}
                 Some(v) => {v}
             };
-            self.update_scroll_x(-frame_x, false);
-            self.update_scroll_y(-frame_y, false);
+            self.update_scroll_x(-window_x, false);
+            self.update_scroll_y(-window_y, false);
             let left = element.get_scroll_left();
             let top = element.get_scroll_top();
-            // println!("touch updated: {:?}", (frame_x, frame_y));
+            // println!("touch updated: {:?}", (window_x, window_y));
             if let Some(momentum_info) = &mut self.momentum_info {
                 if momentum_info.start_time.elapsed().as_millis() as f32 > MOMENTUM_DURATION {
                     momentum_info.start_time = Instant::now();
@@ -581,8 +581,8 @@ impl ElementBackend for Scroll {
                         .key_frame(0.0, vec![StyleProp::RowGap(StylePropVal::Custom(0.0)), StyleProp::ColumnGap(StylePropVal::Custom(0.0))])
                         .key_frame(1.0, vec![StyleProp::RowGap(StylePropVal::Custom(1.0)), StyleProp::ColumnGap(StylePropVal::Custom(1.0))])
                         .build();
-                    let frame = some_or_return!(element.get_frame(), false);
-                    let frame_controller = WindowAnimationController::new(frame);
+                    let window = some_or_return!(element.get_window(), false);
+                    let frame_controller = WindowAnimationController::new(window);
                     let mut animation_instance = AnimationInstance::new(animation, 1000.0 * 1000000.0, 1.0, Box::new(frame_controller));
                     let mut ele = self.element.clone();
                     let timing_func = Bezier::from_cubic_coordinates(0.0, 0.0, 0.17, 0.89, 0.45, 1.0, 1.0, 1.0);

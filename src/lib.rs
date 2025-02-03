@@ -46,7 +46,7 @@ pub mod color;
 pub mod app;
 // mod graphics;
 pub mod renderer;
-pub mod frame;
+pub mod window;
 pub mod element;
 pub mod loader;
 pub mod time;

@@ -8,17 +8,17 @@ use serde::{Deserialize, Serialize};
 use winit::event::WindowEvent;
 #[cfg(feature = "x11")]
 use winit::platform::x11::WindowAttributesExtX11;
-use winit::window::{Window, WindowId};
+use winit::window::{WindowId};
 
 use crate::app::{exit_app};
 use crate::element::{ElementBackend, Element};
 use crate::{js_deserialize, js_weak_value};
-use crate::frame::{Frame, FrameWeak};
+use crate::window::{Window, WindowWeak};
 
 
 thread_local! {
-    pub static FRAMES: RefCell<HashMap<i32, Frame>> = RefCell::new(HashMap::new());
-    pub static WINDOW_TO_FRAME: RefCell<HashMap<WindowId, FrameWeak>> = RefCell::new(HashMap::new());
+    pub static FRAMES: RefCell<HashMap<i32, Window>> = RefCell::new(HashMap::new());
+    pub static WINDOW_TO_FRAME: RefCell<HashMap<WindowId, WindowWeak>> = RefCell::new(HashMap::new());
     pub static MODAL_TO_OWNERS: RefCell<HashMap<WindowId, WindowId>> = RefCell::new(HashMap::new());
 }
 
@@ -72,26 +72,26 @@ pub fn handle_window_event(window_id: WindowId, event: WindowEvent) {
             }
         }
     }
-    let mut frame = WINDOW_TO_FRAME.with_borrow_mut(|m| {
+    let mut window = WINDOW_TO_FRAME.with_borrow_mut(|m| {
         match m.get_mut(&window_id) {
             None => None,
             Some(f) => Some(f.clone())
         }
     });
-    if let Some(frame) = &mut frame {
+    if let Some(window) = &mut window {
         if &WindowEvent::CloseRequested == &event {
-            if let Ok(mut f) = frame.upgrade() {
+            if let Ok(mut f) = window.upgrade() {
                 let _ = f.close();
             }
         } else {
-            if let Ok(mut frame) = frame.upgrade_mut() {
-                frame.handle_event(event);
+            if let Ok(mut window) = window.upgrade_mut() {
+                window.handle_event(event);
             }
         }
     }
 }
 
-impl FrameWeak {
+impl WindowWeak {
 
     pub fn set_body(&mut self, body: Element) {
         if let Ok(mut f) = self.upgrade_mut() {
@@ -103,6 +103,6 @@ impl FrameWeak {
 
 // Js Api
 //TODO remove
-// define_resource!(FrameWeak);
+// define_resource!(WindowWeak);
 
-js_weak_value!(Frame, FrameWeak);
+js_weak_value!(Window, WindowWeak);

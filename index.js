@@ -175,23 +175,23 @@ function createParagraph() {
     return paragraph;
 }
 
-function testFrameHandle(frame) {
-    const handle = frame.handle;
-    const frameFromHandle = Frame.fromHandle(handle);
-    assertEq(frame, frameFromHandle);
+function testWindowHandle(window) {
+    const handle = window.handle;
+    const windowFromHandle = Window.fromHandle(handle);
+    assertEq(window, windowFromHandle);
 }
 
 function main() {
     runWorker();
     createSystemTray();
-    console.log("begin create frame");
-    const frame = new Frame();
-    testFrameHandle(frame);
-    frame.setTitle("DeftDemo");
-    frame.bindResize((e) => {
-        console.log("frame resized", e);
+    console.log("begin create window");
+    const window = new Window();
+    testWindowHandle(window);
+    window.setTitle("DeftDemo");
+    window.bindResize((e) => {
+        console.log("window resized", e);
     })
-    console.log("frame created", frame);
+    console.log("window created", window);
 
     typeface_create("auto-mono", {
         family: "monospace",
@@ -216,8 +216,8 @@ function main() {
     assertEq(container, entry.getParent());
     container.addChild(createCenterElement());
     // batchCreateLabels(container);
-    frame.setBody(container);
-    assertEq(frame, container.getFrame());
+    window.setBody(container);
+    assertEq(window, container.getWindow());
     assertEq(null, container.getParent());
 }
 

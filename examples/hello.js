@@ -4,8 +4,8 @@ function createLabel(text) {
     return label;
 }
 
-const frame = new Frame();
-frame.setTitle("DeftDemo");
+const window = new Window();
+window.setTitle("DeftDemo");
 
 const container = new ScrollElement();
 container.setStyle({
@@ -17,4 +17,4 @@ container.setStyle({
 container.addChild(createLabel("Hello,world!"));
 container.addChild(createLabel("你好,世界!"));
 
-frame.setBody(container);
+window.setBody(container);

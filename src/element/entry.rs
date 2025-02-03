@@ -26,7 +26,7 @@ use crate::element::scroll::{Scroll, ScrollBarStrategy};
 use crate::element::text::text_paragraph::Line;
 use crate::event::{KEY_MOD_CTRL, KEY_MOD_SHIFT, KeyEventDetail, MouseDownEvent, MouseUpEvent, MouseMoveEvent, KeyDownEvent, CaretChangeEvent, TextUpdateEvent, TextChangeEvent, FocusEvent, BlurEvent, SelectStartEvent, SelectEndEvent, SelectMoveEvent, TextInputEvent, ClickEvent};
 use crate::event_loop::{create_event_loop_callback, create_event_loop_proxy};
-use crate::frame::Frame;
+use crate::window::Window;
 use crate::render::RenderFn;
 use crate::string::StringUtils;
 use crate::style::{StyleProp, StylePropKey, StylePropVal};
@@ -296,8 +296,8 @@ impl Entry {
         self.caret_visible.set(false);
         let mut element = ok_or_return!(self.element.upgrade_mut());
         element.mark_dirty(false);
-        if let Some(frame) = element.get_frame() {
-            if let Ok(f) = frame.upgrade_mut() {
+        if let Some(window) = element.get_window() {
+            if let Ok(f) = window.upgrade_mut() {
                 let elp = create_event_loop_proxy();
                 elp.send_event(AppEvent::HideSoftInput(f.get_id())).unwrap();
             }
@@ -411,8 +411,8 @@ impl Entry {
         });
         let mut element = ok_or_return!(self.element.upgrade_mut());
         element.mark_dirty(false);
-        if let Some(frame) = element.get_frame() {
-            if let Ok(f) = frame.upgrade_mut() {
+        if let Some(window) = element.get_window() {
+            if let Ok(f) = window.upgrade_mut() {
                 let elp = create_event_loop_proxy();
                 elp.send_event(AppEvent::ShowSoftInput(f.get_id())).unwrap();
             }

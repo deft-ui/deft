@@ -1,5 +1,5 @@
-declare type FrameType = "normal" | "menu"
-declare interface FrameAttrs {
+declare type WindowType = "normal" | "menu"
+declare interface WindowAttrs {
     width ?: number
     height ?: number
     title ?: string
@@ -8,7 +8,7 @@ declare interface FrameAttrs {
     overrideRedirect ?: boolean,
     position ?: [number, number],
     visible ?: boolean,
-    frameType ?: FrameType,
+    windowType ?: WindowType,
 }
 
 declare interface ResizeDetail {
@@ -32,8 +32,8 @@ declare interface MouseDetail {
     button: number,
     offsetX: number;
     offsetY: number;
-    frameX: number;
-    frameY: number;
+    windowX: number;
+    windowY: number;
     screenX: number;
     screenY: number;
 }
@@ -83,8 +83,8 @@ declare interface TouchInfo {
     identifier: number;
     offsetX: number;
     offsetY: number;
-    frameX: number;
-    frameY: number;
+    windowX: number;
+    windowY: number;
 }
 
 declare interface TouchDetail {
@@ -233,7 +233,7 @@ declare function Base64_encode_str(str: string): string;
 declare interface ShowFileDialogOptions {
     dialogType ?: "single" | "multiple" | "save" | "dir",
     //TODO fix type
-    frame ?: any,
+    window ?: any,
 }
 declare function dialog_show_file_dialog(options ?: ShowFileDialogOptions): Promise<string[]>;
 

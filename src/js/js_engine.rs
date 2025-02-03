@@ -38,7 +38,7 @@ use crate::ext::ext_timer::{timer_clear_interval, timer_clear_timeout, timer_set
 use crate::ext::ext_tray::SystemTray;
 use crate::ext::ext_websocket::WsConnection;
 use crate::ext::ext_worker::{SharedModuleLoader, Worker, WorkerInitParams};
-use crate::frame::{Frame, FrameType};
+use crate::window::{Window, WindowType};
 use crate::js::js_binding::{JsCallError, JsFunc};
 use crate::js::js_runtime::JsContext;
 use crate::mrc::Mrc;
@@ -140,7 +140,7 @@ impl JsEngine {
         engine.add_global_functions(WsConnection::create_js_apis());
         engine.add_global_functions(fetch::create_js_apis());
 
-        engine.add_global_functions(Frame::create_js_apis());
+        engine.add_global_functions(Window::create_js_apis());
         engine.add_global_func(timer_set_timeout::new());
         engine.add_global_func(timer_clear_timeout::new());
         engine.add_global_func(timer_set_interval::new());
@@ -212,8 +212,8 @@ impl JsEngine {
         if let DeviceEvent::Button {..} = event {
             let close_frames = FRAMES.with_borrow(|frames| {
                 let mut result = Vec::new();
-                let menu_frames: Vec<&Frame> = frames.iter()
-                    .filter(|(_, f)| f.frame_type == FrameType::Menu)
+                let menu_frames: Vec<&Window> = frames.iter()
+                    .filter(|(_, f)| f.frame_type == WindowType::Menu)
                     .map(|(_, f)| f)
                     .collect();
                 if menu_frames.is_empty() {
@@ -221,16 +221,16 @@ impl JsEngine {
                 }
                 run_with_event_loop(|el| {
                     if let Some(pos) = el.query_pointer(device_id) {
-                        menu_frames.iter().for_each(|frame| {
-                            let w_size = frame.window.outer_size();
-                            if let Some(wp) = frame.window.outer_position().ok() {
+                        menu_frames.iter().for_each(|window| {
+                            let w_size = window.window.outer_size();
+                            if let Some(wp) = window.window.outer_position().ok() {
                                 let (wx, wy) = (wp.x as f32, wp.y as f32);
                                 let (ww, wh) = (w_size.width as f32, w_size.height as f32);
                                 let is_in_frame = pos.0 >= wx && pos.0 <= wx + ww
                                                        && pos.1 >= wy && pos.1 <= wy + wh;
                                 if !is_in_frame {
-                                    let _ = frame.window.set_cursor_grab(CursorGrabMode::None);
-                                    result.push(frame.as_weak());
+                                    let _ = window.window.set_cursor_grab(CursorGrabMode::None);
+                                    result.push(window.as_weak());
                                 }
                             }
                         })
@@ -238,8 +238,8 @@ impl JsEngine {
                 });
                 result
             });
-            for frame in close_frames {
-                if let Ok(mut f) = frame.upgrade() {
+            for window in close_frames {
+                if let Ok(mut f) = window.upgrade() {
                     let _ = f.close();
                 }
             }

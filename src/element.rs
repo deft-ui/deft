@@ -28,7 +28,7 @@ use crate::element::textedit::TextEdit;
 use crate::event::{DragOverEventListener, BlurEventListener, BoundsChangeEventListener, CaretChangeEventListener, ClickEventListener, DragStartEventListener, DropEventListener, FocusEventListener, FocusShiftEventListener, KeyDownEventListener, KeyUpEventListener, MouseDownEventListener, MouseEnterEvent, MouseEnterEventListener, MouseLeaveEvent, MouseLeaveEventListener, MouseMoveEventListener, MouseUpEventListener, MouseWheelEventListener, ScrollEvent, ScrollEventListener, TextChangeEventListener, TextUpdateEventListener, TouchCancelEventListener, TouchEndEventListener, TouchMoveEventListener, TouchStartEventListener, BoundsChangeEvent, ContextMenuEventListener};
 use crate::event_loop::{create_event_loop_callback};
 use crate::ext::ext_frame::{VIEW_TYPE_BUTTON, VIEW_TYPE_CONTAINER, VIEW_TYPE_ENTRY, VIEW_TYPE_IMAGE, VIEW_TYPE_LABEL, VIEW_TYPE_SCROLL, VIEW_TYPE_TEXT_EDIT};
-use crate::frame::{Frame, FrameWeak};
+use crate::window::{Window, WindowWeak};
 use crate::img_manager::IMG_MANAGER;
 use crate::js::js_serde::JsValueSerializer;
 use crate::mrc::{Mrc, MrcWeak};
@@ -230,8 +230,8 @@ impl Element {
 
     #[js_func]
     pub fn focus(&mut self) {
-        if let Some(mut frame) = self.upgrade_frame() {
-            frame.focus(self.clone());
+        if let Some(mut window) = self.upgrade_window() {
+            window.focus(self.clone());
         }
     }
 
@@ -374,28 +374,20 @@ impl Element {
 
     }
 
-    pub fn set_window(&mut self, window: Option<FrameWeak>) {
+    pub fn set_window(&mut self, window: Option<WindowWeak>) {
         self.window = window.clone();
         self.on_window_changed(&window);
         self.process_auto_focus();
     }
 
-    fn get_window(&self) -> Option<FrameWeak> {
-        if let Some(p) = self.get_parent() {
-            p.get_window()
-        } else {
-            self.window.clone()
-        }
-    }
-
-    pub fn on_window_changed(&mut self, window: &Option<FrameWeak>) {
+    pub fn on_window_changed(&mut self, window: &Option<WindowWeak>) {
         self.update_style_variables(window);
         for mut c in self.get_children() {
             c.on_window_changed(window);
         }
     }
 
-    fn update_style_variables(&mut self, window: &Option<FrameWeak>) {
+    fn update_style_variables(&mut self, window: &Option<WindowWeak>) {
         if let Some(win) = &window {
             if let Ok(win) = win.upgrade() {
                 self.style_manager.bind_style_variables(&win.style_variables);
@@ -403,7 +395,7 @@ impl Element {
         }
     }
 
-    pub fn with_window<F: FnOnce(&mut Frame)>(&self, callback: F) {
+    pub fn with_window<F: FnOnce(&mut Window)>(&self, callback: F) {
         if let Some(p) = self.get_parent() {
             return p.with_window(callback);
         } else if let Some(ww) = &self.window {
@@ -414,17 +406,17 @@ impl Element {
     }
 
     #[js_func]
-    pub fn get_frame(&self) -> Option<FrameWeak> {
+    pub fn get_window(&self) -> Option<WindowWeak> {
         if let Some(p) = self.get_parent() {
-            return p.get_frame()
+            return p.get_window()
         } else if let Some(ww) = &self.window {
             return Some(ww.clone())
         }
         None
     }
 
-    pub fn upgrade_frame(&self) -> Option<Frame> {
-        if let Some(f) = self.get_frame() {
+    pub fn upgrade_window(&self) -> Option<Window> {
+        if let Some(f) = self.get_window() {
             f.upgrade().ok()
         } else {
             None
@@ -568,8 +560,8 @@ impl Element {
         let layout = &mut ele.style;
         layout.remove_child(&mut c.style);
         ele.mark_dirty(true);
-        if let Some(frame) = self.get_frame() {
-            if let Ok(mut f) = frame.upgrade_mut() {
+        if let Some(window) = self.get_window() {
+            if let Ok(mut f) = window.upgrade_mut() {
                 f.on_element_removed(&c);
             }
         }
@@ -949,7 +941,7 @@ pub struct Element {
     backend: Box<dyn ElementBackend>,
     parent: Option<ElementWeak>,
     children: Vec<Element>,
-    window: Option<FrameWeak>,
+    window: Option<WindowWeak>,
     event_registration: EventRegistration<ElementWeak>,
     pub style: StyleNode,
     style_props: HashMap<StylePropKey, StyleProp>,

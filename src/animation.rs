@@ -14,7 +14,7 @@ use tokio::time::Instant;
 use yoga::StyleUnit;
 use crate::base::Callback;
 use crate::element::Element;
-use crate::frame::FrameWeak;
+use crate::window::WindowWeak;
 
 macro_rules! interpolate_values {
     ($prev: expr, $next: expr, $percent: expr; $($ty: ident => $handler: ident,)* ) => {
@@ -328,11 +328,11 @@ impl Drop for AnimationInstance {
 }
 
 pub struct WindowAnimationController {
-    frame: FrameWeak,
+    frame: WindowWeak,
 }
 
 impl WindowAnimationController {
-    pub fn new(frame: FrameWeak) -> Self {
+    pub fn new(frame: WindowWeak) -> Self {
         Self { frame }
     }
 }

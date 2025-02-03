@@ -44,7 +44,7 @@ use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use winit::keyboard::{Key, NamedKey};
 #[cfg(feature = "x11")]
 use winit::platform::x11::WindowAttributesExtX11;
-use winit::window::{Cursor, CursorGrabMode, CursorIcon, Fullscreen, Window, WindowAttributes, WindowId};
+use winit::window::{Cursor, CursorGrabMode, CursorIcon, Fullscreen, WindowAttributes, WindowId};
 use crate::{bind_js_event_listener, is_snapshot_usable, ok_or_return, send_app_event, show_focus_hit, show_repaint_area, some_or_continue, some_or_return};
 use crate::computed::ComputedValue;
 use crate::frame_rate::{FrameRateController};
@@ -60,8 +60,8 @@ use crate::style::ColorHelper;
 #[derive(Clone)]
 struct MouseDownInfo {
     button: i32,
-    frame_x: f32,
-    frame_y: f32,
+    window_x: f32,
+    window_y: f32,
 }
 
 struct TouchingInfo {
@@ -78,17 +78,17 @@ fn treat_mouse_as_touch() -> bool {
 }
 
 #[derive(PartialEq)]
-pub enum FrameType {
+pub enum WindowType {
     Normal,
     Menu,
 }
 
 #[mrc_object]
-pub struct Frame {
+pub struct Window {
     id: i32,
     pub(crate) window: SkiaWindow,
     cursor_position: LogicalPosition<f64>,
-    pub(crate) frame_type: FrameType,
+    pub(crate) frame_type: WindowType,
     cursor_root_position: LogicalPosition<f64>,
     pub body: Option<Element>,
     focusing: Option<Element>,
@@ -102,7 +102,7 @@ pub struct Frame {
     dirty: bool,
     layout_dirty: bool,
     repaint_timer_handle: Option<TimerHandle>,
-    event_registration: EventRegistration<FrameWeak>,
+    event_registration: EventRegistration<WindowWeak>,
     attributes: WindowAttributes,
     init_width: Option<f32>,
     init_height: Option<f32>,
@@ -117,8 +117,8 @@ pub struct Frame {
     resource_table: ResourceTable,
 }
 
-pub type FrameEventHandler = EventHandler<FrameWeak>;
-pub type FrameEventContext = EventContext<FrameWeak>;
+pub type FrameEventHandler = EventHandler<WindowWeak>;
+pub type FrameEventContext = EventContext<WindowWeak>;
 
 thread_local! {
     pub static NEXT_FRAME_ID: Cell<i32> = Cell::new(1);
@@ -139,11 +139,11 @@ pub struct FrameFocusEvent;
 #[frame_event]
 pub struct FrameBlurEvent;
 
-impl LayoutRoot for FrameWeak {
+impl LayoutRoot for WindowWeak {
 
     fn update_layout(&mut self) {
-        let mut frame = ok_or_return!(self.upgrade());
-        frame.update_layout();
+        let mut window = ok_or_return!(self.upgrade());
+        window.update_layout();
     }
 
     fn should_propagate_dirty(&self) -> bool {
@@ -154,26 +154,26 @@ impl LayoutRoot for FrameWeak {
 
 
 #[js_methods]
-impl Frame {
+impl Window {
 
     #[js_func]
     pub fn create(attrs: FrameAttrs) -> Result<Self, Error> {
-        let mut frame = Frame::create_inner(attrs);
-        send_app_event(AppEvent::BindWindow(frame.get_id())).unwrap();
-        frame.update_inset(InsetType::Ime, Rect::new_empty());
-        frame.update_inset(InsetType::Navigation, Rect::new_empty());
-        frame.update_inset(InsetType::StatusBar, Rect::new_empty());
-        let window_id = frame.get_window_id();
-        FRAMES.with_borrow_mut(|m| m.insert(frame.get_id(), frame.clone()));
-        WINDOW_TO_FRAME.with_borrow_mut(|m| m.insert(window_id, frame.as_weak()));
-        Ok(frame)
+        let mut window = Window::create_inner(attrs);
+        send_app_event(AppEvent::BindWindow(window.get_id())).unwrap();
+        window.update_inset(InsetType::Ime, Rect::new_empty());
+        window.update_inset(InsetType::Navigation, Rect::new_empty());
+        window.update_inset(InsetType::StatusBar, Rect::new_empty());
+        let window_id = window.get_window_id();
+        FRAMES.with_borrow_mut(|m| m.insert(window.get_id(), window.clone()));
+        WINDOW_TO_FRAME.with_borrow_mut(|m| m.insert(window_id, window.as_weak()));
+        Ok(window)
     }
 
     fn create_inner(attrs: FrameAttrs) -> Self {
         let id = NEXT_FRAME_ID.get();
         NEXT_FRAME_ID.set(id + 1);
 
-        let mut attributes = Window::default_attributes();
+        let mut attributes = winit::window::Window::default_attributes();
         if let Some(t) = &attrs.title {
             attributes.title = t.to_string();
         } else {
@@ -203,12 +203,12 @@ impl Frame {
             }));
         }
         let frame_type = match attrs.frame_type.unwrap_or(FRAME_TYPE_NORMAL.to_string()).as_str() {
-            FRAME_TYPE_MENU => FrameType::Menu,
-            _ => FrameType::Normal,
+            FRAME_TYPE_MENU => WindowType::Menu,
+            _ => WindowType::Normal,
         };
 
         let window = Self::create_window(attributes.clone());
-        let state = FrameData {
+        let state = WindowData {
             id,
             window,
             cursor_position: LogicalPosition {
@@ -252,7 +252,7 @@ impl Frame {
             next_frame_timer_handle: None,
             resource_table: ResourceTable::new(),
         };
-        let mut handle = Frame {
+        let mut handle = Window {
             inner: Mrc::new(state),
         };
         // handle.body.set_window(Some(win.clone()));
@@ -311,7 +311,7 @@ impl Frame {
     }
 
     #[js_func]
-    pub fn set_modal(&mut self, owner: Frame) -> Result<(), JsError> {
+    pub fn set_modal(&mut self, owner: Window) -> Result<(), JsError> {
         self.window.set_modal(&owner.window);
         let frame_id = self.get_window_id();
         MODAL_TO_OWNERS.with_borrow_mut(|m| m.insert(frame_id, owner.get_window_id()));
@@ -538,7 +538,7 @@ impl Frame {
         self.event_registration.unregister_event_listener(id)
     }
 
-    pub fn register_event_listener<T: 'static, H: EventListener<T, FrameWeak> + 'static>(&mut self, mut listener: H) -> u32 {
+    pub fn register_event_listener<T: 'static, H: EventListener<T, WindowWeak> + 'static>(&mut self, mut listener: H) -> u32 {
         self.event_registration.register_event_listener(listener)
     }
 
@@ -553,7 +553,7 @@ impl Frame {
 
     pub fn on_element_removed(&mut self, element: &Element) {
         if let Some(f) = &self.focusing {
-            if f.get_frame().is_none() {
+            if f.get_window().is_none() {
                 self.focusing = self.body.clone();
             }
         }
@@ -567,8 +567,8 @@ impl Frame {
     }
 
     fn handle_cursor_moved(&mut self) {
-        let frame_x = self.cursor_position.x as f32;
-        let frame_y = self.cursor_position.y as f32;
+        let window_x = self.cursor_position.x as f32;
+        let window_y = self.cursor_position.y as f32;
         let screen_x = self.cursor_root_position.x as f32;
         let screen_y = self.cursor_root_position.y as f32;
         let mut target_node = self.get_node_by_point();
@@ -583,8 +583,8 @@ impl Frame {
                 }
             } else {
                 if pressing.is_draggable() && (
-                    f32::abs(frame_x - down_info.frame_x) > 3.0
-                    || f32::abs(frame_y - down_info.frame_y) > 3.0
+                    f32::abs(window_x - down_info.window_x) > 3.0
+                    || f32::abs(window_y - down_info.window_y) > 3.0
                 ) {
                     pressing.emit(DragStartEvent);
                     //TODO check preventDefault?
@@ -592,7 +592,7 @@ impl Frame {
                     self.dragging = true;
                 } else {
                     self.update_cursor(pressing);
-                    self.emit_mouse_event( pressing, MouseEventType::MouseMove, 0, frame_x, frame_y, screen_x, screen_y);
+                    self.emit_mouse_event( pressing, MouseEventType::MouseMove, 0, window_x, window_y, screen_x, screen_y);
                 }
             }
             //TODO should emit mouseenter|mouseleave?
@@ -600,13 +600,13 @@ impl Frame {
             self.update_cursor(&node);
             if let Some(hover) = &mut self.hover.clone() {
                 if hover != &node {
-                    self.emit_mouse_event( hover, MouseEventType::MouseLeave, 0, frame_x, frame_y, screen_x, screen_y);
-                    self.mouse_enter_node(node.clone(), frame_x, frame_y, screen_x, screen_y);
+                    self.emit_mouse_event( hover, MouseEventType::MouseLeave, 0, window_x, window_y, screen_x, screen_y);
+                    self.mouse_enter_node(node.clone(), window_x, window_y, screen_x, screen_y);
                 } else {
-                    self.emit_mouse_event( &mut node, MouseEventType::MouseMove, 0, frame_x, frame_y, screen_x, screen_y);
+                    self.emit_mouse_event( &mut node, MouseEventType::MouseMove, 0, window_x, window_y, screen_x, screen_y);
                 }
             } else {
-                self.mouse_enter_node(node.clone(), frame_x, frame_y, screen_x, screen_y);
+                self.mouse_enter_node(node.clone(), window_x, window_y, screen_x, screen_y);
             }
         }
     }
@@ -631,8 +631,8 @@ impl Frame {
 
     pub fn emit_click(&mut self, mouse_button: MouseButton, state: ElementState) {
         //TODO to logical?
-        let frame_x = self.cursor_position.x as f32;
-        let frame_y = self.cursor_position.y as f32;
+        let window_x = self.cursor_position.x as f32;
+        let window_y = self.cursor_position.y as f32;
         let screen_x = self.cursor_root_position.x as f32;
         let screen_y = self.cursor_root_position.y as f32;
         //TODO impl
@@ -653,12 +653,12 @@ impl Frame {
             match state {
                 ElementState::Pressed => {
                     self.focus(node.clone());
-                    self.pressing = Some((node.clone(), MouseDownInfo {button, frame_x, frame_y}));
-                    self.emit_mouse_event( &mut node, event_type, button, frame_x, frame_y, screen_x, screen_y);
+                    self.pressing = Some((node.clone(), MouseDownInfo {button, window_x, window_y}));
+                    self.emit_mouse_event( &mut node, event_type, button, window_x, window_y, screen_x, screen_y);
                 }
                 ElementState::Released => {
                     if let Some(mut pressing) = self.pressing.clone() {
-                        self.emit_mouse_event( &mut pressing.0, MouseUp, button, frame_x, frame_y, screen_x, screen_y);
+                        self.emit_mouse_event( &mut pressing.0, MouseUp, button, window_x, window_y, screen_x, screen_y);
                         if pressing.0 == node && pressing.1.button == button {
                             let ty = match mouse_button {
                                 MouseButton::Left => Some(MouseEventType::MouseClick),
@@ -666,26 +666,26 @@ impl Frame {
                                 _ => None
                             };
                             if let Some(ty) = ty {
-                                self.emit_mouse_event( &mut node, ty, button, frame_x, frame_y, screen_x, screen_y);
+                                self.emit_mouse_event( &mut node, ty, button, window_x, window_y, screen_x, screen_y);
                             }
                         }
                         self.release_press();
                     } else {
-                        self.emit_mouse_event( &mut node, MouseUp, button, frame_x, frame_y, screen_x, screen_y);
+                        self.emit_mouse_event( &mut node, MouseUp, button, window_x, window_y, screen_x, screen_y);
                     }
                 }
             }
         }
         if state == ElementState::Released {
             if let Some(pressing) = &mut self.pressing.clone() {
-                self.emit_mouse_event( &mut pressing.0, MouseUp, pressing.1.button, frame_x, frame_y, screen_x, screen_y);
+                self.emit_mouse_event( &mut pressing.0, MouseUp, pressing.1.button, window_x, window_y, screen_x, screen_y);
                 self.release_press();
             }
         }
     }
 
-    pub fn emit_touch_event(&mut self, identifier: u64, phase: TouchPhase, frame_x: f32, frame_y: f32) -> Option<()> {
-        if let Some((mut node, relative_x, relative_y)) = self.get_node_by_pos(frame_x, frame_y) {
+    pub fn emit_touch_event(&mut self, identifier: u64, phase: TouchPhase, window_x: f32, window_y: f32) -> Option<()> {
+        if let Some((mut node, relative_x, relative_y)) = self.get_node_by_pos(window_x, window_y) {
             let _e_type = match phase {
                 TouchPhase::Started => "touchstart",
                 TouchPhase::Ended => "touchend",
@@ -703,8 +703,8 @@ impl Frame {
                         identifier,
                         offset_x,
                         offset_y,
-                        frame_x,
-                        frame_y,
+                        window_x,
+                        window_y,
                     };
                     if self.touching.touches.is_empty() {
                         if SystemTime::now().duration_since(self.touching.start_time).unwrap().as_millis() < 300 {
@@ -716,18 +716,18 @@ impl Frame {
                     }
                     self.touching.touches.insert(identifier, touch_info);
                     self.touching.scrolled = false;
-                    self.touching.start_point = (frame_x, frame_y);
+                    self.touching.start_point = (window_x, window_y);
                 }
                 TouchPhase::Moved => {
                     if let Some(e) = self.touching.touches.get_mut(&identifier) {
                         e.offset_x = offset_x;
                         e.offset_y = offset_y;
-                        e.frame_x = frame_x;
-                        e.frame_y = frame_y;
+                        e.window_x = window_x;
+                        e.window_y = window_y;
                     }
                     self.touching.scrolled = self.touching.scrolled
-                        || (frame_x - self.touching.start_point.0).abs() > 5.0
-                        || (frame_y - self.touching.start_point.1).abs() > 5.0;
+                        || (window_x - self.touching.start_point.0).abs() > 5.0
+                        || (window_y - self.touching.start_point.1).abs() > 5.0;
                 }
                 TouchPhase::Cancelled => {
                     self.touching.touches.remove(&identifier);
@@ -760,7 +760,7 @@ impl Frame {
                         self.focus(node.clone());
                         println!("clicked");
                         //TODO fix screen_x, screen_y
-                        self.emit_mouse_event( &mut node, MouseClick, 0, frame_x, frame_y, 0.0, 0.0);
+                        self.emit_mouse_event( &mut node, MouseClick, 0, window_x, window_y, 0.0, 0.0);
                     }
                 }
                 TouchPhase::Cancelled => {
@@ -858,7 +858,7 @@ impl Frame {
     }
 
     fn update_force(&mut self) -> ResultWaiter<bool> {
-        // print_time!("frame update time");
+        // print_time!("window update time");
         let mut frame_callbacks = Vec::new();
         frame_callbacks.append(&mut self.next_frame_callbacks);
         for cb in frame_callbacks {
@@ -935,7 +935,7 @@ impl Frame {
         });
     }
 
-    pub fn emit<T: 'static>(&mut self, mut event: T) -> EventContext<FrameWeak> {
+    pub fn emit<T: 'static>(&mut self, mut event: T) -> EventContext<WindowWeak> {
         let mut ctx = EventContext {
             target: self.as_weak(),
             propagation_cancelled: false,
@@ -1043,7 +1043,7 @@ impl Frame {
         Some((element, x, y))
     }
 
-    fn emit_mouse_event(&mut self, node: &mut Element, event_type_enum: MouseEventType, button: i32, frame_x: f32, frame_y: f32, screen_x: f32, screen_y: f32) {
+    fn emit_mouse_event(&mut self, node: &mut Element, event_type_enum: MouseEventType, button: i32, window_x: f32, window_y: f32, screen_x: f32, screen_y: f32) {
         let render_tree = &self.render_tree;
         let node_matrix = some_or_return!(render_tree.get_element_total_matrix(node));
         let (border_top, _, _, border_left) = node.get_border_width();
@@ -1051,7 +1051,7 @@ impl Frame {
         //TODO maybe not inverted?
         let inverted_matrix = node_matrix.invert().unwrap();
 
-        let Point { x: relative_x, y: relative_y } = inverted_matrix.map_xy(frame_x, frame_y);
+        let Point { x: relative_x, y: relative_y } = inverted_matrix.map_xy(window_x, window_y);
         let off_x = relative_x - border_left;
         let off_y = relative_y - border_top;
 
@@ -1060,8 +1060,8 @@ impl Frame {
             button,
             offset_x: off_x,
             offset_y: off_y,
-            frame_x,
-            frame_y,
+            window_x,
+            window_y,
             screen_x,
             screen_y,
         };
@@ -1096,12 +1096,12 @@ impl Frame {
 }
 
 pub struct WeakWindowHandle {
-    inner: MrcWeak<FrameData>,
+    inner: MrcWeak<WindowData>,
 }
 
 impl WeakWindowHandle {
-    pub fn upgrade(&self) -> Option<Frame> {
-        self.inner.upgrade().map(|i| Frame::from_inner(i)).ok()
+    pub fn upgrade(&self) -> Option<Window> {
+        self.inner.upgrade().map(|i| Window::from_inner(i)).ok()
     }
 }
 

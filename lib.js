@@ -72,7 +72,7 @@ export class FileDialog {
         return new Promise((resolve, reject) => {
             dialog_show_file_dialog({
                 dialogType: options.dialogType,
-            }, options.frame?.handle, (result, data) => {
+            }, options.window?.handle, (result, data) => {
                 if (result) {
                     resolve(data);
                 } else {
@@ -87,7 +87,7 @@ export class FileDialog {
 /**
  * @typedef {IEvent<ResizeDetail>} IResizeEvent
  */
-export class Frame {
+export class Window {
 
     /**
      * @type EventRegistry
@@ -99,29 +99,29 @@ export class Frame {
      */
     #eventBinder;
 
-    #frameHandle;
+    #windowHandle;
 
     /**
      *
-     * @param attrs {FrameAttrs}
+     * @param attrs {WindowAttrs}
      */
     constructor(attrs) {
-        this.#frameHandle = Frame_create(attrs || {});
-        this.#eventBinder = new EventBinder(this.#frameHandle, Frame_bind_js_event_listener, Frame_unbind_js_event_listener, this);
-        Frame_set_js_context(this.#frameHandle, this);
+        this.#windowHandle = Window_create(attrs || {});
+        this.#eventBinder = new EventBinder(this.#windowHandle, Window_bind_js_event_listener, Window_unbind_js_event_listener, this);
+        Window_set_js_context(this.#windowHandle, this);
     }
 
     /**
      *
-     * @param frameHandle
-     * @returns {Frame}
+     * @param windowHandle
+     * @returns {Window}
      */
-    static fromHandle(frameHandle) {
-        return Frame_get_js_context(frameHandle);
+    static fromHandle(windowHandle) {
+        return Window_get_js_context(windowHandle);
     }
 
     get handle() {
-        return this.#frameHandle
+        return this.#windowHandle
     }
 
     /**
@@ -129,7 +129,7 @@ export class Frame {
      * @param view {View}
      */
     setBody(view) {
-        Frame_set_body(this.#frameHandle, view.el);
+        Window_set_body(this.#windowHandle, view.el);
     }
 
     /**
@@ -137,7 +137,7 @@ export class Frame {
      * @param title {string}
      */
     setTitle(title) {
-        Frame_set_title(this.#frameHandle, title);
+        Window_set_title(this.#windowHandle, title);
     }
 
     /**
@@ -145,19 +145,19 @@ export class Frame {
      * @param size {Size}
      */
     resize(size) {
-        Frame_resize(this.#frameHandle, size);
+        Window_resize(this.#windowHandle, size);
     }
 
     /**
      *
-     * @param owner {Frame}
+     * @param owner {Window}
      */
     setModal(owner) {
-        Frame_set_modal(this.#frameHandle, owner.#frameHandle)
+        Window_set_modal(this.#windowHandle, owner.#windowHandle)
     }
 
     close() {
-        Frame_close(this.#frameHandle);
+        Window_close(this.#windowHandle);
     }
 
     /**
@@ -165,15 +165,15 @@ export class Frame {
      * @param visible {boolean}
      */
     setVisible(visible) {
-        Frame_set_visible(this.#frameHandle, visible);
+        Window_set_visible(this.#windowHandle, visible);
     }
 
     requestFullscreen() {
-        Frame_request_fullscreen(this.#frameHandle);
+        Window_request_fullscreen(this.#windowHandle);
     }
 
     exitFullscreen() {
-        Frame_exit_fullscreen(this.#frameHandle);
+        Window_exit_fullscreen(this.#windowHandle);
     }
 
     /**
@@ -558,9 +558,9 @@ export class View {
         Element_focus(this.el);
     }
 
-    getFrame() {
-        const frameHandle = Element_get_frame(this.el);
-        return Frame.fromHandle(frameHandle);
+    getWindow() {
+        const windowHandle = Element_get_window(this.el);
+        return Window.fromHandle(windowHandle);
     }
 
     /**
@@ -1670,7 +1670,7 @@ globalThis.process.setPromiseRejectionTracker(error => {
 globalThis.fileDialog = new FileDialog();
 globalThis.Worker = Worker;
 globalThis.WorkerContext = WorkerContext;
-globalThis.Frame = Frame;
+globalThis.Window = Window;
 if (globalThis.SystemTray_create) {
     globalThis.SystemTray = SystemTray;
 }
