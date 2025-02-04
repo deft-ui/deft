@@ -524,6 +524,7 @@ impl Text {
 
 
             let mut style = TextStyle::default();
+            style.set_font_size(paragraph_params.font_size);
             style.set_foreground_paint(&params.paint);
             pb.push_style(&style);
             pb.add_text(ln.to_string());
