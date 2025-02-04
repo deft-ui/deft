@@ -9,7 +9,7 @@ pub mod ext_http;
 pub mod ext_websocket;
 pub mod common;
 pub mod ext_timer;
-pub mod ext_frame;
+pub mod ext_window;
 pub mod ext_audio;
 pub mod ext_fetch;
 mod audio_player;

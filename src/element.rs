@@ -27,7 +27,7 @@ use crate::element::text::Text;
 use crate::element::textedit::TextEdit;
 use crate::event::{DragOverEventListener, BlurEventListener, BoundsChangeEventListener, CaretChangeEventListener, ClickEventListener, DragStartEventListener, DropEventListener, FocusEventListener, FocusShiftEventListener, KeyDownEventListener, KeyUpEventListener, MouseDownEventListener, MouseEnterEvent, MouseEnterEventListener, MouseLeaveEvent, MouseLeaveEventListener, MouseMoveEventListener, MouseUpEventListener, MouseWheelEventListener, ScrollEvent, ScrollEventListener, TextChangeEventListener, TextUpdateEventListener, TouchCancelEventListener, TouchEndEventListener, TouchMoveEventListener, TouchStartEventListener, BoundsChangeEvent, ContextMenuEventListener};
 use crate::event_loop::{create_event_loop_callback};
-use crate::ext::ext_frame::{VIEW_TYPE_BUTTON, VIEW_TYPE_CONTAINER, VIEW_TYPE_ENTRY, VIEW_TYPE_IMAGE, VIEW_TYPE_LABEL, VIEW_TYPE_SCROLL, VIEW_TYPE_TEXT_EDIT};
+use crate::ext::ext_window::{ELEMENT_TYPE_BUTTON, ELEMENT_TYPE_CONTAINER, ELEMENT_TYPE_ENTRY, ELEMENT_TYPE_IMAGE, ELEMENT_TYPE_LABEL, ELEMENT_TYPE_SCROLL, ELEMENT_TYPE_TEXT_EDIT};
 use crate::window::{Window, WindowWeak};
 use crate::img_manager::IMG_MANAGER;
 use crate::js::js_serde::JsValueSerializer;
@@ -154,13 +154,13 @@ impl Element {
     #[js_func]
     pub fn create_by_type(view_type: i32, context: JsValue) -> Result<Element, Error> {
         let mut view = match view_type {
-            VIEW_TYPE_CONTAINER => Element::create(Container::create),
-            VIEW_TYPE_SCROLL => Element::create(Scroll::create),
-            VIEW_TYPE_LABEL => Element::create(Text::create),
-            VIEW_TYPE_ENTRY => Element::create(Entry::create),
-            VIEW_TYPE_BUTTON => Element::create(Button::create),
-            VIEW_TYPE_TEXT_EDIT => Element::create(TextEdit::create),
-            VIEW_TYPE_IMAGE => Element::create(Image::create),
+            ELEMENT_TYPE_CONTAINER => Element::create(Container::create),
+            ELEMENT_TYPE_SCROLL => Element::create(Scroll::create),
+            ELEMENT_TYPE_LABEL => Element::create(Text::create),
+            ELEMENT_TYPE_ENTRY => Element::create(Entry::create),
+            ELEMENT_TYPE_BUTTON => Element::create(Button::create),
+            ELEMENT_TYPE_TEXT_EDIT => Element::create(TextEdit::create),
+            ELEMENT_TYPE_IMAGE => Element::create(Image::create),
             _ => return Err(anyhow!("invalid view_type")),
         };
         view.resource_table.put(ElementJsContext { context });

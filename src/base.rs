@@ -200,9 +200,9 @@ pub struct MouseDetail {
     ///  The offset in the Y coordinate of the mouse pointer between that event and the padding edge of the target node.
     pub offset_y: f32,
 
-    /// x-axis relative to frame(as clientX in web)
+    /// x-axis relative to window(as clientX in web)
     pub window_x: f32,
-    /// y-axis relative to frame(as clientY in web)
+    /// y-axis relative to window(as clientY in web)
     pub window_y: f32,
     pub screen_x: f32,
     pub screen_y: f32,
@@ -217,9 +217,9 @@ pub struct Touch {
     ///  The offset in the Y coordinate of the mouse pointer between that event and the padding edge of the target node.
     pub offset_y: f32,
 
-    /// x-axis relative to frame(as clientX in web)
+    /// x-axis relative to window(as clientX in web)
     pub window_x: f32,
-    /// y-axis relative to frame(as clientY in web)
+    /// y-axis relative to window(as clientY in web)
     pub window_y: f32,
     // pub screen_x: f32,
     // pub screen_y: f32,

@@ -429,7 +429,7 @@ impl Scroll {
     }
 
     /// invert transform effect
-    fn map_frame_xy(&self, window_x: f32, window_y: f32) -> Option<(f32, f32)> {
+    fn map_window_xy(&self, window_x: f32, window_y: f32) -> Option<(f32, f32)> {
         let mut element = ok_or_return!(self.element.upgrade_mut(), None);
         let mut window = element.get_window()?.upgrade().ok()?;
         let node_matrix = window.render_tree.get_element_total_matrix(&element)?;
@@ -524,7 +524,7 @@ impl ElementBackend for Scroll {
             // println!("touch start: {:?}", e.0);
             let d = &e.0;
             let touch = unsafe { d.touches.get_unchecked(0) };
-            let (window_x, window_y) = match self.map_frame_xy(touch.window_x, touch.window_y) {
+            let (window_x, window_y) = match self.map_window_xy(touch.window_x, touch.window_y) {
                 None => {return false}
                 Some(v) => {v}
             };
@@ -542,7 +542,7 @@ impl ElementBackend for Scroll {
             // println!("touch move: {:?}", e.0);
             let d = &e.0;
             let touch = unsafe { d.touches.get_unchecked(0) };
-            let (window_x, window_y) = match self.map_frame_xy(touch.window_x, touch.window_y) {
+            let (window_x, window_y) = match self.map_window_xy(touch.window_x, touch.window_y) {
                 None => {return false}
                 Some(v) => {v}
             };

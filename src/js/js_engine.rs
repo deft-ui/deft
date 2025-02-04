@@ -25,7 +25,7 @@ use crate::ext::ext_clipboard::{clipboard_read_text, clipboard_write_text};
 use crate::ext::ext_console::Console as ExtConsole;
 use crate::ext::ext_env::env;
 use crate::ext::ext_fetch::fetch;
-use crate::ext::ext_frame::{handle_window_event, FRAMES};
+use crate::ext::ext_window::{handle_window_event, WINDOWS};
 use crate::ext::ext_fs::{fs_create_dir, fs_create_dir_all, fs_delete_file, fs_exists, fs_read_dir, fs_remove_dir, fs_remove_dir_all, fs_rename, fs_stat};
 use crate::ext::ext_http::http;
 use crate::ext::ext_localstorage::localstorage;
@@ -210,25 +210,25 @@ impl JsEngine {
 
     pub fn handle_device_event(&mut self, device_id: DeviceId, event: DeviceEvent) {
         if let DeviceEvent::Button {..} = event {
-            let close_frames = FRAMES.with_borrow(|frames| {
+            let close_windows = WINDOWS.with_borrow(|windows| {
                 let mut result = Vec::new();
-                let menu_frames: Vec<&Window> = frames.iter()
-                    .filter(|(_, f)| f.frame_type == WindowType::Menu)
+                let menu_windows: Vec<&Window> = windows.iter()
+                    .filter(|(_, f)| f.window_type == WindowType::Menu)
                     .map(|(_, f)| f)
                     .collect();
-                if menu_frames.is_empty() {
+                if menu_windows.is_empty() {
                     return result;
                 }
                 run_with_event_loop(|el| {
                     if let Some(pos) = el.query_pointer(device_id) {
-                        menu_frames.iter().for_each(|window| {
+                        menu_windows.iter().for_each(|window| {
                             let w_size = window.window.outer_size();
                             if let Some(wp) = window.window.outer_position().ok() {
                                 let (wx, wy) = (wp.x as f32, wp.y as f32);
                                 let (ww, wh) = (w_size.width as f32, w_size.height as f32);
-                                let is_in_frame = pos.0 >= wx && pos.0 <= wx + ww
+                                let is_in_window = pos.0 >= wx && pos.0 <= wx + ww
                                                        && pos.1 >= wy && pos.1 <= wy + wh;
-                                if !is_in_frame {
+                                if !is_in_window {
                                     let _ = window.window.set_cursor_grab(CursorGrabMode::None);
                                     result.push(window.as_weak());
                                 }
@@ -238,7 +238,7 @@ impl JsEngine {
                 });
                 result
             });
-            for window in close_frames {
+            for window in close_windows {
                 if let Ok(mut f) = window.upgrade() {
                     let _ = f.close();
                 }

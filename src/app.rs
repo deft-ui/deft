@@ -16,9 +16,9 @@ use winit::platform::android::activity::AndroidApp;
 use winit::window::WindowId;
 
 use crate::event_loop::{init_event_loop_proxy, run_event_loop_task, run_with_event_loop, AppEventProxy};
-use crate::ext::ext_frame::FRAMES;
+use crate::ext::ext_window::WINDOWS;
 use crate::ext::ext_localstorage::localstorage_flush;
-use crate::window::{frame_check_update, frame_input, frame_on_render_idle, frame_send_key, frame_update_inset};
+use crate::window::{window_check_update, window_input, window_on_render_idle, window_send_key, window_update_inset};
 use crate::js::js_engine::JsEngine;
 use crate::js::js_event_loop::{js_init_event_loop, JsEvent, JsEventLoopClosedError};
 use crate::js::js_runtime::JsContext;
@@ -133,12 +133,12 @@ impl WinitApp {
 impl ApplicationHandler<AppEventPayload> for WinitApp {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         run_event_loop_task(event_loop, move || {
-            let uninitialized = FRAMES.with(|m| m.borrow().is_empty());
+            let uninitialized = WINDOWS.with(|m| m.borrow().is_empty());
             if uninitialized {
                 self.js_engine.execute_main();
                 self.execute_pending_jobs();
             } else {
-                FRAMES.with_borrow_mut(|m| {
+                WINDOWS.with_borrow_mut(|m| {
                     m.iter_mut().for_each(|(_, f)| {
                         f.resume();
                     })
@@ -165,30 +165,30 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
                         }
                     }
                 }
-                AppEvent::ShowSoftInput(frame_id) => {
+                AppEvent::ShowSoftInput(window_id) => {
                     println!("show soft input");
                     #[cfg(target_os = "android")]
-                    show_hide_keyboard(event_loop.android_app().clone(), frame_id, true);
+                    show_hide_keyboard(event_loop.android_app().clone(), window_id, true);
                 },
-                AppEvent::HideSoftInput(frame_id) => {
+                AppEvent::HideSoftInput(window_id) => {
                     println!("hide soft input");
                     #[cfg(target_os = "android")]
-                    show_hide_keyboard(event_loop.android_app().clone(), frame_id, false);
+                    show_hide_keyboard(event_loop.android_app().clone(), window_id, false);
                 },
-                AppEvent::CommitInput(frame_id, content) => {
-                    frame_input(frame_id, content);
+                AppEvent::CommitInput(window_id, content) => {
+                    window_input(window_id, content);
                 },
-                AppEvent::NamedKeyInput(frame_id, key, pressed) => {
-                    frame_send_key(frame_id, &key, pressed);
+                AppEvent::NamedKeyInput(window_id, key, pressed) => {
+                    window_send_key(window_id, &key, pressed);
                 }
-                AppEvent::SetInset(frame_id, ty, rect) => {
-                    frame_update_inset(frame_id, ty, rect);
+                AppEvent::SetInset(window_id, ty, rect) => {
+                    window_update_inset(window_id, ty, rect);
                 },
-                AppEvent::RenderIdle(frame_id) => {
-                    frame_on_render_idle(frame_id);
+                AppEvent::RenderIdle(window_id) => {
+                    window_on_render_idle(window_id);
                 },
-                AppEvent::Update(frame_id) => {
-                    frame_check_update(frame_id);
+                AppEvent::Update(window_id) => {
+                    window_check_update(window_id);
                 }
             }
             let (lock, cvar) = &*event.lock;
@@ -226,37 +226,37 @@ pub fn exit_app(code: i32) -> Result<(), Error> {
 }
 
 #[cfg(target_os = "android")]
-pub fn bind_deft_window(app: AndroidApp, frame_id: i32) -> Result<(), jni::errors::Error> {
+pub fn bind_deft_window(app: AndroidApp, window_id: i32) -> Result<(), jni::errors::Error> {
     use jni::JavaVM;
     use jni::objects::JObject;
     let vm = unsafe { JavaVM::from_raw(app.vm_as_ptr() as _)? };
     let activity = unsafe { JObject::from_raw(app.activity_as_ptr() as _) };
     let mut env = vm.attach_current_thread()?;
-    let frame_id = frame_id as jlong;
+    let window_id = window_id as jlong;
     env.call_method(&activity, "bindDeftWindow", "(J)V", &[
-        JValue::Long(frame_id)
+        JValue::Long(window_id)
     ])?.v()?;
     Ok(())
 }
 
 #[cfg(target_os = "android")]
-fn show_hide_keyboard_fallible(app: AndroidApp, frame_id: i32, show: bool) -> Result<(), jni::errors::Error> {
+fn show_hide_keyboard_fallible(app: AndroidApp, window_id: i32, show: bool) -> Result<(), jni::errors::Error> {
     use jni::JavaVM;
     use jni::objects::JObject;
     let vm = unsafe { JavaVM::from_raw(app.vm_as_ptr() as _)? };
     let activity = unsafe { JObject::from_raw(app.activity_as_ptr() as _) };
     let mut env = vm.attach_current_thread()?;
-    let frame_id = frame_id as jlong;
+    let window_id = window_id as jlong;
     let show = show as jboolean;
     env.call_method(&activity, "showInput", "(JZ)V", &[
-        JValue::Long(frame_id), JValue::Bool(show)
+        JValue::Long(window_id), JValue::Bool(show)
     ])?.v()?;
     Ok(())
 }
 
 #[cfg(target_os = "android")]
-fn show_hide_keyboard(app: AndroidApp, frame_id: i32, show: bool) {
-    if let Err(e) = show_hide_keyboard_fallible(app, frame_id, show) {
+fn show_hide_keyboard(app: AndroidApp, window_id: i32, show: bool) {
+    if let Err(e) = show_hide_keyboard_fallible(app, window_id, show) {
        //tracing::error!("Showing or hiding the soft keyboard failed: {e:?}");
     };
 }

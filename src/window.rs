@@ -8,13 +8,13 @@ use crate::element::{Element, ElementWeak, PaintInfo};
 use crate::event::{build_modifier, named_key_to_str, str_to_named_key, BlurEvent, CaretChangeEventListener, ClickEvent, ContextMenuEvent, DragOverEvent, DragStartEvent, DropEvent, FocusEvent, FocusShiftEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent, MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, TextInputEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT};
 use crate::event_loop::{create_event_loop_proxy, run_with_event_loop};
 use crate::ext::common::create_event_handler;
-use crate::ext::ext_frame::{FrameAttrs, FRAMES, FRAME_TYPE_MENU, FRAME_TYPE_NORMAL, MODAL_TO_OWNERS, WINDOW_TO_FRAME};
+use crate::ext::ext_window::{WindowAttrs, WINDOWS, WINDOW_TYPE_MENU, WINDOW_TYPE_NORMAL, MODAL_TO_OWNERS, WINIT_TO_WINDOW};
 use crate::js::JsError;
 use crate::mrc::{Mrc, MrcWeak};
 use crate::renderer::CpuRenderer;
 use crate::timer::{set_timeout, set_timeout_nanos, TimerHandle};
 use anyhow::{anyhow, Error};
-use deft_macros::{event, frame_event, js_func, js_methods, mrc_object};
+use deft_macros::{event, window_event, js_func, js_methods, mrc_object};
 use measure_time::print_time;
 use quick_js::{JsValue, ResourceValue};
 use skia_bindings::{SkCanvas_SrcRectConstraint, SkClipOp, SkPathOp, SkRect};
@@ -88,7 +88,7 @@ pub struct Window {
     id: i32,
     pub(crate) window: SkiaWindow,
     cursor_position: LogicalPosition<f64>,
-    pub(crate) frame_type: WindowType,
+    pub(crate) window_type: WindowType,
     cursor_root_position: LogicalPosition<f64>,
     pub body: Option<Element>,
     focusing: Option<Element>,
@@ -117,27 +117,27 @@ pub struct Window {
     resource_table: ResourceTable,
 }
 
-pub type FrameEventHandler = EventHandler<WindowWeak>;
-pub type FrameEventContext = EventContext<WindowWeak>;
+pub type WindowEventHandler = EventHandler<WindowWeak>;
+pub type WindowEventContext = EventContext<WindowWeak>;
 
 thread_local! {
-    pub static NEXT_FRAME_ID: Cell<i32> = Cell::new(1);
+    pub static NEXT_WINDOW_ID: Cell<i32> = Cell::new(1);
 }
 
-#[frame_event]
-pub struct FrameResizeEvent {
+#[window_event]
+pub struct WindowResizeEvent {
     pub width: u32,
     pub height: u32,
 }
 
-#[frame_event]
-pub struct FrameCloseEvent;
+#[window_event]
+pub struct WindowCloseEvent;
 
-#[frame_event]
-pub struct FrameFocusEvent;
+#[window_event]
+pub struct WindowFocusEvent;
 
-#[frame_event]
-pub struct FrameBlurEvent;
+#[window_event]
+pub struct WindowBlurEvent;
 
 impl LayoutRoot for WindowWeak {
 
@@ -157,21 +157,21 @@ impl LayoutRoot for WindowWeak {
 impl Window {
 
     #[js_func]
-    pub fn create(attrs: FrameAttrs) -> Result<Self, Error> {
+    pub fn create(attrs: WindowAttrs) -> Result<Self, Error> {
         let mut window = Window::create_inner(attrs);
         send_app_event(AppEvent::BindWindow(window.get_id())).unwrap();
         window.update_inset(InsetType::Ime, Rect::new_empty());
         window.update_inset(InsetType::Navigation, Rect::new_empty());
         window.update_inset(InsetType::StatusBar, Rect::new_empty());
         let window_id = window.get_window_id();
-        FRAMES.with_borrow_mut(|m| m.insert(window.get_id(), window.clone()));
-        WINDOW_TO_FRAME.with_borrow_mut(|m| m.insert(window_id, window.as_weak()));
+        WINDOWS.with_borrow_mut(|m| m.insert(window.get_id(), window.clone()));
+        WINIT_TO_WINDOW.with_borrow_mut(|m| m.insert(window_id, window.as_weak()));
         Ok(window)
     }
 
-    fn create_inner(attrs: FrameAttrs) -> Self {
-        let id = NEXT_FRAME_ID.get();
-        NEXT_FRAME_ID.set(id + 1);
+    fn create_inner(attrs: WindowAttrs) -> Self {
+        let id = NEXT_WINDOW_ID.get();
+        NEXT_WINDOW_ID.set(id + 1);
 
         let mut attributes = winit::window::Window::default_attributes();
         if let Some(t) = &attrs.title {
@@ -202,8 +202,8 @@ impl Window {
                 y: position.1 as f64,
             }));
         }
-        let frame_type = match attrs.frame_type.unwrap_or(FRAME_TYPE_NORMAL.to_string()).as_str() {
-            FRAME_TYPE_MENU => WindowType::Menu,
+        let window_type = match attrs.window_type.unwrap_or(WINDOW_TYPE_NORMAL.to_string()).as_str() {
+            WINDOW_TYPE_MENU => WindowType::Menu,
             _ => WindowType::Normal,
         };
 
@@ -238,7 +238,7 @@ impl Window {
                 scrolled: false,
                 start_point: (0.0, 0.0),
             },
-            frame_type,
+            window_type,
             init_width: attrs.width,
             init_height: attrs.height,
             background_color: Color::from_rgb(0, 0, 0),
@@ -313,8 +313,8 @@ impl Window {
     #[js_func]
     pub fn set_modal(&mut self, owner: Window) -> Result<(), JsError> {
         self.window.set_modal(&owner.window);
-        let frame_id = self.get_window_id();
-        MODAL_TO_OWNERS.with_borrow_mut(|m| m.insert(frame_id, owner.get_window_id()));
+        let window_id = self.get_window_id();
+        MODAL_TO_OWNERS.with_borrow_mut(|m| m.insert(window_id, owner.get_window_id()));
         Ok(())
     }
 
@@ -322,9 +322,9 @@ impl Window {
     pub fn close(&mut self) -> Result<(), JsError> {
         let window_id = self.get_window_id();
         if self.allow_close() {
-            WINDOW_TO_FRAME.with_borrow_mut(|m| m.remove(&window_id));
+            WINIT_TO_WINDOW.with_borrow_mut(|m| m.remove(&window_id));
             MODAL_TO_OWNERS.with_borrow_mut(|m| m.remove(&window_id));
-            FRAMES.with_borrow_mut(|m| {
+            WINDOWS.with_borrow_mut(|m| {
                 m.remove(&self.get_id());
                 if m.is_empty() {
                     let _ = exit_app(0);
@@ -364,7 +364,7 @@ impl Window {
     }
     
     pub fn allow_close(&mut self) -> bool {
-        let ctx = self.emit(FrameCloseEvent);
+        let ctx = self.emit(WindowCloseEvent);
         !ctx.prevent_default
     }
 
@@ -504,20 +504,20 @@ impl Window {
             WindowEvent::Focused(focus) => {
                 let target = self.as_weak();
                 if focus {
-                    self.emit(FrameFocusEvent);
+                    self.emit(WindowFocusEvent);
                 } else {
-                    self.emit(FrameBlurEvent);
+                    self.emit(WindowBlurEvent);
                 }
             }
             _ => (),
         }
     }
 
-    pub fn add_event_listener(&mut self, event_type: &str, handler: Box<FrameEventHandler>) -> u32 {
+    pub fn add_event_listener(&mut self, event_type: &str, handler: Box<WindowEventHandler>) -> u32 {
         self.event_registration.add_event_listener(event_type, handler)
     }
 
-    pub fn bind_event_listener<T: 'static, F: FnMut(&mut FrameEventContext, &mut T) + 'static>(&mut self, event_type: &str, handler: F) -> u32 {
+    pub fn bind_event_listener<T: 'static, F: FnMut(&mut WindowEventContext, &mut T) + 'static>(&mut self, event_type: &str, handler: F) -> u32 {
         self.event_registration.bind_event_listener(event_type, handler)
     }
 
@@ -525,10 +525,10 @@ impl Window {
     pub fn bind_js_event_listener(&mut self, event_type: String, listener: JsValue) -> Result<u32, JsError> {
         let id = bind_js_event_listener!(
             self, event_type.as_str(), listener;
-            "resize" => FrameResizeEventListener,
-            "close"  => FrameCloseEventListener,
-            "focus"  => FrameFocusEventListener,
-            "blur"   => FrameBlurEventListener,
+            "resize" => WindowResizeEventListener,
+            "close"  => WindowCloseEventListener,
+            "focus"  => WindowFocusEventListener,
+            "blur"   => WindowBlurEventListener,
         );
         Ok(id)
     }
@@ -845,7 +845,7 @@ impl Window {
         }
         let sleep_time = self.frame_rate_controller.next_frame();
         if sleep_time > 0 {
-            let frame_id = self.get_id();
+            let window_id = self.get_id();
             let mut me = self.clone();
             let next_frame_timer_handle = set_timeout_nanos(move || {
                 me.next_frame_timer_handle = None;
@@ -929,7 +929,7 @@ impl Window {
         self.window.resize_surface(width, height);
         self.invalid_layout();
         let scale_factor = self.window.scale_factor();
-        self.emit(FrameResizeEvent {
+        self.emit(WindowResizeEvent {
             width: (width as f64 / scale_factor) as u32,
             height: (height as f64 / scale_factor) as u32,
         });
@@ -989,7 +989,7 @@ impl Window {
             return ResultWaiter::new_finished(false);
         };
         let waiter_finisher = waiter.clone();
-        let frame_id = self.get_id();
+        let window_id = self.get_id();
         self.renderer_idle = false;
         self.window.render_with_result(Renderer::new(move |canvas, ctx| {
             // print_time!("drawing time");
@@ -1005,7 +1005,7 @@ impl Window {
             canvas.restore();
         }), move|r| {
             waiter_finisher.finish(r);
-            send_app_event(AppEvent::RenderIdle(frame_id));
+            send_app_event(AppEvent::RenderIdle(window_id));
         });
         waiter
     }
@@ -1150,45 +1150,45 @@ fn print_tree(node: &Element, padding: &str) {
     }
 }
 
-pub fn frame_input(frame_id: i32, content: String) {
-    FRAMES.with_borrow_mut(|m| {
-        if let Some(f) = m.get_mut(&frame_id) {
+pub fn window_input(window_id: i32, content: String) {
+    WINDOWS.with_borrow_mut(|m| {
+        if let Some(f) = m.get_mut(&window_id) {
             f.handle_input(&content);
         }
     });
 }
 
-pub fn frame_send_key(frame_id: i32, key: &str, pressed: bool) {
+pub fn window_send_key(window_id: i32, key: &str, pressed: bool) {
     if let Some(k) = str_to_named_key(&key) {
-        FRAMES.with_borrow_mut(|m| {
-            if let Some(f) = m.get_mut(&frame_id) {
+        WINDOWS.with_borrow_mut(|m| {
+            if let Some(f) = m.get_mut(&window_id) {
                 f.handle_key(0, Some(k), Some(key.to_string()), None, false, pressed);
             }
         });
     }
 }
 
-pub fn frame_update_inset(frame_id: i32, ty: InsetType, rect: Rect) {
-    FRAMES.with_borrow_mut(|m| {
-        if let Some(f) = m.get_mut(&frame_id) {
+pub fn window_update_inset(window_id: i32, ty: InsetType, rect: Rect) {
+    WINDOWS.with_borrow_mut(|m| {
+        if let Some(f) = m.get_mut(&window_id) {
             f.update_inset(ty, rect);
             // f.mark_dirty_and_update_immediate(true).wait_finish();
         }
     });
 }
 
-pub fn frame_on_render_idle(frame_id: i32) {
-    FRAMES.with_borrow_mut(|m| {
-        if let Some(f) = m.get_mut(&frame_id) {
+pub fn window_on_render_idle(window_id: i32) {
+    WINDOWS.with_borrow_mut(|m| {
+        if let Some(f) = m.get_mut(&window_id) {
             f.renderer_idle = true;
             f.update();
         }
     });
 }
 
-pub fn frame_check_update(frame_id: i32) {
-    FRAMES.with_borrow_mut(|m| {
-        if let Some(f) = m.get_mut(&frame_id) {
+pub fn window_check_update(window_id: i32) {
+    WINDOWS.with_borrow_mut(|m| {
+        if let Some(f) = m.get_mut(&window_id) {
             f.update();
         }
     });
