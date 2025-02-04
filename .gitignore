@@ -4,4 +4,3 @@ target
 *.so
 *.log
 local*
-/js
