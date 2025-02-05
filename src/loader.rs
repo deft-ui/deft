@@ -24,8 +24,10 @@ impl JsModuleLoader for RemoteModuleLoader {
         } else {
             return Err(Error::new(ErrorKind::AddrNotAvailable, anyhow!("Failed to resolve module: {}", module_name)));
         };
-        let body = reqwest::blocking::get(&url).map_err(|e| Error::new(ErrorKind::Other, e))?
-            .text().map_err(|e| Error::new(ErrorKind::Other, e))?;
+        let body = reqwest::blocking::get(&url)
+            .map_err(|e| Error::new(ErrorKind::Other, format!("Failed to request {:?}", e)))?
+            .text()
+            .map_err(|e| Error::new(ErrorKind::Other, format!("Failed to read response text: {:?}", e)))?;
         Ok(body)
     }
 }
