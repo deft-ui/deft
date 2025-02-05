@@ -1,7 +1,7 @@
 {
-  "name": "deftjs",
+  "name": "deft-sys",
   "version": "0.1.4",
-  "description": "Deft type",
+  "description": "Deft typings",
   "typings": "deft.d.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
