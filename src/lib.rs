@@ -86,8 +86,8 @@ pub mod winit;
 
 pub use deft_macros::*;
 use rodio::cpal::available_hosts;
-use skia_bindings::SkFontStyle_Slant;
 use skia_safe::font_style::{Weight, Width};
+use skia_safe::font_style::Slant::Upright;
 use skia_safe::wrapper::ValueWrapper;
 use yoga::Direction::LTR;
 use crate::event_loop::{AppEventProxy, AppEventResult};
@@ -243,7 +243,7 @@ fn test_text_measure() {
     // let font = DEFAULT_TYPE_FACE.with(|tf| Font::from_typeface(tf, 14.0));
     let paint = Paint::default();
     let fm = FONT_MGR.with(|fm| fm.clone());
-    let mut font_style = FontStyle::new(Weight::NORMAL, Width::NORMAL, SkFontStyle_Slant::Upright);
+    let mut font_style = FontStyle::new(Weight::NORMAL, Width::NORMAL, Upright);
     let tf = fm.match_family_style("monospace", font_style).unwrap();
     println!("font name: {}", &tf.family_name());
     let font = Font::from_typeface(tf, 14.0);

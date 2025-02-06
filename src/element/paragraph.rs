@@ -18,7 +18,6 @@ use crate::{js_deserialize, js_serialize, match_event_type};
 use deft_macros::{element_backend, js_methods, mrc_object};
 use rodio::cpal::available_hosts;
 use serde::{Deserialize, Serialize};
-use skia_bindings::SkFontStyle_Weight;
 use skia_safe::font_style::{Slant, Weight, Width};
 use skia_safe::textlayout::{
     Decoration, FontFamilies, Paragraph as SkParagraph, ParagraphBuilder, ParagraphStyle,

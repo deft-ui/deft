@@ -1,6 +1,5 @@
-use skia_bindings::SkPaint_Style;
-use skia_bindings::SkPaint_Style::Fill;
-use skia_safe::{Canvas, Color, Image, Matrix, Paint, Path, Rect};
+use skia_safe::{Canvas, Color, Image, Matrix, Paint, PaintStyle, Path, Rect};
+use skia_safe::PaintStyle::{Fill, Stroke};
 use crate::paint::{InvalidArea, InvalidRects, RenderLayerKey, RenderObject};
 use crate::render::RenderFn;
 use crate::style::ColorHelper;
@@ -38,7 +37,7 @@ impl ElementPaintObject {
             let rect = Rect::new(bd_left, bd_top, width - bd_right, height - bd_bottom);
 
             paint.set_color(self.background_color);
-            paint.set_style(SkPaint_Style::Fill);
+            paint.set_style(Fill);
             canvas.draw_rect(&rect, &paint);
         }
     }
@@ -50,7 +49,7 @@ impl ElementPaintObject {
             let p = &paths[i];
             if !p.is_empty() {
                 let mut paint = Paint::default();
-                paint.set_style(SkPaint_Style::Fill);
+                paint.set_style(Fill);
                 paint.set_anti_alias(true);
                 paint.set_color(color[i]);
                 canvas.draw_path(&p, &paint);
@@ -62,7 +61,7 @@ impl ElementPaintObject {
         let rect = Rect::from_xywh(1.0, 1.0, self.width - 2.0, self.height - 2.0);
         let mut paint = Paint::default();
         paint.set_color(Color::RED);
-        paint.set_style(SkPaint_Style::Stroke);
+        paint.set_style(Stroke);
         paint.set_stroke_width(2.0);
         canvas.draw_rect(&rect, &paint);
     }

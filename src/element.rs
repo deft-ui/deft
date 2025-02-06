@@ -11,7 +11,6 @@ use measure_time::print_time;
 use ordered_float::Float;
 use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
-use skia_bindings::{SkPaint_Style, SkPathOp};
 use skia_safe::{Canvas, Color, Matrix, Paint, Path, Rect};
 use winit::window::CursorIcon;
 use yoga::{Direction, Edge, StyleUnit};

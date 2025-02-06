@@ -1,5 +1,5 @@
-use skia_bindings::{SkPaint_Style, SkPathOp};
-use skia_safe::{Canvas, Color, Matrix, Paint, Path, Rect};
+use skia_safe::{Canvas, Color, Matrix, Paint, Path, PathOp, Rect};
+use skia_safe::PaintStyle::Fill;
 
 #[derive(Clone)]
 pub enum BorderStyle {
@@ -84,7 +84,7 @@ pub fn draw_border(canvas: &Canvas, border_width: [f32; 4], border_color: [Color
         if let Some(mut path) = draw_top_border(&top, &left, left_radius, &right, right_radius, width, height) {
             let color = top.1;
             let mut paint = Paint::default();
-            paint.set_style(SkPaint_Style::Fill);
+            paint.set_style(Fill);
             paint.set_anti_alias(true);
             paint.set_color(color);
             let mut matrix = Matrix::rotate_deg(rotate);
@@ -147,10 +147,10 @@ fn draw_top_border(top_border: &BorderProps,
     clip_paths.push(intersect_paths(clip_ps));
 
     for p in paths {
-        path = path.op(&p, SkPathOp::Intersect).unwrap_or(Path::new());
+        path = path.op(&p, PathOp::Intersect).unwrap_or(Path::new());
     }
     for p in clip_paths {
-        path = path.op(&p, SkPathOp::Difference).unwrap_or(Path::new());
+        path = path.op(&p, PathOp::Difference).unwrap_or(Path::new());
     }
     Some(path)
 }
@@ -230,7 +230,7 @@ fn intersect_paths(paths: Vec<Path>) -> Path {
             path = p.clone();
             first = false;
         } else {
-            path = path.op(&p, SkPathOp::Intersect).unwrap_or(Path::new())
+            path = path.op(&p, PathOp::Intersect).unwrap_or(Path::new())
         }
     }
     path

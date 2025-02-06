@@ -1,6 +1,5 @@
 use measure_time::print_time;
 use ordered_float::OrderedFloat;
-use skia_bindings::SkPaint_Style;
 use skia_safe::{Canvas, Color, Paint, Surface, surfaces};
 use skia_window::skia_window::SkiaWindow;
 use winit::application::ApplicationHandler;

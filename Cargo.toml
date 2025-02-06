@@ -4,7 +4,7 @@ readme = "README.md"
 license = "MIT"
 description = "Cross platform ui framework"
 
-version = "0.1.6"
+version = "0.1.7"
 authors = ["KasonYang <me@kason.fun>"]
 edition = "2021"
 
@@ -18,7 +18,6 @@ winit = { package = "deft-winit", version = "0.30.8", features = ["android-nativ
 skia-window = { path = "skia-window", version = "0.1.0" }
 
 lazy_static = "1.4"
-skia-bindings = {package = "deft-skia-bindings", version = "0.81.0", default-features = false, features = ["binary-cache"] }
 
 
 base64 = { version = "0.22.0" }
@@ -47,24 +46,19 @@ rusqlite = { version = "0.32.0", features = ["bundled"] }
 bezier-rs = "0.4.0"
 raw-window-handle = "0.5.2"
 log = "0.4.25"
+skia-safe = {package = "deft-skia-safe", version = "0.81.0", features = ["binary-cache", "textlayout", "svg"], default-features = false}
 
 [features]
-default=[]
-tray=["ksni"]
-x11=[]
+default = []
+tray = ["ksni"]
+x11 = ["skia-safe/x11"]
+wayland = ["skia-safe/wayland"]
 
 [target.'cfg(not(target_os = "android"))'.dependencies]
 native-dialog = "0.7.0"
 
 [target.'cfg(target_os = "android")'.dependencies]
-skia-safe = {package = "deft-skia-safe", version = "0.81.0", features = ["binary-cache", "textlayout", "svg", "x11"], default-features = false}
 android_logger = "0.11.0"
-[target.'cfg(target_os = "linux")'.dependencies]
-skia-safe = {package = "deft-skia-safe", version = "0.81.0", features = ["binary-cache","textlayout", "svg", "x11"], default-features = false}
-[target.'cfg(target_os = "windows")'.dependencies]
-skia-safe = {package = "deft-skia-safe", version = "0.81.0", features = ["binary-cache","textlayout", "svg"], default-features = false}
-[target.'cfg(target_os = "macos")'.dependencies]
-skia-safe = {package = "deft-skia-safe", version = "0.81.0", features = ["binary-cache","textlayout", "svg"], default-features = false}
 
 [build-dependencies]
 cfg_aliases = "0.2.1"

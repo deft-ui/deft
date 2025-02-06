@@ -3,7 +3,6 @@ use std::rc::Rc;
 use anyhow::{Error};
 use quick_js::JsValue;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
-use skia_bindings::SkTextUtils_Align;
 use skia_safe::{Canvas, Color, Color4f, Font, FontMgr, FontStyle, Paint, Typeface};
 use skia_safe::textlayout::{FontCollection, Paragraph, ParagraphBuilder, ParagraphStyle, StrutStyle, TextAlign, TextStyle};
 use crate::base::{ElementEvent, PropertyValue, Rect, TextUpdateDetail};

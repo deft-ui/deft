@@ -6,7 +6,6 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use measure_time::print_time;
 use sha1::digest::generic_array::functional::FunctionalSequence;
-use skia_bindings::{SkClipOp, SkPaint_Style, SkPathOp};
 use skia_safe::{scalar, ClipOp, Color, Contains, IRect, Image, Matrix, Paint, Path, PathOp, Point, Rect, Vector};
 use skia_safe::Canvas;
 use skia_window::context::{RenderContext, UserContext};
@@ -845,7 +844,7 @@ impl<'a> Painter for SkiaPainter<'a> {
         for r in &invalid_rects.rects {
             path.add_rect(r, None);
         }
-        self.canvas.clip_path(&path, SkClipOp::Intersect, false);
+        self.canvas.clip_path(&path, ClipOp::Intersect, false);
         self.invalid_rects = invalid_rects;
     }
     fn is_visible_origin(&self, bounds: &Rect) -> bool {
@@ -966,7 +965,7 @@ impl ClipPath {
             *self = other.clone();
             return;
         }
-        self.path = self.path.op(&other.path, SkPathOp::Intersect).unwrap_or(Path::new());
+        self.path = self.path.op(&other.path, PathOp::Intersect).unwrap_or(Path::new());
     }
 
     pub fn offset(&mut self, d: impl Into<Vector>) {
@@ -990,7 +989,7 @@ impl ClipPath {
 
     pub fn apply(&self, canvas: &Canvas) {
         if !self.unlimited {
-            canvas.clip_path(&self.path, SkClipOp::Intersect, false);
+            canvas.clip_path(&self.path, ClipOp::Intersect, false);
         }
     }
 
@@ -998,7 +997,7 @@ impl ClipPath {
         if self.unlimited {
             path.clone()
         } else {
-            self.path.op(path, SkPathOp::Intersect).unwrap_or(Path::new())
+            self.path.op(path, PathOp::Intersect).unwrap_or(Path::new())
         }
     }
 

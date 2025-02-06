@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::mem;
-use skia_bindings::SkPaint_Style;
 use skia_safe::{Canvas, ClipOp, Color, Image, Matrix, Paint, PaintStyle, Rect};
 use skia_window::context::RenderContext;
 use crate::canvas_util::CanvasHelper;
@@ -128,7 +127,7 @@ impl ElementPainter {
     fn paint_hit_rect(canvas: &Canvas, width: f32, height: f32) {
         let rect = Rect::new(0.5, 0.5, width - 1.0, height - 1.0);
         let mut paint = Paint::default();
-        paint.set_style(SkPaint_Style::Stroke);
+        paint.set_style(PaintStyle::Stroke);
         paint.set_color(Color::RED);
         canvas.draw_rect(&rect, &paint);
     }

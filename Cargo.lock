@@ -910,7 +910,7 @@ dependencies = [
 
 [[package]]
 name = "deft"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "android_logger",
  "anyhow",
@@ -922,7 +922,6 @@ dependencies = [
  "clipboard",
  "deft-macros",
  "deft-quick-js",
- "deft-skia-bindings",
  "deft-skia-safe",
  "deft-winit",
  "deft-yoga",
