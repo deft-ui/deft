@@ -146,7 +146,7 @@ pub fn android_bootstrap(app: AndroidApp, deft_app: App) {
     use winit::platform::android::EventLoopBuilderExtAndroid;
     android::init_android_app(&app);
 
-    // android_logger::init_once(android_logger::Config::default().with_min_level(log::Level::Debug));
+    android_logger::init_once(android_logger::Config::default().with_min_level(log::Level::Warn));
 
     // info!("starting");
     if let Some(p) = app.internal_data_path() {
