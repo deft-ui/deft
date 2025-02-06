@@ -4,7 +4,7 @@ readme = "README.md"
 license = "MIT"
 description = "Cross platform ui framework"
 
-version = "0.1.8"
+version = "0.1.11"
 authors = ["KasonYang <me@kason.fun>"]
 edition = "2021"
 
@@ -15,7 +15,7 @@ deft-macros = { path = "packages/deft-macros", version = "0.1.1" }
 quick-js = { package = "deft-quick-js", version = "0.5.0"}
 yoga = { package = "deft-yoga", version = "0.5.0" }
 winit = { package = "deft-winit", version = "0.30.8", features = ["android-native-activity", "rwh_05"] }
-skia-window = { path = "skia-window", version = "0.1.2" }
+skia-window = { path = "skia-window", version = "0.1.4" }
 
 lazy_static = "1.4"
 
@@ -49,10 +49,10 @@ log = "0.4.25"
 skia-safe = {package = "deft-skia-safe", version = "0.81.0", features = ["binary-cache", "textlayout", "svg"], default-features = false}
 
 [features]
-default = ["x11"]
+default = []
 tray = ["ksni"]
-x11 = ["skia-safe/x11"]
-wayland = ["skia-safe/wayland"]
+x11 = ["skia-safe/x11", "skia-window/x11"]
+wayland = ["skia-safe/wayland", "skia-window/wayland"]
 
 [target.'cfg(not(target_os = "android"))'.dependencies]
 native-dialog = "0.7.0"

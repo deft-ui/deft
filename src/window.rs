@@ -40,7 +40,7 @@ use winit::error::ExternalError;
 use winit::event::{ElementState, Ime, Modifiers, MouseButton, MouseScrollDelta, TouchPhase, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use winit::keyboard::{Key, NamedKey};
-#[cfg(feature = "x11")]
+#[cfg(x11_platform)]
 use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorGrabMode, CursorIcon, Fullscreen, WindowAttributes, WindowId};
 use crate::{bind_js_event_listener, is_snapshot_usable, ok_or_return, send_app_event, show_focus_hit, show_repaint_area, some_or_continue, some_or_return};
@@ -190,7 +190,7 @@ impl Window {
             height: attrs.height.unwrap_or(default_height) as f64,
         };
         attributes.inner_size = Some(Size::Logical(size));
-        #[cfg(feature = "x11")]
+        #[cfg(x11_platform)]
         {
             attributes = attributes.with_override_redirect(attrs.override_redirect.unwrap_or(false));
         }

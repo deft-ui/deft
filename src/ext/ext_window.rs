@@ -6,7 +6,7 @@ use anyhow::{anyhow, Error};
 use quick_js::{JsValue, ResourceValue, ValueError};
 use serde::{Deserialize, Serialize};
 use winit::event::WindowEvent;
-#[cfg(feature = "x11")]
+#[cfg(x11_platform)]
 use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{WindowId as WinitWindowId};
 

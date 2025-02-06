@@ -910,7 +910,7 @@ dependencies = [
 
 [[package]]
 name = "deft"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "android_logger",
  "anyhow",
@@ -3572,7 +3572,7 @@ dependencies = [
 
 [[package]]
 name = "skia-window"
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
  "android_logger",
  "cfg_aliases 0.1.1",
