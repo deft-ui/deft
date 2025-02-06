@@ -461,6 +461,59 @@ dependencies = [
 ]
 
 [[package]]
+name = "deft-winit"
+version = "0.30.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d7bc9a0983b04138743ab1224e01ae0daaec4ecd046c9460de57ef6e0942ec2"
+dependencies = [
+ "ahash",
+ "android-activity",
+ "atomic-waker",
+ "bitflags 2.6.0",
+ "block2 0.5.1",
+ "bytemuck",
+ "calloop",
+ "cfg_aliases 0.2.1",
+ "concurrent-queue",
+ "core-foundation 0.9.3",
+ "core-graphics 0.23.1",
+ "cursor-icon",
+ "dpi",
+ "js-sys",
+ "libc",
+ "memmap2",
+ "ndk",
+ "objc2 0.5.2",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "objc2-ui-kit",
+ "orbclient",
+ "percent-encoding",
+ "pin-project",
+ "raw-window-handle 0.5.2",
+ "raw-window-handle 0.6.2",
+ "redox_syscall 0.4.1",
+ "rustix 0.38.35",
+ "sctk-adwaita",
+ "smithay-client-toolkit",
+ "smol_str",
+ "tracing",
+ "unicode-segmentation",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wayland-backend",
+ "wayland-client",
+ "wayland-protocols",
+ "wayland-protocols-plasma",
+ "web-sys",
+ "web-time",
+ "windows-sys 0.52.0",
+ "x11-dl",
+ "x11rb",
+ "xkbcommon-dl",
+]
+
+[[package]]
 name = "dispatch"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -484,6 +537,8 @@ checksum = "9ea835d29036a4087793836fa931b08837ad5e957da9e23886b29586fb9b6650"
 [[package]]
 name = "dpi"
 version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f25c0e292a7ca6d6498557ff1df68f32c99850012b6ea401cf8daf771f22ff53"
 
 [[package]]
 name = "drm"
@@ -897,57 +952,6 @@ name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
-
-[[package]]
-name = "lento-winit"
-version = "0.30.5"
-dependencies = [
- "ahash",
- "android-activity",
- "atomic-waker",
- "bitflags 2.6.0",
- "block2 0.5.1",
- "bytemuck",
- "calloop",
- "cfg_aliases 0.2.1",
- "concurrent-queue",
- "core-foundation 0.9.3",
- "core-graphics 0.23.1",
- "cursor-icon",
- "dpi",
- "js-sys",
- "libc",
- "memmap2",
- "ndk",
- "objc2 0.5.2",
- "objc2-app-kit",
- "objc2-foundation",
- "objc2-ui-kit",
- "orbclient",
- "percent-encoding",
- "pin-project",
- "raw-window-handle 0.5.2",
- "raw-window-handle 0.6.2",
- "redox_syscall 0.4.1",
- "rustix 0.38.35",
- "sctk-adwaita",
- "smithay-client-toolkit",
- "smol_str",
- "tracing",
- "unicode-segmentation",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "wayland-backend",
- "wayland-client",
- "wayland-protocols",
- "wayland-protocols-plasma",
- "web-sys",
- "web-time",
- "windows-sys 0.52.0",
- "x11-dl",
- "x11rb",
- "xkbcommon-dl",
-]
 
 [[package]]
 name = "libc"
@@ -1630,16 +1634,16 @@ dependencies = [
 
 [[package]]
 name = "skia-window"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "android_logger",
  "cfg_aliases 0.1.1",
  "deft-skia-safe",
+ "deft-winit",
  "env_logger",
  "gl",
  "gl_generator",
  "glutin",
- "lento-winit",
  "log",
  "measure_time",
  "raw-window-handle 0.5.2",

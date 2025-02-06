@@ -1,20 +1,20 @@
 [package]
 name = "skia-window"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description = "Rendering window with skia"
 license = "MIT"
 
 
 [features]
-default = ["egl", "wayland", "wgl"]
+default = ["egl", "wayland", "wgl", "x11"]
 
 desktop = []
 
 egl = ["glutin/egl"]
 glx = ["glutin/glx", "glutin/x11", "winit/x11", "x11"]
 wgl = ["glutin/wgl"]
-x11 = ["glutin/x11", "winit/x11"]
+x11 = ["glutin/x11", "winit/x11", "skia-safe/x11"]
 wayland = ["glutin/wayland", "winit/wayland", "winit/wayland-dlopen", "winit/wayland-csd-adwaita-notitle"]
 
 
