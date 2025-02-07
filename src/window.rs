@@ -1077,9 +1077,6 @@ impl Window {
     fn create_window(attributes: WindowAttributes) -> SkiaWindow {
         run_with_event_loop(|el| {
             //TODO support RenderBackedType parameter
-            #[cfg(not(target_os = "android"))]
-            let default_backend_type = "softbuffer";
-            #[cfg(target_os = "android")]
             let default_backend_type = "gl";
             let backend_type_str = env::var("renderer").unwrap_or(default_backend_type.to_string());
             let backend_type = match backend_type_str.as_str() {
