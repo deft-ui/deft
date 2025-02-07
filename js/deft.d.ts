@@ -521,7 +521,7 @@ declare class Element {
      *
      * @returns {ElementRect}
      */
-    get boundingClientRect(): ElementRect;
+    getBoundingClientRect(): ElementRect;
     /**
      *
      * @returns {number}

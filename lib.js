@@ -641,7 +641,7 @@ export class Element {
      *
      * @returns {ElementRect}
      */
-    get boundingClientRect() {
+    getBoundingClientRect() {
         return Element_get_bounding_client_rect(this.handle);
     }
 
