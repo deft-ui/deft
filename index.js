@@ -1,6 +1,6 @@
 function assertEq(expected, actual) {
     if (expected !== actual) {
-        console.error("assert fail");
+        console.error(new Error("assert fail"));
         process.exit(1);
     }
 }
@@ -18,7 +18,7 @@ function createSystemTray() {
         return;
     }
     const tray = new SystemTray();
-    tray.setTitle("DeftTest");
+    tray.title="DeftTest";
     tray.setMenus([{
         id: "test",
         label: "test",
@@ -30,13 +30,13 @@ function createSystemTray() {
 
 function createEntry() {
     const entry = new EntryElement();
-    entry.setText("test测试");
-    entry.setStyle({
+    entry.text = "test测试";
+    entry.style = {
         width: 100,
         padding: 5,
         border: "1 #ccc"
-    })
-    console.log("entry id:", entry.getId())
+    }
+    console.log("entry id:", entry.id)
     return entry;
 }
 
@@ -44,32 +44,32 @@ function createTextEdit() {
     const textEdit = new EntryElement();
 
     //textEdit.setAlign("center")
-    textEdit.setText("1\n12\n测试\n123\n1234");
-    textEdit.setMultipleLine(true);
-    textEdit.setAutoHeight(true);
-    textEdit.setAutoFocus(true);
+    textEdit.text = "1\n12\n测试\n123\n1234";
+    textEdit.multipleLine=true;
+    textEdit.autoHeight=true;
+    textEdit.autoFocus=true;
 
-    textEdit.setStyle({
+    textEdit.style={
         padding: 10,
         // "height": 100,
         // "width": 100,
         // "background": "#ccc",
         "border": "1 #ccc"
         // "minWidth": 600,
-    });
-    console.log("TextEdit id:", textEdit.getId());
+    };
+    console.log("TextEdit id:", textEdit.id);
     return textEdit;
 }
 
 function createCenterElement() {
     const outer = new ContainerElement();
-    outer.setStyle({
+    outer.style={
         position: 'relative',
         height: 200,
         background: '#000',
-    });
+    };
     const inner = new ContainerElement();
-    inner.setStyle({
+    inner.style={
         position: 'absolute',
         left: '50%',
         top: '50%',
@@ -78,37 +78,37 @@ function createCenterElement() {
         transform: 'translate(-50%, -50%)',
         border: '1 #ccc',
         background: '#ccc',
-    });
+    };
     outer.addChild(inner);
-    console.log("innerId", inner.getId());
+    console.log("innerId", inner.id);
     return outer;
 }
 
 function createLabel(text) {
     const label = new LabelElement();
-    label.setText(text);
+    label.text=text;
     return label;
 }
 
 function batchCreateLabels(container) {
     const wrapper = new ContainerElement();
-    wrapper.setStyle({
+    wrapper.style={
         flexDirection: 'row',
         flexWrap: 'wrap',
-    })
+    }
     for (let i = 0; i < 2000; i++) {
         const lb = new LabelElement();
-        lb.setStyle({
+        lb.style={
             border: '1 #ccc',
             borderRadius: 10,
             marginTop: 10,
             width: 80,
             height: 20,
-        });
-        lb.setHoverStyle({
+        };
+        lb.hoverStyle={
             background: '#ccc',
-        })
-        lb.setText("label" + i);
+        }
+        lb.text = "label" + i;
         lb.bindClick(() => {
             console.log(`clicked label ${i}`)
         })
@@ -129,9 +129,9 @@ function createAddChildrenButton(container) {
 
 function createAnimationButton() {
     let animationButton = new ButtonElement();
-    animationButton.setStyle({
+    animationButton.style={
         width: 100,
-    });
+    };
     animationButton.addChild(createLabel("Animation"));
     animation_create("rotate", {
         "0": {
@@ -147,12 +147,12 @@ function createAnimationButton() {
             // transform: 'scale(2, 2)',
         }
     });
-    animationButton.setHoverStyle({
+    animationButton.hoverStyle={
         animationName: 'rotate',
         animationDuration: 1000,
         animationIterationCount: Infinity,
-    })
-    console.log("animationButtonId", animationButton.getId());
+    }
+    console.log("animationButtonId", animationButton.id);
     return animationButton;
 }
 
@@ -187,7 +187,7 @@ function main() {
     console.log("begin create window");
     const window = new Window();
     testWindowHandle(window);
-    window.setTitle("DeftDemo");
+    window.title="DeftDemo";
     window.bindResize((e) => {
         console.log("window resized", e);
     })
@@ -199,12 +199,12 @@ function main() {
     })
 
     const container = new ScrollElement();
-    container.setStyle({
+    container.style={
         background: "#2a2a2a",
         color: "#FFF",
         padding: 5,
         gap: 5,
-    })
+    }
 
     container.addChild(createAddChildrenButton(container));
     container.addChild(createAnimationButton());
@@ -213,12 +213,12 @@ function main() {
     container.addChild(createTextEdit());
     const entry = createEntry();
     container.addChild(entry);
-    assertEq(container, entry.getParent());
+    assertEq(container, entry.parent);
     container.addChild(createCenterElement());
     // batchCreateLabels(container);
-    window.setBody(container);
-    assertEq(window, container.getWindow());
-    assertEq(null, container.getParent());
+    window.body=(container);
+    assertEq(window, container.window);
+    assertEq(null, container.parent);
 }
 
 try {

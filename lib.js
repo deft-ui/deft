@@ -128,7 +128,7 @@ export class Window {
      *
      * @param element {Element}
      */
-    setBody(element) {
+    set body(element) {
         Window_set_body(this.#windowHandle, element.handle);
     }
 
@@ -136,7 +136,7 @@ export class Window {
      *
      * @param title {string}
      */
-    setTitle(title) {
+    set title(title) {
         Window_set_title(this.#windowHandle, title);
     }
 
@@ -164,7 +164,7 @@ export class Window {
      *
      * @param visible {boolean}
      */
-    setVisible(visible) {
+    set visible(visible) {
         Window_set_visible(this.#windowHandle, visible);
     }
 
@@ -416,11 +416,11 @@ export class SystemTray {
         this.#eventRegistry = new EventRegistry(this.tray, SystemTray_bind_event, SystemTray_remove_event_listener, this);
     }
 
-    setTitle(title) {
+    set title(title) {
         SystemTray_set_title(this.tray, title);
     }
 
-    setIcon(icon) {
+    set icon(icon) {
         SystemTray_set_icon(this.tray, icon);
     }
 
@@ -466,7 +466,7 @@ export class Element {
     /**
      * @type {ContainerBasedElement}
      */
-    parent
+    _parent
     /**
      * @type number
      */
@@ -528,7 +528,7 @@ export class Element {
      *
      * @returns {number}
      */
-    getId() {
+    get id() {
         return Element_get_id(this.handle)
     }
 
@@ -536,7 +536,7 @@ export class Element {
      *
      * @returns {Element | null}
      */
-    getParent() {
+    get parent() {
         const eh = Element_get_parent(this.handle);
         return Element.fromHandle(eh);
     }
@@ -545,7 +545,7 @@ export class Element {
      *
      * @returns {Element}
      */
-    getRootElement() {
+    get rootElement() {
         let p = this.getParent();
         if (p == null) {
             return this;
@@ -558,7 +558,7 @@ export class Element {
         Element_focus(this.handle);
     }
 
-    getWindow() {
+    get window() {
         const windowHandle = Element_get_window(this.handle);
         return Window.fromHandle(windowHandle);
     }
@@ -567,7 +567,7 @@ export class Element {
      *
      * @param style {StyleProps}
      */
-    setStyle(style) {
+    set style(style) {
         this.#style = style;
         Element_set_style(this.handle, style);
     }
@@ -576,19 +576,15 @@ export class Element {
      *
      * @returns {StyleProps}
      */
-    getStyle() {
+    get style() {
         return this.#style
-    }
-
-    setAnimation(animation) {
-        Element_set_animation(this.handle, animation);
     }
 
     /**
      *
      * @param style {StyleProps}
      */
-    setHoverStyle(style) {
+    set hoverStyle(style) {
         Element_set_hover_style(this.handle, style);
     }
 
@@ -596,7 +592,7 @@ export class Element {
      *
      * @param value {number}
      */
-    setScrollTop(value) {
+    set scrollTop(value) {
         Element_set_scroll_top(this.handle, value);
     }
 
@@ -604,7 +600,7 @@ export class Element {
      *
      * @param value {number}
      */
-    setScrollLeft(value) {
+    set scrollLeft(value) {
         Element_set_scroll_left(this.handle, value);
     }
 
@@ -613,7 +609,7 @@ export class Element {
      *
      * @param value {boolean}
      */
-    setDraggable(value) {
+    set draggable(value) {
         Element_set_draggable(this.handle, value);
     }
 
@@ -621,7 +617,7 @@ export class Element {
      *
      * @param value {string}
      */
-    setCursor(value) {
+    set cursor(value) {
         Element_set_cursor(this.handle, value);
     }
 
@@ -629,7 +625,7 @@ export class Element {
      *
      * @returns {[number, number]}
      */
-    getSize() {
+    get size() {
         return Element_get_size(this.handle);
     }
 
@@ -637,7 +633,7 @@ export class Element {
      *
      * @returns {[number, number]}
      */
-    getContentSize() {
+    get contentSize() {
         return Element_get_real_content_size(this.handle);
     }
 
@@ -645,7 +641,7 @@ export class Element {
      *
      * @returns {ElementRect}
      */
-    getBoundingClientRect() {
+    get boundingClientRect() {
         return Element_get_bounding_client_rect(this.handle);
     }
 
@@ -653,7 +649,7 @@ export class Element {
      *
      * @returns {number}
      */
-    getScrollTop() {
+    get scrollTop() {
         return Element_get_scroll_top(this.handle);
     }
 
@@ -661,7 +657,7 @@ export class Element {
      *
      * @returns {number}
      */
-    getScrollLeft() {
+    get scrollLeft() {
         return Element_get_scroll_left(this.handle);
     }
 
@@ -669,7 +665,7 @@ export class Element {
      *
      * @returns {number}
      */
-    getScrollHeight() {
+    get scrollHeight() {
         return Element_get_scroll_height(this.handle);
     }
 
@@ -677,7 +673,7 @@ export class Element {
      *
      * @returns {number}
      */
-    getScrollWidth() {
+    get scrollWidth() {
         return Element_scroll_width(this.handle);
     }
 
@@ -817,7 +813,7 @@ export class Element {
      *
      * @param value {boolean}
      */
-    setAutoFocus(value) {
+    set autoFocus(value) {
         Element_set_auto_focus(this.handle, value);
     }
 
@@ -887,7 +883,7 @@ export class LabelElement extends Element {
      *
      * @param wrap {boolean}
      */
-    setTextWrap(wrap) {
+    set textWrap(wrap) {
         Text_set_text_wrap(this.handle, wrap);
     }
 
@@ -895,7 +891,7 @@ export class LabelElement extends Element {
      *
      * @param text {string}
      */
-    setText(text) {
+    set text(text) {
         Text_set_text(this.handle, text);
     }
 
@@ -903,7 +899,7 @@ export class LabelElement extends Element {
      *
      * @param align {"left" | "right" | "center"}
      */
-    setAlign(align) {
+    set align(align) {
         Element_set_property(this.handle, "align", align);
     }
 
@@ -911,7 +907,7 @@ export class LabelElement extends Element {
      *
      * @param selection {number[]}
      */
-    setSelection(selection) {
+    set selection(selection) {
         Text_set_selection(this.handle, selection);
     }
 
@@ -1043,7 +1039,7 @@ export class ParagraphElement extends Element {
      *
      * @returns {string | undefined}
      */
-    getSelectionText() {
+    get selectionText() {
         return Paragraph_get_selection_text(this.#paragraph);
     }
 
@@ -1053,7 +1049,7 @@ export class ImageElement extends Element {
     constructor() {
         super(VT_IMAGE);
     }
-    setSrc(src) {
+    set src(src) {
         Image_set_src(this.handle, src);
     }
 }
@@ -1068,7 +1064,7 @@ export class EntryElement extends Element {
      *
      * @param align {"left"|"right"|"center"}
      */
-    setAlign(align) {
+    set align(align) {
         Element_set_property(this.handle, "align", align);
     }
 
@@ -1076,7 +1072,7 @@ export class EntryElement extends Element {
      *
      * @param text {string}
      */
-    setText(text) {
+    set text(text) {
         Entry_set_text(this.handle, text);
     }
 
@@ -1101,7 +1097,7 @@ export class EntryElement extends Element {
      *
      * @param multipleLine {boolean}
      */
-    setMultipleLine(multipleLine) {
+    set multipleLine(multipleLine) {
         Entry_set_multiple_line(this.handle, multipleLine)
         // Element_set_property(this.el, "multipleline", String(multipleLine));
     }
@@ -1110,7 +1106,7 @@ export class EntryElement extends Element {
      *
      * @param value {boolean}
      */
-    setAutoHeight(value) {
+    set autoHeight(value) {
         Entry_set_auto_height(this.handle, value);
     }
 
@@ -1118,7 +1114,7 @@ export class EntryElement extends Element {
      *
      * @returns {string}
      */
-    getText() {
+    get text() {
         return Entry_get_text(this.handle);
     }
 
@@ -1126,7 +1122,7 @@ export class EntryElement extends Element {
      *
      * @param rows {number}
      */
-    setRows(rows) {
+    set rows(rows) {
         Entry_set_rows(this.handle, rows);
     }
 
@@ -1145,7 +1141,7 @@ export class TextEditElement extends Element {
      *
      * @param align {"left"|"right"|"center"}
      */
-    setAlign(align) {
+    set align(align) {
         Element_set_property(this.handle, "align", align);
     }
 
@@ -1153,7 +1149,7 @@ export class TextEditElement extends Element {
      *
      * @param text {string}
      */
-    setText(text) {
+    set text(text) {
         Element_set_property(this.handle, "text", text);
     }
 
@@ -1161,7 +1157,7 @@ export class TextEditElement extends Element {
      *
      * @returns {string}
      */
-    getText() {
+    get text() {
         return Element_get_property(this.handle, "text");
     }
 
@@ -1169,7 +1165,7 @@ export class TextEditElement extends Element {
      *
      * @param selection {[number, number]}
      */
-    setSelection(selection) {
+    set selection(selection) {
         Element_set_property(this.handle, "selection", selection);
     }
 
@@ -1177,7 +1173,7 @@ export class TextEditElement extends Element {
      *
      * @param caret {number}
      */
-    setCaret(caret) {
+    set caret(caret) {
         Element_set_property(this.handle, "caret", caret);
     }
 
@@ -1208,7 +1204,7 @@ class ContainerBasedElement extends Element {
      * @param index {number}
      */
     addChild(child, index= -1) {
-        if (child.parent === this) {
+        if (child._parent === this) {
             const oldIndex = this.#children.indexOf(child);
             if (oldIndex === index) {
                 return;
@@ -1218,10 +1214,10 @@ class ContainerBasedElement extends Element {
             this.addChild(child, index);
             return;
         }
-        if (child.parent) {
-            child.parent.removeChild(child);
+        if (child._parent) {
+            child._parent.removeChild(child);
         }
-        child.parent = this;
+        child._parent = this;
         if (typeof index === "number" && index >= 0 && index < this.#children.length) {
             Element_add_child(this.handle, child.handle, index);
             this.#children.splice(index, 0, child);
@@ -1262,7 +1258,7 @@ class ContainerBasedElement extends Element {
     removeChild(child) {
         const index = this.#children.indexOf(child);
         if (index >= 0) {
-            child.parent = null;
+            child._parent = null;
             Element_remove_child(this.handle, index);
             this.#children.splice(index, 1);
         } else {
@@ -1292,7 +1288,7 @@ export class ScrollElement extends ContainerBasedElement {
      *
      * @param value {"auto"|"always"|"never"}
      */
-    setScrollX(value) {
+    set scrollX(value) {
         Scroll_set_scroll_x(this.handle, value);
     }
 
@@ -1300,7 +1296,7 @@ export class ScrollElement extends ContainerBasedElement {
      *
      * @param value {"auto"|"always"|"never"}
      */
-    setScrollY(value) {
+    set scrollY(value) {
         Scroll_set_scroll_y(this.handle, value);
     }
 

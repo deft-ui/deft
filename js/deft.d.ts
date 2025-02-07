@@ -317,12 +317,12 @@ declare class Window {
      *
      * @param element {Element}
      */
-    setBody(element: Element): void;
+    set body(element: Element);
     /**
      *
      * @param title {string}
      */
-    setTitle(title: string): void;
+    set title(title: string);
     /**
      *
      * @param size {Size}
@@ -338,7 +338,7 @@ declare class Window {
      *
      * @param visible {boolean}
      */
-    setVisible(visible: boolean): void;
+    set visible(visible: boolean);
     requestFullscreen(): void;
     exitFullscreen(): void;
     /**
@@ -417,8 +417,8 @@ declare class EventBinder {
 }
 declare class SystemTray {
     tray: any;
-    setTitle(title: any): void;
-    setIcon(icon: any): void;
+    set title(title: any);
+    set icon(icon: any);
     /**
      *
      * @param menus {TrayMenu[]}
@@ -439,7 +439,7 @@ declare class Element {
     /**
      * @type {ContainerBasedElement}
      */
-    parent: ContainerBasedElement;
+    _parent: ContainerBasedElement;
     /**
      * @type number
      */
@@ -449,90 +449,89 @@ declare class Element {
      *
      * @returns {number}
      */
-    getId(): number;
+    get id(): number;
     /**
      *
      * @returns {Element | null}
      */
-    getParent(): Element | null;
+    get parent(): Element | null;
     /**
      *
      * @returns {Element}
      */
-    getRootElement(): Element;
+    get rootElement(): Element;
     focus(): void;
-    getWindow(): Window;
+    get window(): Window;
     /**
      *
      * @param style {StyleProps}
      */
-    setStyle(style: StyleProps): void;
+    set style(style: StyleProps);
     /**
      *
      * @returns {StyleProps}
      */
-    getStyle(): StyleProps;
-    setAnimation(animation: any): void;
+    get style(): StyleProps;
     /**
      *
      * @param style {StyleProps}
      */
-    setHoverStyle(style: StyleProps): void;
+    set hoverStyle(style: StyleProps);
     /**
      *
      * @param value {number}
      */
-    setScrollTop(value: number): void;
+    set scrollTop(value: number);
+    /**
+     *
+     * @returns {number}
+     */
+    get scrollTop(): number;
     /**
      *
      * @param value {number}
      */
-    setScrollLeft(value: number): void;
+    set scrollLeft(value: number);
+    /**
+     *
+     * @returns {number}
+     */
+    get scrollLeft(): number;
     /**
      *
      * @param value {boolean}
      */
-    setDraggable(value: boolean): void;
+    set draggable(value: boolean);
     /**
      *
      * @param value {string}
      */
-    setCursor(value: string): void;
+    set cursor(value: string);
     /**
      *
      * @returns {[number, number]}
      */
-    getSize(): [number, number];
+    get size(): [number, number];
     /**
      *
      * @returns {[number, number]}
      */
-    getContentSize(): [number, number];
+    get contentSize(): [number, number];
     /**
      *
      * @returns {ElementRect}
      */
-    getBoundingClientRect(): ElementRect;
+    get boundingClientRect(): ElementRect;
     /**
      *
      * @returns {number}
      */
-    getScrollTop(): number;
+    get scrollHeight(): number;
     /**
      *
      * @returns {number}
      */
-    getScrollLeft(): number;
-    /**
-     *
-     * @returns {number}
-     */
-    getScrollHeight(): number;
-    /**
-     *
-     * @returns {number}
-     */
-    getScrollWidth(): number;
+    get scrollWidth(): number;
     /**
      *
      * @param callback {(event: IBoundsChangeEvent) => void}
@@ -600,7 +599,7 @@ declare class Element {
      *
      * @param value {boolean}
      */
-    setAutoFocus(value: boolean): void;
+    set autoFocus(value: boolean);
     toString(): string;
     
 }
@@ -626,22 +625,22 @@ declare class LabelElement extends Element {
      *
      * @param wrap {boolean}
      */
-    setTextWrap(wrap: boolean): void;
+    set textWrap(wrap: boolean);
     /**
      *
      * @param text {string}
      */
-    setText(text: string): void;
+    set text(text: string);
     /**
      *
      * @param align {"left" | "right" | "center"}
      */
-    setAlign(align: "left" | "right" | "center"): void;
+    set align(align: "left" | "right" | "center");
     /**
      *
      * @param selection {number[]}
      */
-    setSelection(selection: number[]): void;
+    set selection(selection: number[]);
     /**
      *
      * @param startCaretOffset {number}
@@ -726,12 +725,12 @@ declare class ParagraphElement extends Element {
      *
      * @returns {string | undefined}
      */
-    getSelectionText(): string | undefined;
+    get selectionText(): string | undefined;
     
 }
 declare class ImageElement extends Element {
     constructor();
-    setSrc(src: any): void;
+    set src(src: any);
 }
 declare class EntryElement extends Element {
     constructor();
@@ -739,12 +738,17 @@ declare class EntryElement extends Element {
      *
      * @param align {"left"|"right"|"center"}
      */
-    setAlign(align: "left" | "right" | "center"): void;
+    set align(align: "left" | "right" | "center");
     /**
      *
      * @param text {string}
      */
-    setText(text: string): void;
+    set text(text: string);
+    /**
+     *
+     * @returns {string}
+     */
+    get text(): string;
     /**
      *
      * @param start {number}
@@ -760,22 +764,17 @@ declare class EntryElement extends Element {
      *
      * @param multipleLine {boolean}
      */
-    setMultipleLine(multipleLine: boolean): void;
+    set multipleLine(multipleLine: boolean);
     /**
      *
      * @param value {boolean}
      */
-    setAutoHeight(value: boolean): void;
-    /**
-     *
-     * @returns {string}
-     */
-    getText(): string;
+    set autoHeight(value: boolean);
     /**
      *
      * @param rows {number}
      */
-    setRows(rows: number): void;
+    set rows(rows: number);
     bindTextChange(callback: any): void;
 }
 declare class TextEditElement extends Element {
@@ -784,27 +783,27 @@ declare class TextEditElement extends Element {
      *
      * @param align {"left"|"right"|"center"}
      */
-    setAlign(align: "left" | "right" | "center"): void;
+    set align(align: "left" | "right" | "center");
     /**
      *
      * @param text {string}
      */
-    setText(text: string): void;
+    set text(text: string);
     /**
      *
      * @returns {string}
      */
-    getText(): string;
+    get text(): string;
     /**
      *
      * @param selection {[number, number]}
      */
-    setSelection(selection: [number, number]): void;
+    set selection(selection: [number, number]);
     /**
      *
      * @param caret {number}
      */
-    setCaret(caret: number): void;
+    set caret(caret: number);
     /**
      *
      * @param top {number}
@@ -825,12 +824,12 @@ declare class ScrollElement extends ContainerBasedElement {
      *
      * @param value {"auto"|"always"|"never"}
      */
-    setScrollX(value: "auto" | "always" | "never"): void;
+    set scrollX(value: "auto" | "always" | "never");
     /**
      *
      * @param value {"auto"|"always"|"never"}
      */
-    setScrollY(value: "auto" | "always" | "never"): void;
+    set scrollY(value: "auto" | "always" | "never");
     scrollBy(value: any): void;
 }
 declare class WebSocket {
