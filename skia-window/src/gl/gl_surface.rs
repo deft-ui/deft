@@ -98,7 +98,7 @@ impl SurfaceState {
     }
 
 
-    pub fn new(event_loop: &ActiveEventLoop, window: Window) -> SurfaceState {
+    pub fn new(event_loop: &ActiveEventLoop, window: Window) -> Option<SurfaceState> {
         let raw_display_handle = event_loop.raw_display_handle();
         let raw_window_handle = window.raw_window_handle();
 
@@ -109,7 +109,7 @@ impl SurfaceState {
         let config = unsafe {
             glutin_display
                 .find_configs(template)
-                .unwrap()
+                .ok()?
                 .reduce(|accum, config| {
                     // Find the config with the maximum number of samples.
                     //
@@ -124,8 +124,7 @@ impl SurfaceState {
                     } else {
                         accum
                     }
-                })
-                .unwrap()
+                })?
         };
         println!("Picked a config with {} samples", config.num_samples());
 
@@ -135,13 +134,13 @@ impl SurfaceState {
         let raw_window_handle = window.raw_window_handle();
         let attrs = SurfaceAttributesBuilder::<WindowSurface>::new().build(
             raw_window_handle,
-            NonZeroU32::new(width).unwrap(),
-            NonZeroU32::new(height).unwrap(),
+            NonZeroU32::new(width)?,
+            NonZeroU32::new(height)?,
         );
         let surface = unsafe {
             glutin_display
                 .create_window_surface(&config, &attrs)
-                .unwrap()
+                .ok()?
         };
 
         let not_current_context =
@@ -149,9 +148,9 @@ impl SurfaceState {
         let context = not_current_context
             .make_current(&surface)
             .expect("Failed to make GL context current");
-        let render = GlRenderer::new(&glutin_display, &window, surface, context);
+        let render = GlRenderer::new(&glutin_display, &window, surface, context)?;
 
-        SurfaceState { window, glutin_display, render }
+        Some(SurfaceState { window, glutin_display, render })
     }
 }
 

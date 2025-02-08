@@ -16,27 +16,27 @@ pub struct SkiaWindow {
     surface_state: Box<dyn RenderBackend>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum RenderBackendType {
     SoftBuffer,
     GL,
 }
 
 impl SkiaWindow {
-    pub fn new(event_loop: &ActiveEventLoop, attributes: WindowAttributes, backend: RenderBackendType) -> Self {
+    pub fn new(event_loop: &ActiveEventLoop, attributes: WindowAttributes, backend: RenderBackendType) -> Option<Self> {
         let window = event_loop.create_window(attributes).unwrap();
         let surface_state: Box<dyn RenderBackend> = match backend {
             RenderBackendType::SoftBuffer => {
                 #[cfg(target_os = "android")]
-                panic!("Android does not support this backend!");
+                return None;
                 #[cfg(not(target_os = "android"))]
                 Box::new(SoftSurface::new(event_loop, window))
             }
             RenderBackendType::GL => {
-                Box::new(SurfaceState::new(event_loop, window))
+                Box::new(SurfaceState::new(event_loop, window)?)
             }
         };
-        Self { surface_state }
+        Some(Self { surface_state })
     }
 
     pub fn resize_surface(&mut self, width: u32, height: u32) {

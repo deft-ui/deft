@@ -60,7 +60,7 @@ struct GlContext {
 unsafe impl Send for GlContext {}
 
 impl GlRenderer {
-    pub fn new(gl_display: &Display, window: &Window, gl_surface: glutin::surface::Surface<WindowSurface>, context: PossiblyCurrentContext) -> Self {
+    pub fn new(gl_display: &Display, window: &Window, gl_surface: glutin::surface::Surface<WindowSurface>, context: PossiblyCurrentContext) -> Option<Self> {
         unsafe {
             gl::load_with(|s| {
                 gl_display
@@ -71,7 +71,9 @@ impl GlRenderer {
                 .with_alpha_size(8)
                 .with_transparency(false).build();
 
-            let configs = gl_display.find_configs(template).unwrap();
+            let configs = gl_display
+                .find_configs(template)
+                .ok()?;
             let gl_config = configs.reduce(|accum, config| {
                 let transparency_check = config.supports_transparency().unwrap_or(false)
                     & !accum.supports_transparency().unwrap_or(false);
@@ -81,8 +83,7 @@ impl GlRenderer {
                 } else {
                     accum
                 }
-            })
-                .unwrap();
+            })?;
 
 
             let interface = gpu::gl::Interface::new_load_with(|name| {
@@ -129,8 +130,8 @@ impl GlRenderer {
                 Self::create_surface(size.0, size.1, &mut gr_context, &surface_params)
             };
 
-            let context = context.make_not_current().unwrap().treat_as_possibly_current();
-            let render_context = GlRenderContext { gr_context: gr_context };
+            let context = context.make_not_current().ok()?.treat_as_possibly_current();
+            let render_context = GlRenderContext { gr_context };
             let context =  GlContext {
                 surface,
                 gl_surface,
@@ -165,7 +166,7 @@ impl GlRenderer {
                 });
             }
 
-            Self { sender, render_context_wrapper }
+            Some(Self { sender, render_context_wrapper })
         }
     }
 

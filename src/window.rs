@@ -1077,14 +1077,35 @@ impl Window {
     fn create_window(attributes: WindowAttributes) -> SkiaWindow {
         run_with_event_loop(|el| {
             //TODO support RenderBackedType parameter
-            let default_backend_type = "gl";
-            let backend_type_str = env::var("renderer").unwrap_or(default_backend_type.to_string());
-            let backend_type = match backend_type_str.as_str() {
-                "softbuffer" => RenderBackendType::SoftBuffer,
-                _ => RenderBackendType::GL,
-            };
-            println!("render backend: {:?}", backend_type);
-            SkiaWindow::new(el, attributes, backend_type)
+            let mut backend_types = vec![
+                RenderBackendType::GL,
+                RenderBackendType::SoftBuffer,
+            ];
+            if let Ok(backend_type_str) = env::var("DEFT_RENDERERS") {
+                backend_types.clear();
+                for bt_str in backend_type_str.split(",") {
+                    let bt = match bt_str.to_lowercase().as_str() {
+                        "softbuffer" => Some(RenderBackendType::SoftBuffer),
+                        "gl" => Some(RenderBackendType::GL),
+                        _ => None,
+                    };
+                    if let Some(bt) = bt {
+                        backend_types.push(bt);
+                    }
+                }
+            }
+            println!("render backends: {:?}", backend_types);
+            for bt in &backend_types {
+                let mut init_attributes = attributes.clone().with_visible(false);
+                if let Some(mut sw) = SkiaWindow::new(el, init_attributes, *bt) {
+                    if attributes.visible {
+                        sw.set_visible(true);
+                    }
+                    println!("created window with backend {:?}", bt);
+                    return sw;
+                }
+            }
+            panic!("Failed to create window with backends: {:?}", backend_types);
         })
     }
 
