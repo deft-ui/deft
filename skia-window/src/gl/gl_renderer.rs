@@ -92,11 +92,9 @@ impl GlRenderer {
                 }
                 gl_display
                     .get_proc_address(CString::new(name).unwrap().as_c_str())
-            })
-                .expect("Could not create interface");
+            })?;
 
-            let mut gr_context = gpu::direct_contexts::make_gl(interface, None)
-                .expect("Could not create direct context");
+            let mut gr_context = gpu::direct_contexts::make_gl(interface, None)?;
 
             let fb_info = {
                 let mut fboid: GLint = 0;
