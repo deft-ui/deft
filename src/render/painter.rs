@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::mem;
-use skia_safe::{Canvas, ClipOp, Color, Image, Matrix, Paint, PaintStyle, Rect};
+use skia_safe::{Canvas, ClipOp, Color, FilterMode, Image, Matrix, Paint, PaintStyle, Rect, SamplingOptions};
+use skia_safe::canvas::SetMatrix;
 use skia_window::context::RenderContext;
 use crate::canvas_util::CanvasHelper;
 use crate::paint::{InvalidRects, LayerState, RenderLayerKey};
@@ -103,7 +104,10 @@ impl ElementPainter {
             canvas.save();
             canvas.translate((layer.surface_bounds.left, layer.surface_bounds.top));
             canvas.scale((1.0 / self.scale, 1.0 / self.scale));
-            canvas.draw_image(img, (0.0, 0.0), None);
+            let mut options = SamplingOptions::default();
+            //TODO use Nearest?
+            options.filter = FilterMode::Linear;
+            canvas.draw_image_with_sampling_options(img, (0.0, 0.0), options, None);
             canvas.restore();
 
             if show_repaint_area() {
@@ -157,6 +161,7 @@ impl ElementPainter {
                     let mut temp_gl = context.create_layer(surface_width, surface_height).unwrap();
                     temp_gl.canvas().session(|canvas| {
                         // canvas.clip_rect(&Rect::new(0.0, 0.0, layer.width * scale, layer.height * scale), ClipOp::Intersect, false);
+                        canvas.clear(Color::TRANSPARENT);
                         canvas.draw_image(&ogl_state.layer.as_image(), (-scroll_delta_x * scale, -scroll_delta_y * scale), None);
                     });
                     context.flush();
@@ -206,6 +211,7 @@ impl ElementPainter {
         self.layer_state_map.insert(layer.key.clone(), graphic_layer);
 
         root_canvas.save();
+        let old_total_matrix = root_canvas.local_to_device();
         root_canvas.concat(&layer.total_matrix);
         if let Some(clip_rect) = &layer.clip_rect {
             root_canvas.clip_rect(&clip_rect, ClipOp::Intersect, false);
@@ -216,7 +222,7 @@ impl ElementPainter {
         }
         self.submit_layer(root_canvas, context, layer);
         context.flush();
-        root_canvas.concat(&layer.total_matrix.invert().unwrap());
+        root_canvas.set_matrix(&old_total_matrix);
 
         for l in &mut layer.layer_nodes {
             self.draw_layer(root_canvas, context, l, layer_state_map);
