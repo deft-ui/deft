@@ -137,6 +137,11 @@ impl Element {
         self.draggable = draggable;
     }
 
+    #[js_func]
+    pub fn get_draggable(&mut self) -> bool {
+        self.draggable
+    }
+
     pub fn is_draggable(&self) -> bool {
         self.draggable
     }
@@ -241,6 +246,11 @@ impl Element {
     }
 
     #[js_func]
+    pub fn get_cursor(&self) -> CursorIcon {
+        self.cursor
+    }
+
+    #[js_func]
     pub fn scroll_by(&mut self, option: ScrollByOption) {
         let mut el = self.clone();
         if option.x != 0.0 {
@@ -249,10 +259,6 @@ impl Element {
         if option.y != 0.0 {
             el.set_scroll_top(el.scroll_top + option.y);
         }
-    }
-
-    pub fn get_cursor(&self) -> CursorIcon {
-        self.cursor
     }
 
     pub fn get_max_scroll_left(&self) -> f32 {
@@ -444,6 +450,11 @@ impl Element {
     #[js_func]
     pub fn set_auto_focus(&mut self, auto_focus: bool) {
         self.auto_focus = auto_focus;
+    }
+
+    #[js_func]
+    pub fn get_auto_focus(&mut self) -> bool {
+        self.auto_focus
     }
 
     fn compute_length(&self, length: StyleUnit, parent_length: Option<f32>) -> Option<f32> {

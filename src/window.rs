@@ -339,6 +339,11 @@ impl Window {
     }
 
     #[js_func]
+    pub fn is_visible(&self) -> Option<bool> {
+        self.window.is_visible()
+    }
+
+    #[js_func]
     fn request_fullscreen(&mut self) {
         self.window.set_fullscreen(Some(Fullscreen::Borderless(None)));
     }
@@ -906,8 +911,18 @@ impl Window {
     }
 
     #[js_func]
+    pub fn get_body(&self) -> Option<Element> {
+        self.body.clone()
+    }
+
+    #[js_func]
     pub fn set_title(&mut self, title: String) {
         self.window.set_title(&title);
+    }
+
+    #[js_func]
+    pub fn get_title(&self) -> String {
+        self.window.title()
     }
 
     #[js_func]

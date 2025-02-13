@@ -1,6 +1,7 @@
 use std::env;
 use std::future::Future;
 use std::ops::{Deref, DerefMut};
+use std::str::FromStr;
 use anyhow::Error;
 use quick_js::{Context, ExecutionError, JsPromise, JsValue, ValueError};
 use skia_safe::textlayout::TextAlign;
@@ -10,7 +11,6 @@ use winit::event_loop::EventLoopProxy;
 use winit::window::CursorIcon;
 use crate::app::{AppEvent};
 use crate::base::UnsafeFnOnce;
-use crate::cursor::parse_cursor;
 use crate::js::js_value_util::JsValueHelper;
 use crate::element::label::parse_align;
 use crate::js::{ToJsCallResult};
@@ -283,8 +283,14 @@ impl FromJsValue for (usize, usize) {
 impl crate::js::js_binding::FromJsValue for CursorIcon {
     fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
         match value {
-            JsValue::String(str) => parse_cursor(&str).ok_or_else(|| ValueError::UnexpectedType),
+            JsValue::String(str) => CursorIcon::from_str(&str).map_err(|_e| ValueError::UnexpectedType),
             _ => Err(ValueError::UnexpectedType),
         }
+    }
+}
+
+impl crate::js::js_binding::ToJsValue for CursorIcon {
+    fn to_js_value(self) -> Result<JsValue, ValueError> {
+        Ok(JsValue::String(self.name().to_string()))
     }
 }

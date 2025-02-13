@@ -320,9 +320,19 @@ declare class Window {
     set body(element: Element);
     /**
      *
+     * @returns {Element}
+     */
+    get body(): Element;
+    /**
+     *
      * @param title {string}
      */
     set title(title: string);
+    /**
+     *
+     * @returns {string}
+     */
+    get title(): string;
     /**
      *
      * @param size {Size}
@@ -339,6 +349,7 @@ declare class Window {
      * @param visible {boolean}
      */
     set visible(visible: boolean);
+    get visible(): boolean;
     requestFullscreen(): void;
     exitFullscreen(): void;
     /**
@@ -477,6 +488,7 @@ declare class Element {
      * @param style {StyleProps}
      */
     set hoverStyle(style: StyleProps);
+    get hoverStyle(): StyleProps;
     /**
      *
      * @param value {number}
@@ -502,6 +514,7 @@ declare class Element {
      * @param value {boolean}
      */
     set draggable(value: boolean);
+    get draggable(): boolean;
     /**
      *
      * @param value {string}
@@ -600,6 +613,11 @@ declare class Element {
      * @param value {boolean}
      */
     set autoFocus(value: boolean);
+    /**
+     *
+     * @returns {boolean}
+     */
+    get autoFocus(): boolean;
     toString(): string;
     
 }

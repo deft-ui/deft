@@ -134,10 +134,27 @@ export class Window {
 
     /**
      *
+     * @returns {Element}
+     */
+    get body() {
+        const handle = Window_get_body(this.#windowHandle);
+        return Element.fromHandle(handle);
+    }
+
+    /**
+     *
      * @param title {string}
      */
     set title(title) {
         Window_set_title(this.#windowHandle, title);
+    }
+
+    /**
+     *
+     * @returns {string}
+     */
+    get title() {
+        return Window_get_title(this.#windowHandle);
     }
 
     /**
@@ -166,6 +183,10 @@ export class Window {
      */
     set visible(visible) {
         Window_set_visible(this.#windowHandle, visible);
+    }
+
+    get visible() {
+        return Window_is_visible(this.#windowHandle);
     }
 
     requestFullscreen() {
@@ -478,6 +499,11 @@ export class Element {
     #style
 
     /**
+     * @type {StyleProps}
+     */
+    #hoverStyle
+
+    /**
      * @type EventBinder
      */
     #eventBinder;
@@ -585,7 +611,12 @@ export class Element {
      * @param style {StyleProps}
      */
     set hoverStyle(style) {
+        this.#hoverStyle = style;
         Element_set_hover_style(this.handle, style);
+    }
+
+    get hoverStyle() {
+        return this.#hoverStyle;
     }
 
     /**
@@ -594,6 +625,14 @@ export class Element {
      */
     set scrollTop(value) {
         Element_set_scroll_top(this.handle, value);
+    }
+
+    /**
+     *
+     * @returns {number}
+     */
+    get scrollTop() {
+        return Element_get_scroll_top(this.handle);
     }
 
     /**
@@ -611,6 +650,10 @@ export class Element {
      */
     set draggable(value) {
         Element_set_draggable(this.handle, value);
+    }
+
+    get draggable() {
+        return Element_get_draggable(this.handle);
     }
 
     /**
@@ -643,14 +686,6 @@ export class Element {
      */
     getBoundingClientRect() {
         return Element_get_bounding_client_rect(this.handle);
-    }
-
-    /**
-     *
-     * @returns {number}
-     */
-    get scrollTop() {
-        return Element_get_scroll_top(this.handle);
     }
 
     /**
@@ -816,6 +851,15 @@ export class Element {
     set autoFocus(value) {
         Element_set_auto_focus(this.handle, value);
     }
+
+    /**
+     *
+     * @returns {boolean}
+     */
+    get autoFocus() {
+        return Element_get_auto_focus(this.handle);
+    }
+
 
     toString() {
         return this.handle + "@" + this.constructor.name
