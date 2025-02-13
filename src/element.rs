@@ -24,7 +24,7 @@ use crate::element::image::Image;
 use crate::element::scroll::Scroll;
 use crate::element::text::Text;
 use crate::element::textedit::TextEdit;
-use crate::event::{DragOverEventListener, BlurEventListener, BoundsChangeEventListener, CaretChangeEventListener, ClickEventListener, DragStartEventListener, DropEventListener, FocusEventListener, FocusShiftEventListener, KeyDownEventListener, KeyUpEventListener, MouseDownEventListener, MouseEnterEvent, MouseEnterEventListener, MouseLeaveEvent, MouseLeaveEventListener, MouseMoveEventListener, MouseUpEventListener, MouseWheelEventListener, ScrollEvent, ScrollEventListener, TextChangeEventListener, TextUpdateEventListener, TouchCancelEventListener, TouchEndEventListener, TouchMoveEventListener, TouchStartEventListener, BoundsChangeEvent, ContextMenuEventListener};
+use crate::event::{DragOverEventListener, BlurEventListener, BoundsChangeEventListener, CaretChangeEventListener, ClickEventListener, DragStartEventListener, DropEventListener, FocusEventListener, FocusShiftEventListener, KeyDownEventListener, KeyUpEventListener, MouseDownEventListener, MouseEnterEvent, MouseEnterEventListener, MouseLeaveEvent, MouseLeaveEventListener, MouseMoveEventListener, MouseUpEventListener, MouseWheelEventListener, ScrollEvent, ScrollEventListener, TextChangeEventListener, TextUpdateEventListener, TouchCancelEventListener, TouchEndEventListener, TouchMoveEventListener, TouchStartEventListener, BoundsChangeEvent, ContextMenuEventListener, MouseDownEvent, TouchStartEvent};
 use crate::event_loop::{create_event_loop_callback};
 use crate::ext::ext_window::{ELEMENT_TYPE_BUTTON, ELEMENT_TYPE_CONTAINER, ELEMENT_TYPE_ENTRY, ELEMENT_TYPE_IMAGE, ELEMENT_TYPE_LABEL, ELEMENT_TYPE_SCROLL, ELEMENT_TYPE_TEXT_EDIT};
 use crate::window::{Window, WindowWeak};
@@ -759,6 +759,15 @@ impl Element {
     }
 
     fn handle_default_behavior(&mut self, event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) {
+        if event.downcast_ref::<MouseDownEvent>().is_some() || event.downcast_ref::<TouchStartEvent>().is_some() {
+            if self.as_weak() == ctx.target {
+                if let Some(win) = self.get_window() {
+                    if let Ok(mut win) = win.upgrade_mut() {
+                        win.focus(self.clone());
+                    }
+                }
+            }
+        }
         if !self.backend.execute_default_behavior(event, ctx) {
             if let Some(mut p) = self.get_parent() {
                 p.handle_default_behavior(event, ctx);

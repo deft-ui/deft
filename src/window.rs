@@ -655,7 +655,6 @@ impl Window {
             };
             match state {
                 ElementState::Pressed => {
-                    self.focus(node.clone());
                     self.pressing = Some((node.clone(), MouseDownInfo {button, window_x, window_y}));
                     self.emit_mouse_event( &mut node, event_type, button, window_x, window_y, screen_x, screen_y);
                 }
@@ -760,7 +759,6 @@ impl Window {
                         && SystemTime::now().duration_since(self.touching.start_time).unwrap().as_millis() < 1000
                     {
                         let mut node = node.clone();
-                        self.focus(node.clone());
                         println!("clicked");
                         //TODO fix screen_x, screen_y
                         self.emit_mouse_event( &mut node, MouseClick, 0, window_x, window_y, 0.0, 0.0);
@@ -777,6 +775,7 @@ impl Window {
     pub fn focus(&mut self, mut node: Element) {
         let focusing = Some(node.clone());
         if self.focusing != focusing {
+            // println!("focusing {:?}", node.get_id());
             if let Some(old_focusing) = &mut self.focusing {
                 old_focusing.emit(BlurEvent);
 
