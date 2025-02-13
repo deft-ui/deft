@@ -16,6 +16,7 @@ use glutin::context::PossiblyCurrentContext;
 use glutin::display::{Display, GetGlDisplay};
 use glutin::prelude::*;
 use glutin::surface::{SurfaceAttributesBuilder, SwapInterval, WindowSurface};
+use log::info;
 use measure_time::print_time;
 use raw_window_handle::HasRawWindowHandle;
 use skia_safe::{Canvas, ColorType, gpu, Surface, EncodedImageFormat, Image, AlphaType};
@@ -151,7 +152,10 @@ impl GlRenderer {
                 thread::spawn(move || {
                     render_context_wrapper.make_current();
                     loop {
-                        let msg = receiver.recv().unwrap();
+                        let msg = match receiver.recv() {
+                            Ok(msg) => msg,
+                            Err(_) => break,
+                        };
                         match msg {
                             RenderMsg::Updated => {
                                 render_context_wrapper.update();
@@ -161,6 +165,7 @@ impl GlRenderer {
                             }
                         }
                     }
+                    info!("GlRenderer thread stopped");
                 });
             }
 
