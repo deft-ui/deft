@@ -397,8 +397,8 @@ export class EventBinder {
          * @private
          */
         function eventCallback(detail, target) {
-            const event = new EventObject(type, detail, getJsContext(target), self);
             try {
+                const event = new EventObject(type, detail, getJsContext(target), self);
                 callback && callback(event);
             } catch (error) {
                 console.error(`${type} event handling error, detail=`, detail ,error.message || error);
@@ -543,10 +543,7 @@ export class Element {
             }
         }
         return new EventBinder(target, addEventListenerApi, removeEventListenerApi, this, (target) => {
-            const myContext = Element_get_js_context(target);
-            if (myContext) {
-                return CONTEXT2ELEMENT.get(myContext);
-            }
+            return Element.fromHandle(target);
         });
     }
 
