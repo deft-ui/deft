@@ -39,7 +39,8 @@ use winit::dpi::{LogicalPosition, LogicalSize, Position, Size};
 use winit::error::ExternalError;
 use winit::event::{ElementState, Ime, Modifiers, MouseButton, MouseScrollDelta, TouchPhase, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
-use winit::keyboard::{Key, NamedKey};
+use winit::keyboard::{Key, NamedKey, PhysicalKey};
+use winit::platform::scancode::PhysicalKeyExtScancode;
 #[cfg(x11_platform)]
 use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorGrabMode, CursorIcon, Fullscreen, WindowAttributes, WindowId};
@@ -379,6 +380,7 @@ impl Window {
 
     pub fn handle_key(
         &mut self, modifiers: u32,
+        scancode: Option<u32>,
         named_key: Option<NamedKey>,
         key: Option<String>,
         key_str: Option<String>,
@@ -386,7 +388,8 @@ impl Window {
         pressed: bool,
     ) {
         let detail = KeyEventDetail {
-            modifiers ,
+            scancode,
+            modifiers,
             ctrl_key: modifiers & KEY_MOD_CTRL != 0 ,
             alt_key:  modifiers & KEY_MOD_ALT != 0,
             meta_key: modifiers & KEY_MOD_META != 0,
@@ -432,6 +435,10 @@ impl Window {
                 event,
                 ..
             } => {
+                let scancode = match event.physical_key {
+                    PhysicalKey::Code(c) => c.to_scancode(),
+                    PhysicalKey::Unidentified(e) => None,
+                };
                 let key = match &event.logical_key {
                     Key::Named(n) => {Some(named_key_to_str(n).to_string())},
                     Key::Character(c) => Some(c.as_str().to_string()),
@@ -462,7 +469,7 @@ impl Window {
                 }
                 let repeat =  event.repeat;
                 let pressed = event.state == ElementState::Pressed;
-                self.handle_key(modifiers, named_key, key, key_str, repeat, pressed);
+                self.handle_key(modifiers, scancode, named_key, key, key_str, repeat, pressed);
             }
             WindowEvent::MouseInput { button, state, .. } => {
                 // println!("mouse:{:?}:{:?}", button, state);
@@ -1192,7 +1199,8 @@ pub fn window_send_key(window_id: i32, key: &str, pressed: bool) {
     if let Some(k) = str_to_named_key(&key) {
         WINDOWS.with_borrow_mut(|m| {
             if let Some(f) = m.get_mut(&window_id) {
-                f.handle_key(0, Some(k), Some(key.to_string()), None, false, pressed);
+                //FIXME scancode
+                f.handle_key(0, None, Some(k), Some(key.to_string()), None, false, pressed);
             }
         });
     }

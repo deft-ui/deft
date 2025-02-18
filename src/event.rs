@@ -15,6 +15,7 @@ pub const KEY_MOD_SHIFT: u32 = 0x1 << 3;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyEventDetail {
+    pub scancode: Option<u32>,
     pub modifiers: u32,
     pub ctrl_key: bool,
     pub alt_key: bool,
