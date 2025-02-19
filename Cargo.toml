@@ -4,13 +4,13 @@ readme = "README.md"
 license = "MIT"
 description = "Cross platform ui framework"
 
-version = "0.2.7"
+version = "0.2.8"
 authors = ["KasonYang <me@kason.fun>"]
 edition = "2021"
 
 
 [dependencies]
-deft-macros = { path = "packages/deft-macros", version = "0.2.0" }
+deft-macros = { path = "packages/deft-macros", version = "0.2.1" }
 
 quick-js = { package = "deft-quick-js", version = "0.5.0"}
 yoga = { package = "deft-yoga", version = "0.5.0" }

@@ -354,7 +354,12 @@ fn build_bridge_body(func_inputs: Vec<FnArg>, asyncness: Option<Async>, struct_n
     for p in params {
         let p_name = format_ident!("_p{}", idx);
         param_expand_stmts.push(quote! {
-            let #p_name = <#p as deft::js::FromJsValue>::from_js_value(args.get(#idx).unwrap().clone())?;
+            let #p_name = <#p as deft::js::FromJsValue>::from_js_value(args.get(#idx).unwrap().clone())
+            .map_err(
+                |e| deft::js::ValueError::Internal(
+                    format!("Failed to cast js argument {} (zero-based) to rust type, {}", #idx, e)
+                )
+            )?;
         });
         param_list.push(p_name);
         idx += 1;

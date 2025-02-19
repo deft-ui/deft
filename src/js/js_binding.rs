@@ -120,10 +120,9 @@ impl FromJsValue for JsValue {
 
 impl<T: FromJsValue> FromJsValue for Option<T> {
     fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
-        if let Ok(v) = T::from_js_value(value) {
-            Ok(Some(v))
-        } else {
-            Err(ValueError::UnexpectedType)
+        match value {
+            JsValue::Undefined | JsValue::Null => Ok(None),
+            v => Ok(Some(T::from_js_value(v)?)),
         }
     }
 }

@@ -910,7 +910,7 @@ dependencies = [
 
 [[package]]
 name = "deft"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "android_logger",
  "anyhow",
@@ -952,7 +952,7 @@ dependencies = [
 
 [[package]]
 name = "deft-macros"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "quote",
  "syn",
