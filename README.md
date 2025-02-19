@@ -2,6 +2,9 @@
 
 Deft is a framework for building desktop and mobile applications with Rust and JavaScript.
 
+[![crates.io](https://img.shields.io/crates/v/deft)](https://crates.io/crates/deft)
+
+
 # Features
 
 * Hybrid programming with Rust and JavaScript
