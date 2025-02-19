@@ -1703,6 +1703,36 @@ if (workerContext) {
     globalThis.workerContext = workerContext;
 }
 
+export class FetchResponse {
+    _resp;
+
+    constructor(resp, status) {
+        this._resp = resp;
+        this.status = status;
+        this.ok = this.status >= 200 && this.status < 300;
+    }
+
+    async json() {
+        const body = await fetch_response_body_string(this._resp);
+        return JSON.parse(body);
+    }
+
+}
+
+/**
+ *
+ * @param url {string}
+ * @param options {FetchOptions}
+ * @returns {Promise<FetchResponse>}
+ */
+async function fetch(url, options) {
+    const resp = await fetch_create(url, options);
+    let status = await fetch_response_status(resp);
+    return new FetchResponse(resp, status);
+}
+
+globalThis.fetch = fetch;
+
 globalThis.navigator = new Navigator();
 globalThis.process = new Process();
 globalThis.process.setPromiseRejectionTracker(error => {

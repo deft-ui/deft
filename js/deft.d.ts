@@ -908,6 +908,13 @@ declare class Sqlite {
     static open(path: string): Promise<SqliteConn>;
 }
 declare const workerContext: WorkerContext;
+declare class FetchResponse {
+    constructor(resp: any, status: any);
+    _resp: any;
+    status: any;
+    ok: boolean;
+    json(): Promise<any>;
+}
 declare type IResizeEvent = IEvent<ResizeDetail>;
 declare type ParagraphUnit = {
     type: "text";
