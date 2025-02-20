@@ -1685,7 +1685,7 @@ fn parse_rotate_op(value: &str) -> Option<StyleTransformOp> {
 fn parse_scale_op(value: &str) -> Option<StyleTransformOp> {
     let mut values = value.split(",").collect::<Vec<&str>>();
     if values.len() < 2 {
-        values.push(values[0].clone());
+        values.push(values[0]);
     }
     let x = f32::from_str(values[0].trim()).ok()?;
     let y = f32::from_str(values[1].trim()).ok()?;

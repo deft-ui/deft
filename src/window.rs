@@ -206,7 +206,8 @@ impl Window {
             _ => WindowType::Normal,
         };
 
-        let window = Self::create_window(attributes.clone());
+        let mut window = Self::create_window(attributes.clone());
+        window.set_ime_allowed(true);
         let state = WindowData {
             id,
             window,
