@@ -17,13 +17,13 @@ pub fn auto_generate_loader() {
 }
 
 pub fn generate_dev_loader(url: &str, output_dir: &str) {
-    let mut code = format!("Box::new(deft::loader::DevModuleLoader::new(Some(\"{}\")))", url);
+    let code = format!("Box::new(deft::loader::DevModuleLoader::new(Some(\"{}\")))", url);
     write_code(code.as_str(), output_dir);
 }
 
 pub fn generate_static_loader(js_dir: &str, output_dir: &str) {
     let path = PathBuf::from_str(&js_dir).unwrap();
-    let canonical_path = path.canonicalize().unwrap().to_string_lossy().to_string();
+    let canonical_path = path.canonicalize().unwrap();
     let files = path.read_dir().unwrap();
 
     let mut code = String::new();
@@ -31,8 +31,9 @@ pub fn generate_static_loader(js_dir: &str, output_dir: &str) {
     code.push_str("let mut loader = deft::loader::StaticModuleLoader::new();\n");
     for f in files {
         let file_name = f.unwrap().file_name();
+        let full_path = canonical_path.join(&file_name).to_string_lossy().to_string().replace("\\", "\\\\");
         let name = file_name.to_str().unwrap();
-        code.push_str(&format!("loader.add_module(\"{}\".to_string(), include_str!(\"{}/{}\").to_string());\n", name, canonical_path, name));
+        code.push_str(&format!("loader.add_module(\"{}\".to_string(), include_str!(\"{}\").to_string());\n", name, full_path));
     }
     code.push_str("Box::new(loader)\n");
     code.push_str("}");
