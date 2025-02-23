@@ -1100,8 +1100,8 @@ impl Window {
         run_with_event_loop(|el| {
             //TODO support RenderBackedType parameter
             let mut backend_types = vec![
-                RenderBackendType::GL,
                 RenderBackendType::SoftBuffer,
+                RenderBackendType::GL,
             ];
             if let Ok(backend_type_str) = env::var("DEFT_RENDERERS") {
                 backend_types.clear();
