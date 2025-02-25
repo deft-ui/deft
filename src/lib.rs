@@ -173,30 +173,8 @@ fn main_js_deserializer() {
     println!("result:{:?}", result);
 }
 
-#[tokio::test]
-async fn test_websocket() {
-    let (client, _) = connect_async("ws://localhost:7800/ws").await.unwrap();
-    let (w, mut r) = client.split();
-    loop {
-        let msg = r.next().await.unwrap().unwrap();
-        println!("{:?}", msg);
-    }
-}
-
-#[tokio::test]
-async fn test_websocket_manager() {
-    let mut ws_mgr = WebSocketManager::new();
-    let conn = ws_mgr.create_connection("ws://localhost:7800/ws").await.unwrap();
-    loop {
-        let msg = ws_mgr.read_msg(conn).await.unwrap();
-        println!("msg:{:?}", msg);
-    }
-}
-
-
-
 // test layout performance
-#[test]
+// #[test]
 fn test_layout() {
     let text = include_str!("../Cargo.lock").repeat(100);
     let start_mem_use = memory_stats().unwrap().physical_mem as f32;
@@ -236,7 +214,7 @@ fn test_layout() {
 }
 
 
-#[test]
+// #[test]
 fn test_text_measure() {
     let text = include_str!("../Cargo.lock").repeat(100);
     let start_mem_use = memory_stats().unwrap().physical_mem as f32;

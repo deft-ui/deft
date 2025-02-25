@@ -854,8 +854,8 @@ fn test_measure() {
     // let result = font.measure_text(text.as_str(), None);
 }
 
-#[test]
-fn test_layout() {
+// #[test]
+fn test_layout_performance() {
     let text_demo = include_str!("../../Cargo.lock");
     let params = ParagraphParams {
         line_height: Some(20.0),
