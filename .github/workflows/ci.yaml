@@ -1,0 +1,64 @@
+name: Run CI
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+  merge_group:
+    types: [checks_requested]
+
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+env:
+  RUST_BACKTRACE: 1
+  SHELL: /bin/bash
+
+jobs:
+  ci-linux:
+    name: Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install
+        run: |
+          sudo apt-get install build-essential libssl-dev libclang-dev libc++-dev xorg-dev libxcb-xfixes0-dev libxcb-shape0-dev libasound2-dev;
+      - name: Build
+        run: cargo build --features x11
+#      - name: Tests
+#        run: cargo test
+#      - name: Format
+#        run: cargo fmt --all -- --check
+
+  ci-macos:
+    name: macOS
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build
+        run: cargo build
+#      - name: Tests
+#        run: cargo test
+
+  ci-win:
+    name: Windows
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build
+        run: cargo build
+#      - name: Tests
+#        run: cargo test
