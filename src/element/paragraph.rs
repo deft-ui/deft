@@ -44,6 +44,7 @@ const ZERO_WIDTH_WHITESPACE: &str = "\u{200B}";
 
 #[derive(Clone)]
 pub struct ParagraphParams {
+    pub mask_char: Option<char>,
     pub text_wrap: Option<bool>,
     pub line_height: Option<f32>,
     pub align: TextAlign,
@@ -569,6 +570,11 @@ impl Paragraph {
         Some(text)
     }
 
+    pub fn set_mask_char(&mut self, mask_char: Option<char>) {
+        self.params.mask_char = mask_char;
+        self.mark_dirty();
+    }
+
     fn rebuild_paragraph(&mut self) {
         let params = self.params.clone();
         for ln in &mut self.lines {
@@ -601,6 +607,7 @@ impl Paragraph {
 
         let mut pb = SimpleParagraphBuilder::new(&paragraph_params);
         let p_color = paragraph_params.color;
+        let mask_char = paragraph_params.mask_char;
         for u in units {
             match u {
                 ParagraphUnit::Text(unit) => {
@@ -641,7 +648,12 @@ impl Paragraph {
                     }
 
                     pb.push_style(&text_style);
-                    pb.add_text(&unit.text);
+                    if let Some(mc) = mask_char {
+                        let mask_str = mc.to_string().repeat(unit.text.chars_count());
+                        pb.add_text(&mask_str);
+                    } else {
+                        pb.add_text(&unit.text);
+                    }
                 }
             }
         }
@@ -665,6 +677,7 @@ impl ElementBackend for Paragraph {
             color: Color::default(),
             font_size: 12.0,
             font_families,
+            mask_char: None,
         };
         let units = Vec::new();
         let paragraph = Self::build_paragraph(&params, &units);
@@ -864,6 +877,7 @@ fn test_layout_performance() {
         font_size: 16.0,
         font_families: vec!["monospace".to_string()],
         text_wrap: Some(false),
+        mask_char: None,
     };
     let mut text = String::new();
     for i in 0..200 {

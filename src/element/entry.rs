@@ -6,7 +6,7 @@ use std::string::ToString;
 use anyhow::Error;
 use clipboard::{ClipboardContext, ClipboardProvider};
 use ordered_float::OrderedFloat;
-use quick_js::JsValue;
+use quick_js::{JsValue, ValueError};
 use skia_safe::{Canvas, Color, Font, Paint};
 use skia_safe::textlayout::{Placeholder, TextAlign};
 use skia_safe::wrapper::NativeTransmutableWrapper;
@@ -14,11 +14,12 @@ use winit::keyboard::NamedKey;
 use winit::window::CursorIcon;
 use yoga::{PositionType, StyleUnit};
 use deft_macros::{element_backend, js_methods};
+use serde::{Deserialize, Serialize};
 use crate::base::{Callback, CaretDetail, ElementEvent, EventContext, MouseDetail, MouseEventType, Rect, TextChangeDetail, TextUpdateDetail};
 use crate::element::{ElementBackend, Element, ElementWeak};
 use crate::element::text::{AtomOffset, Text as Label};
 use crate::number::DeNan;
-use crate::{js_call, match_event, match_event_type, ok_or_return, timer};
+use crate::{js_call, js_deserialize, js_serialize, match_event, match_event_type, ok_or_return, timer};
 use crate::app::AppEvent;
 use crate::element::edit_history::{EditHistory, EditOpType};
 use crate::element::paragraph::{Paragraph, ParagraphUnit, TextCoord, TextUnit};
@@ -26,6 +27,7 @@ use crate::element::scroll::{Scroll, ScrollBarStrategy};
 use crate::element::text::text_paragraph::Line;
 use crate::event::{KEY_MOD_CTRL, KEY_MOD_SHIFT, KeyEventDetail, MouseDownEvent, MouseUpEvent, MouseMoveEvent, KeyDownEvent, CaretChangeEvent, TextUpdateEvent, TextChangeEvent, FocusEvent, BlurEvent, SelectStartEvent, SelectEndEvent, SelectMoveEvent, TextInputEvent, ClickEvent};
 use crate::event_loop::{create_event_loop_callback, create_event_loop_proxy};
+use crate::js::{FromJsValue, ToJsValue};
 use crate::window::Window;
 use crate::render::RenderFn;
 use crate::string::StringUtils;
@@ -39,6 +41,39 @@ const PASTE_KEY: &str = "\x16";
 const KEY_BACKSPACE: &str = "\x08";
 const KEY_ENTER: &str = "\x0D";
 
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum InputType {
+    Text,
+    Password,
+}
+
+impl ToJsValue for InputType {
+    fn to_js_value(self) -> Result<JsValue, ValueError> {
+        let str = match self {
+            InputType::Text => "text",
+            InputType::Password => "password",
+        };
+        Ok(JsValue::String(str.to_string()))
+    }
+}
+
+impl FromJsValue for InputType {
+    fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
+        if let JsValue::String(value) = value {
+            let value = value.to_lowercase();
+            match value.as_str() {
+                "text" => Ok(InputType::Text),
+                "password" => Ok(InputType::Password),
+                _ => Err(ValueError::UnexpectedType),
+            }
+        } else {
+            Err(ValueError::UnexpectedType)
+        }
+    }
+}
+
+
 #[element_backend]
 pub struct Entry {
     base: Scroll,
@@ -47,6 +82,8 @@ pub struct Entry {
 
     placeholder: Label,
     placeholder_element: Element,
+
+    input_type: InputType,
 
     /// (row_offset, column_offset)
     caret: TextCoord,
@@ -151,6 +188,24 @@ impl Entry {
         if let Some(caret) = self.paragraph.get_text_coord_by_char_offset(char_offset) {
             self.update_caret_value(caret, false);
         }
+    }
+
+    #[js_func]
+    pub fn set_type(&mut self, input_type: InputType) {
+        match &input_type {
+            InputType::Text => {
+                self.paragraph.set_mask_char(None);
+            }
+            InputType::Password => {
+                self.paragraph.set_mask_char(Some('●'));
+            }
+        }
+        self.input_type = input_type;
+    }
+
+    #[js_func]
+    pub fn get_type(&self) -> InputType {
+        self.input_type.clone()
     }
 
     // pub fn get_font(&self) -> &Font {
@@ -587,6 +642,7 @@ impl ElementBackend for Entry {
             paragraph_element,
             placeholder,
             placeholder_element,
+            input_type: InputType::Text,
             caret: TextCoord::new((0, 0)),
             //paint_offset: 0f32,
             // text_changed_listener: Vec::new(),

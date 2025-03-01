@@ -35,8 +35,21 @@ function createEntry() {
         padding: 5,
         border: "1 #ccc"
     }
-    entry.placeholder = "Please input"
+    entry.placeholder = "Please input some text"
     console.log("entry id:", entry.id)
+    return entry;
+}
+
+function createPassword() {
+    const entry = new EntryElement();
+    entry.style = {
+        width: 200,
+        padding: 5,
+        border: "1 #ccc"
+    }
+    entry.placeholder = "Input password"
+    entry.type = "password";
+    console.log("password id:", entry.id)
     return entry;
 }
 
@@ -214,6 +227,8 @@ function main() {
     const entry = createEntry();
     container.addChild(entry);
     assertEq(container, entry.parent);
+
+    container.addChild(createPassword());
     container.addChild(createCenterElement());
     // batchCreateLabels(container);
     window.body=(container);

@@ -519,6 +519,7 @@ impl Text {
                 color: params.paint.color(),
                 font_size: params.font_size,
                 font_families: params.font_families.clone(),
+                mask_char: None,
             };
             let mut pb = SimpleParagraphBuilder::new(&paragraph_params);
 

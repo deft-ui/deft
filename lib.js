@@ -1147,6 +1147,22 @@ export class EntryElement extends Element {
 
     /**
      *
+     * @param type {"text"|"password"}
+     */
+    set type(type) {
+        Entry_set_type(this.handle, type);
+    }
+
+    /**
+     *
+     * @returns {"text" | "password"}
+     */
+    get type() {
+        return Entry_get_type(this.handle);
+    }
+
+    /**
+     *
      * @returns {StyleProps}
      */
     get placeholderStyle() {
