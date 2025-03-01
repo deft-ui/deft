@@ -7,5 +7,4 @@ pub mod layer;
 pub mod context;
 mod gl;
 pub mod renderer;
-#[cfg(not(target_os = "android"))]
 mod softbuffer;

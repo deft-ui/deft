@@ -2,14 +2,12 @@ use std::num::{NonZeroU32};
 use std::rc::Rc;
 use std::slice;
 use skia_safe::{Canvas, ColorType, ImageInfo};
-use softbuffer::{Context, Surface};
 use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window};
 use crate::context::{RenderContext, UserContext};
 use crate::renderer::Renderer;
 use crate::softbuffer::context::SoftRenderContext;
 use crate::softbuffer::soft_renderer::SoftRenderer;
-use crate::softbuffer::softbuffer_surface_presenter::SoftBufferSurfacePresenter;
 use crate::softbuffer::surface_presenter::SurfacePresenter;
 use crate::surface::RenderBackend;
 
