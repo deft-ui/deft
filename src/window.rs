@@ -39,8 +39,7 @@ use winit::dpi::{LogicalPosition, LogicalSize, Position, Size};
 use winit::error::ExternalError;
 use winit::event::{ElementState, Ime, Modifiers, MouseButton, MouseScrollDelta, TouchPhase, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
-use winit::keyboard::{Key, NamedKey, PhysicalKey};
-use winit::platform::scancode::PhysicalKeyExtScancode;
+use winit::keyboard::{Key, KeyCode, NamedKey, PhysicalKey};
 #[cfg(x11_platform)]
 use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorGrabMode, CursorIcon, Fullscreen, WindowAttributes, WindowId};
@@ -437,7 +436,9 @@ impl Window {
                 ..
             } => {
                 let scancode = match event.physical_key {
-                    PhysicalKey::Code(c) => c.to_scancode(),
+                    PhysicalKey::Code(c) => {
+                        get_scancode(c)
+                    },
                     PhysicalKey::Unidentified(e) => None,
                 };
                 let key = match &event.logical_key {
@@ -1141,6 +1142,16 @@ impl WeakWindowHandle {
     pub fn upgrade(&self) -> Option<Window> {
         self.inner.upgrade().map(|i| Window::from_inner(i)).ok()
     }
+}
+
+fn get_scancode(code: KeyCode) -> Option<u32> {
+    #[cfg(any(windows_platform, macos_platform, x11_platform, wayland_platform))]
+    {
+        use winit::platform::scancode::PhysicalKeyExtScancode;
+        return code.to_scancode();
+    }
+    #[allow(dead_code)]
+    return None;
 }
 
 pub fn build_render_nodes(root: &mut Element) -> RenderTree {
