@@ -1101,6 +1101,9 @@ export class ImageElement extends Element {
 
 
 export class EntryElement extends Element {
+
+    #placeholderStyle;
+
     constructor() {
         super(VT_ENTRY);
     }
@@ -1119,6 +1122,35 @@ export class EntryElement extends Element {
      */
     set text(text) {
         Entry_set_text(this.handle, text);
+    }
+
+    /**
+     *
+     * @param placeholder {string}
+     */
+    set placeholder(placeholder) {
+        Entry_set_placeholder(this.handle, placeholder);
+    }
+
+    get placeholder() {
+        return Entry_get_placeholder(this.handle);
+    }
+
+    /**
+     *
+     * @param style {StyleProps}
+     */
+    set placeholderStyle(style) {
+        this.#placeholderStyle = style;
+        Entry_set_placeholder_style(this.handle, style);
+    }
+
+    /**
+     *
+     * @returns {StyleProps}
+     */
+    get placeholderStyle() {
+        return this.#placeholderStyle;
     }
 
     /**

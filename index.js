@@ -30,12 +30,12 @@ function createSystemTray() {
 
 function createEntry() {
     const entry = new EntryElement();
-    entry.text = "test测试";
     entry.style = {
-        width: 100,
+        width: 200,
         padding: 5,
         border: "1 #ccc"
     }
+    entry.placeholder = "Please input"
     console.log("entry id:", entry.id)
     return entry;
 }

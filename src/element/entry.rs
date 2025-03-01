@@ -8,7 +8,7 @@ use clipboard::{ClipboardContext, ClipboardProvider};
 use ordered_float::OrderedFloat;
 use quick_js::JsValue;
 use skia_safe::{Canvas, Color, Font, Paint};
-use skia_safe::textlayout::{TextAlign};
+use skia_safe::textlayout::{Placeholder, TextAlign};
 use skia_safe::wrapper::NativeTransmutableWrapper;
 use winit::keyboard::NamedKey;
 use winit::window::CursorIcon;
@@ -29,8 +29,8 @@ use crate::event_loop::{create_event_loop_callback, create_event_loop_proxy};
 use crate::window::Window;
 use crate::render::RenderFn;
 use crate::string::StringUtils;
-use crate::style::{StyleProp, StylePropKey, StylePropVal};
-use crate::style::StyleProp::{BackgroundColor, Left, MinWidth, Position, Top};
+use crate::style::{StyleProp, StylePropKey, StylePropVal, YogaNode};
+use crate::style::StyleProp::{BackgroundColor, Display, Left, MinWidth, Position, Top};
 use crate::style::StylePropKey::Height;
 use crate::timer::TimerHandle;
 
@@ -44,6 +44,10 @@ pub struct Entry {
     base: Scroll,
     paragraph: Paragraph,
     paragraph_element: Element,
+
+    placeholder: Label,
+    placeholder_element: Element,
+
     /// (row_offset, column_offset)
     caret: TextCoord,
     // paint_offset: f32,
@@ -81,6 +85,22 @@ impl Entry {
             }
             self.update_caret_value(TextCoord::new((0, 0)), false);
         }
+        self.update_placeholder_style(text.is_empty());
+    }
+
+    #[js_func]
+    pub fn set_placeholder(&mut self, placeholder: String) {
+        self.placeholder.set_text(placeholder);
+    }
+
+    #[js_func]
+    pub fn get_placeholder(&self) -> String {
+        self.placeholder.get_text()
+    }
+
+    #[js_func]
+    pub fn set_placeholder_style(&mut self, style: JsValue) {
+        self.placeholder_element.update_style(style, false);
     }
 
     pub fn set_align(&mut self, align: TextAlign) {
@@ -492,6 +512,7 @@ impl Entry {
     fn handle_input(&mut self, input: &str) {
         //println!("on input:{}", input);
         self.insert_text(input, self.caret, true);
+        self.update_placeholder_style(self.paragraph.get_text().is_empty());
     }
 
     fn build_line(text: String) -> Vec<ParagraphUnit> {
@@ -505,6 +526,15 @@ impl Entry {
             background_color: None,
         });
         vec![unit]
+    }
+
+    fn update_placeholder_style(&mut self, is_text_empty: bool) {
+        let placeholder_color = if is_text_empty {
+            Color::from_rgb(160, 160, 160)
+        } else {
+            Color::TRANSPARENT
+        };
+        self.placeholder_element.set_style_props(vec![StyleProp::Color(StylePropVal::Custom(placeholder_color))]);
     }
 
 }
@@ -524,6 +554,19 @@ impl ElementBackend for Entry {
         let mut paragraph = paragraph_element.get_backend_as::<Paragraph>().clone();
         paragraph.set_text_wrap(false);
         paragraph.add_line(Self::build_line("".to_string()));
+
+        let mut placeholder_element = Element::create(Label::create);
+        placeholder_element.set_style_props(
+            vec![
+                Position(StylePropVal::Custom(PositionType::Absolute)),
+                Left(StylePropVal::Custom(StyleUnit::Point(OrderedFloat(0.0)))),
+                Top(StylePropVal::Custom(StyleUnit::Point(OrderedFloat(0.0)))),
+                MinWidth(StylePropVal::Custom(StyleUnit::Percent(OrderedFloat(100.0)))),
+            ]
+        );
+        let mut placeholder = placeholder_element.get_backend_as::<Label>().clone();
+
+        ele.add_child_view(placeholder_element.clone(), None);
         ele.add_child_view(paragraph_element.clone(), None);
         // base.set_text_wrap(false);
         ele.set_cursor(CursorIcon::Text);
@@ -542,6 +585,8 @@ impl ElementBackend for Entry {
             base,
             paragraph,
             paragraph_element,
+            placeholder,
+            placeholder_element,
             caret: TextCoord::new((0, 0)),
             //paint_offset: 0f32,
             // text_changed_listener: Vec::new(),
@@ -556,6 +601,7 @@ impl ElementBackend for Entry {
             rows: 5,
         }.to_ref();
         inst.set_multiple_line(false);
+        inst.update_placeholder_style(true);
         inst
     }
 
@@ -644,6 +690,7 @@ impl ElementBackend for Entry {
             | StylePropKey::PaddingLeft
             => {
                 self.paragraph_element.set_style_prop_internal(style.clone());
+                self.placeholder_element.set_style_prop_internal(style.clone());
                 return false;
             },
             _ => {

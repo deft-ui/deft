@@ -609,7 +609,13 @@ impl Element {
 
     #[js_func]
     pub fn set_style(&mut self, style: JsValue) {
-        self.style_props.clear();
+        self.update_style(style, true);
+    }
+
+    pub fn update_style(&mut self, style: JsValue, full: bool) {
+        if full {
+            self.style_props.clear();
+        }
         self.style_manager.parse_style_obj(style);
     }
 
