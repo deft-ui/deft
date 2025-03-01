@@ -127,6 +127,7 @@ fn test_get_char_bounds() {
         color: Default::default(),
         font_size: 14.0,
         font_families: vec!["monospace".to_string()],
+        mask_char: None,
     };
     let mut pb = SimpleParagraphBuilder::new(&params);
     pb.add_text(format!("{}{}", "12", ZERO_WIDTH_WHITESPACE));
