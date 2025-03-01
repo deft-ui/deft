@@ -5,21 +5,17 @@ use winit::window::Window;
 use crate::context::{IRenderContext, UserContext};
 use crate::layer::ILayer;
 use crate::softbuffer::layer::SoftLayer;
+use crate::softbuffer::surface_presenter::SurfacePresenter;
 
 pub struct SoftRenderContext {
-    pub win_surface: Surface<Rc<Window>, Rc<Window>>,
+    pub surface_presenter: Box<dyn SurfacePresenter>,
     pub user_context: Option<UserContext>,
 }
 
 impl SoftRenderContext {
-    pub fn new(window: Window) -> SoftRenderContext {
-        let window = Rc::new(window);
-        let context = Context::new(window.clone()).unwrap();
-        let mut win_surface = Surface::new(&context, window.clone()).unwrap();
-        let size = window.inner_size();
-        win_surface.resize(NonZeroU32::new(size.width).unwrap(), NonZeroU32::new(size.height).unwrap());
+    pub fn new(surface_presenter: Box<dyn SurfacePresenter>) -> SoftRenderContext {
         Self {
-            win_surface,
+            surface_presenter,
             user_context: Some(UserContext::new()),
         }
     }

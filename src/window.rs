@@ -1108,6 +1108,7 @@ impl Window {
                 backend_types.clear();
                 for bt_str in backend_type_str.split(",") {
                     let bt = match bt_str.to_lowercase().as_str() {
+                        "softgl" => Some(RenderBackendType::SoftGL),
                         "softbuffer" => Some(RenderBackendType::SoftBuffer),
                         "gl" => Some(RenderBackendType::GL),
                         _ => None,

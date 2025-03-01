@@ -7,6 +7,8 @@ use winit::platform::android::activity::AndroidApp;
 use winit::window::{Window, WindowAttributes};
 use crate::gl::SurfaceState;
 use crate::renderer::Renderer;
+use crate::softbuffer::gl_presenter::GlPresenter;
+use crate::softbuffer::softbuffer_surface_presenter::SoftBufferSurfacePresenter;
 #[cfg(not(target_os = "android"))]
 use crate::softbuffer::SoftSurface;
 use crate::surface::RenderBackend;
@@ -20,6 +22,7 @@ pub struct SkiaWindow {
 pub enum RenderBackendType {
     SoftBuffer,
     GL,
+    SoftGL,
 }
 
 impl SkiaWindow {
@@ -30,7 +33,10 @@ impl SkiaWindow {
                 #[cfg(target_os = "android")]
                 return None;
                 #[cfg(not(target_os = "android"))]
-                Box::new(SoftSurface::new(event_loop, window))
+                Box::new(SoftSurface::new(event_loop, SoftBufferSurfacePresenter::new(window)))
+            }
+            RenderBackendType::SoftGL => {
+                Box::new(SoftSurface::new(event_loop, GlPresenter::new(event_loop, window)?))
             }
             RenderBackendType::GL => {
                 Box::new(SurfaceState::new(event_loop, window)?)
