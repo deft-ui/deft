@@ -769,6 +769,32 @@ declare class EntryElement extends Element {
     get text(): string;
     /**
      *
+     * @param placeholder {string}
+     */
+    set placeholder(placeholder: string);
+    get placeholder(): string;
+    /**
+     *
+     * @param style {StyleProps}
+     */
+    set placeholderStyle(style: StyleProps);
+    /**
+     *
+     * @returns {StyleProps}
+     */
+    get placeholderStyle(): StyleProps;
+    /**
+     *
+     * @param type {"text"|"password"}
+     */
+    set type(type: "text" | "password");
+    /**
+     *
+     * @returns {"text" | "password"}
+     */
+    get type(): "text" | "password";
+    /**
+     *
      * @param start {number}
      * @param end {number}
      */
@@ -794,6 +820,7 @@ declare class EntryElement extends Element {
      */
     set rows(rows: number);
     bindTextChange(callback: any): void;
+    
 }
 declare class TextEditElement extends Element {
     constructor();
