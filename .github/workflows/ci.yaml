@@ -27,6 +27,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Install
         run: |
+          sudo apt-get update
           sudo apt-get install build-essential libssl-dev libclang-dev libc++-dev xorg-dev libxcb-xfixes0-dev libxcb-shape0-dev libasound2-dev;
       # TODO support build with only wayland feature?
       - name: Build
