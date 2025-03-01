@@ -910,7 +910,7 @@ dependencies = [
 
 [[package]]
 name = "deft"
-version = "0.2.10"
+version = "0.2.11"
 dependencies = [
  "android_logger",
  "anyhow",
