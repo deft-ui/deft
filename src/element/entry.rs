@@ -562,12 +562,13 @@ impl Entry {
         self.element.emit(TextChangeEvent {
             value: text,
         });
+
+        self.update_placeholder_style(self.paragraph.get_text().is_empty());
     }
 
     fn handle_input(&mut self, input: &str) {
         //println!("on input:{}", input);
         self.insert_text(input, self.caret, true);
-        self.update_placeholder_style(self.paragraph.get_text().is_empty());
     }
 
     fn build_line(text: String) -> Vec<ParagraphUnit> {
