@@ -3,8 +3,8 @@ use std::rc::Rc;
 use winit::window::Window;
 use crate::context::{IRenderContext, UserContext};
 use crate::layer::ILayer;
-use crate::softbuffer::layer::SoftLayer;
-use crate::softbuffer::surface_presenter::SurfacePresenter;
+use crate::soft::layer::SoftLayer;
+use crate::soft::surface_presenter::SurfacePresenter;
 
 pub struct SoftRenderContext {
     pub surface_presenter: Box<dyn SurfacePresenter>,

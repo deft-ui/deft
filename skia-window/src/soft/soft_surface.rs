@@ -6,9 +6,9 @@ use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window};
 use crate::context::{RenderContext, UserContext};
 use crate::renderer::Renderer;
-use crate::softbuffer::context::SoftRenderContext;
-use crate::softbuffer::soft_renderer::SoftRenderer;
-use crate::softbuffer::surface_presenter::SurfacePresenter;
+use crate::soft::context::SoftRenderContext;
+use crate::soft::soft_renderer::SoftRenderer;
+use crate::soft::surface_presenter::SurfacePresenter;
 use crate::surface::RenderBackend;
 
 pub struct SoftSurface {

@@ -1,5 +1,5 @@
 use crate::layer::ILayer;
-use crate::softbuffer::soft_renderer::SoftRenderer;
+use crate::soft::soft_renderer::SoftRenderer;
 use skia_safe::{Canvas, Image};
 
 pub struct SoftLayer {

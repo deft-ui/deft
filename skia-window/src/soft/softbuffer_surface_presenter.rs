@@ -1,4 +1,4 @@
-use crate::softbuffer::surface_presenter::SurfacePresenter;
+use crate::soft::surface_presenter::SurfacePresenter;
 use skia_safe::{ColorType, ImageInfo};
 use softbuffer::{Context, Surface};
 use std::num::NonZeroU32;

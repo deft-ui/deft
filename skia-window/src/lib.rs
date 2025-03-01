@@ -7,4 +7,4 @@ pub mod layer;
 pub mod context;
 mod gl;
 pub mod renderer;
-mod softbuffer;
+mod soft;

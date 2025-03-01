@@ -7,8 +7,8 @@ use winit::platform::android::activity::AndroidApp;
 use winit::window::{Window, WindowAttributes};
 use crate::gl::SurfaceState;
 use crate::renderer::Renderer;
-use crate::softbuffer::gl_presenter::GlPresenter;
-use crate::softbuffer::SoftSurface;
+use crate::soft::gl_presenter::GlPresenter;
+use crate::soft::SoftSurface;
 use crate::surface::RenderBackend;
 
 pub struct SkiaWindow {
@@ -32,7 +32,7 @@ impl SkiaWindow {
                 return None;
                 #[cfg(not(target_os = "android"))]
                 {
-                    use crate::softbuffer::softbuffer_surface_presenter::SoftBufferSurfacePresenter;
+                    use crate::soft::softbuffer_surface_presenter::SoftBufferSurfacePresenter;
                     Box::new(SoftSurface::new(event_loop, SoftBufferSurfacePresenter::new(window)))
                 }
             }

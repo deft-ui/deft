@@ -1,6 +1,6 @@
 use crate::gl::SurfaceState;
 use crate::renderer::Renderer;
-use crate::softbuffer::surface_presenter::SurfacePresenter;
+use crate::soft::surface_presenter::SurfacePresenter;
 use crate::surface::RenderBackend;
 use skia_safe::{Paint, Surface};
 use winit::event_loop::ActiveEventLoop;
