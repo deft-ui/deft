@@ -28,10 +28,9 @@ jobs:
       - name: Install
         run: |
           sudo apt-get install build-essential libssl-dev libclang-dev libc++-dev xorg-dev libxcb-xfixes0-dev libxcb-shape0-dev libasound2-dev;
-      - name: BuildX11
-        run: cargo build --features x11
-      - name: BuildWayland
-        run: cargo build --features wayland
+      # TODO support build with only wayland feature?
+      - name: Build
+        run: cargo build --features x11,wayland
       - name: Tests
         run: cargo test --features x11
 #      - name: Format
