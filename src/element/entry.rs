@@ -1,4 +1,4 @@
-use crate as deft;
+use crate::{self as deft, some_or_return};
 use std::any::Any;
 use std::cell::Cell;
 use std::rc::Rc;
@@ -10,6 +10,7 @@ use quick_js::{JsValue, ValueError};
 use skia_safe::{Canvas, Color, Font, Paint};
 use skia_safe::textlayout::{Placeholder, TextAlign};
 use skia_safe::wrapper::NativeTransmutableWrapper;
+use winit::dpi::{LogicalPosition, LogicalSize, Size};
 use winit::keyboard::NamedKey;
 use winit::window::CursorIcon;
 use yoga::{PositionType, StyleUnit};
@@ -25,7 +26,7 @@ use crate::element::edit_history::{EditHistory, EditOpType};
 use crate::element::paragraph::{Paragraph, ParagraphUnit, TextCoord, TextUnit};
 use crate::element::scroll::{Scroll, ScrollBarStrategy};
 use crate::element::text::text_paragraph::Line;
-use crate::event::{KEY_MOD_CTRL, KEY_MOD_SHIFT, KeyEventDetail, MouseDownEvent, MouseUpEvent, MouseMoveEvent, KeyDownEvent, CaretChangeEvent, TextUpdateEvent, TextChangeEvent, FocusEvent, BlurEvent, SelectStartEvent, SelectEndEvent, SelectMoveEvent, TextInputEvent, ClickEvent};
+use crate::event::{BlurEvent, BoundsChangeEvent, CaretChangeEvent, ClickEvent, FocusEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ScrollEvent, SelectEndEvent, SelectMoveEvent, SelectStartEvent, TextChangeEvent, TextInputEvent, TextUpdateEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
 use crate::event_loop::{create_event_loop_callback, create_event_loop_proxy};
 use crate::js::{FromJsValue, ToJsValue};
 use crate::window::Window;
@@ -208,6 +209,39 @@ impl Entry {
         self.input_type.clone()
     }
 
+    fn get_caret_pixels_position(&self) -> Option<Rect> {
+        let mut element = self.element.upgrade_mut().ok()?;
+        let scroll_left = element.get_scroll_left();
+        let scroll_top = element.get_scroll_top();
+        let paragraph_padding = self.paragraph_element.get_padding();
+
+        let mut me = self.clone();
+        let caret_rect = me.paragraph.get_char_rect(self.caret)?;
+        let caret_visible = self.caret_visible.get();
+        let x = caret_rect.x - scroll_left + paragraph_padding.1;
+        let y = caret_rect.y - scroll_top + paragraph_padding.0;
+        Some(Rect::new(x, y, 1.0, caret_rect.height))
+    }
+
+    fn update_ime(&self) -> Option<()> {
+        let pos = self.get_caret_pixels_position()?;
+        let mut el = self.element.upgrade_mut().ok()?;
+        let win = el.get_window()?;
+        let mut win = win.upgrade_mut().ok()?;
+        //TOOD use transformed position
+        let el_offset = el.get_origin_bounds();
+        let x = (el_offset.x + pos.x) as f64;
+        let y = (el_offset.y + pos.bottom()) as f64;
+        win.window.set_ime_cursor_area(crate::winit::dpi::Position::Logical(LogicalPosition {
+            x,
+            y,
+        }), Size::Logical(LogicalSize {
+            width: 1.0,
+            height: 1.0
+        }));
+        Some(())
+    }
+
     // pub fn get_font(&self) -> &Font {
     //     &self.base.get_font()
     // }
@@ -319,6 +353,7 @@ impl Entry {
             let mut me = self.clone();
             let mut element = ok_or_return!(self.element.upgrade_mut());
             let callback = Callback::new(move || {
+                me.update_ime();
                 me.emit_caret_change();
             });
             element.with_window(|w| {
@@ -473,6 +508,7 @@ impl Entry {
     }
 
     fn handle_focus(&mut self) {
+        let _ = self.update_ime();
         self.focusing = true;
         // self.emit_caret_change();
         self.caret_visible.set(true);
@@ -672,33 +708,22 @@ impl ElementBackend for Entry {
 
     fn render(&mut self) -> RenderFn {
         let mut element = ok_or_return!(self.element.upgrade_mut(), RenderFn::empty());
-        let children = element.get_children();
-        //let paint = self.label.get_paint().clone();
         let mut paint = Paint::default();
         paint.set_color(element.style.computed_style.color);
-        let scroll_left = element.get_scroll_left();
-        let scroll_top = element.get_scroll_top();
-        let paragraph_padding = self.paragraph_element.get_padding();
 
-
-        let mut me = self.clone();
-        let caret_rect = match me.paragraph.get_char_rect(self.caret) {
-            None => return RenderFn::empty(),
-            Some(r) => r,
-        };
         let mut base_render_fn = self.base.render();
         let focusing = self.focusing;
         let caret_visible = self.caret_visible.get();
-        let x = caret_rect.x - scroll_left + paragraph_padding.1;
-        let y = caret_rect.y - scroll_top + paragraph_padding.0;
+
+        let caret_pos = some_or_return!(self.get_caret_pixels_position(), RenderFn::empty());
 
         RenderFn::new(move |canvas| {
             canvas.save();
             base_render_fn.run(canvas);
             if focusing && caret_visible {
                 paint.set_stroke_width(2.0);
-                let start = (x, y);
-                let end = (x, y + caret_rect.height);
+                let start = (caret_pos.x, caret_pos.y);
+                let end = (caret_pos.x, caret_pos.bottom());
                 canvas.draw_line(start, end, &paint);
             }
             canvas.restore();
@@ -720,6 +745,12 @@ impl ElementBackend for Entry {
             if !self.paragraph.is_selecting() {
                 self.update_caret_by_offset_coordinate(e.0.offset_x, e.0.offset_y, false);
             }
+        } else if let Some(e) = event.downcast_ref::<ScrollEvent>() {
+            //TODO update later?
+            let _ = self.update_ime();
+        } else if let Some(e) = event.downcast_ref::<BoundsChangeEvent>() {
+            //TODO update later?
+            let _ = self.update_ime();
         }
         self.base.on_event(event, ctx)
     }
