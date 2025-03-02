@@ -634,6 +634,7 @@ impl Entry {
 impl ElementBackend for Entry {
 
     fn create(mut ele: &mut Element) -> Self {
+        ele.set_focusable(true);
         let mut base = Scroll::create(ele);
         let mut paragraph_element = Element::create(Paragraph::create);
         paragraph_element.set_style_props(vec![

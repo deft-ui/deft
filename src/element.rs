@@ -199,6 +199,12 @@ impl Element {
         Ok(())
     }
 
+    pub fn remove_all_child(&mut self) {
+        while !self.children.is_empty() {
+            self.remove_child(0);
+        }
+    }
+
     #[js_func]
     pub fn add_js_event_listener(&mut self, event_type: String, listener: JsValue) -> Result<u32, JsError> {
         let id = bind_js_event_listener!(
@@ -584,7 +590,6 @@ impl Element {
     pub fn calculate_layout(&mut self, available_width: f32, available_height: f32) {
         // mark all children dirty so that custom measure function could be call
         // self.mark_all_layout_dirty();
-        self.on_before_layout_update();
         self.style.calculate_layout(available_width, available_height, Direction::LTR);
         if let Some(lr) = &mut self.layout_root {
             lr.update_layout();
@@ -896,14 +901,6 @@ impl Element {
         Some(Rect::new(x, y, right, bottom))
     }
 
-    //TODO remove?
-    pub fn on_before_layout_update(&mut self) {
-        for c in &mut self.get_children() {
-            c.on_before_layout_update();
-        }
-    }
-
-
     pub fn on_layout_update(&mut self) {
         self.layout_dirty = false;
         let origin_bounds = self.get_origin_bounds();
@@ -944,6 +941,14 @@ impl Element {
             self.border_path = bp;
         }
         &mut self.border_path
+    }
+
+    pub fn set_focusable(&mut self, focusable: bool) {
+        self.focusable = focusable;
+    }
+
+    pub fn is_focusable(&self) -> bool {
+        self.focusable
     }
 
 }
@@ -994,6 +999,7 @@ pub struct Element {
     pub render_object_idx: Option<usize>,
     border_path: BorderPath,
     style_manager: StyleManager,
+    focusable: bool,
 }
 
 pub struct PaintInfo {
@@ -1039,6 +1045,7 @@ impl ElementData {
             border_path: BorderPath::new(0.0, 0.0, [0.0; 4], [0.0; 4]),
             style_manager: StyleManager::new(),
             auto_focus: false,
+            focusable: false,
         }
     }
 

@@ -477,22 +477,6 @@ impl RenderTree {
         element.need_snapshot
     }
 
-    pub fn update_layout_info_recurse(
-        &mut self,
-        root: &mut Element,
-        bounds: Rect,
-    ) {
-        //TODO support overflow:visible
-        // matrix_calculator.intersect_clip_path(&ClipPath::from_path(border_box_path));
-
-        // let (transformed_bounds, _) = total_matrix.map_rect(Rect::from_xywh(0.0, 0.0, bounds.width(), bounds.height()));
-        //TODO update border path when border changed
-        for mut c in root.get_children() {
-            let child_bounds = c.get_bounds().translate(-root.get_scroll_left(), -root.get_scroll_top());
-            self.update_layout_info_recurse(&mut c, child_bounds.to_skia_rect());
-        }
-    }
-
     pub fn build_paint_tree_new(&mut self, viewport: &Rect) -> Option<PaintTreeNew> {
         // print_time!("Building paint tree");
         // let invalid_rects = InvalidArea::Full.build(viewport.clone());

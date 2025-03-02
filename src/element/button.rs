@@ -18,6 +18,7 @@ impl Button {}
 
 impl ElementBackend for Button {
     fn create(element: &mut Element) -> Self {
+        element.set_focusable(true);
         let base = Container::create(element);
 
         element.style.yoga_node.set_margin(Edge::Top, StyleUnit::Point(OrderedFloat(4.0)));

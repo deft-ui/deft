@@ -4,7 +4,7 @@ use crate::base::MouseEventType::{MouseClick, MouseUp};
 use crate::base::{Callback, ElementEvent, Event, EventContext, EventHandler, EventListener, EventRegistration, JsValueContext, MouseDetail, MouseEventType, ResultWaiter, Touch, TouchDetail, UnsafeFnOnce};
 use crate::canvas_util::CanvasHelper;
 use crate::cursor::search_cursor;
-use crate::element::{Element, ElementWeak, PaintInfo};
+use crate::element::{Element, ElementBackend, ElementWeak, PaintInfo};
 use crate::event::{build_modifier, named_key_to_str, str_to_named_key, BlurEvent, CaretChangeEventListener, ClickEvent, ContextMenuEvent, DragOverEvent, DragStartEvent, DropEvent, FocusEvent, FocusShiftEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent, MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, TextInputEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT};
 use crate::event_loop::{create_event_loop_proxy, run_with_event_loop};
 use crate::ext::common::create_event_handler;
@@ -782,6 +782,13 @@ impl Window {
     }
 
     pub fn focus(&mut self, mut node: Element) {
+        if !node.is_focusable() {
+            if let Some(p) = node.get_parent() {
+                self.focus(p);
+            }
+            return;
+        }
+
         let focusing = Some(node.clone());
         if self.focusing != focusing {
             // debug!("focusing {:?}", node.get_id());
@@ -895,6 +902,7 @@ impl Window {
     #[js_func]
     pub fn set_body(&mut self, mut body: Element) {
         body.set_window(Some(self.as_weak()));
+        body.set_focusable(true);
         if self.focusing.is_none() {
             self.focusing = Some(body.clone());
         }
@@ -985,7 +993,6 @@ impl Window {
         let mut me = self.clone();
         let viewport = Rect::new(0.0, 0.0, width as f32 / scale_factor, height as f32 / scale_factor);
         let mut paint_tree = if let Some(body) = &mut me.body {
-            self.render_tree.update_layout_info_recurse(body, body.get_bounds().to_skia_rect());
             self.render_tree.rebuild_render_object(body);
             some_or_return!(
                 self.render_tree.build_paint_tree_new(&viewport),
