@@ -6,7 +6,7 @@ use skia_window::context::RenderContext;
 use crate::canvas_util::CanvasHelper;
 use crate::paint::{InvalidRects, LayerState, RenderLayerKey};
 use crate::render::paint_object::{ElementPaintObject, LayerPaintObject, PaintObject};
-use crate::render::paint_tree::{PaintTree, PaintTreeNew};
+use crate::render::paint_tree::{PaintTreeNew};
 use crate::{show_focus_hit, show_layer_hit, show_repaint_area, some_or_continue, some_or_return};
 
 enum PaintStep {

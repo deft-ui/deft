@@ -50,7 +50,6 @@ use crate::frame_rate::{FrameRateController};
 use crate::layout::LayoutRoot;
 use crate::paint::{InvalidArea, PartialInvalidArea, Painter, RenderTree, SkiaPainter, UniqueRect, InvalidRects, MatrixCalculator, RenderLayerKey, LayerState};
 use crate::render::paint_object::{ElementPaintObject, PaintObject};
-use crate::render::paint_tree::PaintTree;
 use crate::render::painter::ElementPainter;
 use crate::resource_table::ResourceTable;
 use crate::style::border_path::BorderPath;
@@ -994,6 +993,7 @@ impl Window {
         let viewport = Rect::new(0.0, 0.0, width as f32 / scale_factor, height as f32 / scale_factor);
         let mut paint_tree = if let Some(body) = &mut me.body {
             self.render_tree.rebuild_render_object(body);
+            //TODO notify absolute position change
             some_or_return!(
                 self.render_tree.build_paint_tree_new(&viewport),
                 ResultWaiter::new_finished(false)

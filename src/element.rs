@@ -53,7 +53,6 @@ use crate::computed::ComputedValue;
 use crate::js::JsError;
 use crate::layout::LayoutRoot;
 use crate::paint::{MatrixCalculator, Painter, RenderTree, UniqueRect};
-use crate::render::paint_tree::PaintTree;
 use crate::render::RenderFn;
 use crate::style::border_path::BorderPath;
 use crate::style_manager::StyleManager;

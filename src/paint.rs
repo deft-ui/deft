@@ -20,7 +20,7 @@ use crate::renderer::CpuRenderer;
 use crate::{some_or_break, some_or_continue, some_or_return};
 use crate::render::layout_tree::LayoutTree;
 use crate::render::paint_object::{ElementPaintObject, LayerPaintObject, PaintObject};
-use crate::render::paint_tree::{PaintTree, PaintTreeNew};
+use crate::render::paint_tree::{PaintTreeNew};
 use crate::style::border_path::BorderPath;
 use crate::style::ColorHelper;
 
