@@ -625,7 +625,7 @@ impl ElementBackend for Text {
         RenderFn::new(move |canvas| {
             let clip_rect = canvas.local_clip_bounds();
             // if let Some(clip_r) = canvas.local_clip_bounds() {
-            //     println!("clip_r:{:?}", clip_r);
+            //     debug!("clip_r:{:?}", clip_r);
             //     let mut paint = Paint::default();
             //     paint.set_color(parse_hex_color("ccc").unwrap());
             //     canvas.draw_rect(clip_r, &paint);

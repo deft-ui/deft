@@ -29,6 +29,7 @@ use std::{env, mem, slice};
 use std::string::ToString;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
+use log::debug;
 use skia_safe::canvas::SetMatrix;
 use skia_safe::wrapper::{NativeTransmutableWrapper, PointerWrapper};
 use skia_window::context::RenderContext;
@@ -43,7 +44,7 @@ use winit::keyboard::{Key, KeyCode, NamedKey, PhysicalKey};
 #[cfg(x11_platform)]
 use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorGrabMode, CursorIcon, Fullscreen, WindowAttributes, WindowId};
-use crate::{bind_js_event_listener, is_snapshot_usable, ok_or_return, send_app_event, show_focus_hit, show_repaint_area, some_or_continue, some_or_return};
+use crate::{bind_js_event_listener, is_snapshot_usable, ok_or_return, send_app_event, show_focus_hit, show_repaint_area, some_or_continue, some_or_return, warn_time};
 use crate::computed::ComputedValue;
 use crate::frame_rate::{FrameRateController};
 use crate::layout::LayoutRoot;
@@ -272,7 +273,7 @@ impl Window {
             }
         };
         let height = rect.height() / self.window.scale_factor() as f32;
-        println!("updating style variable: {} {}", name, height);
+        debug!("updating style variable: {} {}", name, height);
         self.style_variables.update_value(name, format!("{:.6}", height));
     }
 
@@ -425,7 +426,6 @@ impl Window {
                     Ime::Enabled => {}
                     Ime::Preedit(_, _) => {}
                     Ime::Commit(str) => {
-                        println!("input:{}", str);
                         self.handle_input(&str);
                     }
                     Ime::Disabled => {}
@@ -474,7 +474,7 @@ impl Window {
                 self.handle_key(modifiers, scancode, named_key, key, key_str, repeat, pressed);
             }
             WindowEvent::MouseInput { button, state, .. } => {
-                // println!("mouse:{:?}:{:?}", button, state);
+                // debug!("mouse:{:?}:{:?}", button, state);
                 if treat_mouse_as_touch() {
                     match state {
                         ElementState::Pressed => {
@@ -489,7 +489,7 @@ impl Window {
                 }
             }
             WindowEvent::CursorMoved { position, root_position, .. } => {
-                //println!("cursor moved:{:?}", position);
+                //debug!("cursor moved:{:?}", position);
                 self.cursor_position = position.to_logical(self.window.scale_factor());
                 self.cursor_root_position = root_position.to_logical(self.window.scale_factor());
                 if treat_mouse_as_touch() {
@@ -507,7 +507,7 @@ impl Window {
                     }
                     MouseScrollDelta::PixelDelta(_) => {}
                 }
-                // println!("delta:{:?}", delta);
+                // debug!("delta:{:?}", delta);
             }
             WindowEvent::Touch(touch) => {
                 let loc = touch.location.to_logical(self.window.scale_factor());
@@ -752,15 +752,15 @@ impl Window {
             let touch_detail = TouchDetail { touches };
             match phase {
                 TouchPhase::Started => {
-                    println!("touch start:{:?}", touch_detail);
+                    debug!("touch start:{:?}", touch_detail);
                     node.emit(TouchStartEvent(touch_detail));
                 }
                 TouchPhase::Moved => {
-                    // println!("touch move:{:?}", &touch_detail);
+                    // debug!("touch move:{:?}", &touch_detail);
                     node.emit(TouchMoveEvent(touch_detail));
                 }
                 TouchPhase::Ended => {
-                    // println!("touch end:{:?}", &touch_detail);
+                    // debug!("touch end:{:?}", &touch_detail);
                     node.emit(TouchEndEvent(touch_detail));
                     if self.touching.max_identifiers == 1
                         && self.touching.times == 1
@@ -768,7 +768,7 @@ impl Window {
                         && SystemTime::now().duration_since(self.touching.start_time).unwrap().as_millis() < 1000
                     {
                         let mut node = node.clone();
-                        println!("clicked");
+                        debug!("clicked");
                         //TODO fix screen_x, screen_y
                         self.emit_mouse_event( &mut node, MouseClick, 0, window_x, window_y, 0.0, 0.0);
                     }
@@ -784,7 +784,7 @@ impl Window {
     pub fn focus(&mut self, mut node: Element) {
         let focusing = Some(node.clone());
         if self.focusing != focusing {
-            // println!("focusing {:?}", node.get_id());
+            // debug!("focusing {:?}", node.get_id());
             if let Some(old_focusing) = &mut self.focusing {
                 old_focusing.emit(BlurEvent);
 
@@ -879,6 +879,7 @@ impl Window {
             // skip duplicate update
             return ResultWaiter::new_finished(false);
         }
+        warn_time!(16, "update window");
         if self.layout_dirty {
             self.update_layout();
             if let Some(body) = &mut self.body {
@@ -1059,7 +1060,7 @@ impl Window {
         let body = self.body.clone()?;
         let (eo, x, y) = self.render_tree.get_element_object_by_pos(x, y)?;
         let element_id = eo.element_id;
-        // println!("found element id: {}", element_id);
+        // debug!("found element id: {}", element_id);
         let element = self.get_element_by_id(&body, element_id)?;
         Some((element, x, y))
     }
@@ -1118,14 +1119,14 @@ impl Window {
                     }
                 }
             }
-            println!("render backends: {:?}", backend_types);
+            debug!("render backends: {:?}", backend_types);
             for bt in &backend_types {
                 let mut init_attributes = attributes.clone().with_visible(false);
                 if let Some(mut sw) = SkiaWindow::new(el, init_attributes, *bt) {
                     if attributes.visible {
                         sw.set_visible(true);
                     }
-                    println!("created window with backend {:?}", bt);
+                    debug!("created window with backend {:?}", bt);
                     return sw;
                 }
             }
@@ -1189,14 +1190,14 @@ fn print_tree(node: &Element, padding: &str) {
     let name = node.get_backend().get_name();
     let children = node.get_children();
     if children.is_empty() {
-        println!("{}{}", padding, name);
+        debug!("{}{}", padding, name);
     } else {
-        println!("{}{}{}", padding, name, " {");
+        debug!("{}{}{}", padding, name, " {");
         for c in children {
             let c_padding = padding.to_string() + "  ";
             print_tree(&c, &c_padding);
         }
-        println!("{}{}", padding, "}");
+        debug!("{}{}", padding, "}");
     }
 }
 

@@ -6,6 +6,7 @@ use deft_macros::{js_func, js_methods};
 use quick_js::exception::HostPromiseRejectionTracker;
 use quick_js::JsValue;
 use std::env;
+use log::error;
 
 struct UserPromiseRejectionTracker {
     handler: JsValue,
@@ -14,7 +15,7 @@ struct UserPromiseRejectionTracker {
 impl HostPromiseRejectionTracker for UserPromiseRejectionTracker {
     fn track_promise_rejection(&mut self, promise: JsValue, reason: JsValue, is_handled: bool) {
         if let Err(e) = self.handler.call_as_function(vec![reason, promise]) {
-            println!("Failed to call user promise rejection handler: {:?}", e);
+            error!("Failed to call user promise rejection handler: {:?}", e);
         }
     }
 }

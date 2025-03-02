@@ -3,6 +3,7 @@ use std::future::Future;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use anyhow::Error;
+use log::error;
 use quick_js::{Context, ExecutionError, JsPromise, JsValue, ValueError};
 use skia_safe::textlayout::TextAlign;
 use skia_safe::wrapper::NativeTransmutableWrapper;
@@ -48,7 +49,7 @@ impl JsContext {
             match result {
                 Ok(res) => resolver.resolve(res),
                 Err(e) => {
-                    println!("promise error:{}", e);
+                    error!("promise error:{}", e);
                     resolver.reject(JsValue::String(format!("promise error:{}", e)));
                 }
             }

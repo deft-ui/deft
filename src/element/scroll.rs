@@ -3,6 +3,7 @@ use std::any::Any;
 use std::str::FromStr;
 use bezier_rs::{Bezier, TValue};
 use deft_macros::{element_backend, js_methods};
+use log::debug;
 use measure_time::print_time;
 use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
@@ -217,7 +218,7 @@ impl Scroll {
     }
 
     fn handle_caret_change(&mut self, detail: &CaretChangeEvent) {
-        // println!("caretchange:{:?}", detail.origin_bounds);
+        // debug!("caretchange:{:?}", detail.origin_bounds);
         let mut body = ok_or_return!(self.element.upgrade_mut());
         let scroll_origin_bounds = body.get_origin_content_bounds();
 
@@ -521,7 +522,7 @@ impl ElementBackend for Scroll {
             self.update_scroll_y(d.window_y, true);
             return true;
         } else if let Some(e) = event.downcast_mut::<TouchStartEvent>() {
-            // println!("touch start: {:?}", e.0);
+            // debug!("touch start: {:?}", e.0);
             let d = &e.0;
             let touch = unsafe { d.touches.get_unchecked(0) };
             let (window_x, window_y) = match self.map_window_xy(touch.window_x, touch.window_y) {
@@ -530,7 +531,7 @@ impl ElementBackend for Scroll {
             };
             self.begin_scroll_x(-window_x);
             self.begin_scroll_y(-window_y);
-            println!("touch start: pos {:?}", (window_x, window_y));
+            debug!("touch start: pos {:?}", (window_x, window_y));
             self.momentum_info = Some(MomentumInfo {
                 start_time: Instant::now(),
                 start_left: element.get_scroll_left(),
@@ -539,7 +540,7 @@ impl ElementBackend for Scroll {
             self.momentum_animation_instance = None;
             return true;
         } else if let Some(e) = event.downcast_mut::<TouchMoveEvent>() {
-            // println!("touch move: {:?}", e.0);
+            // debug!("touch move: {:?}", e.0);
             let d = &e.0;
             let touch = unsafe { d.touches.get_unchecked(0) };
             let (window_x, window_y) = match self.map_window_xy(touch.window_x, touch.window_y) {
@@ -550,7 +551,7 @@ impl ElementBackend for Scroll {
             self.update_scroll_y(-window_y, false);
             let left = element.get_scroll_left();
             let top = element.get_scroll_top();
-            // println!("touch updated: {:?}", (window_x, window_y));
+            // debug!("touch updated: {:?}", (window_x, window_y));
             if let Some(momentum_info) = &mut self.momentum_info {
                 if momentum_info.start_time.elapsed().as_millis() as f32 > MOMENTUM_DURATION {
                     momentum_info.start_time = Instant::now();
@@ -560,17 +561,17 @@ impl ElementBackend for Scroll {
             }
             return true;
         } else if let Some(e) = event.downcast_mut::<TouchEndEvent>() {
-            println!("touch end: {:?}", e.0);
+            debug!("touch end: {:?}", e.0);
             if let Some(momentum_info) = &self.momentum_info {
                 let duration = momentum_info.start_time.elapsed().as_nanos() as f32 / 1000_000.0;
                 let horizontal_distance = element.get_scroll_left() - momentum_info.start_left;
                 let vertical_distance = element.get_scroll_top() - momentum_info.start_top;
                 let max_distance = f32::max(horizontal_distance.abs(), vertical_distance.abs());
-                // println!("touch end: info{:?}", (duration, vertical_distance));
+                // debug!("touch end: info{:?}", (duration, vertical_distance));
                 if duration < MOMENTUM_DURATION && max_distance > MOMENTUM_DISTANCE {
                     let horizontal_speed = calculate_speed(horizontal_distance, duration);
                     let vertical_speed = calculate_speed(vertical_distance, duration);
-                    // println!("speed: {} {}", horizontal_speed, vertical_speed);
+                    // debug!("speed: {} {}", horizontal_speed, vertical_speed);
                     let old_left = element.get_scroll_left();
                     let old_top = element.get_scroll_top();
                     let left_dist = horizontal_speed / 0.003;

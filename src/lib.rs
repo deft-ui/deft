@@ -85,6 +85,7 @@ mod style_manager;
 pub mod winit;
 
 pub use deft_macros::*;
+use log::debug;
 use rodio::cpal::available_hosts;
 use skia_safe::font_style::{Weight, Width};
 use skia_safe::font_style::Slant::Upright;
@@ -151,12 +152,12 @@ pub fn android_bootstrap(app: AndroidApp, deft_app: App) {
     // info!("starting");
     if let Some(p) = app.internal_data_path() {
         let data_path = p.into_os_string().to_string_lossy().to_string();
-        println!("internal data_path:{}", data_path);
+        debug!("internal data_path:{}", data_path);
         unsafe {
             std::env::set_var(data_dir::ENV_KEY, data_path);
         }
     }
-    println!("data path: {:?}", data_dir::get_data_path(""));
+    debug!("data path: {:?}", data_dir::get_data_path(""));
     let event_loop = EventLoop::with_user_event().with_android_app(app).build().unwrap();
     run_event_loop(event_loop, deft_app);
 }
@@ -170,7 +171,7 @@ fn main_js_deserializer() {
         value: JsValue::Object(map)
     };
     let result = ScrollByOption::deserialize(des).unwrap();
-    println!("result:{:?}", result);
+    debug!("result:{:?}", result);
 }
 
 // test layout performance
@@ -197,7 +198,7 @@ fn test_layout() {
             it.paragraph.layout(700.0);
         }
         let mem_use = memory_stats().unwrap().physical_mem as f32 - start_mem_use;
-        println!("mem use:{}", mem_use / 1024.0 / 1024.0);
+        debug!("mem use:{}", mem_use / 1024.0 / 1024.0);
     }
     let mut renderer = CpuRenderer::new(1024, 1024);
     {
@@ -223,19 +224,19 @@ fn test_text_measure() {
     let fm = FONT_MGR.with(|fm| fm.clone());
     let mut font_style = FontStyle::new(Weight::NORMAL, Width::NORMAL, Upright);
     let tf = fm.match_family_style("monospace", font_style).unwrap();
-    println!("font name: {}", &tf.family_name());
+    debug!("font name: {}", &tf.family_name());
     let font = Font::from_typeface(tf, 14.0);
     {
         print_time!("measure time");
         for ln in text.lines() {
             let lines = break_lines(&font, ln, 100.0);
-            // println!("lines:{:?}", lines);
+            // debug!("lines:{:?}", lines);
             // for ch in ln.chars() {
             //     font.measure_str(ch.to_string(), Some(&paint));
             // }
         }
         let mem_use = memory_stats().unwrap().physical_mem as f32 - start_mem_use;
-        println!("mem use:{}", mem_use / 1024.0 / 1024.0);
+        debug!("mem use:{}", mem_use / 1024.0 / 1024.0);
     }
 
 }

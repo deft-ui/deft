@@ -50,7 +50,7 @@ impl SimpleParagraphBuilder {
         let font_families = style.font_families();
         let font_families_names: Vec<&str> = font_families.iter().collect();
         let mut text_blocks = self.resolve_font(&font_families_names, &style, &text);
-        // println!("text_blocks: {:?} {:?}", &text, &text_blocks);
+        // debug!("text_blocks: {:?} {:?}", &text, &text_blocks);
         self.text_blocks.append(&mut text_blocks);
     }
 

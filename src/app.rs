@@ -4,6 +4,7 @@ use std::thread;
 use anyhow::Error;
 use jni::objects::JValue;
 use jni::sys::{jboolean, jlong};
+use log::debug;
 use skia_safe::Rect;
 use crate::js::loader::JsModuleLoader;
 use winit::application::ApplicationHandler;
@@ -150,10 +151,10 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
         run_event_loop_task(event_loop, move || {
             match event.event {
                 AppEvent::BindWindow(id) => {
-                    println!("bindWindow {} Start", id);
+                    debug!("bindWindow {} Start", id);
                     #[cfg(target_os = "android")]
                     bind_deft_window(event_loop.android_app().clone(), id).unwrap();
-                    println!("bindWindow {} Done", id);
+                    debug!("bindWindow {} Done", id);
                 }
                 AppEvent::Callback(callback) => {
                     callback();
@@ -166,12 +167,12 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
                     }
                 }
                 AppEvent::ShowSoftInput(window_id) => {
-                    println!("show soft input");
+                    debug!("show soft input");
                     #[cfg(target_os = "android")]
                     show_hide_keyboard(event_loop.android_app().clone(), window_id, true);
                 },
                 AppEvent::HideSoftInput(window_id) => {
-                    println!("hide soft input");
+                    debug!("hide soft input");
                     #[cfg(target_os = "android")]
                     show_hide_keyboard(event_loop.android_app().clone(), window_id, false);
                 },
@@ -200,7 +201,7 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
-        // println!("onWindowEvent: {:?}", event);
+        // debug!("onWindowEvent: {:?}", event);
         run_event_loop_task(event_loop, move || {
             self.js_engine.handle_window_event(window_id, event);
             self.execute_pending_jobs();
@@ -208,7 +209,7 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
     }
 
     fn device_event(&mut self, event_loop: &ActiveEventLoop, device_id: DeviceId, event: DeviceEvent) {
-        // println!("onDeviceEvent: {:?}", event);
+        // debug!("onDeviceEvent: {:?}", event);
         run_event_loop_task(event_loop, move || {
             self.js_engine.handle_device_event(device_id, event);
             self.execute_pending_jobs();

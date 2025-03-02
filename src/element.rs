@@ -628,7 +628,7 @@ impl Element {
     }
 
     fn set_style_prop_internal(&mut self, style: StyleProp) {
-        // println!("setting style {:?}", style);
+        // debug!("setting style {:?}", style);
         if self.backend.accept_style(&style) {
             self.style_props.insert(style.key().clone(), style);
             self.apply_style();
@@ -700,7 +700,7 @@ impl Element {
 
         let old_style = self.applied_style.clone();
         let mut changed_style_props = Self::calculate_changed_style(&old_style, &new_style);
-        // println!("changed style props:{:?}", changed_style_props);
+        // debug!("changed style props:{:?}", changed_style_props);
 
         changed_style_props.iter().for_each(| e | {
             let (repaint, need_layout) = self.style.set_style(e.clone());

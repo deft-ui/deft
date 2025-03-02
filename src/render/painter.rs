@@ -52,7 +52,7 @@ impl ElementPainter {
 
         /*
         for k in &obj.all_layer_keys {
-            // println!("Merging layer {:?}", k);
+            // debug!("Merging layer {:?}", k);
             let layer = some_or_continue!(self.layer_state_map.get_mut(&k));
             let img = layer.layer.as_image();
             canvas.save();
@@ -81,7 +81,7 @@ impl ElementPainter {
     }
 
     fn draw_element_object_recurse(&mut self, canvas: &Canvas, epo: &mut ElementPaintObject, context: &mut RenderContext, layer_states: &mut HashMap<RenderLayerKey, LayerState>) {
-        // println!("Painting {}", epo.element_id);
+        // debug!("Painting {}", epo.element_id);
         //TODO optimize
         if !epo.need_paint && epo.children.is_empty() {
             return;

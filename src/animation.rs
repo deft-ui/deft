@@ -10,6 +10,7 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::ops::Bound::{Excluded, Included};
 use std::time::SystemTime;
+use log::debug;
 use tokio::time::Instant;
 use yoga::StyleUnit;
 use crate::base::Callback;
@@ -90,7 +91,7 @@ fn interpolate_transform(prev: &StyleTransform, next: &StyleTransform, position:
         if let Some(v) = interpolate_transform_op(p, n, position) {
             op_list.push(v);
         } else {
-            println!("Unsupported animation value");
+            debug!("Unsupported animation value");
         }
         //TODO support other transform
     }
@@ -289,14 +290,14 @@ impl AnimationInstance {
     pub fn run(&mut self, renderer: Box<dyn FnMut(Vec<StyleProp>)>) {
         let mut state = self.state.clone();
         self.state.frame_controller.request_next_frame(Box::new(move || {
-            // println!("animation started:{}", t);
+            // debug!("animation started:{}", t);
             state.start_time = Instant::now();
             Self::render_frame(state, renderer);
         }));
     }
 
     fn stop(&mut self) {
-        // println!("stopped");
+        // debug!("stopped");
         self.state.stopped = true;
     }
 

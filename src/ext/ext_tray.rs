@@ -11,6 +11,7 @@ use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
 use std::cell::Cell;
 use ksni::MenuItem::{Checkmark, Separator};
+use log::{debug, error};
 use winit::event_loop::EventLoopProxy;
 use crate::{js_deserialize, js_value};
 
@@ -29,7 +30,7 @@ thread_local! {
 
 impl Tray for MyTray {
     fn activate(&mut self, _x: i32, _y: i32) {
-        println!("Activate");
+        debug!("Activate");
         (self.activate_callback)();
     }
     fn icon_name(&self) -> String {
@@ -71,7 +72,7 @@ impl Tray for MyTray {
                     list.push(Separator);
                 }
                 _ => {
-                    println!("invalid menu kind: {}", m.kind)
+                    error!("invalid menu kind: {}", m.kind)
                 }
             }
         }

@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::sync::mpsc::{SendError, Sender};
 use std::sync::{Arc, LazyLock, Mutex, OnceLock};
 use std::thread;
+use log::error;
 use crate::app::{IApp, App};
 use crate::id_generator::IdGenerator;
 use crate::id_hash_map::IdHashMap;
@@ -108,7 +109,7 @@ impl Service {
 
                 let r = js_engine.execute_module(module_name.as_str());
                 if let Err(err) = r {
-                    println!("Error executing module: {}, error:{}", module_name, err);
+                    error!("Error executing module: {}, error:{}", module_name, err);
                     return;
                 }
                 js_engine.execute_pending_jobs();

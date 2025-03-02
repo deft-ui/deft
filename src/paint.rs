@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::mem;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use log::debug;
 use measure_time::print_time;
 use sha1::digest::generic_array::functional::FunctionalSequence;
 use skia_safe::{scalar, ClipOp, Color, Contains, IRect, Image, Matrix, Paint, Path, PathOp, Point, Rect, Vector};
@@ -131,7 +132,7 @@ pub struct LayerNode {
 
 impl LayerObjectData {
     pub fn invalid(&mut self, rect: &Rect) {
-        // println!("Invalid {:?}   {:?}", self.key, rect);
+        // error!("Invalid {:?}   {:?}", self.key, rect);
         self.invalid_area.add_rect(Some(rect));
     }
 
@@ -1027,7 +1028,7 @@ pub fn test_rect_intersect() {
     let mut rect = Rect::from_xywh(0.0, 0.0, 100.0, 100.0);
     let rect2 = Rect::from_xywh(50.0, 50.0, 100.0, 100.0);
     rect.intersect(&rect2);
-    println!("{:?}", rect);
+    debug!("{:?}", rect);
 }
 
 #[test]
@@ -1049,12 +1050,12 @@ pub fn test_matrix() {
     let sx = 4.0;
     let sy = 9.0;
     let d = matrix.map_xy(sx, sy);
-    println!("s={},{}", sx, sy);
-    println!("d={},{}", d.x, d.y);
+    debug!("s={},{}", sx, sy);
+    debug!("d={},{}", d.x, d.y);
 
     let invert_matrix = matrix.invert().unwrap();
     let r = invert_matrix.map_xy(d.x, d.y);
-    println!("r={}, {}", r.x, r.y);
+    debug!("r={}, {}", r.x, r.y);
 
     {
         print_time!("map rect time");

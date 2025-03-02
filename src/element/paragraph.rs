@@ -862,7 +862,7 @@ fn test_measure() {
         text.push_str(text_demo);
     }
     // let font = DEFAULT_TYPE_FACE.with(|tf| Font::from_typeface(tf, 14.0));
-    // println!("font {:?}", font.typeface().family_name());
+    // debug!("font {:?}", font.typeface().family_name());
     // print_time!("measure time");
     // let result = font.measure_text(text.as_str(), None);
 }

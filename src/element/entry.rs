@@ -480,7 +480,7 @@ impl Entry {
             let caret_visible = self.caret_visible.clone();
             let context = self.element.clone();
             timer::set_interval(move || {
-                //println!("onInterval");
+                //debug!("onInterval");
                 Self::caret_tick(caret_visible.clone(), context.clone());
             }, 500)
         });
@@ -567,7 +567,7 @@ impl Entry {
     }
 
     fn handle_input(&mut self, input: &str) {
-        //println!("on input:{}", input);
+        //debug!("on input:{}", input);
         self.insert_text(input, self.caret, true);
     }
 

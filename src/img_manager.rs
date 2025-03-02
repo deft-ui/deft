@@ -7,6 +7,7 @@ use libc::memcpy;
 use skia_safe::{AlphaType, Bitmap, ColorSpace, ColorType, Image, ImageInfo};
 use std::borrow::Borrow;
 use std::cell::RefCell;
+use log::error;
 
 thread_local! {
     pub static IMG_MANAGER: ImgManager = ImgManager::new();
@@ -45,7 +46,7 @@ impl ImgManager {
                 Some(img)
             }
             Err(err) => {
-                println!("failed to load image:{:?}", err);
+                error!("failed to load image:{:?}", err);
                 None
             }
         }

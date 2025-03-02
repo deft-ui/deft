@@ -5,6 +5,7 @@ pub mod event_handling;
 pub mod style;
 pub mod obj_ref;
 pub mod js_type;
+mod performance;
 
 #[macro_export]
 macro_rules! ok_or_return {

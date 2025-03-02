@@ -12,6 +12,7 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::Duration;
 use std::{fs, thread};
+use log::{debug, error};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AudioCurrentChangeInfo {
@@ -64,13 +65,13 @@ impl AudioSources {
                     match Self::create_source(path.as_str()) {
                         Ok(src) => SourceResult::Some((id, src)),
                         Err(err) => {
-                            eprintln!("load source failed:{}", err);
+                            error!("load source failed:{}", err);
                             self.next_source()
                         }
                     }
                 }
                 Err(e) => {
-                    println!("error: {:?}", e);
+                    error!("error: {:?}", e);
                     self.next_source()
                 }
             };
@@ -88,7 +89,7 @@ impl AudioSources {
                     let key = base16ct::lower::encode_string(&Sha1::digest(&s));
                     let path = cache_dir.join(key);
                     if !path.exists() {
-                        println!("downloading {} to {:?}", &s, &path);
+                        debug!("downloading {} to {:?}", &s, &path);
 
                         let rsp = reqwest::blocking::get(&s).unwrap();
                         let bytes = rsp.bytes().unwrap();

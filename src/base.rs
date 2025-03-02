@@ -10,6 +10,7 @@ use std::str::FromStr;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::thread::LocalKey;
 use anyhow::Error;
+use log::debug;
 use quick_js::{JsValue, ValueError};
 use serde::{Deserialize, Serialize};
 use skia_safe::Path;
@@ -645,7 +646,7 @@ fn test_event_registration() {
     }
     impl EventListener<MyEvent, ()> for MyEventListener {
         fn handle_event(&mut self, event: &mut MyEvent, ctx: &mut EventContext<()>) {
-            println!("handling {:?}", event);
+            debug!("handling {:?}", event);
             let mut v = event.value.borrow_mut();
             *v = 1;
         }

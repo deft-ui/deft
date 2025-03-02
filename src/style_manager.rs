@@ -1,6 +1,7 @@
 use crate as deft;
 use std::collections::HashMap;
 use deft_macros::mrc_object;
+use log::debug;
 use quick_js::JsValue;
 use skia_safe::wrapper::NativeTransmutableWrapper;
 use crate::computed::{ComputedValue, ComputedValueHandle};
@@ -186,7 +187,7 @@ fn test_style_manager() {
     style_vars.update_value("height", "5".to_string());
     let mut sm = StyleManager::new();
     sm.set_style_consumer(|style| {
-        println!("style {:?}", style);
+        debug!("style {:?}", style);
     });
     sm.bind_style_variables(&style_vars);
     sm.parse_style("width", "4");

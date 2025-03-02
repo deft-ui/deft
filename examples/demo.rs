@@ -12,6 +12,7 @@ impl IApp for AppImpl {
 }
 
 fn main() {
+    env_logger::init();
     let app = App::new(AppImpl {});
     bootstrap(app);
 }

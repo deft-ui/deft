@@ -48,7 +48,7 @@ pub fn test_border(canvas: &Canvas) {
     style.calculate_layout(70.0, 16.0, Direction::LTR);
     let width = style.get_layout_width();
     let height = style.get_layout_height();
-    println!("size: {} x {}", width, height);
+    debug!("size: {} x {}", width, height);
     for i in 0..1000 {
         let y = (i / 20) * 20;
         let x = i % 20 * 80;

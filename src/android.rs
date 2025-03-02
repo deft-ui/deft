@@ -23,9 +23,9 @@ pub extern "system" fn Java_deft_DeftActivity_send<'local>(mut env: JNIEnv<'loca
 {
     let input: String =
         env.get_string(&input).expect("Couldn't get java string!").into();
-    println!("receive input:{}", input);
+    debug!("receive input:{}", input);
     if let Err(e) = send_app_event(AppEvent::CommitInput(window_id as i32, input)) {
-        println!("send app event error: {:?}", e);
+        debug!("send app event error: {:?}", e);
     }
 }
 
@@ -38,9 +38,9 @@ pub extern "system" fn Java_deft_DeftActivity_sendKey0<'local>(mut env: JNIEnv<'
 {
     let input: String =
         env.get_string(&input).expect("Couldn't get java string!").into();
-    println!("receive key input:{}", input);
+    debug!("receive key input:{}", input);
     if let Err(e) = send_app_event(AppEvent::NamedKeyInput(window_id as i32, input, pressed != 0)) {
-        println!("send app event error: {:?}", e);
+        debug!("send app event error: {:?}", e);
     }
 }
 
@@ -56,10 +56,10 @@ pub extern "system" fn Java_deft_DeftActivity_setInset0<'local>(mut env: JNIEnv<
 {
     if let Some(ty) = InsetType::from_i32(inset_type) {
         let rect = Rect::new(left, top, right, bottom);
-        println!("setInset0,{} {:?}, {:?}", window_id, ty, rect);
+        debug!("setInset0,{} {:?}, {:?}", window_id, ty, rect);
         send_app_event(AppEvent::SetInset(window_id as i32, ty, rect));
     } else {
-        println!("unknown inset type: {:?}", inset_type);
+        debug!("unknown inset type: {:?}", inset_type);
     }
 }
 

@@ -2,6 +2,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use anyhow::Error;
 use deft_macros::js_func;
+use log::error;
 use quick_js::{JsValue};
 use crate::timer::{set_interval, set_timeout, TimerHandle};
 use crate as deft;
@@ -22,7 +23,7 @@ pub fn timer_set_timeout(callback: JsValue, timeout: Option<i32>) -> Result<i32,
         match r {
             Ok(_) => {}
             Err(err) => {
-                println!("timeout callback error:{:?}", err);
+                error!("timeout callback error:{:?}", err);
             }
         }
         TIMERS.with_borrow_mut(|m| m.remove(&id));
