@@ -9,6 +9,7 @@ use tokio::net::TcpStream;
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 use tokio_tungstenite::tungstenite::Message;
 use crate::mrc::Mrc;
+use crate::some_or_return;
 
 #[derive(Clone)]
 pub struct WebSocketManager {
@@ -65,8 +66,10 @@ impl WebSocketManagerInner {
     }
 
     pub async fn read_msg(&mut self, id: i32) -> Result<Message, io::Error> {
-        //TODO no unwrap
-        let (_, reader) = self.clients.get_mut(&id).unwrap();
+        let (_, reader) = some_or_return!(
+            self.clients.get_mut(&id),
+            Err(io::Error::new(ErrorKind::InvalidInput, format!("invalid client id: {}", id)))
+        );
         if let Some(result) = reader.next().await {
             result.map_err(|e| io::Error::new(ErrorKind::Other, e))
         } else {

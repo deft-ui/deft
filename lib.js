@@ -1435,7 +1435,6 @@ export class WebSocket {
     }
 
     async send(data) {
-        //TODO check status
         try {
             await WsConnection_send_str(this.client, data + "");
         } catch (error) {

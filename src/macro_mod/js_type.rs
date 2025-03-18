@@ -89,9 +89,10 @@ macro_rules! js_deserialize {
         impl deft::js::FromJsValue for $ty
         {
              fn from_js_value(value: deft::js::JsValue) -> Result<Self, deft::js::ValueError> {
-                 //TODO no unwrap
                  use serde::Deserialize;
-                 Ok(Self::deserialize(deft::js::js_deserialze::JsDeserializer { value }).unwrap())
+                 let v = Self::deserialize(deft::js::js_deserialze::JsDeserializer { value })
+                    .map_err(|e| deft::js::ValueError::Internal(format!("Failed to deserialize js valued: {:?}", e)))?;
+                 Ok(v)
              }
 
         }

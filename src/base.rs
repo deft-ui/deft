@@ -10,7 +10,7 @@ use std::str::FromStr;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::thread::LocalKey;
 use anyhow::Error;
-use log::debug;
+use log::{debug, error};
 use quick_js::{JsValue, ValueError};
 use serde::{Deserialize, Serialize};
 use skia_safe::Path;
@@ -449,8 +449,14 @@ impl<E: ToJsValue + Clone + 'static> EventRegistration<E> {
     pub fn add_js_event_listener(&mut self, event_type: &str, callback: JsValue) -> i32 {
         let handler = create_event_handler(event_type, callback);
         let id = self.add_event_listener(event_type, Box::new(move |e| {
-            //TODO no unwrap
-            handler(&mut e.context, e.detail.create_js_value().unwrap());
+            match e.detail.create_js_value() {
+                Ok(ev) => {
+                    handler(&mut e.context, ev);
+                }
+                Err(e) => {
+                    error!("Failed to convert rust object to js value: {}", e);
+                }
+            }
         }));
         id as i32
     }

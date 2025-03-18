@@ -34,11 +34,9 @@ pub fn timer_set_timeout(callback: JsValue, timeout: Option<i32>) -> Result<i32,
     Ok(id)
 }
 
-//TODO no return?
 #[js_func]
-pub fn timer_clear_timeout(id: i32) -> Result<(), JsError> {
+pub fn timer_clear_timeout(id: i32)  {
     TIMERS.with_borrow_mut(|m| m.remove(&id));
-    Ok(())
 }
 
 #[js_func]
@@ -55,7 +53,6 @@ pub fn timer_set_interval(callback: JsValue, interval: i32) -> Result<i32, JsErr
 }
 
 #[js_func]
-pub fn timer_clear_interval(id: i32) -> Result<(), JsError> {
+pub fn timer_clear_interval(id: i32) {
     TIMERS.with_borrow_mut(|m| m.remove(&id));
-    Ok(())
 }

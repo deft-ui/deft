@@ -1550,9 +1550,8 @@ pub fn parse_float(value: &str) -> f32 {
 }
 
 pub fn parse_style_unit(value: &str) -> Option<StyleUnit> {
-    //TODO no unwrap
-    return if value.ends_with("%") {
-        let width = f32::from_str(value.strip_suffix("%").unwrap()).unwrap();
+    if let Some(v) = value.strip_suffix("%") {
+        let width = f32::from_str(v).unwrap();
         Some(StyleUnit::Percent(OrderedFloat(width)))
     } else {
         match f32::from_str(value) {

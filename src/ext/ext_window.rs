@@ -101,8 +101,4 @@ impl WindowWeak {
 
 }
 
-// Js Api
-//TODO remove
-// define_resource!(WindowWeak);
-
 js_weak_value!(Window, WindowWeak);
