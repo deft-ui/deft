@@ -1,32 +1,16 @@
 
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::ffi::{CStr, CString};
-use std::num::NonZeroU32;
-use std::time::Instant;
-use ::gl::GetIntegerv;
-use gl::types::GLint;
 
-use winit::event::{ElementState, Event, KeyEvent, WindowEvent};
-use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopBuilder};
+use winit::event::{ElementState, WindowEvent};
+use winit::event_loop::{ActiveEventLoop, EventLoop};
 #[cfg(target_os = "android")]
 use winit::platform::android::activity::AndroidApp;
 #[cfg(glx_backend)]
 use winit::platform::x11;
 
-use glutin::config::{Config, ConfigSurfaceTypes, ConfigTemplate, ConfigTemplateBuilder};
-use glutin::context::{ContextApi, ContextAttributesBuilder, NotCurrentContext, PossiblyCurrentContext};
-use glutin::display::{Display, DisplayApiPreference};
-use glutin::prelude::*;
-use glutin::surface::{SurfaceAttributesBuilder, WindowSurface};
-use log::info;
-use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle, RawDisplayHandle, RawWindowHandle};
-use skia_safe::{Color, Paint, Rect, Surface};
-use skia_safe::gpu::{backend_render_targets, SurfaceOrigin};
-use skia_safe::gpu::gl::FramebufferInfo;
-use skia_safe::PaintStyle::Stroke;
+use skia_safe::{Color, Paint};
 use winit::application::ApplicationHandler;
-use winit::window::{Fullscreen, Window, WindowAttributes, WindowId};
+use winit::window::{Fullscreen, WindowAttributes, WindowId};
 use skia_window::renderer::Renderer;
 use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 
@@ -37,7 +21,7 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
-        let mut windows = HashMap::new();
+        let windows = HashMap::new();
         Self {
             windows,
         }
@@ -53,7 +37,7 @@ impl ApplicationHandler for App {
     fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
         if let Some(win) = self.windows.get_mut(&window_id) {
             match event {
-                WindowEvent::MouseInput { state, button, .. } => {
+                WindowEvent::MouseInput { state, .. } => {
                     if state == ElementState::Pressed {
                         if win.fullscreen().is_some() {
                             win.set_fullscreen(None);
@@ -85,12 +69,12 @@ impl ApplicationHandler for App {
         }
     }
 
-    fn suspended(&mut self, event_loop: &ActiveEventLoop) {
+    fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
         //self.app.suspended(event_loop)
     }
 }
 
-fn run(mut event_loop: EventLoop<()>) {
+fn run(event_loop: EventLoop<()>) {
     log::trace!("Running mainloop...");
 
     let mut app = App::new();

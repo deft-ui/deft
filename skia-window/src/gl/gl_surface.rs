@@ -22,10 +22,8 @@ use crate::surface::RenderBackend;
 #[allow(dead_code)]
 pub struct SurfaceState {
     glutin_display: Display,
-    //TODO make private
-    pub render: GlRenderer,
-    //TODO make private
-    pub window: Window,
+    render: GlRenderer,
+    window: Window,
 }
 
 impl SurfaceState {
