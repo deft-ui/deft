@@ -20,7 +20,7 @@ impl JsModuleLoader for RemoteModuleLoader {
         let url = if module_name.starts_with("http://") || module_name.starts_with("https://") {
             module_name.to_string()
         } else if let Some(base) = &self.base {
-            format!("{}/{}", base.trim_end_matches("/"), module_name)
+            format!("{}/{}", base.trim_end_matches("/"), module_name.trim_start_matches("/"))
         } else {
             return Err(Error::new(ErrorKind::AddrNotAvailable, anyhow!("Failed to resolve module: {}", module_name)));
         };
