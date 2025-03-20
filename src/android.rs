@@ -7,6 +7,7 @@ use winit::platform::android::activity::AndroidApp;
 use crate::app::{AppEvent, InsetType};
 use crate::event_loop::{create_event_loop_proxy};
 use crate::send_app_event;
+use log::debug;
 
 pub static ANDROID_APP: OnceLock<AndroidApp> = OnceLock::new();
 
