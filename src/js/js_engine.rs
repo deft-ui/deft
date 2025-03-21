@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::fmt::Debug;
+use std::future::Future;
 use std::panic::RefUnwindSafe;
 
 use anyhow::anyhow;
@@ -41,6 +42,7 @@ use crate::ext::ext_worker::{SharedModuleLoader, Worker, WorkerInitParams};
 use crate::window::{Window, WindowType};
 use crate::js::js_binding::{JsCallError, JsFunc};
 use crate::js::js_runtime::JsContext;
+use crate::js::ToJsCallResult;
 use crate::mrc::Mrc;
 use crate::typeface::typeface_create;
 
@@ -165,6 +167,14 @@ impl JsEngine {
         Worker::init_js_api(WorkerInitParams { app });
         engine.add_global_functions(Worker::create_js_apis());
         JS_ENGINE.with(|e| *e.borrow_mut() = Some(Mrc::new(engine)));
+    }
+
+    pub fn create_async_task<F, O>(&mut self, future: F) -> JsValue
+    where
+        F: Future<Output=O> + Send + 'static,
+        O: ToJsCallResult,
+    {
+        self.js_context.create_async_task2(future)
     }
 
     pub fn init_api(&self) {

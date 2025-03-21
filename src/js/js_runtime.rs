@@ -39,25 +39,6 @@ impl JsContext {
         (result, resolver)
     }
 
-    pub fn create_async_task<F>(&mut self, future: F) -> JsValue
-    where
-        F: Future<Output=Result<JsValue, Error>> + Send + 'static,
-    {
-        let (result, resolver) = self.create_promise();
-        self.runtime.spawn(async move {
-            let result = future.await;
-            match result {
-                Ok(res) => resolver.resolve(res),
-                Err(e) => {
-                    error!("promise error:{}", e);
-                    resolver.reject(JsValue::String(format!("promise error:{}", e)));
-                }
-            }
-            // resolver.resolve(result)
-        });
-        result
-    }
-
     pub fn create_async_task2<F, O>(&mut self, future: F) -> JsValue
     where
         F: Future<Output=O> + Send + 'static,
