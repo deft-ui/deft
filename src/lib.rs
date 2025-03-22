@@ -83,6 +83,7 @@ pub mod render;
 mod computed;
 mod style_manager;
 pub mod winit;
+mod task_executor;
 
 pub use deft_macros::*;
 use log::debug;

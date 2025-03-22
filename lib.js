@@ -1647,7 +1647,8 @@ export class Sqlite {
      * @returns {Promise<SqliteConn>}
      */
     static async open(path) {
-        const conn = await SqliteConn_open(path);
+        const conn = SqliteConn_create();
+        await SqliteConn_open(conn, path);
         return new SqliteConn(conn);
     }
 

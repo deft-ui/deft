@@ -14,7 +14,7 @@ use crate::app::{AppEvent};
 use crate::base::UnsafeFnOnce;
 use crate::js::js_value_util::JsValueHelper;
 use crate::element::label::parse_align;
-use crate::js::{ToJsCallResult};
+use crate::js::{JsError, ToJsCallResult};
 use crate::js::js_event_loop::{js_create_event_loop_proxy, JsEvent, JsEventLoopProxy};
 use crate::resource_table::ResourceTable;
 
@@ -105,6 +105,15 @@ impl PromiseResolver {
                 promise.resolve(value)
             });
             self.event_loop_proxy.schedule_macro_task(callback.into_box()).unwrap();
+        }
+    }
+
+    pub fn settle(mut self, result: Result<JsValue, String>) {
+        match result {
+            Ok(v) => {
+                self.resolve(v)
+            }
+            Err(e) => self.reject(JsValue::String(e)),
         }
     }
 

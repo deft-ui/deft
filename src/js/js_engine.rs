@@ -5,7 +5,7 @@ use std::panic::RefUnwindSafe;
 
 use anyhow::anyhow;
 use quick_js::loader::JsModuleLoader;
-use quick_js::{Callback, Context, ExecutionError, JsValue, ValueError};
+use quick_js::{Callback, Context, ExecutionError, JsPromise, JsValue, ValueError};
 use tokio::runtime::Builder;
 use winit::event::{DeviceEvent, DeviceId, WindowEvent};
 use winit::window::{CursorGrabMode, WindowId};
@@ -41,7 +41,8 @@ use crate::ext::ext_websocket::WsConnection;
 use crate::ext::ext_worker::{SharedModuleLoader, Worker, WorkerInitParams};
 use crate::window::{Window, WindowType};
 use crate::js::js_binding::{JsCallError, JsFunc};
-use crate::js::js_runtime::JsContext;
+use crate::js::js_event_loop::js_create_event_loop_proxy;
+use crate::js::js_runtime::{JsContext, PromiseResolver};
 use crate::js::ToJsCallResult;
 use crate::mrc::Mrc;
 use crate::typeface::typeface_create;
@@ -176,6 +177,11 @@ impl JsEngine {
     {
         self.js_context.create_async_task2(future)
     }
+
+    pub fn create_promise(&mut self) -> (JsValue, PromiseResolver) {
+        self.js_context.create_promise()
+    }
+
 
     pub fn init_api(&self) {
         let libjs = String::from_utf8_lossy(include_bytes!("../../lib.js"));
