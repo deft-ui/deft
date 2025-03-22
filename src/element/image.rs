@@ -1,11 +1,12 @@
 use crate as deft;
 use std::fs::File;
 use std::io::Cursor;
-
+use std::rc::Rc;
 use anyhow::Error;
 use base64::Engine;
 use base64::prelude::*;
 use deft_macros::{element_backend, js_methods};
+use image::ImageReader;
 use quick_js::JsValue;
 use skia_safe::{Canvas};
 use skia_safe::svg::Dom;
@@ -14,7 +15,7 @@ use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 
 use crate::element::{ElementBackend, Element, ElementWeak};
 use crate::element::label::FONT_MGR;
-use crate::img_manager::IMG_MANAGER;
+use crate::img_manager::{dyn_image_to_skia_image, IMG_MANAGER};
 use crate::{js_call, ok_or_return};
 use crate::render::RenderFn;
 
@@ -74,22 +75,22 @@ impl Image {
 
     #[js_func]
     pub fn set_src(&mut self, src: String) {
-        //TODO optimize data-url parsing
-        let base64_prefix = "data:image/svg+xml;base64,";
-        self.img = if src.starts_with(base64_prefix) {
-            if let Ok(dom) = Self::load_svg_base64(&src[base64_prefix.len()..]) {
-                ImageSrc::Svg(dom)
-            } else {
-                ImageSrc::None
+        if let Some(data_url) = src.strip_prefix("data:") {
+            if let Some((mime, data)) = Self::parse_data_url(data_url) {
+                if mime.starts_with("image/svg") {
+                    self.load_svg_from_data(&data);
+                } else {
+                    self.load_image_from_data(&data);
+                }
             }
         } else if src.ends_with(".svg") {
-            if let Ok(dom) = Self::load_svg(&src) {
+            self.img = if let Ok(dom) = Self::load_svg(&src) {
                 ImageSrc::Svg(dom)
             } else {
                 ImageSrc::None
             }
         } else {
-            if let Some(img) = IMG_MANAGER.with(|im| im.get_img(&src)) {
+            self.img = if let Some(img) = IMG_MANAGER.with(|im| im.get_img(&src)) {
                 ImageSrc::Img(img)
             } else {
                 ImageSrc::None
@@ -101,16 +102,40 @@ impl Image {
         self.element.mark_dirty(true);
     }
 
-    fn load_svg_base64(data: &str) -> Result<Dom, Error> {
-        let bytes = BASE64_STANDARD.decode(data)?;
+    fn load_svg_from_data(&mut self, data: &Vec<u8>) {
         let fm = FONT_MGR.with(|fm| fm.clone());
-        Ok(Dom::read(Cursor::new(bytes), fm)?)
+        self.img = match Dom::read(Cursor::new(data), fm) {
+            Ok(dom) => ImageSrc::Svg(dom),
+            Err(_) => ImageSrc::None,
+        }
+    }
+
+    fn load_image_from_data(&mut self, data: &Vec<u8>) {
+        self.img = match ImageReader::new(Cursor::new(data)).decode() {
+            Ok(img) => {
+                let sk_img = dyn_image_to_skia_image(&img);
+                ImageSrc::Img(sk_img)
+            },
+            Err(e) => {
+                ImageSrc::None
+            }
+        }
     }
 
     fn load_svg(src: &str) -> Result<Dom, Error> {
         let fm = FONT_MGR.with(|fm| fm.clone());
         let data = File::open(src)?;
         Ok(Dom::read(data, fm)?)
+    }
+
+    fn parse_data_url(url: &str) -> Option<(String, Vec<u8>)> {
+        let (params, data) = url.split_once(",")?;
+        let (mime, encoding) = params.split_once(";")?;
+        if encoding == "base64" {
+            Some((mime.to_string(), BASE64_STANDARD.decode(data).ok()?))
+        } else {
+            None
+        }
     }
 
 }
