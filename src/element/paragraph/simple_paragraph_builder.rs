@@ -1,4 +1,6 @@
-use skia_safe::{Font, FontStyle, Paint, Unichar};
+use std::collections::HashMap;
+use measure_time::print_time;
+use skia_safe::{Font, FontStyle, Paint, Typeface, Unichar};
 use skia_safe::textlayout::{FontCollection, FontFamilies, Paragraph, ParagraphStyle, TextAlign, TextStyle};
 use skia_safe::wrapper::ValueWrapper;
 use crate::element::paragraph::{ParagraphParams, DEFAULT_FONT_NAME, ZERO_WIDTH_WHITESPACE};
@@ -13,6 +15,7 @@ pub struct SimpleParagraphBuilder {
     styles: Vec<TextStyle>,
     text_blocks: Vec<TextBlock>,
     font_collection: FontCollection,
+    fallback_cache: HashMap<char, Option<Typeface>>,
 }
 
 impl SimpleParagraphBuilder {
@@ -37,6 +40,7 @@ impl SimpleParagraphBuilder {
             styles: vec![text_style],
             text_blocks: Vec::new(),
             font_collection: font_collection.into(),
+            fallback_cache: HashMap::new(),
         }
     }
 
@@ -73,8 +77,21 @@ impl SimpleParagraphBuilder {
             if resolved_typefaces[i] != -1 {
                 continue;
             }
-            //TODO fix locale
-            let tf = some_or_continue!(self.font_collection.default_fallback_char(chars[i] as Unichar, style.font_style(), "en"));
+            let ch = chars[i];
+            if ch == '\n' {
+                continue;
+            }
+            let cached_tf = match self.fallback_cache.get(&ch) {
+                Some(tf) => tf,
+                None => {
+                    //TODO fix locale
+                    let tf = self.font_collection.default_fallback_char(chars[i] as Unichar, style.font_style(), "en");
+                    self.fallback_cache.insert(ch, tf);
+                    self.fallback_cache.get(&ch).unwrap()
+                }
+            };
+
+            let tf = some_or_continue!(cached_tf);
             for tf_idx in 0..typefaces.len() {
                 if typefaces[tf_idx].unique_id() == tf.unique_id() {
                     resolved_typefaces[i] = tf_idx as i32;
@@ -82,7 +99,7 @@ impl SimpleParagraphBuilder {
                 }
             }
             if resolved_typefaces[i] == -1 {
-                typefaces.push(tf);
+                typefaces.push(tf.clone());
                 resolved_typefaces[i] = (typefaces.len() - 1) as i32;
             }
         }
@@ -116,6 +133,26 @@ impl SimpleParagraphBuilder {
         let mut text = String::new();
         SimpleTextParagraph::new(self.text_blocks)
     }
+}
+
+#[test]
+fn test_performance() {
+    let params = ParagraphParams {
+        text_wrap: None,
+        line_height: None,
+        align: Default::default(),
+        color: Default::default(),
+        font_size: 14.0,
+        font_families: vec!["monospace".to_string()],
+        mask_char: None,
+    };
+    let mut pb = SimpleParagraphBuilder::new(&params);
+    let str = include_str!("../../../Cargo.lock");
+    {
+        print_time!("render");
+        pb.add_text(str.to_string());
+    }
+    let b = pb.build();
 }
 
 #[test]
