@@ -942,10 +942,12 @@ impl Element {
         &mut self.border_path
     }
 
+    #[js_func]
     pub fn set_focusable(&mut self, focusable: bool) {
         self.focusable = focusable;
     }
 
+    #[js_func]
     pub fn is_focusable(&self) -> bool {
         self.focusable
     }

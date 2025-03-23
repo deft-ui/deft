@@ -570,6 +570,22 @@ export class Element {
 
     /**
      *
+     * @param focusable {boolean}
+     */
+    set focusable(focusable) {
+        Element_set_focusable(this.handle, focusable);
+    }
+
+    /**
+     *
+     * @returns {boolean}
+     */
+    get focusable() {
+        return Element_is_focusable(this.handle);
+    }
+
+    /**
+     *
      * @returns {Element}
      */
     get rootElement() {
