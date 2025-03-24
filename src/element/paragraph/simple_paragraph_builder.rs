@@ -137,22 +137,24 @@ impl SimpleParagraphBuilder {
 
 #[test]
 fn test_performance() {
-    let params = ParagraphParams {
-        text_wrap: None,
-        line_height: None,
-        align: Default::default(),
-        color: Default::default(),
-        font_size: 14.0,
-        font_families: vec!["monospace".to_string()],
-        mask_char: None,
-    };
-    let mut pb = SimpleParagraphBuilder::new(&params);
-    let str = include_str!("../../../Cargo.lock");
-    {
-        print_time!("render");
-        pb.add_text(str.to_string());
+    for _ in 0..10 {
+        let params = ParagraphParams {
+            text_wrap: None,
+            line_height: None,
+            align: Default::default(),
+            color: Default::default(),
+            font_size: 14.0,
+            font_families: vec!["monospace".to_string()],
+            mask_char: None,
+        };
+        let mut pb = SimpleParagraphBuilder::new(&params);
+        let str = include_str!("../../../Cargo.lock");
+        {
+            print_time!("render");
+            pb.add_text(str.to_string());
+        }
+        let b = pb.build();
     }
-    let b = pb.build();
 }
 
 #[test]

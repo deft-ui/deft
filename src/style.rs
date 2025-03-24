@@ -319,7 +319,7 @@ macro_rules! define_style_props {
             )*
         }
 
-        #[derive(Clone, Hash, PartialEq, Eq, Copy)]
+        #[derive(Clone, Hash, PartialEq, Eq, Copy, Debug)]
         pub enum StylePropKey {
             $(
                 $name,

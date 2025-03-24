@@ -621,6 +621,7 @@ impl Element {
             self.style_props.clear();
         }
         self.style_manager.parse_style_obj(style);
+        self.apply_style();
     }
 
     pub fn set_style_props(&mut self, styles: Vec<StyleProp>) {
@@ -628,14 +629,13 @@ impl Element {
         for st in styles {
             self.set_style_prop_internal(st);
         }
-        // self.apply_style();
+        self.apply_style();
     }
 
     fn set_style_prop_internal(&mut self, style: StyleProp) {
         // debug!("setting style {:?}", style);
         if self.backend.accept_style(&style) {
             self.style_props.insert(style.key().clone(), style);
-            self.apply_style();
         }
     }
 
