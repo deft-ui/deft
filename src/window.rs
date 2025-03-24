@@ -886,6 +886,9 @@ impl Window {
             return ResultWaiter::new_finished(false);
         }
         warn_time!(16, "update window");
+        if let Some(body) = &mut self.body {
+            body.apply_style_update();
+        }
         if self.layout_dirty {
             self.update_layout();
             if let Some(body) = &mut self.body {

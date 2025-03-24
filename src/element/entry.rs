@@ -780,9 +780,6 @@ impl ElementBackend for Entry {
             => {
                 self.paragraph_element.set_style_prop_internal(style.clone());
                 self.placeholder_element.set_style_prop_internal(style.clone());
-                //TODO apply style lazily
-                self.paragraph_element.apply_style();
-                self.placeholder_element.apply_style();
                 return false;
             },
             _ => {

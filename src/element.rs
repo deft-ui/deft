@@ -6,6 +6,7 @@ use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 
 use anyhow::{anyhow, Error};
+use bitflags::{bitflags, Flags};
 use deft_macros::{js_func, js_methods, mrc_object};
 use measure_time::print_time;
 use ordered_float::Float;
@@ -62,6 +63,17 @@ thread_local! {
     pub static STYLE_VARS: ComputedValue<String> = ComputedValue::new();
 }
 
+bitflags! {
+
+    struct StyleDirtyFlags: u8 {
+        const SelfDirty = 0b1;
+        const ChildrenDirty = 0b10;
+    }
+
+}
+
+
+
 struct ElementJsContext {
     context: JsValue,
 }
@@ -111,7 +123,7 @@ impl Element {
                 for st in styles {
                     el.animation_style_props.insert(st.key().clone(), st);
                 }
-                el.apply_style();
+                el.mark_style_dirty();
             }
         })));
         // let bk = backend(ele_cp);
@@ -380,8 +392,7 @@ impl Element {
         };
         self.applied_style.clear();
         let mut el = self.clone();
-        self.apply_style();
-
+        self.mark_style_dirty();
     }
 
     pub fn set_window(&mut self, window: Option<WindowWeak>) {
@@ -621,7 +632,6 @@ impl Element {
             self.style_props.clear();
         }
         self.style_manager.parse_style_obj(style);
-        self.apply_style();
     }
 
     pub fn set_style_props(&mut self, styles: Vec<StyleProp>) {
@@ -629,13 +639,13 @@ impl Element {
         for st in styles {
             self.set_style_prop_internal(st);
         }
-        self.apply_style();
     }
 
     fn set_style_prop_internal(&mut self, style: StyleProp) {
         // debug!("setting style {:?}", style);
         if self.backend.accept_style(&style) {
             self.style_props.insert(style.key().clone(), style);
+            self.mark_style_dirty();
         }
     }
 
@@ -647,7 +657,7 @@ impl Element {
             self.hover_style_props.insert(st.key().clone(), st);
         }
         if self.hover {
-            self.apply_style();
+            self.mark_style_dirty();
         }
     }
 
@@ -690,7 +700,39 @@ impl Element {
         changed_style_props
     }
 
-    fn apply_style(&mut self) {
+    fn mark_style_dirty(&mut self) {
+        self.dirty_flags |= StyleDirtyFlags::SelfDirty;
+        self.mark_dirty(false);
+        if let Some(mut p) = self.get_parent() {
+            p.mark_children_style_dirty();
+        }
+    }
+
+    fn mark_children_style_dirty(&mut self) {
+        if !self.dirty_flags.contains(StyleDirtyFlags::ChildrenDirty) {
+            self.dirty_flags |= StyleDirtyFlags::ChildrenDirty;
+            if let Some(mut p) = self.get_parent() {
+                p.mark_children_style_dirty();
+            }
+        }
+    }
+
+    pub fn apply_style_update(&mut self) {
+        let is_self_dirty = self.dirty_flags.contains(StyleDirtyFlags::SelfDirty);
+        let is_children_dirty = self.dirty_flags.contains(StyleDirtyFlags::ChildrenDirty);
+        if is_self_dirty {
+            self.apply_own_style();
+        }
+        if is_self_dirty || is_children_dirty {
+            let mut children = self.get_children();
+            for c in &mut children {
+                c.apply_style_update();
+            }
+        }
+        self.dirty_flags = StyleDirtyFlags::empty();
+    }
+
+    pub fn apply_own_style(&mut self) {
         let mut style_props = self.style_props.clone();
         if self.hover {
             for (k, v) in &self.hover_style_props {
@@ -749,12 +791,12 @@ impl Element {
         if TypeId::of::<T>() == TypeId::of::<MouseEnterEvent>() {
             self.hover = true;
             if !self.hover_style_props.is_empty() {
-                self.apply_style();
+                self.mark_style_dirty();
             }
         } else if TypeId::of::<T>() == TypeId::of::<MouseLeaveEvent>() {
             self.hover = false;
             if !self.hover_style_props.is_empty() {
-                self.apply_style();
+                self.mark_style_dirty();
             }
         }
         let backend = self.get_backend_mut();
@@ -980,6 +1022,7 @@ pub struct Element {
     animation_style_props: HashMap<StylePropKey, StyleProp>,
     hover: bool,
     auto_focus: bool,
+    dirty_flags: StyleDirtyFlags,
 
     applied_style: Vec<StyleProp>,
     // animation_instance: Option<AnimationInstance>,
@@ -1047,6 +1090,7 @@ impl ElementData {
             style_manager: StyleManager::new(),
             auto_focus: false,
             focusable: false,
+            dirty_flags: StyleDirtyFlags::empty(),
         }
     }
 

@@ -48,6 +48,7 @@ raw-window-handle = "0.5.2"
 log = "0.4.25"
 skia-safe = {package = "deft-skia-safe", version = "0.81.0", features = ["binary-cache", "textlayout", "svg"], default-features = false}
 env_logger = "0.11.6"
+bitflags = "2.6.0"
 
 [features]
 default = []
