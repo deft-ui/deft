@@ -7,7 +7,7 @@ use crate::canvas_util::CanvasHelper;
 use crate::paint::{InvalidRects, LayerState, RenderLayerKey};
 use crate::render::paint_object::{ElementPaintObject, LayerPaintObject, PaintObject};
 use crate::render::paint_tree::{PaintTreeNew};
-use crate::{show_focus_hit, show_layer_hit, show_repaint_area, some_or_continue, some_or_return};
+use crate::{show_focus_hint, show_layer_hint, show_repaint_area, some_or_continue, some_or_return};
 
 enum PaintStep {
     Elements,
@@ -122,7 +122,7 @@ impl ElementPainter {
                 }
                 canvas.restore();
             }
-            if show_layer_hit() {
+            if show_layer_hint() {
                 Self::paint_hit_rect(canvas, lpo.width, lpo.height);
             }
         }
@@ -257,7 +257,7 @@ impl ElementPainter {
                 }
             }
             canvas.restore();
-            if show_focus_hit() && node.focused {
+            if show_focus_hint() && node.focused {
                 node.draw_hit_rect(canvas);
             }
         });

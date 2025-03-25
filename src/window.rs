@@ -44,7 +44,7 @@ use winit::keyboard::{Key, KeyCode, NamedKey, PhysicalKey};
 #[cfg(x11_platform)]
 use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorGrabMode, CursorIcon, Fullscreen, WindowAttributes, WindowId};
-use crate::{bind_js_event_listener, is_snapshot_usable, ok_or_return, send_app_event, show_focus_hit, show_repaint_area, some_or_continue, some_or_return, warn_time};
+use crate::{bind_js_event_listener, ok_or_return, send_app_event, show_focus_hint, show_repaint_area, some_or_continue, some_or_return, warn_time};
 use crate::computed::ComputedValue;
 use crate::frame_rate::{FrameRateController};
 use crate::layout::LayoutRoot;
@@ -795,11 +795,11 @@ impl Window {
                 old_focusing.emit(BlurEvent);
 
                 old_focusing.emit(FocusShiftEvent);
-                if show_focus_hit() {
+                if show_focus_hint() {
                     old_focusing.mark_dirty(false);
                 }
             }
-            if show_focus_hit() {
+            if show_focus_hint() {
                 node.mark_dirty(false);
             }
             self.focusing = focusing;

@@ -81,10 +81,13 @@ impl Debug for AppEvent {
     }
 }
 
+/// Deft app trait
 pub trait IApp {
+    /// Js engine initializing callback, you can add global functions or do some works to initialize the js engine.
     fn init_js_engine(&mut self, js_engine: &mut JsEngine) {
         let _ = js_engine;
     }
+    /// Create js module loader
     fn create_module_loader(&mut self) -> Box<dyn JsModuleLoader + Send + Sync + 'static>;
 }
 

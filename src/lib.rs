@@ -108,17 +108,20 @@ fn run_event_loop(event_loop: EventLoop<AppEventPayload>, deft_app: App) {
     event_loop.run_app(&mut app).unwrap();
 }
 
+/// Boostrap for desktop apps
 pub fn bootstrap(deft_app: App) {
     let event_loop: EventLoop<AppEventPayload> = EventLoop::with_user_event().build().unwrap();
     run_event_loop(event_loop, deft_app);
 }
 
+/// Send an app event. Could call from any thread.
 pub fn send_app_event(event: AppEvent) -> Result<AppEventResult, Error> {
     let proxy = APP_EVENT_PROXY.get().ok_or_else(|| anyhow!("no app event proxy found"))?;
     let result = proxy.send_event(event)?;
     Ok(result)
 }
 
+/// Whether is mobile platform
 pub fn is_mobile_platform() -> bool {
     #[cfg(mobile_platform)]
     return true;
@@ -126,22 +129,22 @@ pub fn is_mobile_platform() -> bool {
     return false;
 }
 
+/// Show repaint area, just for debug
 pub fn show_repaint_area() -> bool {
     false
 }
 
-pub fn show_focus_hit() -> bool {
+/// Show focus hint, just for debug
+pub fn show_focus_hint() -> bool {
     false
 }
 
-pub fn show_layer_hit() -> bool {
+/// Show layer hint, just for debug
+pub fn show_layer_hint() -> bool {
     false
 }
 
-pub fn is_snapshot_usable() -> bool {
-    true
-}
-
+/// Bootstrap for android apps
 #[cfg(target_os = "android")]
 #[no_mangle]
 pub fn android_bootstrap(app: AndroidApp, deft_app: App) {
