@@ -887,7 +887,7 @@ impl Window {
         }
         warn_time!(16, "update window");
         if let Some(body) = &mut self.body {
-            body.apply_style_update();
+            body.apply_style_update(&Vec::new());
         }
         if self.layout_dirty {
             self.update_layout();

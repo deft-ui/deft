@@ -35,7 +35,7 @@ use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::resource_table::ResourceTable;
 use crate::style::{parse_style_obj, ColorHelper, ResolvedStyleProp, StyleNode, StyleProp, StylePropKey, StyleTransform};
-use crate::{base, bind_js_event_listener, compute_style, js_auto_upgrade, js_call, js_call_rust, js_deserialize, js_get_prop, js_serialize, js_value, js_weak_value, ok_or_return, send_app_event, some_or_continue, some_or_return};
+use crate::{base, bind_js_event_listener, js_auto_upgrade, js_call, js_call_rust, js_deserialize, js_get_prop, js_serialize, js_value, js_weak_value, ok_or_return, send_app_event, some_or_continue, some_or_return};
 
 pub mod container;
 pub mod entry;
@@ -670,15 +670,16 @@ impl Element {
     fn calculate_changed_style<'a>(
         old_style: &'a Vec<StyleProp>,
         new_style: &'a Vec<StyleProp>,
+        parent_changed: &Vec<StylePropKey>,
     ) -> Vec<StyleProp> {
-        let mut changed_style_props = Vec::new();
+        let mut changed_style_props = HashMap::new();
         let mut old_style_map = HashMap::new();
         let mut new_style_map = HashMap::new();
         for e in old_style {
-            old_style_map.insert(e.name(), e);
+            old_style_map.insert(e.key(), e);
         }
         for e in new_style {
-            new_style_map.insert(e.name(), e);
+            new_style_map.insert(e.key(), e);
         }
         let mut keys = HashSet::new();
         for k in old_style_map.keys() {
@@ -695,10 +696,20 @@ impl Element {
                 None => old_value.unwrap().clone().clone().unset(),
             };
             if old_value != Some(&&new_value) {
-                changed_style_props.push(new_value)
+                changed_style_props.insert(new_value.key(), new_value);
             }
         }
-        changed_style_props
+        for pc in parent_changed {
+            if changed_style_props.contains_key(pc) {
+                continue;
+            }
+            if let Some(v) = old_style_map.get(pc) {
+                if v.is_inherited() {
+                    changed_style_props.insert(v.key(), v.clone().clone());
+                }
+            }
+        }
+        changed_style_props.values().cloned().into_iter().collect()
     }
 
     fn mark_style_dirty(&mut self) {
@@ -718,27 +729,26 @@ impl Element {
         }
     }
 
-    pub fn apply_style_update(&mut self) {
+    pub fn apply_style_update(&mut self, parent_changed: &Vec<StylePropKey>) {
         let is_self_dirty = self.dirty_flags.contains(StyleDirtyFlags::SelfDirty);
         let is_children_dirty = self.dirty_flags.contains(StyleDirtyFlags::ChildrenDirty);
-        if is_self_dirty {
-            let changed_styles = self.apply_own_style();
-            if !changed_styles.is_empty() {
-                for cs in &changed_styles {
-                    self.update_children_inherited_style(cs);
-                }
+        let mut changed_keys = Vec::new();
+        if is_self_dirty || !changed_keys.is_empty() {
+            let changed_styles = self.apply_own_style(parent_changed);
+            for s in changed_styles {
+                changed_keys.push(s.key());
             }
         }
-        if is_children_dirty {
+        if is_children_dirty || !changed_keys.is_empty() {
             let mut children = self.get_children();
             for c in &mut children {
-                c.apply_style_update();
+                c.apply_style_update(&changed_keys);
             }
         }
         self.dirty_flags = StyleDirtyFlags::empty();
     }
 
-    pub fn apply_own_style(&mut self) -> Vec<ResolvedStyleProp> {
+    pub fn apply_own_style(&mut self, parent_changed: &Vec<StylePropKey>) -> Vec<ResolvedStyleProp> {
         let mut style_props = self.style_props.clone();
         if self.hover {
             for (k, v) in &self.hover_style_props {
@@ -749,14 +759,12 @@ impl Element {
             style_props.insert(k.clone(), v.clone());
         }
         let mut new_style: Vec<StyleProp> = style_props.values().map(|t| t.clone()).collect();
-        for o in &self.applied_style {
-            if !style_props.contains_key(&o.key()) {
-                new_style.push(o.unset());
-            }
-        }
+        let old_style = self.applied_style.clone();
+        let mut changed_style_props = Self::calculate_changed_style(&old_style, &new_style, parent_changed);
+
 
         let mut changed_list = Vec::new();
-        for sp in &mut new_style {
+        for sp in &mut changed_style_props {
             let (repaint, need_layout, v) = self.style.set_style(sp.clone());
             if need_layout || repaint {
                 self.mark_dirty(need_layout);
