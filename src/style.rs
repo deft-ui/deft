@@ -1565,6 +1565,7 @@ pub fn parse_style_unit(value: &str) -> Option<StyleUnit> {
         let width = f32::from_str(v).unwrap();
         Some(StyleUnit::Percent(OrderedFloat(width)))
     } else {
+        let value = value.strip_suffix("px").unwrap_or_else(|| value);
         match f32::from_str(value) {
             Ok(v) => {
                 Some(StyleUnit::Point(OrderedFloat(v)))

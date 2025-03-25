@@ -293,12 +293,6 @@ impl<E> Event<E> {
         }
     }
 
-    pub fn try_as_detail<T: 'static, F: FnMut(&T)>(&self, mut callback: F) {
-        if let Some(d) = self.detail.raw().downcast_ref::<T>() {
-            callback(d);
-        }
-    }
-
 }
 
 #[derive(Serialize, Deserialize)]
