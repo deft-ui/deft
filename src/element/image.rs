@@ -16,7 +16,7 @@ use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 use crate::element::{ElementBackend, Element, ElementWeak};
 use crate::element::label::FONT_MGR;
 use crate::img_manager::{dyn_image_to_skia_image, IMG_MANAGER};
-use crate::{js_call, ok_or_return};
+use crate::{ok_or_return};
 use crate::render::RenderFn;
 
 extern "C" fn measure_image(node_ref: NodeRef, width: f32, _mode: MeasureMode, _height: f32, _height_mode: MeasureMode) -> Size {

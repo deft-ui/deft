@@ -18,7 +18,6 @@ use crate::color::parse_hex_color;
 use crate::element::{ElementBackend, Element, ElementWeak};
 use crate::element::text::skia_text_paragraph::{SkiaTextParagraph};
 use crate::element::text::text_paragraph::{ParagraphData, Line, ParagraphRef, TextParams};
-use crate::{js_call, match_event_type};
 use crate::element::paragraph::ParagraphParams;
 use crate::element::paragraph::simple_paragraph_builder::SimpleParagraphBuilder;
 use crate::element::text::simple_text_paragraph::{SimpleTextParagraph, TextBlock};

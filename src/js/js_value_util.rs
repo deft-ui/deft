@@ -6,31 +6,6 @@ use crate::js::js_deserialze::JsDeserializer;
 use crate::js::js_serde::JsValueSerializer;
 use crate::js_deserialize;
 
-pub struct JsParam {
-    pub value: JsValue
-}
-
-impl TryFrom<JsValue> for JsParam {
-    type Error = ValueError;
-
-    fn try_from(value: JsValue) -> Result<Self, Self::Error> {
-        Ok(JsParam { value})
-    }
-}
-
-pub trait SerializeToJsValue {
-    fn to_js_value(self) -> Result<JsValue, Error>;
-}
-
-
-impl<F> SerializeToJsValue for F where F: Serialize {
-    fn to_js_value(self) -> Result<JsValue, Error> {
-        let serializer = JsValueSerializer {};
-        let js_r = self.serialize(serializer)?;
-        Ok(js_r)
-    }
-}
-
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct EventResult {

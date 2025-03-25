@@ -14,7 +14,7 @@ use skia_safe::{Color, Image, Matrix, Path};
 use yoga::{Align, Direction, Display, Edge, FlexDirection, Justify, Node, Overflow, PositionType, StyleUnit, Wrap};
 use crate::base::Rect;
 use crate::color::parse_hex_color;
-use crate::{compute_style, inherit_color_prop, match_both, ok_or_return, send_app_event, some_or_return};
+use crate::{match_both, ok_or_return, send_app_event, some_or_return};
 use crate::animation::{AnimationInstance, SimpleFrameController, WindowAnimationController};
 use crate::border::build_border_paths;
 use crate::cache::CacheValue;

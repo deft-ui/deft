@@ -10,7 +10,7 @@ use crate::color::parse_hex_color;
 use crate::element::container::Container;
 use crate::element::{ElementBackend, Element};
 use crate::element::entry::Entry;
-use crate::{create_element, js_call_rust, set_style, tree};
+use crate::{create_element, set_style, tree};
 use crate::element::scroll::Scroll;
 use crate::event::TextUpdateEventListener;
 use crate::style::StylePropKey;

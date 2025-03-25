@@ -35,7 +35,7 @@ use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::resource_table::ResourceTable;
 use crate::style::{parse_style_obj, ColorHelper, ResolvedStyleProp, StyleNode, StyleProp, StylePropKey, StyleTransform};
-use crate::{base, bind_js_event_listener, js_auto_upgrade, js_call, js_call_rust, js_deserialize, js_get_prop, js_serialize, js_value, js_weak_value, ok_or_return, send_app_event, some_or_continue, some_or_return};
+use crate::{base, bind_js_event_listener, js_auto_upgrade, js_deserialize, js_serialize, js_value, js_weak_value, ok_or_return, send_app_event, some_or_continue, some_or_return};
 
 pub mod container;
 pub mod entry;

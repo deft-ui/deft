@@ -11,7 +11,7 @@ use skia_safe::{Canvas, Color, Paint, Path, Point};
 use tokio::time::Instant;
 use yoga::Direction::LTR;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size, StyleUnit};
-use crate::{backend_as_api, is_mobile_platform, js_call, js_deserialize, js_serialize, ok_or_return, some_or_return};
+use crate::{backend_as_api, is_mobile_platform, js_deserialize, js_serialize, ok_or_return, some_or_return};
 use crate::animation::{AnimationDef, AnimationInstance, SimpleFrameController, WindowAnimationController};
 use crate::base::{CaretDetail, ElementEvent, EventContext, Rect};
 use crate::color::parse_hex_color;

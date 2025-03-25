@@ -9,7 +9,6 @@ use crate::base::{ElementEvent, PropertyValue, Rect, TextUpdateDetail};
 use crate::color::parse_hex_color;
 use crate::element::{ElementData, ElementBackend, Element};
 use crate::event::TextUpdateEvent;
-use crate::js_call;
 use crate::js::js_value_util::JsValueHelper;
 use crate::number::DeNan;
 use crate::string::StringUtils;

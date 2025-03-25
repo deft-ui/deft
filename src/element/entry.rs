@@ -20,7 +20,7 @@ use crate::base::{Callback, CaretDetail, ElementEvent, EventContext, MouseDetail
 use crate::element::{ElementBackend, Element, ElementWeak};
 use crate::element::text::{AtomOffset, Text as Label};
 use crate::number::DeNan;
-use crate::{js_call, js_deserialize, js_serialize, match_event, match_event_type, ok_or_return, timer};
+use crate::{js_deserialize, js_serialize, ok_or_return, timer};
 use crate::app::AppEvent;
 use crate::element::edit_history::{EditHistory, EditOpType};
 use crate::element::paragraph::{Paragraph, ParagraphUnit, TextCoord, TextUnit};

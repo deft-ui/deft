@@ -14,7 +14,7 @@ use crate::js::JsError;
 use crate::number::DeNan;
 use crate::string::StringUtils;
 use crate::style::{parse_color_str, parse_optional_color_str, StylePropKey};
-use crate::{js_deserialize, js_serialize, match_event_type};
+use crate::{js_deserialize, js_serialize};
 use deft_macros::{element_backend, js_methods, mrc_object};
 use rodio::cpal::available_hosts;
 use serde::{Deserialize, Serialize};
