@@ -385,6 +385,15 @@ macro_rules! define_style_props {
                     )*
                 }
             }
+
+            pub fn is_inherited(&self) -> bool {
+                match self {
+                    $(
+                       Self::$name(v) => *v == StylePropVal::Inherit,
+                    )*
+                }
+            }
+
             pub fn resolve_value<
                 D: Fn(StylePropKey) -> ResolvedStyleProp,
                 P: Fn(StylePropKey) -> ResolvedStyleProp
@@ -924,7 +933,8 @@ impl StyleNode {
         }
     }
 
-    pub fn set_style(&mut self, p: StyleProp) -> (bool, bool) {
+    /// return (need_repaint, need_layout)
+    pub fn set_style(&mut self, p: StyleProp) -> (bool, bool, ResolvedStyleProp) {
         self.style_props.insert(p.key().clone(), p.clone());
         let v = p.resolve_value(|k| {
             self.get_default_value(k)
@@ -935,7 +945,8 @@ impl StyleNode {
                 self.get_default_value(k)
             }
         });
-        self.set_resolved_style_prop(v)
+        let (need_repaint, need_layout) = self.set_resolved_style_prop(v.clone());
+        (need_repaint, need_layout, v)
     }
 
     fn compute_style_prop(&self, p: &ResolvedStyleProp) -> ComputedStyleProp {

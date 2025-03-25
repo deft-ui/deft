@@ -34,8 +34,8 @@ use crate::js::js_serde::JsValueSerializer;
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::resource_table::ResourceTable;
-use crate::style::{parse_style_obj, ColorHelper, StyleNode, StyleProp, StylePropKey, StyleTransform};
-use crate::{base, bind_js_event_listener, compute_style, js_auto_upgrade, js_call, js_call_rust, js_deserialize, js_get_prop, js_serialize, js_value, js_weak_value, ok_or_return, send_app_event, some_or_return};
+use crate::style::{parse_style_obj, ColorHelper, ResolvedStyleProp, StyleNode, StyleProp, StylePropKey, StyleTransform};
+use crate::{base, bind_js_event_listener, compute_style, js_auto_upgrade, js_call, js_call_rust, js_deserialize, js_get_prop, js_serialize, js_value, js_weak_value, ok_or_return, send_app_event, some_or_continue, some_or_return};
 
 pub mod container;
 pub mod entry;
@@ -666,6 +666,7 @@ impl Element {
         self.get_origin_bounds()
     }
 
+    //TODO remove
     fn calculate_changed_style<'a>(
         old_style: &'a Vec<StyleProp>,
         new_style: &'a Vec<StyleProp>,
@@ -721,9 +722,14 @@ impl Element {
         let is_self_dirty = self.dirty_flags.contains(StyleDirtyFlags::SelfDirty);
         let is_children_dirty = self.dirty_flags.contains(StyleDirtyFlags::ChildrenDirty);
         if is_self_dirty {
-            self.apply_own_style();
+            let changed_styles = self.apply_own_style();
+            if !changed_styles.is_empty() {
+                for cs in &changed_styles {
+                    self.update_children_inherited_style(cs);
+                }
+            }
         }
-        if is_self_dirty || is_children_dirty {
+        if is_children_dirty {
             let mut children = self.get_children();
             for c in &mut children {
                 c.apply_style_update();
@@ -732,7 +738,7 @@ impl Element {
         self.dirty_flags = StyleDirtyFlags::empty();
     }
 
-    pub fn apply_own_style(&mut self) {
+    pub fn apply_own_style(&mut self) -> Vec<ResolvedStyleProp> {
         let mut style_props = self.style_props.clone();
         if self.hover {
             for (k, v) in &self.hover_style_props {
@@ -742,19 +748,40 @@ impl Element {
         for (k, v) in &self.animation_style_props {
             style_props.insert(k.clone(), v.clone());
         }
-        let new_style = style_props.values().map(|t| t.clone()).collect();
+        let mut new_style: Vec<StyleProp> = style_props.values().map(|t| t.clone()).collect();
+        for o in &self.applied_style {
+            if !style_props.contains_key(&o.key()) {
+                new_style.push(o.unset());
+            }
+        }
 
-        let old_style = self.applied_style.clone();
-        let mut changed_style_props = Self::calculate_changed_style(&old_style, &new_style);
-        // debug!("changed style props:{:?}", changed_style_props);
-
-        changed_style_props.iter().for_each(| e | {
-            let (repaint, need_layout) = self.style.set_style(e.clone());
+        let mut changed_list = Vec::new();
+        for sp in &mut new_style {
+            let (repaint, need_layout, v) = self.style.set_style(sp.clone());
             if need_layout || repaint {
                 self.mark_dirty(need_layout);
+                changed_list.push(v);
             }
-        });
+        }
+        // debug!("changed list: {:?}", changed_list);
         self.applied_style = new_style;
+        changed_list
+    }
+
+    fn update_children_inherited_style(&mut self, p: &ResolvedStyleProp) {
+        let mut children = self.get_children();
+        for c in &mut children {
+            let v = some_or_continue!(c.style_props.get(&p.key()));
+            if !v.is_inherited() {
+                continue;
+            }
+            //TODO use computed value
+            let (rp, rl) = c.style.set_resolved_style_prop(p.clone());
+            if rp || rl {
+                c.mark_dirty(rl);
+            }
+            c.update_children_inherited_style(p);
+        }
     }
 
     pub fn register_event_listener<T: 'static, H: EventListener<T, ElementWeak> + 'static>(&mut self, mut listener: H) -> u32 {
