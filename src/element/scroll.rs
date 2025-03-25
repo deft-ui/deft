@@ -360,7 +360,7 @@ impl Scroll {
         }
         let bounds = element.get_bounds();
         let size = (bounds.width, bounds.height);
-        if !element.layout_dirty && size == self.last_layout_size {
+        if !element.is_layout_dirty() && size == self.last_layout_size {
             return;
         }
         self.last_layout_size = size;

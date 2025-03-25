@@ -68,8 +68,15 @@ bitflags! {
     struct StyleDirtyFlags: u8 {
         const SelfDirty = 0b1;
         const ChildrenDirty = 0b10;
+        const LayoutDirty = 0b100;
     }
 
+}
+
+impl StyleDirtyFlags {
+    pub fn is_layout_dirty(&self) -> bool {
+        self.contains(Self::LayoutDirty)
+    }
 }
 
 
@@ -603,7 +610,7 @@ impl Element {
         self.style.calculate_layout(available_width, available_height, Direction::LTR);
         if let Some(lr) = &mut self.layout_root {
             lr.update_layout();
-            assert_eq!(false, self.layout_dirty);
+            assert_eq!(false, self.dirty_flags.contains(StyleDirtyFlags::LayoutDirty));
         }
         self.on_layout_update();
     }
@@ -745,7 +752,8 @@ impl Element {
                 c.apply_style_update(&changed_keys);
             }
         }
-        self.dirty_flags = StyleDirtyFlags::empty();
+        self.dirty_flags.remove(StyleDirtyFlags::ChildrenDirty);
+        self.dirty_flags.remove(StyleDirtyFlags::SelfDirty);
     }
 
     pub fn apply_own_style(&mut self, parent_changed: &Vec<StylePropKey>) -> Vec<ResolvedStyleProp> {
@@ -922,13 +930,13 @@ impl Element {
     }
 
     pub fn is_layout_dirty(&self) -> bool {
-        self.layout_dirty
+        self.dirty_flags.is_layout_dirty()
     }
 
     pub fn ensure_layout_update(&mut self) {
-        if self.layout_dirty {
+        if self.is_layout_dirty() {
             self.request_layout();
-            assert_eq!(false, self.layout_dirty);
+            assert_eq!(false, self.is_layout_dirty());
         }
     }
 
@@ -943,8 +951,12 @@ impl Element {
     }
 
     fn set_dirty_state_recurse(&mut self, dirty: bool) {
-        if self.layout_dirty != dirty {
-            self.layout_dirty = dirty;
+        if self.is_layout_dirty() != dirty {
+            if (dirty) {
+                self.dirty_flags.insert(StyleDirtyFlags::LayoutDirty);
+            } else {
+                self.dirty_flags.remove(StyleDirtyFlags::LayoutDirty);
+            }
             for mut c in self.get_children() {
                 if c.layout_root.is_none() {
                     c.set_dirty_state_recurse(dirty);
@@ -978,7 +990,7 @@ impl Element {
     }
 
     pub fn on_layout_update(&mut self) {
-        self.layout_dirty = false;
+        self.dirty_flags.remove(StyleDirtyFlags::LayoutDirty);
         let origin_bounds = self.get_origin_bounds();
         //TODO emit size change
         let origin_bounds = self.get_origin_bounds();
@@ -1072,7 +1084,6 @@ pub struct Element {
     children_decoration: (f32, f32, f32, f32),
 
     layout_root: Option<Box<dyn LayoutRoot>>,
-    layout_dirty: bool,
     //TODO rename
     pub need_snapshot: bool,
     pub render_object_idx: Option<usize>,
@@ -1118,14 +1129,13 @@ impl ElementData {
             children_decoration: (0.0, 0.0, 0.0, 0.0),
             children: Vec::new(),
             layout_root: None,
-            layout_dirty: true,
             need_snapshot: false,
             render_object_idx: None,
             border_path: BorderPath::new(0.0, 0.0, [0.0; 4], [0.0; 4]),
             style_manager: StyleManager::new(),
             auto_focus: false,
             focusable: false,
-            dirty_flags: StyleDirtyFlags::empty(),
+            dirty_flags: StyleDirtyFlags::LayoutDirty,
         }
     }
 
