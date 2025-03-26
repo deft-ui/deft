@@ -1374,6 +1374,15 @@ class ContainerBasedElement extends Element {
             console.log("remove child failed")
         }
     }
+
+    /**
+     *
+     * @returns {Element[]}
+     */
+    get children() {
+        return this.#children.slice();
+    }
+
 }
 
 export class ButtonElement extends ContainerBasedElement {

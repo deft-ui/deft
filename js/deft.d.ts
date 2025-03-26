@@ -468,6 +468,16 @@ declare class Element {
     get parent(): Element | null;
     /**
      *
+     * @param focusable {boolean}
+     */
+    set focusable(focusable: boolean);
+    /**
+     *
+     * @returns {boolean}
+     */
+    get focusable(): boolean;
+    /**
+     *
      * @returns {Element}
      */
     get rootElement(): Element;
@@ -1009,6 +1019,11 @@ declare class ContainerBasedElement extends Element {
      * @param child {Element}
      */
     removeChild(child: Element): void;
+    /**
+     *
+     * @returns {Element[]}
+     */
+    get children(): Element[];
     
 }
 
