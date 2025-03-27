@@ -10,8 +10,7 @@ Deft is a framework for building desktop and mobile applications with Rust and J
 * Hybrid programming with Rust and JavaScript
 * Non-webview core
 * Unified JavaScript engine and rendering engine
-* Similar api to web
-* Support React/Vue
+* Support React/Vue/Solid or any framework that supports custom render
 
 # Quick Start
 
