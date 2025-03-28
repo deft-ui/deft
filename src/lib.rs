@@ -14,7 +14,7 @@ use crate::performance::MemoryUsage;
 use crate::renderer::CpuRenderer;
 use crate::websocket::WebSocketManager;
 use futures_util::StreamExt;
-use measure_time::{info, print_time};
+use measure_time::{debug_time, info, print_time};
 use memory_stats::memory_stats;
 use quick_js::loader::FsJsModuleLoader;
 use serde::{Deserialize, Serialize};
@@ -104,7 +104,10 @@ fn run_event_loop(event_loop: EventLoop<AppEventPayload>, deft_app: App) {
         let el_proxy = el_proxy.clone();
         APP_EVENT_PROXY.get_or_init(move || el_proxy);
     }
-    let mut app = WinitApp::new(deft_app, el_proxy);
+    let mut app = {
+        debug_time!("init engine time");
+        WinitApp::new(deft_app, el_proxy)
+    };
     event_loop.run_app(&mut app).unwrap();
 }
 

@@ -5,6 +5,7 @@ use anyhow::Error;
 use jni::objects::JValue;
 use jni::sys::{jboolean, jlong};
 use log::debug;
+use measure_time::debug_time;
 use skia_safe::Rect;
 use crate::js::loader::JsModuleLoader;
 use winit::application::ApplicationHandler;
@@ -139,6 +140,7 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
         run_event_loop_task(event_loop, move || {
             let uninitialized = WINDOWS.with(|m| m.borrow().is_empty());
             if uninitialized {
+                debug_time!("js init time");
                 self.js_engine.execute_main();
                 self.execute_pending_jobs();
             } else {
