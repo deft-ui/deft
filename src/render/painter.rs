@@ -9,16 +9,10 @@ use crate::render::paint_object::{ElementPaintObject, LayerPaintObject, PaintObj
 use crate::render::paint_tree::{PaintTreeNew};
 use crate::{show_focus_hint, show_layer_hint, show_repaint_area, some_or_continue, some_or_return};
 
-enum PaintStep {
-    Elements,
-    Layers,
-}
-
 pub struct ElementPainter {
     scale: f32,
     viewport: Rect,
     layer_state_map: HashMap<RenderLayerKey, LayerState>,
-    paint_step: PaintStep,
 }
 
 impl ElementPainter {
@@ -28,7 +22,6 @@ impl ElementPainter {
             scale: 1.0,
             viewport: Rect::new_empty(),
             layer_state_map: HashMap::new(),
-            paint_step: PaintStep::Elements,
         }
     }
 
@@ -49,38 +42,9 @@ impl ElementPainter {
     pub fn draw_root(&mut self, canvas: &Canvas, obj: &mut PaintTreeNew, context: &mut RenderContext) {
         let mut state = mem::take(&mut self.layer_state_map);
         self.draw_layer(canvas, context, &mut obj.root, &mut state);
-
-        /*
-        for k in &obj.all_layer_keys {
-            // debug!("Merging layer {:?}", k);
-            let layer = some_or_continue!(self.layer_state_map.get_mut(&k));
-            let img = layer.layer.as_image();
-            canvas.save();
-            canvas.concat(&layer.total_matrix);
-            canvas.translate((layer.surface_bounds.left, layer.surface_bounds.top));
-            canvas.scale((1.0 / self.scale, 1.0 / self.scale));
-            canvas.draw_image(img, (0.0, 0.0), None);
-            if show_repaint_area() {
-                canvas.scale((self.scale, self.scale));
-                let path = layer.invalid_rects.to_path();
-                if !path.is_empty() {
-                    let mut paint = Paint::default();
-                    paint.set_style(PaintStyle::Stroke);
-                    paint.set_color(Color::from_rgb(200, 0, 0));
-                    canvas.draw_path(&path, &paint);
-                }
-            }
-            canvas.restore();
-            unsafe  {
-                let sf = canvas.surface();
-                let sf = sf.unwrap();
-                sf.direct_context().unwrap().flush_and_submit();
-            }
-        }
-         */
     }
 
-    fn draw_element_object_recurse(&mut self, canvas: &Canvas, epo: &mut ElementPaintObject, context: &mut RenderContext, layer_states: &mut HashMap<RenderLayerKey, LayerState>) {
+    fn draw_element_object_recurse(&mut self, canvas: &Canvas, epo: &mut ElementPaintObject, context: &mut RenderContext) {
         // debug!("Painting {}", epo.element_id);
         //TODO optimize
         if !epo.need_paint && epo.children.is_empty() {
@@ -93,7 +57,7 @@ impl ElementPainter {
             self.draw_element_paint_object(canvas, epo);
         }
         for e in &mut epo.children {
-            self.draw_element_object_recurse(canvas, e, context, layer_states);
+            self.draw_element_object_recurse(canvas, e, context);
         }
         canvas.restore();
     }
@@ -204,7 +168,7 @@ impl ElementPainter {
             layer_canvas.clear(Color::TRANSPARENT);
         }
         for e in &mut layer.normal_nodes {
-            self.draw_element_object_recurse(layer_canvas, e, context, layer_state_map);
+            self.draw_element_object_recurse(layer_canvas, e, context);
         }
         layer_canvas.restore();
         context.flush();
