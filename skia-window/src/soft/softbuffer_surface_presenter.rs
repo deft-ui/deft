@@ -1,5 +1,5 @@
 use crate::soft::surface_presenter::SurfacePresenter;
-use skia_safe::{ColorType, ImageInfo};
+use skia_safe::{AlphaType, Canvas, ColorSpace, ColorType, ImageInfo};
 use softbuffer::{Context, Surface};
 use std::num::NonZeroU32;
 use std::rc::Rc;
@@ -39,7 +39,8 @@ impl SurfacePresenter for SoftBufferSurfacePresenter {
         self.height = height;
         self.win_surface.resize(NonZeroU32::new(width).unwrap(), NonZeroU32::new(height).unwrap());
     }
-    fn present_surface(&mut self, skia_surface: &mut skia_safe::Surface) {
+
+    fn render(&mut self, renderer: Box<dyn FnOnce(&Canvas)>) {
         let mut buffer = self
             .win_surface
             .buffer_mut()
@@ -49,17 +50,14 @@ impl SurfacePresenter for SoftBufferSurfacePresenter {
 
         let width = self.width;
         let height = self.height;
-
-        let src_img_info = skia_surface.image_info();
         let img_info = ImageInfo::new(
             (width as i32, height as i32),
             ColorType::BGRA8888,
-            src_img_info.alpha_type(),
-            src_img_info.color_space(),
+            AlphaType::Premul,
+            Some(ColorSpace::new_srgb())
         );
-        let _ = skia_surface
-            .canvas()
-            .read_pixels(&img_info, buf_ptr, width as usize * 4, (0, 0));
+        let mut surface = skia_safe::surfaces::wrap_pixels(&img_info, buf_ptr, width as usize * 4, None).unwrap();
+        renderer(&mut surface.canvas());
         buffer
             .present()
             .expect("Failed to present the softbuffer buffer");

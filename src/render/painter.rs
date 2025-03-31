@@ -13,6 +13,7 @@ pub struct ElementPainter {
     scale: f32,
     viewport: Rect,
     layer_state_map: HashMap<RenderLayerKey, LayerState>,
+    layer_cache_enabled: bool,
 }
 
 impl ElementPainter {
@@ -22,6 +23,7 @@ impl ElementPainter {
             scale: 1.0,
             viewport: Rect::new_empty(),
             layer_state_map: HashMap::new(),
+            layer_cache_enabled: false,
         }
     }
 
@@ -37,6 +39,13 @@ impl ElementPainter {
     pub fn update_viewport(&mut self, scale: f32, viewport: Rect) {
         self.scale = scale;
         self.viewport = viewport;
+    }
+
+    pub fn set_layer_cache(&mut self, layer_cache_enabled: bool) {
+        self.layer_cache_enabled = layer_cache_enabled;
+        if !layer_cache_enabled {
+            self.layer_state_map.clear();
+        }
     }
 
     pub fn draw_root(&mut self, canvas: &Canvas, obj: &mut PaintTreeNew, context: &mut RenderContext) {
@@ -62,33 +71,31 @@ impl ElementPainter {
         canvas.restore();
     }
 
-    fn submit_layer(&mut self, canvas: &Canvas, context: &mut RenderContext, lpo: &mut LayerPaintObject) {
-        if let Some(layer) = self.layer_state_map.get_mut(&lpo.key) {
-            let img = layer.layer.as_image();
-            canvas.save();
-            canvas.translate((layer.surface_bounds.left, layer.surface_bounds.top));
-            canvas.scale((1.0 / self.scale, 1.0 / self.scale));
-            let mut options = SamplingOptions::default();
-            //TODO use Nearest?
-            options.filter = FilterMode::Linear;
-            canvas.draw_image_with_sampling_options(img, (0.0, 0.0), options, None);
-            canvas.restore();
+    fn submit_layer(&mut self, canvas: &Canvas, context: &mut RenderContext, lpo: &mut LayerPaintObject, layer: &mut LayerState) {
+        let img = layer.layer.as_image();
+        canvas.save();
+        canvas.translate((layer.surface_bounds.left, layer.surface_bounds.top));
+        canvas.scale((1.0 / self.scale, 1.0 / self.scale));
+        let mut options = SamplingOptions::default();
+        //TODO use Nearest?
+        options.filter = FilterMode::Linear;
+        canvas.draw_image_with_sampling_options(img, (0.0, 0.0), options, None);
+        canvas.restore();
 
-            if show_repaint_area() {
-                canvas.save();
-                canvas.scale((self.scale, self.scale));
-                let path = layer.invalid_rects.to_path();
-                if !path.is_empty() {
-                    let mut paint = Paint::default();
-                    paint.set_style(PaintStyle::Stroke);
-                    paint.set_color(Color::from_rgb(200, 0, 0));
-                    canvas.draw_path(&path, &paint);
-                }
-                canvas.restore();
+        if show_repaint_area() {
+            canvas.save();
+            canvas.scale((self.scale, self.scale));
+            let path = layer.invalid_rects.to_path();
+            if !path.is_empty() {
+                let mut paint = Paint::default();
+                paint.set_style(PaintStyle::Stroke);
+                paint.set_color(Color::from_rgb(200, 0, 0));
+                canvas.draw_path(&path, &paint);
             }
-            if show_layer_hint() {
-                Self::paint_hit_rect(canvas, lpo.width, lpo.height);
-            }
+            canvas.restore();
+        }
+        if show_layer_hint() {
+            Self::paint_hit_rect(canvas, lpo.width, lpo.height);
         }
     }
 
@@ -114,79 +121,83 @@ impl ElementPainter {
         if surface_width <= 0 || surface_height <= 0 {
             return;
         }
-        let mut graphic_layer = if let Some(mut ogl_state) = layer_state_map.remove(&layer.key) {
-            if ogl_state.surface_width != surface_width || ogl_state.surface_height != surface_height {
-                None
-            } else {
-                //TODO fix scroll delta
-                let scroll_delta_x = layer.surface_bounds.left - ogl_state.surface_bounds.left;
-                let scroll_delta_y = layer.surface_bounds.top - ogl_state.surface_bounds.top;
-                if scroll_delta_x != 0.0 || scroll_delta_y != 0.0 {
-                    let mut temp_gl = context.create_layer(surface_width, surface_height).unwrap();
-                    temp_gl.canvas().session(|canvas| {
-                        // canvas.clip_rect(&Rect::new(0.0, 0.0, layer.width * scale, layer.height * scale), ClipOp::Intersect, false);
-                        canvas.clear(Color::TRANSPARENT);
-                        canvas.draw_image(&ogl_state.layer.as_image(), (-scroll_delta_x * scale, -scroll_delta_y * scale), None);
-                    });
-                    context.flush();
+        {
+            let mut graphic_layer = if let Some(mut ogl_state) = layer_state_map.remove(&layer.key) {
+                if ogl_state.surface_width != surface_width || ogl_state.surface_height != surface_height {
+                    None
+                } else {
+                    //TODO fix scroll delta
+                    let scroll_delta_x = layer.surface_bounds.left - ogl_state.surface_bounds.left;
+                    let scroll_delta_y = layer.surface_bounds.top - ogl_state.surface_bounds.top;
+                    if scroll_delta_x != 0.0 || scroll_delta_y != 0.0 {
+                        let mut temp_gl = context.create_layer(surface_width, surface_height).unwrap();
+                        temp_gl.canvas().session(|canvas| {
+                            // canvas.clip_rect(&Rect::new(0.0, 0.0, layer.width * scale, layer.height * scale), ClipOp::Intersect, false);
+                            canvas.clear(Color::TRANSPARENT);
+                            canvas.draw_image(&ogl_state.layer.as_image(), (-scroll_delta_x * scale, -scroll_delta_y * scale), None);
+                        });
+                        context.flush();
 
-                    ogl_state.layer.canvas().session(|canvas| {
-                        canvas.clear(Color::TRANSPARENT);
-                        // canvas.clip_rect(&Rect::from_xywh(0.0, 0.0, layer.width, layer.height), ClipOp::Intersect, false);
-                        canvas.scale((1.0 / scale, 1.0 / scale));
-                        canvas.draw_image(&temp_gl.as_image(), (0.0, 0.0), None);
-                    });
-                    context.flush();
+                        ogl_state.layer.canvas().session(|canvas| {
+                            canvas.clear(Color::TRANSPARENT);
+                            // canvas.clip_rect(&Rect::from_xywh(0.0, 0.0, layer.width, layer.height), ClipOp::Intersect, false);
+                            canvas.scale((1.0 / scale, 1.0 / scale));
+                            canvas.draw_image(&temp_gl.as_image(), (0.0, 0.0), None);
+                        });
+                        context.flush();
+                    }
+                    ogl_state.surface_bounds = layer.surface_bounds;
+                    Some(ogl_state)
                 }
-                ogl_state.surface_bounds = layer.surface_bounds;
-                Some(ogl_state)
-            }
-        } else {
-            None
-        }.unwrap_or_else(|| {
-            let mut gl = context.create_layer(surface_width, surface_height).unwrap();
-            gl.canvas().scale((scale, scale));
-            LayerState {
-                layer: gl,
-                surface_width,
-                surface_height,
-                total_matrix: Matrix::default(),
-                invalid_rects: InvalidRects::default(),
-                surface_bounds: layer.surface_bounds,
-                matrix: Matrix::default(),
-            }
-        });
-        graphic_layer.total_matrix = layer.total_matrix.clone();
-        graphic_layer.matrix = layer.matrix.clone();
-        let layer_canvas = graphic_layer.layer.canvas();
-        layer_canvas.save();
+            } else {
+                None
+            }.unwrap_or_else(|| {
+                let mut gl = context.create_layer(surface_width, surface_height).unwrap();
+                gl.canvas().scale((scale, scale));
+                LayerState {
+                    layer: gl,
+                    surface_width,
+                    surface_height,
+                    total_matrix: Matrix::default(),
+                    invalid_rects: InvalidRects::default(),
+                    surface_bounds: layer.surface_bounds,
+                    matrix: Matrix::default(),
+                }
+            });
+            graphic_layer.total_matrix = layer.total_matrix.clone();
+            graphic_layer.matrix = layer.matrix.clone();
+            let layer_canvas = graphic_layer.layer.canvas();
+            layer_canvas.save();
 
-        layer_canvas.translate((-graphic_layer.surface_bounds.left, -graphic_layer.surface_bounds.top));
-        if (!layer.invalid_rects.is_empty()) {
-            layer_canvas.clip_path(&layer.invalid_rects.to_path(), ClipOp::Intersect, false);
-            layer_canvas.clip_rect(&Rect::from_xywh(0.0, 0.0, layer.width, layer.height), ClipOp::Intersect, false);
-            layer_canvas.clear(Color::TRANSPARENT);
-        }
-        for e in &mut layer.normal_nodes {
-            self.draw_element_object_recurse(layer_canvas, e, context);
-        }
-        layer_canvas.restore();
-        context.flush();
-        self.layer_state_map.insert(layer.key.clone(), graphic_layer);
+            layer_canvas.translate((-graphic_layer.surface_bounds.left, -graphic_layer.surface_bounds.top));
+            if (!layer.invalid_rects.is_empty()) {
+                layer_canvas.clip_path(&layer.invalid_rects.to_path(), ClipOp::Intersect, false);
+                layer_canvas.clip_rect(&Rect::from_xywh(0.0, 0.0, layer.width, layer.height), ClipOp::Intersect, false);
+                layer_canvas.clear(Color::TRANSPARENT);
+            }
+            for e in &mut layer.normal_nodes {
+                self.draw_element_object_recurse(layer_canvas, e, context);
+            }
+            layer_canvas.restore();
+            context.flush();
 
-        root_canvas.save();
-        let old_total_matrix = root_canvas.local_to_device();
-        root_canvas.concat(&layer.total_matrix);
-        if let Some(clip_rect) = &layer.clip_rect {
-            root_canvas.clip_rect(&clip_rect, ClipOp::Intersect, false);
-        } else {
-            //TODO support overflow
-            let rect = Rect::from_xywh(0.0, 0.0, layer.width, layer.height);
-            root_canvas.clip_rect(&rect, ClipOp::Intersect, false);
+            root_canvas.save();
+            let old_total_matrix = root_canvas.local_to_device();
+            root_canvas.concat(&layer.total_matrix);
+            if let Some(clip_rect) = &layer.clip_rect {
+                root_canvas.clip_rect(&clip_rect, ClipOp::Intersect, false);
+            } else {
+                //TODO support overflow
+                let rect = Rect::from_xywh(0.0, 0.0, layer.width, layer.height);
+                root_canvas.clip_rect(&rect, ClipOp::Intersect, false);
+            }
+            self.submit_layer(root_canvas, context, layer, &mut graphic_layer);
+            context.flush();
+            if self.layer_cache_enabled {
+                self.layer_state_map.insert(layer.key.clone(), graphic_layer);
+            }
+            root_canvas.set_matrix(&old_total_matrix);
         }
-        self.submit_layer(root_canvas, context, layer);
-        context.flush();
-        root_canvas.set_matrix(&old_total_matrix);
 
         for l in &mut layer.layer_nodes {
             self.draw_layer(root_canvas, context, l, layer_state_map);
