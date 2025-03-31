@@ -5,7 +5,7 @@ use crate::base::{Callback, ElementEvent, Event, EventContext, EventHandler, Eve
 use crate::canvas_util::CanvasHelper;
 use crate::cursor::search_cursor;
 use crate::element::{Element, ElementBackend, ElementWeak, PaintInfo};
-use crate::event::{build_modifier, named_key_to_str, str_to_named_key, BlurEvent, CaretChangeEventListener, ClickEvent, ContextMenuEvent, DragOverEvent, DragStartEvent, DropEvent, FocusEvent, FocusShiftEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent, MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, TextInputEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT};
+use crate::event::{build_modifier, named_key_to_str, str_to_named_key, BlurEvent, CaretChangeEventListener, ClickEvent, ContextMenuEvent, DragOverEvent, DragStartEvent, DropEvent, DroppedFileEvent, FocusEvent, FocusShiftEvent, HoveredFileEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent, MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, TextInputEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT};
 use crate::event_loop::{create_event_loop_proxy, run_with_event_loop};
 use crate::ext::common::create_event_handler;
 use crate::ext::ext_window::{WindowAttrs, WINDOWS, WINDOW_TYPE_MENU, WINDOW_TYPE_NORMAL, MODAL_TO_OWNERS, WINIT_TO_WINDOW};
@@ -520,6 +520,13 @@ impl Window {
                     self.emit(WindowBlurEvent);
                 }
             }
+            WindowEvent::DroppedFile(path) => {
+                // println!("dropped file: {:?}", path);
+                self.emit_dropped_file_event(self.cursor_position.x, self.cursor_position.y, path.to_string_lossy().to_string());
+            }
+            WindowEvent::HoveredFile(path) => {
+                self.emit_hovered_file_event(self.cursor_position.x, self.cursor_position.y, path.to_string_lossy().to_string());
+            }
             _ => (),
         }
     }
@@ -692,6 +699,18 @@ impl Window {
                 self.release_press();
             }
         }
+    }
+
+    pub fn emit_dropped_file_event(&mut self, window_x: f64, window_y: f64, path: String) -> Option<()> {
+        let (mut node, relative_x, relative_y) = self.get_node_by_pos(window_x as f32, window_y as f32)?;
+        node.emit(DroppedFileEvent(path));
+        Some(())
+    }
+
+    pub fn emit_hovered_file_event(&mut self, window_x: f64, window_y: f64, path: String) -> Option<()> {
+        let (mut node, relative_x, relative_y) = self.get_node_by_pos(window_x as f32, window_y as f32)?;
+        node.emit(HoveredFileEvent(path));
+        Some(())
     }
 
     pub fn emit_touch_event(&mut self, identifier: u64, phase: TouchPhase, window_x: f32, window_y: f32) -> Option<()> {

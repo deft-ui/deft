@@ -605,8 +605,16 @@ declare class Element {
      * @param callback {(event: IMouseEvent) => void}
      */
     bindMouseLeave(callback: (event: IMouseEvent) => void): void;
-    bindKeyDown(callback: any): void;
-    bindKeyUp(callback: any): void;
+    /**
+     *
+     * @param callback {(e: IKeyEvent) => void}
+     */
+    bindKeyDown(callback: (e: IKeyEvent) => void): void;
+    /**
+     *
+     * @param callback {(e: IKeyEvent) => void}
+     */
+    bindKeyUp(callback: (e: IKeyEvent) => void): void;
     bindSizeChanged(callback: any): void;
     bindScroll(callback: any): void;
     bindMouseWheel(callback: any): void;
@@ -617,6 +625,16 @@ declare class Element {
     bindTouchMove(callback: any): void;
     bindTouchEnd(callback: any): void;
     bindTouchCancel(callback: any): void;
+    /**
+     *
+     * @param callback {(e: IDroppedFileEvent) => void}
+     */
+    bindDroppedFile(callback: (e: IDroppedFileEvent) => void): void;
+    /**
+     *
+     * @param callback {(e: IHoveredFileEvent) => void}
+     */
+    bindHoveredFile(callback: (e: IHoveredFileEvent) => void): void;
     bindEvent(type: any, callback: any): void;
     /**
      *
@@ -982,6 +1000,8 @@ declare type IMouseWheelEvent = IEvent<MouseWheelDetail>;
 declare type ITextEvent = IEvent<TextDetail>;
 declare type ITouchEvent = IEvent<TouchDetail>;
 declare type IScrollEvent = IEvent<ScrollDetail>;
+declare type IDroppedFileEvent = IEvent<string>;
+declare type IHoveredFileEvent = IEvent<string>;
 declare class Clipboard {
     /**
      *

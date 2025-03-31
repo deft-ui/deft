@@ -787,6 +787,13 @@ pub struct DragOverEvent;
 #[event]
 pub struct DropEvent;
 
+
+#[event]
+pub struct DroppedFileEvent(pub String);
+
+#[event]
+pub struct HoveredFileEvent(pub String);
+
 #[event]
 pub struct BoundsChangeEvent {
     pub origin_bounds: base::Rect,

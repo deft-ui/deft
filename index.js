@@ -218,6 +218,9 @@ function main() {
         padding: 5,
         gap: 5,
     }
+    container.bindDroppedFile(e => {
+        console.log("dropped file", e);
+    })
 
     container.addChild(createAddChildrenButton(container));
     container.addChild(createAnimationButton());

@@ -809,10 +809,18 @@ export class Element {
         this.#eventBinder.bindEvent("mouseleave", callback);
     }
 
+    /**
+     *
+     * @param callback {(e: IKeyEvent) => void}
+     */
     bindKeyDown(callback) {
         this.#eventBinder.bindEvent("keydown", callback);
     }
 
+    /**
+     *
+     * @param callback {(e: IKeyEvent) => void}
+     */
     bindKeyUp(callback) {
         this.#eventBinder.bindEvent("keyup", callback);
     }
@@ -855,6 +863,22 @@ export class Element {
 
     bindTouchCancel(callback) {
         this.#eventBinder.bindEvent("touchcancel", callback);
+    }
+
+    /**
+     *
+     * @param callback {(e: IDroppedFileEvent) => void}
+     */
+    bindDroppedFile(callback) {
+        this.#eventBinder.bindEvent("droppedfile", callback);
+    }
+
+    /**
+     *
+     * @param callback {(e: IHoveredFileEvent) => void}
+     */
+    bindHoveredFile(callback) {
+        this.#eventBinder.bindEvent("hoveredfile", callback);
     }
 
     bindEvent(type, callback) {
@@ -1863,4 +1887,6 @@ globalThis.localStorage = localStorage;
  * @typedef {IEvent<TextDetail>} ITextEvent
  * @typedef {IEvent<TouchDetail>} ITouchEvent
  * @typedef {IEvent<ScrollDetail>} IScrollEvent
+ * @typedef {IEvent<string>} IDroppedFileEvent
+ * @typedef {IEvent<string>} IHoveredFileEvent
  */
