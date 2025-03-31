@@ -994,8 +994,10 @@ impl Window {
         let background_color = self.background_color;
         let mut me = self.clone();
         let viewport = Rect::new(0.0, 0.0, width as f32 / scale_factor, height as f32 / scale_factor);
+        //TODO support config
+        let layer_cache_enabled = false;
         let mut paint_tree = if let Some(body) = &mut me.body {
-            self.render_tree.rebuild_render_object(body);
+            self.render_tree.rebuild_render_object(body, layer_cache_enabled);
             //TODO notify absolute position change
             some_or_return!(
                 self.render_tree.build_paint_tree_new(&viewport),
@@ -1016,6 +1018,7 @@ impl Window {
             canvas.clear(background_color);
             let mut element_painter = ElementPainter::take(ctx);
             element_painter.update_viewport(scale_factor, viewport);
+            element_painter.set_layer_cache(layer_cache_enabled);
             element_painter.draw_root(canvas, &mut paint_tree, ctx);
             element_painter.put(ctx);
             canvas.restore();

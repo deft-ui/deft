@@ -216,7 +216,7 @@ impl RenderTree {
         element.render_object_idx = Some(self.element_objects.len() - 1);
     }
 
-    pub fn rebuild_render_object(&mut self, element: &mut Element) {
+    pub fn rebuild_render_object(&mut self, element: &mut Element, layer_cache_enabled: bool) {
         // print_time!("rebuild render object");
         let old_layout_tree = mem::take(&mut self.layout_tree);
         let mut matrix_calculator = MatrixCalculator::new();
@@ -228,7 +228,9 @@ impl RenderTree {
             self.layout_tree.layer_node = None;
         }
         self.layout_tree.root_render_object = Some(rro);
-        old_layout_tree.sync_invalid_area(&mut self.layout_tree);
+        if layer_cache_enabled {
+            old_layout_tree.sync_invalid_area(&mut self.layout_tree);
+        }
     }
 
     fn build_layer_tree(&mut self, layer_object: &LayerObject) -> LayerNode {

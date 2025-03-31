@@ -13,6 +13,7 @@ pub struct ElementPainter {
     scale: f32,
     viewport: Rect,
     layer_state_map: HashMap<RenderLayerKey, LayerState>,
+    layer_cache_enabled: bool,
 }
 
 impl ElementPainter {
@@ -22,6 +23,7 @@ impl ElementPainter {
             scale: 1.0,
             viewport: Rect::new_empty(),
             layer_state_map: HashMap::new(),
+            layer_cache_enabled: false,
         }
     }
 
@@ -37,6 +39,13 @@ impl ElementPainter {
     pub fn update_viewport(&mut self, scale: f32, viewport: Rect) {
         self.scale = scale;
         self.viewport = viewport;
+    }
+
+    pub fn set_layer_cache(&mut self, layer_cache_enabled: bool) {
+        self.layer_cache_enabled = layer_cache_enabled;
+        if !layer_cache_enabled {
+            self.layer_state_map.clear();
+        }
     }
 
     pub fn draw_root(&mut self, canvas: &Canvas, obj: &mut PaintTreeNew, context: &mut RenderContext) {
@@ -62,33 +71,31 @@ impl ElementPainter {
         canvas.restore();
     }
 
-    fn submit_layer(&mut self, canvas: &Canvas, context: &mut RenderContext, lpo: &mut LayerPaintObject) {
-        if let Some(layer) = self.layer_state_map.get_mut(&lpo.key) {
-            let img = layer.layer.as_image();
-            canvas.save();
-            canvas.translate((layer.surface_bounds.left, layer.surface_bounds.top));
-            canvas.scale((1.0 / self.scale, 1.0 / self.scale));
-            let mut options = SamplingOptions::default();
-            //TODO use Nearest?
-            options.filter = FilterMode::Linear;
-            canvas.draw_image_with_sampling_options(img, (0.0, 0.0), options, None);
-            canvas.restore();
+    fn submit_layer(&mut self, canvas: &Canvas, context: &mut RenderContext, lpo: &mut LayerPaintObject, layer: &mut LayerState) {
+        let img = layer.layer.as_image();
+        canvas.save();
+        canvas.translate((layer.surface_bounds.left, layer.surface_bounds.top));
+        canvas.scale((1.0 / self.scale, 1.0 / self.scale));
+        let mut options = SamplingOptions::default();
+        //TODO use Nearest?
+        options.filter = FilterMode::Linear;
+        canvas.draw_image_with_sampling_options(img, (0.0, 0.0), options, None);
+        canvas.restore();
 
-            if show_repaint_area() {
-                canvas.save();
-                canvas.scale((self.scale, self.scale));
-                let path = layer.invalid_rects.to_path();
-                if !path.is_empty() {
-                    let mut paint = Paint::default();
-                    paint.set_style(PaintStyle::Stroke);
-                    paint.set_color(Color::from_rgb(200, 0, 0));
-                    canvas.draw_path(&path, &paint);
-                }
-                canvas.restore();
+        if show_repaint_area() {
+            canvas.save();
+            canvas.scale((self.scale, self.scale));
+            let path = layer.invalid_rects.to_path();
+            if !path.is_empty() {
+                let mut paint = Paint::default();
+                paint.set_style(PaintStyle::Stroke);
+                paint.set_color(Color::from_rgb(200, 0, 0));
+                canvas.draw_path(&path, &paint);
             }
-            if show_layer_hint() {
-                Self::paint_hit_rect(canvas, lpo.width, lpo.height);
-            }
+            canvas.restore();
+        }
+        if show_layer_hint() {
+            Self::paint_hit_rect(canvas, lpo.width, lpo.height);
         }
     }
 
@@ -172,7 +179,6 @@ impl ElementPainter {
         }
         layer_canvas.restore();
         context.flush();
-        self.layer_state_map.insert(layer.key.clone(), graphic_layer);
 
         root_canvas.save();
         let old_total_matrix = root_canvas.local_to_device();
@@ -184,8 +190,11 @@ impl ElementPainter {
             let rect = Rect::from_xywh(0.0, 0.0, layer.width, layer.height);
             root_canvas.clip_rect(&rect, ClipOp::Intersect, false);
         }
-        self.submit_layer(root_canvas, context, layer);
+        self.submit_layer(root_canvas, context, layer, &mut graphic_layer);
         context.flush();
+        if self.layer_cache_enabled {
+            self.layer_state_map.insert(layer.key.clone(), graphic_layer);
+        }
         root_canvas.set_matrix(&old_total_matrix);
 
         for l in &mut layer.layer_nodes {

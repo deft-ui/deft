@@ -1,10 +1,12 @@
 use std::num::{NonZeroU32};
+use std::ops::DerefMut;
 use std::rc::Rc;
 use std::slice;
 use skia_safe::{Canvas, ColorType, ImageInfo};
 use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window};
 use crate::context::{RenderContext, UserContext};
+use crate::mrc::Mrc;
 use crate::renderer::Renderer;
 use crate::soft::context::SoftRenderContext;
 use crate::soft::soft_renderer::SoftRenderer;
@@ -12,22 +14,19 @@ use crate::soft::surface_presenter::SurfacePresenter;
 use crate::surface::RenderBackend;
 
 pub struct SoftSurface {
-    context: SoftRenderContext,
+    context: Mrc<SoftRenderContext>,
     width: u32,
     height: u32,
-    renderer: SoftRenderer,
 }
 
 impl SoftSurface {
     pub fn new<P: SurfacePresenter + 'static>(_event_loop: &ActiveEventLoop, surface_presenter: P) -> Self {
         let (width, height) = surface_presenter.size();
         let context = SoftRenderContext::new(Box::new(surface_presenter));
-        let renderer = SoftRenderer::new(width as i32, height as i32);
         Self {
-            context,
+            context: Mrc::new(context),
             width,
             height,
-            renderer,
         }
     }
 }
@@ -38,19 +37,19 @@ impl RenderBackend for SoftSurface {
     }
 
     fn render(&mut self, draw: Renderer, callback: Box<dyn FnOnce(bool) + Send + 'static>) {
-        let mut skia_surface = self.renderer.skia_surface().clone();
         let mut user_context = self.context.user_context.take().unwrap();
-        let mut ctx = RenderContext::new(&mut self.context, &mut user_context);
-        let canvas = skia_surface.canvas();
-        draw.render(canvas, &mut ctx);
-        self.context.surface_presenter.present_surface(&mut skia_surface);
-        self.context.user_context = Some(user_context);
+        let mut p_ctx = self.context.clone();
+        let mut renderer: Box<dyn FnOnce(&Canvas)> = Box::new(move |canvas| {
+            let mut ctx = RenderContext::new(p_ctx.deref_mut(), &mut user_context);
+            draw.render(canvas, &mut ctx);
+            p_ctx.user_context = Some(user_context);
+        });
+        self.context.surface_presenter.render(renderer);
         callback(true);
     }
 
     fn resize(&mut self, width: u32, height: u32) {
         self.context.surface_presenter.resize(width, height);
-        self.renderer = SoftRenderer::new(width as i32, height as i32);
         self.width = width;
         self.height = height;
     }
