@@ -150,7 +150,6 @@ impl Drop for PromiseResolver {
 pub trait JsValueView {
     fn as_bool(&self) -> Option<bool>;
 
-    fn get_object_property(&self, key: &str) -> Option<JsValue>;
     fn as_number_array(&self) -> Option<Vec<f32>>;
 
 }
@@ -164,15 +163,6 @@ impl JsValueView for JsValue {
             _ => {
                 None
             }
-        }
-    }
-
-    fn get_object_property(&self, key: &str) -> Option<JsValue> {
-        //TODO optimize
-        if let Some(obj) = self.get_properties() {
-            obj.get(key).cloned()
-        } else {
-            None
         }
     }
 

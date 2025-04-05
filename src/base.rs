@@ -19,7 +19,7 @@ use crate::element::{Element, ElementWeak};
 use crate::ext::common::create_event_handler;
 use crate::js::{FromJsValue, ToJsValue};
 use crate::js::js_serde::JsValueSerializer;
-use crate::{js_deserialize, js_serialize};
+use crate::{js_deserialize, js_serialize, some_or_return};
 use crate::number::DeNan;
 
 pub struct IdKey {
@@ -363,10 +363,7 @@ impl<E> EventRegistration<E> {
     }
 
     pub fn unregister_event_listener(&mut self, id: u32) {
-        let event_type_id = match self.listener_types.get(&id) {
-            Some(type_id) => *type_id,
-            None => return,
-        };
+        let event_type_id = some_or_return!(self.listener_types.remove(&id));
         if let Some(listeners) = self.typed_listeners.get_mut(&event_type_id) {
             listeners.retain(|(i, _)| *i != id);
         }

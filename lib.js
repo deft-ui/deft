@@ -373,11 +373,12 @@ export class EventBinder {
         if (typeof callback !== "function") {
             throw new Error("invalid callback");
         }
-        let oldListenerId = this.#eventListeners[type];
-        if (oldListenerId) {
-            this.#removeEventListenerApi(this.#target, oldListenerId);
+        let oldListener = this.#eventListeners[type];
+        if (oldListener) {
+            this.removeEventListener(type, oldListener);
         }
-        this.#eventListeners[type] = this.addEventListener(type, callback);
+        this.addEventListener(type, callback);
+        this.#eventListeners[type] = callback;
     }
     addEventListener(type, callback) {
         const getJsContext = (target) => {
@@ -418,10 +419,14 @@ export class EventBinder {
     }
 
     removeEventListener(type, callback) {
-        const map = this.#eventListeners[type];
-        const id = map.delete(callback);
+        /**
+         * @type {Map}
+         */
+        const map = this.#allEventListeners[type];
+        const id = map.get(callback);
         if (id) {
-            this.#removeEventListenerApi(this.#target, type, id);
+            map.delete(callback);
+            this.#removeEventListenerApi(this.#target, id);
         }
     }
 
