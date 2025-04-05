@@ -16,7 +16,7 @@ use skia_safe::{Canvas, Color, Matrix, Paint, Path, Rect};
 use winit::window::CursorIcon;
 use yoga::{Direction, Edge, StyleUnit};
 
-use crate::base::{ElementEvent, ElementEventContext, ElementEventHandler, EventContext, EventListener, EventRegistration, ScrollEventDetail};
+use crate::base::{ElementEventHandler, EventContext, EventListener, EventRegistration, ScrollEventDetail};
 use crate::border::build_rect_with_radius;
 use crate::element::button::Button;
 use crate::element::container::Container;
@@ -786,22 +786,6 @@ impl Element {
         changed_list
     }
 
-    fn update_children_inherited_style(&mut self, p: &ResolvedStyleProp) {
-        let mut children = self.get_children();
-        for c in &mut children {
-            let v = some_or_continue!(c.style_props.get(&p.key()));
-            if !v.is_inherited() {
-                continue;
-            }
-            //TODO use computed value
-            let (rp, rl) = c.style.set_resolved_style_prop(p.clone());
-            if rp || rl {
-                c.mark_dirty(rl);
-            }
-            c.update_children_inherited_style(p);
-        }
-    }
-
     pub fn register_event_listener<T: 'static, H: EventListener<T, ElementWeak> + 'static>(&mut self, mut listener: H) -> u32 {
         self.event_registration.register_event_listener(listener)
     }
@@ -870,14 +854,6 @@ impl Element {
                 p.handle_default_behavior(event, ctx);
             }
         }
-    }
-
-    pub fn add_event_listener(&mut self, event_type: &str, handler: Box<ElementEventHandler>) -> u32 {
-        self.event_registration.add_event_listener(event_type, handler)
-    }
-
-    pub fn bind_event_listener<T: 'static, F: FnMut(&mut ElementEventContext, &mut T) + 'static>(&mut self, event_type: &str, handler: F) -> u32 {
-        self.event_registration.bind_event_listener(event_type, handler)
     }
 
     #[js_func]

@@ -1,7 +1,7 @@
 use crate as deft;
 use crate::app::{exit_app, AppEvent, AppEventPayload, InsetType};
 use crate::base::MouseEventType::{MouseClick, MouseUp};
-use crate::base::{Callback, ElementEvent, Event, EventContext, EventHandler, EventListener, EventRegistration, JsValueContext, MouseDetail, MouseEventType, ResultWaiter, Touch, TouchDetail, UnsafeFnOnce};
+use crate::base::{Callback, Event, EventContext, EventHandler, EventListener, EventRegistration, JsValueContext, MouseDetail, MouseEventType, ResultWaiter, Touch, TouchDetail, UnsafeFnOnce};
 use crate::canvas_util::CanvasHelper;
 use crate::cursor::search_cursor;
 use crate::element::{Element, ElementBackend, ElementWeak, PaintInfo};

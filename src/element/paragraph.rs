@@ -31,7 +31,7 @@ use measure_time::print_time;
 use skia_safe::wrapper::NativeTransmutableWrapper;
 use winit::keyboard::NamedKey;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
-use crate::base::{ElementEvent, EventContext, MouseDetail, MouseEventType};
+use crate::base::{EventContext, MouseDetail, MouseEventType};
 use crate::element::paragraph::simple_paragraph_builder::SimpleParagraphBuilder;
 use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
 use crate::event::{FocusShiftEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent, SelectEndEvent, SelectMoveEvent, SelectStartEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};

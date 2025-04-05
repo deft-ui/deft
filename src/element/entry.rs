@@ -16,7 +16,7 @@ use winit::window::CursorIcon;
 use yoga::{PositionType, StyleUnit};
 use deft_macros::{element_backend, js_methods};
 use serde::{Deserialize, Serialize};
-use crate::base::{Callback, CaretDetail, ElementEvent, EventContext, MouseDetail, MouseEventType, Rect, TextChangeDetail, TextUpdateDetail};
+use crate::base::{Callback, CaretDetail, EventContext, MouseDetail, MouseEventType, Rect, TextChangeDetail, TextUpdateDetail};
 use crate::element::{ElementBackend, Element, ElementWeak};
 use crate::element::text::{AtomOffset, Text as Label};
 use crate::number::DeNan;

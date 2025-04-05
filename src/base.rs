@@ -275,10 +275,6 @@ pub struct Event<T> {
     pub context: EventContext<T>,
 }
 
-pub type ElementEvent = Event<ElementWeak>;
-
-pub type ElementEventContext = EventContext<ElementWeak>;
-
 impl<E> Event<E> {
 
     pub fn new<T: EventDetail>(event_type: &str, detail: T, target: E) -> Self {

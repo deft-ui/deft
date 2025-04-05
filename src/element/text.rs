@@ -13,7 +13,7 @@ use skia_safe::{Canvas, Color, Font, FontMgr, FontStyle, Paint, Typeface};
 use skia_safe::textlayout::{FontCollection, TextAlign, TextStyle};
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 use deft_macros::{js_methods, mrc_object};
-use crate::base::{ElementEvent, EventContext, MouseDetail, MouseEventType, Rect, TextUpdateDetail};
+use crate::base::{EventContext, MouseDetail, MouseEventType, Rect, TextUpdateDetail};
 use crate::color::parse_hex_color;
 use crate::element::{ElementBackend, Element, ElementWeak};
 use crate::element::text::skia_text_paragraph::{SkiaTextParagraph};
@@ -693,10 +693,6 @@ impl ElementBackend for Text {
         }
     }
 
-    //TODO use on_event
-    // fn handle_event(&mut self, _event_type: &str, event: &mut ElementEvent) {
-    //     match_event_type!(event, MouseDetail, self, handle_mouse_event);
-    // }
 }
 
 pub fn parse_align(align: &str) -> TextAlign {

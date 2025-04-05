@@ -5,7 +5,7 @@ use quick_js::JsValue;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 use skia_safe::{Canvas, Color, Color4f, Font, FontMgr, FontStyle, Paint, Typeface};
 use skia_safe::textlayout::{FontCollection, Paragraph, ParagraphBuilder, ParagraphStyle, StrutStyle, TextAlign, TextStyle};
-use crate::base::{ElementEvent, PropertyValue, Rect, TextUpdateDetail};
+use crate::base::{PropertyValue, Rect, TextUpdateDetail};
 use crate::color::parse_hex_color;
 use crate::element::{ElementData, ElementBackend, Element};
 use crate::event::TextUpdateEvent;

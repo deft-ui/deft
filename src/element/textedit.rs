@@ -4,7 +4,7 @@ use anyhow::Error;
 use quick_js::JsValue;
 use skia_safe::{Canvas, Color, Font, Paint};
 use winit::event::KeyEvent;
-use crate::base::{ElementEvent, MouseDetail, PropertyValue, Rect, TextAlign, TextChangeDetail, TextUpdateDetail, VerticalAlign};
+use crate::base::{MouseDetail, PropertyValue, Rect, TextAlign, TextChangeDetail, TextUpdateDetail, VerticalAlign};
 use crate::canvas_util::CanvasHelper;
 use crate::color::parse_hex_color;
 use crate::element::container::Container;

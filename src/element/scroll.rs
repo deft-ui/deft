@@ -13,7 +13,7 @@ use yoga::Direction::LTR;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size, StyleUnit};
 use crate::{backend_as_api, is_mobile_platform, js_deserialize, js_serialize, ok_or_return, some_or_return};
 use crate::animation::{AnimationDef, AnimationInstance, SimpleFrameController, WindowAnimationController};
-use crate::base::{CaretDetail, ElementEvent, EventContext, Rect};
+use crate::base::{CaretDetail, EventContext, Rect};
 use crate::color::parse_hex_color;
 use crate::element::{ElementBackend, Element, ViewEvent, ElementWeak};
 use crate::element::container::Container;
