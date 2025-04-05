@@ -1,4 +1,3 @@
-pub mod paint_tree;
 pub mod paint_object;
 pub mod layout_tree;
 pub mod painter;

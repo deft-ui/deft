@@ -80,7 +80,7 @@ impl LayoutTree {
         new_tree: &Self,
     ) {
         match render_object {
-            RenderObject::Normal(eo) => {
+            RenderObject::Element(eo) => {
                 self.merge_objects_invalid_area(parent_layer_idx, &eo.children, new_tree);
             }
             RenderObject::Layer(lo) => {

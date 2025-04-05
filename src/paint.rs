@@ -19,8 +19,7 @@ use crate::render::RenderFn;
 use crate::renderer::CpuRenderer;
 use crate::{some_or_break, some_or_continue, some_or_return};
 use crate::render::layout_tree::LayoutTree;
-use crate::render::paint_object::{ElementPaintObject, LayerPaintObject, PaintObject};
-use crate::render::paint_tree::{PaintTreeNew};
+use crate::render::paint_object::{ElementPO, LayerPO};
 use crate::style::border_path::BorderPath;
 use crate::style::ColorHelper;
 
@@ -84,7 +83,7 @@ pub struct ElementObjectData {
 }
 
 #[derive(Clone)]
-pub struct ElementObject {
+pub struct ElementRO {
     pub element_object_idx: usize,
     pub children: Vec<RenderObject>,
 }
@@ -104,7 +103,7 @@ pub struct LayerObjectData {
 }
 
 #[derive(Clone)]
-pub struct LayerObject {
+pub struct LayerRO {
     pub objects: Vec<RenderObject>,
     // pub root_element_id: u32,
     pub layer_object_idx: usize,
@@ -112,8 +111,8 @@ pub struct LayerObject {
 
 #[derive(Clone)]
 pub enum RenderObject {
-    Normal(ElementObject),
-    Layer(LayerObject),
+    Element(ElementRO),
+    Layer(LayerRO),
 }
 
 #[derive(Clone)]
@@ -216,7 +215,7 @@ impl RenderTree {
         element.render_object_idx = Some(self.element_objects.len() - 1);
     }
 
-    pub fn rebuild_render_object(&mut self, element: &mut Element, layer_cache_enabled: bool) {
+    pub fn rebuild_render_tree(&mut self, element: &mut Element, layer_cache_enabled: bool) {
         // print_time!("rebuild render object");
         let old_layout_tree = mem::take(&mut self.layout_tree);
         let mut matrix_calculator = MatrixCalculator::new();
@@ -233,7 +232,7 @@ impl RenderTree {
         }
     }
 
-    fn build_layer_tree(&mut self, layer_object: &LayerObject) -> LayerNode {
+    fn build_layer_tree(&mut self, layer_object: &LayerRO) -> LayerNode {
         let mut normal_nodes = Vec::new();
         let mut layer_objects = Vec::new();
         for c in &layer_object.objects {
@@ -273,9 +272,9 @@ impl RenderTree {
         }
     }
 
-    fn build_normal_node_recurse(&mut self, render_object: &RenderObject, layer_objects: &mut Vec<LayerObject>) -> Option<NormalNode> {
+    fn build_normal_node_recurse(&mut self, render_object: &RenderObject, layer_objects: &mut Vec<LayerRO>) -> Option<NormalNode> {
         match render_object {
-            RenderObject::Normal(eo) => {
+            RenderObject::Element(eo) => {
                 let mut children = Vec::new();
                 for c in &eo.children {
                     let child_node = some_or_continue!(
@@ -363,7 +362,7 @@ impl RenderTree {
                 clip_rect: Some(clip_rect.to_skia_rect()),
             };
             self.layout_tree.layer_objects.push(layer_object_data);
-            let children_layer_object = LayerObject {
+            let children_layer_object = LayerRO {
                 objects: self.build_children_objects(element, matrix_calculator, origin_x, origin_y, 0.0, 0.0, Some(layer_object_idx)),
                 layer_object_idx,
             };
@@ -419,7 +418,7 @@ impl RenderTree {
                 matrix_calculator,
             );
             //TODO fix
-            let layer_object = LayerObject {
+            let layer_object = LayerRO {
                 objects: vec![obj],
                 layer_object_idx,
             };
@@ -451,11 +450,11 @@ impl RenderTree {
         element_data.coord = (bounds.left, bounds.top);
         element_data.layer_object_idx = Some(layer_object_idx);
         element_data.layer_coord = (layer_x, layer_y);
-        let element_obj = ElementObject {
+        let element_obj = ElementRO {
             element_object_idx,
             children: self.build_render_object_children(element, origin_x, origin_y, Some(layer_object_idx), matrix_calculator, layer_x, layer_y),
         };
-        RenderObject::Normal(element_obj)
+        RenderObject::Element(element_obj)
     }
 
     pub fn invalid_element(&mut self, element: &Element) {
@@ -479,17 +478,14 @@ impl RenderTree {
         element.need_snapshot
     }
 
-    pub fn build_paint_tree_new(&mut self, viewport: &Rect) -> Option<PaintTreeNew> {
+    pub fn build_paint_tree(&mut self, viewport: &Rect) -> LayerPO {
         // print_time!("Building paint tree");
         // let invalid_rects = InvalidArea::Full.build(viewport.clone());
-        let root = self.build_layer_node(self.layout_tree.layer_node.clone().as_mut().unwrap(), viewport);
-        Some(PaintTreeNew {
-            root,
-        })
+        self.build_paint_layer_node(self.layout_tree.layer_node.clone().as_mut().unwrap(), viewport)
     }
 
 
-    fn build_paint_normal_nodes(&mut self, nodes: &Vec<NormalNode>, viewport: &Rect, invalid_rects: &InvalidRects) -> Vec<ElementPaintObject> {
+    fn build_paint_normal_nodes(&mut self, nodes: &Vec<NormalNode>, viewport: &Rect, invalid_rects: &InvalidRects) -> Vec<ElementPO> {
         let mut result = Vec::with_capacity(nodes.len());
         for n in nodes {
             result.push(self.build_paint_normal_node(n, viewport, invalid_rects));
@@ -497,7 +493,7 @@ impl RenderTree {
         result
     }
 
-    fn build_paint_normal_node(&mut self, eod: &NormalNode, viewport: &Rect, invalid_rects: &InvalidRects) -> ElementPaintObject {
+    fn build_paint_normal_node(&mut self, eod: &NormalNode, viewport: &Rect, invalid_rects: &InvalidRects) -> ElementPO {
         let children = self.build_paint_normal_nodes(&mut eod.children.clone(), viewport, invalid_rects);
         let eo = &mut self.element_objects[eod.element_object_idx];
 
@@ -505,7 +501,7 @@ impl RenderTree {
         let border_path_mut = eo.element.get_border_path_mut();
         let border_path = border_path_mut.get_paths().clone();
         let border_box_path = border_path_mut.get_box_path().clone();
-        let epo = ElementPaintObject {
+        let epo = ElementPO {
             coord: eo.coord,
             children,
             children_viewport: eo.children_viewport,
@@ -525,7 +521,7 @@ impl RenderTree {
         epo
     }
 
-    pub fn build_layer_node(&mut self, lod: &LayerNode, viewport: &Rect) -> LayerPaintObject {
+    pub fn build_paint_layer_node(&mut self, lod: &LayerNode, viewport: &Rect) -> LayerPO {
         let invalid_rects = {
             let lo = &mut self.layout_tree.layer_objects[lod.layer_object_idx];
             let mut invalid_area = lo.invalid_area.clone();
@@ -637,17 +633,17 @@ impl RenderTree {
         let normal_nodes = self.build_paint_normal_nodes(&lod.normal_nodes, viewport, &invalid_rects);
         let mut layers = Vec::new();
         for lo in &lod.layer_nodes {
-            layers.push(self.build_layer_node(lo, viewport));
+            layers.push(self.build_paint_layer_node(lo, viewport));
         }
 
         let lo = &mut self.layout_tree.layer_objects[lod.layer_object_idx];
-        let lpo = LayerPaintObject {
+        let lpo = LayerPO {
             matrix: lo.matrix.clone(),
             total_matrix: lo.total_matrix.clone(),
             width: lo.width,
             height: lo.height,
-            normal_nodes,
-            layer_nodes: layers,
+            elements: normal_nodes,
+            layers,
             key: lo.key.clone(),
             origin_absolute_pos: lo.origin_absolute_pos,
             visible_bounds: lo.visible_bounds.clone(),

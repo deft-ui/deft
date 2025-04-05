@@ -4,9 +4,9 @@ use crate::paint::{InvalidArea, InvalidRects, RenderLayerKey, RenderObject};
 use crate::render::RenderFn;
 use crate::style::ColorHelper;
 
-pub struct ElementPaintObject {
+pub struct ElementPO {
     pub coord: (f32, f32),
-    pub children: Vec<ElementPaintObject>,
+    pub children: Vec<ElementPO>,
     pub children_viewport: Option<Rect>,
     pub border_path: [Path; 4],
     pub border_box_path: Path,
@@ -24,7 +24,7 @@ pub struct ElementPaintObject {
     pub focused: bool,
 }
 
-impl ElementPaintObject {
+impl ElementPO {
     pub fn draw_background(&self, canvas: &Canvas) {
         // let pi = some_or_return!(&self.paint_info);
         if let Some(img) = &self.background_image {
@@ -68,14 +68,14 @@ impl ElementPaintObject {
 
 }
 
-pub struct LayerPaintObject {
+pub struct LayerPO {
     pub matrix: Matrix,
     pub total_matrix: Matrix,
     pub width: f32,
     pub height: f32,
     // pub objects: Vec<PaintObject>,
-    pub normal_nodes: Vec<ElementPaintObject>,
-    pub layer_nodes: Vec<LayerPaintObject>,
+    pub elements: Vec<ElementPO>,
+    pub layers: Vec<LayerPO>,
     // pub root_element_id: u32,
     pub key: RenderLayerKey,
     // Original position relative to viewport before transform
@@ -84,9 +84,4 @@ pub struct LayerPaintObject {
     pub surface_bounds: Rect,
     pub visible_bounds: Rect,
     pub clip_rect: Option<Rect>,
-}
-
-pub enum PaintObject {
-    Normal(ElementPaintObject),
-    Layer(LayerPaintObject),
 }

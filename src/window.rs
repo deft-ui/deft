@@ -49,7 +49,7 @@ use crate::computed::ComputedValue;
 use crate::frame_rate::{FrameRateController};
 use crate::layout::LayoutRoot;
 use crate::paint::{InvalidArea, PartialInvalidArea, Painter, RenderTree, SkiaPainter, UniqueRect, InvalidRects, MatrixCalculator, RenderLayerKey, LayerState};
-use crate::render::paint_object::{ElementPaintObject, PaintObject};
+use crate::render::paint_object::{ElementPO};
 use crate::render::painter::ElementPainter;
 use crate::resource_table::ResourceTable;
 use crate::style::border_path::BorderPath;
@@ -1015,12 +1015,9 @@ impl Window {
         //TODO support config
         let layer_cache_enabled = false;
         let mut paint_tree = if let Some(body) = &mut me.body {
-            self.render_tree.rebuild_render_object(body, layer_cache_enabled);
+            self.render_tree.rebuild_render_tree(body, layer_cache_enabled);
             //TODO notify absolute position change
-            some_or_return!(
-                self.render_tree.build_paint_tree_new(&viewport),
-                ResultWaiter::new_finished(false)
-            )
+            self.render_tree.build_paint_tree(&viewport)
         } else {
             return ResultWaiter::new_finished(false);
         };
