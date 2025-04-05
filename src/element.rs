@@ -16,7 +16,7 @@ use skia_safe::{Canvas, Color, Matrix, Paint, Path, Rect};
 use winit::window::CursorIcon;
 use yoga::{Direction, Edge, StyleUnit};
 
-use crate::base::{ElementEventHandler, EventContext, EventListener, EventRegistration, ScrollEventDetail};
+use crate::base::{EventContext, EventListener, EventRegistration, ScrollEventDetail};
 use crate::border::build_rect_with_radius;
 use crate::element::button::Button;
 use crate::element::container::Container;

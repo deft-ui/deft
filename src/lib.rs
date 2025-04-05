@@ -55,7 +55,6 @@ pub mod websocket;
 pub mod number;
 pub mod timer;
 pub mod event_loop;
-pub mod async_runtime;
 pub mod string;
 pub mod canvas_util;
 pub mod event;
@@ -92,7 +91,8 @@ use skia_safe::font_style::{Weight, Width};
 use skia_safe::font_style::Slant::Upright;
 use skia_safe::wrapper::ValueWrapper;
 use yoga::Direction::LTR;
-use crate::event_loop::{AppEventProxy, AppEventResult};
+use crate::base::ResultWaiter;
+use crate::event_loop::{AppEventProxy};
 use crate::string::StringUtils;
 use crate::text::break_lines;
 
@@ -118,7 +118,7 @@ pub fn bootstrap(deft_app: App) {
 }
 
 /// Send an app event. Could call from any thread.
-pub fn send_app_event(event: AppEvent) -> Result<AppEventResult, Error> {
+pub fn send_app_event(event: AppEvent) -> Result<ResultWaiter<()>, Error> {
     let proxy = APP_EVENT_PROXY.get().ok_or_else(|| anyhow!("no app event proxy found"))?;
     let result = proxy.send_event(event)?;
     Ok(result)

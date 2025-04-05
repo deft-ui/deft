@@ -38,6 +38,7 @@ impl<T> MrcBox<T> {
     }
 }
 
+/// A single-threaded mutable reference-counting pointer.
 pub struct Mrc<T> {
     ptr: *mut MrcBox<T>,
 }
@@ -48,6 +49,7 @@ impl<T> PartialEq for Mrc<T> {
     }
 }
 
+/// MrcWeak is a version of Mrc that holds a non-owning reference to the managed allocation. The allocation is accessed by calling upgrade on the MrcWeak pointer, which returns an Option<Mrc<T>>.
 pub struct MrcWeak<T> {
     ptr: *mut MrcBox<T>,
 }

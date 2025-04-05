@@ -457,81 +457,96 @@ declare class Element {
     handle: number;
     createEventBinder(target: any, addEventListenerApi: any, removeEventListenerApi: any): EventBinder;
     /**
-     *
+     * Get the id of element
      * @returns {number}
      */
     get id(): number;
     /**
-     *
+     * Get the parent of element
      * @returns {Element | null}
      */
     get parent(): Element | null;
     /**
-     *
+     * Make element focusable or not
      * @param focusable {boolean}
      */
     set focusable(focusable: boolean);
     /**
-     *
+     * Whether element is focusable
      * @returns {boolean}
      */
     get focusable(): boolean;
     /**
-     *
+     * Get the root of current element
      * @returns {Element}
      */
     get rootElement(): Element;
+    /**
+     * Request focus on the current element
+     */
     focus(): void;
+    /**
+     * Get the window of element
+     * @returns {Window}
+     */
     get window(): Window;
     /**
-     *
+     * Set element style
      * @param style {StyleProps}
      */
     set style(style: StyleProps);
     /**
-     *
+     * Get element style
      * @returns {StyleProps}
      */
     get style(): StyleProps;
     /**
-     *
+     * Set element style in hover state
      * @param style {StyleProps}
      */
     set hoverStyle(style: StyleProps);
+    /**
+     * Get element style in hover state
+     * @returns {StyleProps}
+     */
     get hoverStyle(): StyleProps;
     /**
-     *
+     * The scrollTop property gets or sets the number of pixels by which an element's content is scrolled from its top edge.
      * @param value {number}
      */
     set scrollTop(value: number);
     /**
-     *
+     * The scrollTop property gets or sets the number of pixels by which an element's content is scrolled from its top edge.
      * @returns {number}
      */
     get scrollTop(): number;
     /**
-     *
+     * The scrollLeft property gets or sets the number of pixels by which an element's content is scrolled from its left edge.
      * @param value {number}
      */
     set scrollLeft(value: number);
     /**
-     *
+     * The scrollLeft property gets or sets the number of pixels by which an element's content is scrolled from its left edge.
      * @returns {number}
      */
     get scrollLeft(): number;
     /**
-     *
+     * Make element draggable
      * @param value {boolean}
      */
     set draggable(value: boolean);
-    get draggable(): boolean;
     /**
-     *
+     * Whether element is draggable or not
+     * @returns {*}
+     */
+    get draggable(): any;
+    /**
+     * Set the cursor in hover state
      * @param value {string}
      */
     set cursor(value: string);
     /**
-     *
+     * Get the size of element
      * @returns {[number, number]}
      */
     get size(): [number, number];
@@ -546,12 +561,12 @@ declare class Element {
      */
     getBoundingClientRect(): ElementRect;
     /**
-     *
+     * The scrollWidth read-only property is a measurement of the height of an element's content, including content not visible on the screen due to overflow.
      * @returns {number}
      */
     get scrollHeight(): number;
     /**
-     *
+     * The scrollWidth read-only property is a measurement of the width of an element's content, including content not visible on the screen due to overflow.
      * @returns {number}
      */
     get scrollWidth(): number;

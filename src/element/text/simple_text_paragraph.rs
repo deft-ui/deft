@@ -3,7 +3,6 @@ use skia_safe::canvas::GlyphPositions;
 use skia_safe::textlayout::{LineMetrics, PositionWithAffinity, TextStyle};
 use skia_safe::textlayout::paragraph::{GlyphInfo, VisitorInfo};
 use crate::base;
-use crate::base::{TextAlign, VerticalAlign};
 use crate::canvas_util::CanvasHelper;
 use crate::element::paragraph::TextUnit;
 use crate::element::text::text_paragraph::TextParams;

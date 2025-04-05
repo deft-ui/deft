@@ -552,7 +552,7 @@ export class Element {
     }
 
     /**
-     *
+     * Get the id of element
      * @returns {number}
      */
     get id() {
@@ -560,7 +560,7 @@ export class Element {
     }
 
     /**
-     *
+     * Get the parent of element
      * @returns {Element | null}
      */
     get parent() {
@@ -569,7 +569,7 @@ export class Element {
     }
 
     /**
-     *
+     * Make element focusable or not
      * @param focusable {boolean}
      */
     set focusable(focusable) {
@@ -577,7 +577,7 @@ export class Element {
     }
 
     /**
-     *
+     * Whether element is focusable
      * @returns {boolean}
      */
     get focusable() {
@@ -585,7 +585,7 @@ export class Element {
     }
 
     /**
-     *
+     * Get the root of current element
      * @returns {Element}
      */
     get rootElement() {
@@ -597,17 +597,24 @@ export class Element {
         }
     }
 
+    /**
+     * Request focus on the current element
+     */
     focus() {
         Element_focus(this.handle);
     }
 
+    /**
+     * Get the window of element
+     * @returns {Window}
+     */
     get window() {
         const windowHandle = Element_get_window(this.handle);
         return Window.fromHandle(windowHandle);
     }
 
     /**
-     *
+     * Set element style
      * @param style {StyleProps}
      */
     set style(style) {
@@ -616,7 +623,7 @@ export class Element {
     }
 
     /**
-     *
+     * Get element style
      * @returns {StyleProps}
      */
     get style() {
@@ -624,7 +631,7 @@ export class Element {
     }
 
     /**
-     *
+     * Set element style in hover state
      * @param style {StyleProps}
      */
     set hoverStyle(style) {
@@ -632,12 +639,16 @@ export class Element {
         Element_set_hover_style(this.handle, style);
     }
 
+    /**
+     * Get element style in hover state
+     * @returns {StyleProps}
+     */
     get hoverStyle() {
         return this.#hoverStyle;
     }
 
     /**
-     *
+     * The scrollTop property gets or sets the number of pixels by which an element's content is scrolled from its top edge.
      * @param value {number}
      */
     set scrollTop(value) {
@@ -645,7 +656,7 @@ export class Element {
     }
 
     /**
-     *
+     * The scrollTop property gets or sets the number of pixels by which an element's content is scrolled from its top edge.
      * @returns {number}
      */
     get scrollTop() {
@@ -653,28 +664,39 @@ export class Element {
     }
 
     /**
-     *
+     * The scrollLeft property gets or sets the number of pixels by which an element's content is scrolled from its left edge.
      * @param value {number}
      */
     set scrollLeft(value) {
         Element_set_scroll_left(this.handle, value);
     }
 
+    /**
+     * The scrollLeft property gets or sets the number of pixels by which an element's content is scrolled from its left edge.
+     * @returns {number}
+     */
+    get scrollLeft() {
+        return Element_get_scroll_left(this.handle);
+    }
 
     /**
-     *
+     * Make element draggable
      * @param value {boolean}
      */
     set draggable(value) {
         Element_set_draggable(this.handle, value);
     }
 
+    /**
+     * Whether element is draggable or not
+     * @returns {*}
+     */
     get draggable() {
         return Element_get_draggable(this.handle);
     }
 
     /**
-     *
+     * Set the cursor in hover state
      * @param value {string}
      */
     set cursor(value) {
@@ -682,7 +704,7 @@ export class Element {
     }
 
     /**
-     *
+     * Get the size of element
      * @returns {[number, number]}
      */
     get size() {
@@ -706,15 +728,7 @@ export class Element {
     }
 
     /**
-     *
-     * @returns {number}
-     */
-    get scrollLeft() {
-        return Element_get_scroll_left(this.handle);
-    }
-
-    /**
-     *
+     * The scrollWidth read-only property is a measurement of the height of an element's content, including content not visible on the screen due to overflow.
      * @returns {number}
      */
     get scrollHeight() {
@@ -722,7 +736,7 @@ export class Element {
     }
 
     /**
-     *
+     * The scrollWidth read-only property is a measurement of the width of an element's content, including content not visible on the screen due to overflow.
      * @returns {number}
      */
     get scrollWidth() {

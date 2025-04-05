@@ -91,7 +91,7 @@ impl<T> Id<T> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ResultWaiter<T> {
     lock: Arc<(Mutex<Option<T>>, Condvar)>,
 }
@@ -150,18 +150,6 @@ impl Callback {
 
 pub struct JsValueContext {
     pub context: JsValue,
-}
-
-pub enum TextAlign {
-    Left,
-    Right,
-    Center,
-}
-
-pub enum VerticalAlign {
-    Top,
-    Middle,
-    Bottom,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -333,8 +321,6 @@ impl CaretDetail {
 }
 
 pub type EventHandler<E> = dyn FnMut(&mut Event<E>);
-
-pub type ElementEventHandler = EventHandler<ElementWeak>;
 
 pub trait EventListener<T, E> {
     fn handle_event(&mut self, event: &mut T, ctx: &mut EventContext<E>);
@@ -565,39 +551,6 @@ impl Rect {
         self.translate(origin_bounds.x, origin_bounds.y)
     }
 
-}
-
-pub struct PaintContext {
-    pub width: f32,
-    pub height: f32,
-}
-
-
-pub enum PropertyValue {
-    INT(u32),
-    Str(String),
-}
-
-impl PropertyValue {
-    pub fn as_string(&self) -> String {
-        match self {
-            PropertyValue::INT(v) => format!("{}", v),
-            PropertyValue::Str(v) => v.to_string(),
-        }
-    }
-    pub fn as_f32(&self) -> f32 {
-        match self {
-            PropertyValue::INT(v) => *v as f32,
-            PropertyValue::Str(v) => f32::from_str(v).unwrap(),
-        }
-    }
-
-    pub fn as_bool(&self) -> bool {
-        match self {
-            PropertyValue::INT(v) => *v != 0,
-            PropertyValue::Str(v) => bool::from_str(v).unwrap(),
-        }
-    }
 }
 
 pub struct UnsafeFnOnce {

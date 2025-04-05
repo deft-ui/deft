@@ -16,7 +16,7 @@ use winit::platform::android::ActiveEventLoopExtAndroid;
 #[cfg(target_os = "android")]
 use winit::platform::android::activity::AndroidApp;
 use winit::window::WindowId;
-
+use crate::base::ResultWaiter;
 use crate::event_loop::{init_event_loop_proxy, run_event_loop_task, run_with_event_loop, AppEventProxy};
 use crate::ext::ext_window::WINDOWS;
 use crate::ext::ext_localstorage::localstorage_flush;
@@ -30,17 +30,7 @@ use crate::timer;
 #[derive(Debug)]
 pub struct AppEventPayload {
     pub event: AppEvent,
-    pub lock: Arc<(Mutex<bool>, Condvar)>,
-}
-
-impl AppEventPayload {
-    pub fn new(event: AppEvent) -> Self {
-        let lock = Arc::new((Mutex::new(false), Condvar::new()));
-        Self {
-            event,
-            lock,
-        }
-    }
+    pub result_waiter: ResultWaiter<()>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -197,10 +187,7 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
                     window_check_update(window_id);
                 }
             }
-            let (lock, cvar) = &*event.lock;
-            let mut done = lock.lock().unwrap();
-            *done = true;
-            cvar.notify_one();
+            event.result_waiter.finish(());
             self.execute_pending_jobs();
         });
     }

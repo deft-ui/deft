@@ -4,7 +4,7 @@ use ordered_float::OrderedFloat;
 use quick_js::JsValue;
 use skia_safe::{Canvas, Color};
 use yoga::{Edge, StyleUnit};
-use crate::base::{EventContext, PropertyValue, Rect};
+use crate::base::{EventContext, Rect};
 use crate::element::{ElementBackend, Element, ElementWeak};
 use crate::element::container::Container;
 use crate::render::RenderFn;

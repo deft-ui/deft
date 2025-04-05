@@ -3,7 +3,7 @@ use std::ptr::null_mut;
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
 use winit::event_loop::{ActiveEventLoop, EventLoopClosed, EventLoopProxy};
 use crate::app::{WinitApp, AppEvent, AppEventPayload};
-use crate::base::{UnsafeFnMut, UnsafeFnOnce};
+use crate::base::{ResultWaiter, UnsafeFnMut, UnsafeFnOnce};
 
 thread_local! {
     pub static ACTIVE_EVENT_LOOP: Cell<*const ActiveEventLoop> = Cell::new(null_mut());
@@ -15,37 +15,19 @@ pub struct AppEventProxy {
     proxy: EventLoopProxy<AppEventPayload>,
 }
 
-//TODO use ResultWaiter?
-pub struct AppEventResult {
-    lock: Arc<(Mutex<bool>, Condvar)>,
-}
-
-impl AppEventResult {
-    pub fn wait(&self) {
-        let (lock, cvar) = &*self.lock;
-        let mut done = lock.lock().unwrap();
-        while !*done {
-            done = cvar.wait(done).unwrap();
-        }
-    }
-}
-
 impl AppEventProxy {
 
     pub fn new(proxy: EventLoopProxy<AppEventPayload>) -> AppEventProxy {
         Self { proxy }
     }
 
-    pub fn send_event(&self, event: AppEvent) -> Result<AppEventResult, EventLoopClosed<AppEventPayload>> {
-        let lock = Arc::new((Mutex::new(false), Condvar::new()));
-        let lock2 = Arc::clone(&lock);
+    pub fn send_event(&self, event: AppEvent) -> Result<ResultWaiter<()>, EventLoopClosed<AppEventPayload>> {
+        let result_waiter = ResultWaiter::new();
         self.proxy.send_event(AppEventPayload {
             event,
-            lock,
+            result_waiter: result_waiter.clone(),
         })?;
-        Ok(AppEventResult {
-            lock: lock2,
-        })
+        Ok(result_waiter)
     }
 }
 
