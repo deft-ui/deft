@@ -3,7 +3,6 @@ use crate::paint::{ElementObjectData, LayerNode, LayerObjectData, RenderLayerKey
 use crate::{some_or_continue, some_or_return};
 
 pub struct LayoutTree {
-    pub root_render_object: Option<RenderObject>,
     pub layer_objects: Vec<LayerObjectData>,
     pub layer_node: Option<LayerNode>,
 }
@@ -11,15 +10,14 @@ pub struct LayoutTree {
 impl LayoutTree {
     pub fn new() -> Self {
         Self {
-            root_render_object: None,
             layer_objects: Vec::new(),
             layer_node: Default::default(),
         }
     }
 
-    pub fn sync_invalid_area(mut self, new_tree: &mut Self) {
+    pub fn sync_invalid_area(mut self, new_tree: &mut Self, root: &RenderObject) {
         // self.scroll_invalid_area(new_tree);
-        self.merge_invalid_area(new_tree);
+        self.merge_invalid_area(new_tree, root);
         for new_layer in &mut new_tree.layer_objects {
             let layer = some_or_continue!(self.get_layer_object_by_key(&new_layer.key));
             new_layer.invalid_area = layer.invalid_area.clone();
@@ -57,9 +55,8 @@ impl LayoutTree {
     }
      */
 
-    pub fn merge_invalid_area(&mut self, new_tree: &Self) {
-        let root = some_or_return!(&self.root_render_object).clone();
-        self.merge_object_invalid_area(0, &root, new_tree);
+    pub fn merge_invalid_area(&mut self, new_tree: &Self, root: &RenderObject) {
+        self.merge_object_invalid_area(0, root, new_tree);
     }
 
     fn merge_objects_invalid_area(

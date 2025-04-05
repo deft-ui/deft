@@ -226,9 +226,8 @@ impl RenderTree {
         } else {
             self.layout_tree.layer_node = None;
         }
-        self.layout_tree.root_render_object = Some(rro);
         if layer_cache_enabled {
-            old_layout_tree.sync_invalid_area(&mut self.layout_tree);
+            old_layout_tree.sync_invalid_area(&mut self.layout_tree, &rro);
         }
     }
 
