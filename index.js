@@ -142,9 +142,7 @@ function createAddChildrenButton(container) {
 
 function createAnimationButton() {
     let animationButton = new ButtonElement();
-    animationButton.style={
-        width: 100,
-    };
+    animationButton.style="width: 100;";
     animationButton.addChild(createLabel("Animation"));
     animation_create("rotate", {
         "0": {

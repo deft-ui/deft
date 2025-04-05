@@ -40,7 +40,14 @@ impl StyleManager {
     }
 
     pub fn parse_style_obj(&mut self, style: JsValue) {
-        if let Some(obj) = style.get_properties() {
+        if let JsValue::String(str) = &style {
+            //TODO maybe style value contains ';' char ?
+            str.split(';').for_each(|item| {
+                if let Some((k, v)) = item.split_once(':') {
+                    self.parse_style(k.trim(), v.trim());
+                }
+            });
+        } else if let Some(obj) = style.get_properties() {
             //TODO use default style
             obj.into_iter().for_each(|(k, v)| {
                 let v_str = match v {

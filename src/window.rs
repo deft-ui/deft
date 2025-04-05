@@ -1008,7 +1008,6 @@ impl Window {
         for cb in paint_callbacks {
             cb.call();
         }
-        let start = SystemTime::now();
         let scale_factor = self.window.scale_factor() as f32;
         let background_color = self.background_color;
         let mut me = self.clone();

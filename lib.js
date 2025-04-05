@@ -615,7 +615,7 @@ export class Element {
 
     /**
      * Set element style
-     * @param style {StyleProps}
+     * @param style {StyleProps | string}
      */
     set style(style) {
         this.#style = style;
@@ -627,12 +627,12 @@ export class Element {
      * @returns {StyleProps}
      */
     get style() {
-        return this.#style
+        return Element_get_style(this.handle);
     }
 
     /**
      * Set element style in hover state
-     * @param style {StyleProps}
+     * @param style {StyleProps | string}
      */
     set hoverStyle(style) {
         this.#hoverStyle = style;

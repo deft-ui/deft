@@ -636,6 +636,18 @@ impl Element {
         self.update_style(style, true);
     }
 
+    #[js_func]
+    pub fn get_style(&self) -> JsValue {
+        let mut result = HashMap::new();
+        for (_, v) in &self.style_props {
+            result.insert(
+                v.name().to_string(),
+                JsValue::String(v.to_style_string())
+            );
+        }
+        JsValue::Object(result)
+    }
+
     pub fn update_style(&mut self, style: JsValue, full: bool) {
         if full {
             self.style_props.clear();

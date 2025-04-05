@@ -35,8 +35,10 @@ pub enum StylePropertyValue {
 
 pub type StyleColor = ColorPropValue;
 
+//TODO rename
 pub trait PropValueParse: Sized {
     fn parse_prop_value(value: &str) -> Option<Self>;
+    fn to_style_string(&self) -> String;
 }
 
 impl PropValueParse for StyleColor {
@@ -45,6 +47,16 @@ impl PropValueParse for StyleColor {
             parse_hex_color(hex).map(|v| ColorPropValue::Color(v))
         } else {
             None
+        }
+    }
+    fn to_style_string(&self) -> String {
+        match self {
+            StyleColor::Inherit => {
+                "inherit".to_string()
+            }
+            StyleColor::Color(c) => {
+                c.to_style_string()
+            }
         }
     }
 }
@@ -57,6 +69,9 @@ impl PropValueParse for Color {
             None
         }
     }
+    fn to_style_string(&self) -> String {
+        format!("#{:02X}{:02X}{:02X}{:02X}", self.r(), self.g(), self.b(), self.a())
+    }
 }
 
 
@@ -64,17 +79,39 @@ impl PropValueParse for StyleBorder {
     fn parse_prop_value(value: &str) -> Option<Self> {
         parse_border(value)
     }
+    fn to_style_string(&self) -> String {
+        format!("solid {} {}", self.0.to_style_string(), self.1.to_style_string())
+    }
 }
 
 impl PropValueParse for StyleUnit {
     fn parse_prop_value(value: &str) -> Option<Self> {
         parse_style_unit(value)
     }
+    fn to_style_string(&self) -> String {
+        match self {
+            StyleUnit::UndefinedValue => {
+                "".to_string()
+            }
+            StyleUnit::Point(v) => {
+                format!("{}px", v)
+            }
+            StyleUnit::Percent(v) => {
+                format!("{}%", v)
+            }
+            StyleUnit::Auto => {
+                "auto".to_string()
+            }
+        }
+    }
 }
 
 impl PropValueParse for Display {
     fn parse_prop_value(value: &str) -> Option<Self> {
-        parse_display2(value)
+        Display::from_str(value).ok()
+    }
+    fn to_style_string(&self) -> String {
+        self.to_string()
     }
 }
 
@@ -82,47 +119,71 @@ impl PropValueParse for f32 {
     fn parse_prop_value(value: &str) -> Option<Self> {
         f32::from_str(value).ok()
     }
+    fn to_style_string(&self) -> String {
+        self.to_string()
+    }
 }
 
 impl PropValueParse for FlexDirection {
     fn parse_prop_value(value: &str) -> Option<Self> {
-        parse_flex_direction2(value)
+        FlexDirection::from_str(value).ok()
+    }
+    fn to_style_string(&self) -> String {
+        self.to_string()
     }
 }
 
 impl PropValueParse for Direction {
     fn parse_prop_value(value: &str) -> Option<Self> {
-        Some(parse_direction(value))
+        Direction::from_str(value).ok()
+    }
+    fn to_style_string(&self) -> String {
+        self.to_string()
     }
 }
 
 impl PropValueParse for Align {
     fn parse_prop_value(value: &str) -> Option<Self> {
-        Some(parse_align(value))
+        Some(Align::from_str(value).unwrap_or(Align::FlexStart))
+    }
+    fn to_style_string(&self) -> String {
+        self.to_string()
     }
 }
 
 impl PropValueParse for PositionType {
     fn parse_prop_value(value: &str) -> Option<Self> {
-        Some(parse_position_type(value))
+        Some(PositionType::from_str(value).ok().unwrap_or(PositionType::Static))
+    }
+    fn to_style_string(&self) -> String {
+        self.to_string()
     }
 }
 
 impl PropValueParse for Overflow {
     fn parse_prop_value(value: &str) -> Option<Self> {
-        Some(parse_overflow(value))
+        Some(Overflow::from_str(value).unwrap_or(Overflow::Visible))
+    }
+    fn to_style_string(&self) -> String {
+        self.to_string()
     }
 }
 
 impl PropValueParse for Justify {
     fn parse_prop_value(value: &str) -> Option<Self> {
-        Some(parse_justify(value))
+        Some(Justify::from_str(value).unwrap_or(Justify::FlexStart))
+    }
+    fn to_style_string(&self) -> String {
+        self.to_string()
     }
 }
 
 impl PropValueParse for Wrap {
     fn parse_prop_value(value: &str) -> Option<Self> {
-        Some(parse_wrap(value))
+        Some(Wrap::from_str(value).unwrap_or(Wrap::NoWrap))
+    }
+    fn to_style_string(&self) -> String {
+        self.to_string()
     }
 }
 
@@ -138,11 +199,20 @@ impl PropValueParse for StyleTransform {
             None
         }
     }
+    fn to_style_string(&self) -> String {
+        self.op_list.iter()
+            .map(|it| it.to_style_string())
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
 }
 
 impl PropValueParse for String {
     fn parse_prop_value(value: &str) -> Option<Self> {
         Some(value.to_string())
+    }
+    fn to_style_string(&self) -> String {
+        self.to_string()
     }
 }
 
@@ -171,6 +241,17 @@ impl TranslateLength {
         match self {
             TranslateLength::Point(p) => { *p }
             TranslateLength::Percent(p) => { *p / 100.0 * block_length }
+        }
+    }
+
+    pub fn to_style_string(&self) -> String {
+        match self {
+            TranslateLength::Point(v) => {
+                v.to_string()
+            }
+            TranslateLength::Percent(p) => {
+                format!("{}%", p)
+            }
         }
     }
 
@@ -211,6 +292,19 @@ impl StyleTransformOp {
             "rotate" => parse_rotate_op(param_str),
             "scale" => parse_scale_op(param_str),
             _ => None,
+        }
+    }
+    pub fn to_style_string(&self) -> String {
+        match self {
+            StyleTransformOp::Rotate(v) => {
+                format!("rotate({})", v)
+            }
+            StyleTransformOp::Scale(v) => {
+                format!("scale({}, {})", v.0, v.1)
+            }
+            StyleTransformOp::Translate(p) => {
+                format!("translate({}, {})", p.0.to_style_string(), p.1.to_style_string())
+            }
         }
     }
 }
@@ -269,13 +363,13 @@ pub struct StyleBorder(StyleUnit, StyleColor);
 pub struct ComputedStyleBorder(f32, Color);
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum StylePropVal<T> {
+pub enum StylePropVal<T: PropValueParse> {
     Custom(T),
     Inherit,
     Unset,
 }
 
-impl<T: Clone> StylePropVal<T> {
+impl<T: Clone + PropValueParse> StylePropVal<T> {
     //TODO remove
     pub fn resolve(&self, default: &T) -> T {
         match self {
@@ -284,6 +378,21 @@ impl<T: Clone> StylePropVal<T> {
             StylePropVal::Inherit => { todo!() }
         }
     }
+
+    pub fn to_style_string(&self) -> String {
+        match self {
+            StylePropVal::Custom(v) => {
+                v.to_style_string()
+            }
+            StylePropVal::Inherit => {
+                "inherit".to_string()
+            }
+            StylePropVal::Unset => {
+                "unset".to_string()
+            }
+        }
+    }
+
 }
 
 macro_rules! define_style_props {
@@ -390,6 +499,14 @@ macro_rules! define_style_props {
                 match self {
                     $(
                        Self::$name(v) => *v == StylePropVal::Inherit,
+                    )*
+                }
+            }
+
+            pub fn to_style_string(&self) -> String {
+                match self {
+                    $(
+                       Self::$name(v) => v.to_style_string(),
                     )*
                 }
             }
@@ -598,6 +715,12 @@ impl<T: PropValueParse> PropValueParse for PropValue<T> {
             Some(Self::Inherit)
         } else {
             Some(Self::Custom(T::parse_prop_value(value)?))
+        }
+    }
+    fn to_style_string(&self) -> String {
+        match self {
+            PropValue::Inherit => "inherit".to_string(),
+            PropValue::Custom(v) => v.to_style_string()
         }
     }
 }
@@ -1522,39 +1645,6 @@ pub fn parse_style_obj(style: JsValue) -> Vec<StyleProp> {
     result
 }
 
-pub fn parse_display2(str: &str) -> Option<Display> {
-    match str.to_lowercase().as_str() {
-        "none" => Some(Display::None),
-        "flex" => Some(Display::Flex),
-        _ => None
-    }
-}
-
-
-pub fn parse_justify(str: &str) -> Justify {
-    let key = str.to_lowercase();
-    match key.as_str() {
-        "flex-start" => Justify::FlexStart,
-        "center" => Justify::Center,
-        "flex-end" => Justify::FlexEnd,
-        "space-between" => Justify::SpaceBetween,
-        "space-around" => Justify::SpaceAround,
-        "space-evenly" => Justify::SpaceEvenly,
-        _ => Justify::FlexStart,
-    }
-}
-
-pub fn parse_flex_direction2(value: &str) -> Option<FlexDirection> {
-    let key = value.to_lowercase();
-    let r = match key.as_str() {
-        "column" => FlexDirection::Column,
-        "column-reverse" => FlexDirection::ColumnReverse,
-        "row" => FlexDirection::Row,
-        "row-reverse" => FlexDirection::RowReverse,
-        _ => return None,
-    };
-    Some(r)
-}
 
 pub fn parse_float(value: &str) -> f32 {
     f32::from_str(value).unwrap_or(0.0)
@@ -1592,61 +1682,6 @@ pub fn parse_optional_color_str(value: Option<&String>) -> Option<Color> {
         parse_color_str(str)
     } else {
         None
-    }
-}
-
-pub fn parse_align(value: &str) -> Align {
-    let key = value.to_lowercase();
-    match key.as_str() {
-        "auto" => Align::Auto,
-        "flex-start" => Align::FlexStart,
-        "center" => Align::Center,
-        "flex-end" => Align::FlexEnd,
-        "stretch" => Align::Stretch,
-        "baseline" => Align::Baseline,
-        "space-between" => Align::SpaceBetween,
-        "space-around" => Align::SpaceAround,
-        _ => Align::FlexStart,
-    }
-}
-
-pub fn parse_wrap(value: &str) -> Wrap {
-    let key = value.to_lowercase();
-    match key.as_str() {
-        "no-wrap" => Wrap::NoWrap,
-        "wrap" => Wrap::Wrap,
-        "wrap-reverse" => Wrap::WrapReverse,
-        _ => Wrap::NoWrap,
-    }
-}
-
-pub fn parse_direction(value: &str) -> Direction {
-    let key = value.to_lowercase();
-    match key.as_str() {
-        "inherit" => Direction::Inherit,
-        "ltr" => Direction::LTR,
-        "rtl" => Direction::RTL,
-        _ => Direction::Inherit,
-    }
-}
-
-pub fn parse_position_type(value: &str) -> PositionType {
-    let key = value.to_lowercase();
-    match key.as_str() {
-        "static" => PositionType::Static,
-        "relative" => PositionType::Relative,
-        "absolute" => PositionType::Absolute,
-        _ => PositionType::Static,
-    }
-}
-
-pub fn parse_overflow(value: &str) -> Overflow {
-    let key = value.to_lowercase();
-    match key.as_str() {
-        "visible" => Overflow::Visible,
-        "hidden" => Overflow::Hidden,
-        "scroll" => Overflow::Scroll,
-        _ => Overflow::Visible,
     }
 }
 
