@@ -1813,6 +1813,7 @@ const localStorage = {
         localstorage_set(key, value);
     }
 }
+globalThis.localStorage = localStorage;
 
 export const workerContext = WorkerContext.create();
 if (workerContext) {
@@ -1882,8 +1883,6 @@ globalThis.KEY_MOD_CTRL = 0x1;
 globalThis.KEY_MOD_ALT = 0x1 << 1;
 globalThis.KEY_MOD_META = 0x1 << 2;
 globalThis.KEY_MOD_SHIFT = 0x1 << 3;
-
-globalThis.localStorage = localStorage;
 
 /**
  * @template T

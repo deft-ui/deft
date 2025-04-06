@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::fmt::Debug;
 use std::future::Future;
 use std::panic::RefUnwindSafe;
-
+use std::path::{Path, PathBuf};
 use anyhow::anyhow;
 use quick_js::loader::JsModuleLoader;
 use quick_js::{Callback, Context, ExecutionError, JsPromise, JsValue, ValueError};
@@ -168,6 +168,10 @@ impl JsEngine {
         Worker::init_js_api(WorkerInitParams { app });
         engine.add_global_functions(Worker::create_js_apis());
         JS_ENGINE.with(|e| *e.borrow_mut() = Some(Mrc::new(engine)));
+    }
+
+    pub fn enable_localstorage(&mut self, p: PathBuf) {
+        localstorage::init(p);
     }
 
     pub fn create_async_task<F, O>(&mut self, future: F) -> JsValue

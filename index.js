@@ -192,7 +192,18 @@ function testWindowHandle(window) {
     assertEq(window, windowFromHandle);
 }
 
+function saveStartTime() {
+    const key = "app-start-time";
+    const lastStartTime = localStorage.getItem(key);
+    console.log("First start:", !lastStartTime);
+    if (lastStartTime) {
+        console.log("Last start time", lastStartTime);
+    }
+    localStorage.setItem(key, new Date().getTime() + "");
+}
+
 function main() {
+    saveStartTime();
     runWorker();
     createSystemTray();
     console.log("begin create window");

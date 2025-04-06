@@ -18,8 +18,8 @@ use winit::platform::android::activity::AndroidApp;
 use winit::window::WindowId;
 use crate::base::ResultWaiter;
 use crate::event_loop::{init_event_loop_proxy, run_event_loop_task, run_with_event_loop, AppEventProxy};
+use crate::ext::ext_localstorage::localstorage;
 use crate::ext::ext_window::WINDOWS;
-use crate::ext::ext_localstorage::localstorage_flush;
 use crate::window::{window_check_update, window_input, window_on_render_idle, window_send_key, window_update_inset};
 use crate::js::js_engine::JsEngine;
 use crate::js::js_event_loop::{js_init_event_loop, JsEvent, JsEventLoopClosedError};
@@ -211,7 +211,7 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
 }
 
 pub fn exit_app(code: i32) -> Result<(), Error> {
-    localstorage_flush()?;
+    localstorage::cleanup();
     run_with_event_loop(|el| {
         el.exit();
     });
