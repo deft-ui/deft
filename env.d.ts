@@ -268,3 +268,12 @@ declare function appfs_remove_dir(path: string): Promise<void>;
 declare function appfs_remove_dir_all(path: string): Promise<void>;
 
 declare function shell_spawn(executable: string, args ?: string[]): void;
+
+declare function setTimeout(callback: () => void, timeout: number): number;
+
+declare function clearTimeout(timer: number): void;
+
+declare function setInterval(callback: () => void, interval: number): number;
+
+declare function clearInterval(timer: number): void;
+

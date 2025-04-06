@@ -269,6 +269,15 @@ declare function appfs_remove_dir_all(path: string): Promise<void>;
 
 declare function shell_spawn(executable: string, args ?: string[]): void;
 
+declare function setTimeout(callback: () => void, timeout: number): number;
+
+declare function clearTimeout(timer: number): void;
+
+declare function setInterval(callback: () => void, interval: number): number;
+
+declare function clearInterval(timer: number): void;
+
+
 declare class Navigator {
     /**
      * @var {Clipboard}
@@ -492,9 +501,9 @@ declare class Element {
     get window(): Window;
     /**
      * Set element style
-     * @param style {StyleProps}
+     * @param style {StyleProps | string}
      */
-    set style(style: StyleProps);
+    set style(style: StyleProps | string);
     /**
      * Get element style
      * @returns {StyleProps}
@@ -502,9 +511,9 @@ declare class Element {
     get style(): StyleProps;
     /**
      * Set element style in hover state
-     * @param style {StyleProps}
+     * @param style {StyleProps | string}
      */
-    set hoverStyle(style: StyleProps);
+    set hoverStyle(style: StyleProps | string);
     /**
      * Get element style in hover state
      * @returns {StyleProps}
