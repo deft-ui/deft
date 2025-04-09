@@ -13,7 +13,6 @@ pub struct StyleManager {
     raw_expressions: HashMap<String, String>,
     values: HashMap<StylePropKey, StyleProp>,
     computed_handles: HashMap<String, ComputedValueHandle>,
-    consumer: Option<Box<dyn FnMut(StyleProp)>>,
     variables: ComputedValue<String>,
 }
 
@@ -23,16 +22,12 @@ impl StyleManager {
             raw_expressions: HashMap::new(),
             computed_handles: HashMap::new(),
             values: HashMap::new(),
-            consumer: None,
             variables: ComputedValue::new(),
         }.to_ref()
     }
 
-    pub fn set_style_consumer<F: FnMut(StyleProp) + 'static>(&mut self, consumer: F) {
-        self.consumer = Some(Box::new(consumer))
-    }
-
     pub fn bind_style_variables(&mut self, variables: &ComputedValue<String>) {
+        //TODO dont save?
         self.variables = variables.clone();
         for (k, v) in self.raw_expressions.clone() {
             self.parse_style(&k, &v);
@@ -61,11 +56,12 @@ impl StyleManager {
         }
     }
 
+    pub fn get_styles(&self) -> &HashMap<StylePropKey, StyleProp> {
+        &self.values
+    }
+
     fn parse(&mut self, key: &str, value: &str) -> bool {
         if let Some(p) = StyleProp::parse(key, value) {
-            if let Some(consumer) = &mut self.consumer {
-                consumer(p.clone());
-            }
             self.values.insert(p.key(), p);
             true
         } else {
@@ -73,7 +69,7 @@ impl StyleManager {
         }
     }
 
-    pub fn parse_style(&mut self, k: &str, v_str: &str) {
+    fn parse_style(&mut self, k: &str, v_str: &str) {
         let k = k.to_lowercase();
         let weak = self.as_weak();
         let key_str = k.to_string();
@@ -193,9 +189,6 @@ fn test_style_manager() {
     let style_vars = ComputedValue::new();
     style_vars.update_value("height", "5".to_string());
     let mut sm = StyleManager::new();
-    sm.set_style_consumer(|style| {
-        debug!("style {:?}", style);
-    });
     sm.bind_style_variables(&style_vars);
     sm.parse_style("width", "4");
     sm.parse_style("transform", "translate(0, $height)");

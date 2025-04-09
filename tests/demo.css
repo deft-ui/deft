@@ -1,0 +1,11 @@
+button {
+    height: 100%;
+    overflow: hidden;
+    font-size: 13px;
+}
+
+container {
+    color: #ce1f1f;
+    border: none !important;
+    padding: 0 !important;
+}

@@ -1,7 +1,9 @@
+use core::fmt;
 use std::any::{Any, TypeId};
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::default::Default;
+use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 
@@ -56,11 +58,13 @@ use crate::layout::LayoutRoot;
 use crate::paint::{MatrixCalculator, Painter, RenderTree, UniqueRect};
 use crate::render::RenderFn;
 use crate::style::border_path::BorderPath;
+use crate::style::css_manager::CssManager;
 use crate::style_manager::StyleManager;
 
 thread_local! {
     pub static NEXT_ELEMENT_ID: Cell<u32> = Cell::new(1);
     pub static STYLE_VARS: ComputedValue<String> = ComputedValue::new();
+    pub static CSS_MANAGER: RefCell<CssManager> = RefCell::new(CssManager::new());
 }
 
 bitflags! {
@@ -106,14 +110,6 @@ impl Element {
         let mut ele = Self {
             inner,
         };
-        {
-            let mut ele_weak = ele.as_weak();
-            ele.style_manager.set_style_consumer(move |prop| {
-                if let Ok(mut e) = ele_weak.upgrade_mut() {
-                    e.set_style_prop_internal(prop);
-                }
-            });
-        }
         let ele_weak = ele.inner.as_weak();
         let weak = ele.as_weak();
         ele.style.bind_element(weak);
@@ -135,6 +131,7 @@ impl Element {
         })));
         // let bk = backend(ele_cp);
         ele.backend = Box::new(backend(&mut ele));
+        ele.select_style();
         //ele.backend.bind(ele_cp);
         ele
     }
@@ -421,7 +418,15 @@ impl Element {
         if let Some(win) = &window {
             if let Ok(win) = win.upgrade() {
                 self.style_manager.bind_style_variables(&win.style_variables);
+                self.sync_style();
             }
+        }
+    }
+
+    fn sync_style(&mut self) {
+        let mut styles = self.style_manager.get_styles().clone();
+        for (_, v) in styles {
+            self.set_style_prop_internal(v);
         }
     }
 
@@ -653,6 +658,7 @@ impl Element {
             self.style_props.clear();
         }
         self.style_manager.parse_style_obj(style);
+        self.sync_style();
     }
 
     pub fn set_style_props(&mut self, styles: Vec<StyleProp>) {
@@ -1031,6 +1037,13 @@ impl Element {
         self.focusable
     }
 
+    pub(crate) fn select_style(&mut self) {
+        let style = CSS_MANAGER.with_borrow(|cm| {
+            cm.match_styles(&self)
+        });
+        //TODO handle style
+    }
+
 }
 
 impl ElementWeak {
@@ -1042,6 +1055,13 @@ impl ElementWeak {
     pub fn mark_dirty(&mut self, layout_dirty: bool) {
         let mut ele = ok_or_return!(self.upgrade_mut());
         ele.mark_dirty(layout_dirty);
+    }
+}
+
+impl Debug for Element {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str("#");
+        self.id.fmt(f)
     }
 }
 

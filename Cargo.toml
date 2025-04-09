@@ -49,6 +49,9 @@ log = "0.4.25"
 skia-safe = {package = "deft-skia-safe", version = "0.81.0", features = ["binary-cache", "textlayout", "svg"], default-features = false}
 env_logger = "0.11.6"
 bitflags = "2.6.0"
+lightningcss = "1.0.0-alpha.65"
+cssparser = "0.27"
+selectors = "0.22"
 
 [features]
 default = []
