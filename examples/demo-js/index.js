@@ -1,3 +1,6 @@
+const stylesheet= `
+
+`
 function assertEq(expected, actual) {
     if (expected !== actual) {
         console.error(new Error("assert fail"));
@@ -32,8 +35,6 @@ function createEntry() {
     const entry = new EntryElement();
     entry.style = {
         width: 200,
-        padding: 5,
-        border: "1 #ccc"
     }
     entry.placeholder = "Please input some text"
     console.log("entry id:", entry.id)
@@ -44,8 +45,6 @@ function createPassword() {
     const entry = new EntryElement();
     entry.style = {
         width: 200,
-        padding: 5,
-        border: "1 #ccc"
     }
     entry.placeholder = "Input password"
     entry.type = "password";
@@ -63,11 +62,9 @@ function createTextEdit() {
     textEdit.autoFocus=true;
 
     textEdit.style={
-        padding: 10,
         // "height": 100,
         // "width": 100,
         // "background": "#ccc",
-        "border": "1 #ccc"
         // "minWidth": 600,
     };
     console.log("TextEdit id:", textEdit.id);
@@ -203,6 +200,7 @@ function saveStartTime() {
 }
 
 function main() {
+    stylesheet_add(stylesheet);
     saveStartTime();
     runWorker();
     createSystemTray();

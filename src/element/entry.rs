@@ -778,8 +778,8 @@ impl ElementBackend for Entry {
             | StylePropKey::PaddingBottom
             | StylePropKey::PaddingLeft
             => {
-                self.paragraph_element.set_style_prop_internal(style.clone());
-                self.placeholder_element.set_style_prop_internal(style.clone());
+                self.paragraph_element.set_style_props(vec![style.clone()]);
+                self.placeholder_element.set_style_props(vec![style.clone()]);
                 return false;
             },
             _ => {

@@ -12,7 +12,7 @@ use winit::window::{CursorGrabMode, WindowId};
 
 use crate::app::{exit_app, IApp, App};
 use crate::console::Console;
-use crate::element::Element;
+use crate::element::{stylesheet_add, Element, CSS_MANAGER};
 use crate::element::entry::Entry;
 use crate::element::image::Image;
 use crate::element::paragraph::Paragraph;
@@ -164,6 +164,7 @@ impl JsEngine {
 
         engine.add_global_func(clipboard_write_text::new());
         engine.add_global_func(clipboard_read_text::new());
+        engine.add_global_func(stylesheet_add::new());
 
         Worker::init_js_api(WorkerInitParams { app });
         engine.add_global_functions(Worker::create_js_apis());
@@ -188,6 +189,10 @@ impl JsEngine {
 
 
     pub fn init_api(&self) {
+        let default_css = include_str!("../../deft.css");
+        CSS_MANAGER.with_borrow_mut(|mut manager| {
+            manager.add(default_css);
+        });
         let libjs = String::from_utf8_lossy(include_bytes!("../../lib.js"));
         self.js_context.eval_module(&libjs, "lib.js").unwrap();
     }

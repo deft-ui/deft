@@ -83,6 +83,13 @@ impl StyleDirtyFlags {
     }
 }
 
+#[js_func]
+pub fn stylesheet_add(source: String) {
+    CSS_MANAGER.with_borrow_mut(|mut manager| {
+        manager.add(&source);
+    });
+}
+
 
 
 struct ElementJsContext {
@@ -183,6 +190,7 @@ impl Element {
             _ => return Err(anyhow!("invalid view_type")),
         };
         view.resource_table.put(ElementJsContext { context });
+        view.set_element_type(ElementType::Widget);
 
         Ok(view)
     }
@@ -397,6 +405,12 @@ impl Element {
             },
         };
         self.applied_style.clear();
+        if let Some(win) = self.get_window() {
+            if let Ok(mut win) = win.upgrade_mut() {
+                self.refresh_style_variables(&win.style_variables);
+            }
+        }
+        self.select_style_recurse();
         let mut el = self.clone();
         self.mark_style_dirty();
     }
@@ -408,26 +422,35 @@ impl Element {
     }
 
     pub fn on_window_changed(&mut self, window: &Option<WindowWeak>) {
-        self.update_style_variables(window);
+        //TODO remove?
         for mut c in self.get_children() {
             c.on_window_changed(window);
         }
     }
 
-    fn update_style_variables(&mut self, window: &Option<WindowWeak>) {
-        if let Some(win) = &window {
-            if let Ok(win) = win.upgrade() {
-                self.style_manager.bind_style_variables(&win.style_variables);
-                self.sync_style();
-            }
+    pub fn refresh_style_variables(&mut self, variables: &HashMap<String, String>) {
+        self.style_manager.resolve_variables(variables);
+        self.sync_style();
+        for mut c in self.get_children() {
+            c.refresh_style_variables(variables);
         }
     }
 
     fn sync_style(&mut self) {
-        let mut styles = self.style_manager.get_styles().clone();
-        for (_, v) in styles {
-            self.set_style_prop_internal(v);
+        //TODO no clone
+        let mut styles = self.style_manager.get_styles(self.hover);
+        let mut remove_keys = Vec::new();
+        for (k, v) in styles {
+            if !self.backend.accept_style(&v) {
+                remove_keys.push(k);
+            }
         }
+        if !remove_keys.is_empty() {
+            for k in remove_keys {
+                self.style_manager.remove_style(&k);
+            }
+        }
+        self.mark_style_dirty();
     }
 
     pub fn with_window<F: FnOnce(&mut Window)>(&self, callback: F) {
@@ -644,7 +667,7 @@ impl Element {
     #[js_func]
     pub fn get_style(&self) -> JsValue {
         let mut result = HashMap::new();
-        for (_, v) in &self.style_props {
+        for (_, v) in self.style_manager.get_styles(self.hover) {
             result.insert(
                 v.name().to_string(),
                 JsValue::String(v.to_style_string())
@@ -655,34 +678,21 @@ impl Element {
 
     pub fn update_style(&mut self, style: JsValue, full: bool) {
         if full {
-            self.style_props.clear();
+            self.style_manager.clear();
         }
-        self.style_manager.parse_style_obj(style);
+        self.style_manager.set_style_obj(style);
         self.sync_style();
     }
 
     pub fn set_style_props(&mut self, styles: Vec<StyleProp>) {
         // self.style_props.clear();
-        for st in styles {
-            self.set_style_prop_internal(st);
-        }
-    }
-
-    fn set_style_prop_internal(&mut self, style: StyleProp) {
-        // debug!("setting style {:?}", style);
-        if self.backend.accept_style(&style) {
-            self.style_props.insert(style.key().clone(), style);
-            self.mark_style_dirty();
-        }
+        self.style_manager.set_style_props(styles);
+        self.sync_style();
     }
 
     #[js_func]
     pub fn set_hover_style(&mut self, style: JsValue) {
-        let styles = parse_style_obj(style);
-        self.hover_style_props.clear();
-        for st in styles {
-            self.hover_style_props.insert(st.key().clone(), st);
-        }
+        self.style_manager.set_hover_style(style);
         if self.hover {
             self.mark_style_dirty();
         }
@@ -777,12 +787,7 @@ impl Element {
     }
 
     pub fn apply_own_style(&mut self, parent_changed: &Vec<StylePropKey>) -> Vec<ResolvedStyleProp> {
-        let mut style_props = self.style_props.clone();
-        if self.hover {
-            for (k, v) in &self.hover_style_props {
-                style_props.insert(k.clone(), v.clone());
-            }
-        }
+        let mut style_props = self.style_manager.get_styles(self.hover);
         for (k, v) in &self.animation_style_props {
             style_props.insert(k.clone(), v.clone());
         }
@@ -837,12 +842,12 @@ impl Element {
     fn handle_event<T: ViewEvent + 'static>(&mut self, event: &mut T, ctx: &mut EventContext<ElementWeak>) {
         if TypeId::of::<T>() == TypeId::of::<MouseEnterEvent>() {
             self.hover = true;
-            if !self.hover_style_props.is_empty() {
+            if self.style_manager.has_hover_style() {
                 self.mark_style_dirty();
             }
         } else if TypeId::of::<T>() == TypeId::of::<MouseLeaveEvent>() {
             self.hover = false;
-            if !self.hover_style_props.is_empty() {
+            if self.style_manager.has_hover_style() {
                 self.mark_style_dirty();
             }
         }
@@ -1038,10 +1043,23 @@ impl Element {
     }
 
     pub(crate) fn select_style(&mut self) {
-        let style = CSS_MANAGER.with_borrow(|cm| {
-            cm.match_styles(&self)
-        });
-        //TODO handle style
+        if self.element_type == ElementType::Widget {
+            let style = CSS_MANAGER.with_borrow(|cm| {
+                cm.match_styles(&self)
+            });
+            self.style_manager.set_selector_style(style);
+        }
+    }
+
+    pub fn set_element_type(&mut self, element_type: ElementType) {
+        self.element_type = element_type;
+    }
+
+    fn select_style_recurse(&mut self) {
+        self.select_style();
+        for mut child in self.get_children() {
+            child.select_style_recurse();
+        }
     }
 
 }
@@ -1065,6 +1083,12 @@ impl Debug for Element {
     }
 }
 
+#[derive(Debug, Hash, Eq, PartialEq, Clone, Copy)]
+pub enum ElementType {
+    Widget,
+    Inner,
+}
+
 #[mrc_object]
 pub struct Element {
     id: u32,
@@ -1074,12 +1098,11 @@ pub struct Element {
     window: Option<WindowWeak>,
     event_registration: EventRegistration<ElementWeak>,
     pub style: StyleNode,
-    style_props: HashMap<StylePropKey, StyleProp>,
-    hover_style_props: HashMap<StylePropKey, StyleProp>,
     animation_style_props: HashMap<StylePropKey, StyleProp>,
     hover: bool,
     auto_focus: bool,
     dirty_flags: StyleDirtyFlags,
+    element_type: ElementType,
 
     applied_style: Vec<StyleProp>,
     // animation_instance: Option<AnimationInstance>,
@@ -1124,11 +1147,10 @@ impl ElementData {
             window: None,
             event_registration: EventRegistration::new(),
             style: StyleNode::new(),
-            style_props: HashMap::new(),
-            hover_style_props: HashMap::new(),
             animation_style_props: HashMap::new(),
             applied_style: Vec::new(),
             hover: false,
+            element_type: ElementType::Inner,
 
             scroll_top: 0.0,
             scroll_left: 0.0,

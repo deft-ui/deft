@@ -594,7 +594,7 @@ impl ElementBackend for Text {
     }
 
     fn get_name(&self) -> &str {
-        "Text"
+        "Label"
     }
 
     fn handle_style_changed(&mut self, key: StylePropKey) {
