@@ -32,7 +32,7 @@ use crate::js::{FromJsValue, ToJsValue};
 use crate::window::Window;
 use crate::render::RenderFn;
 use crate::string::StringUtils;
-use crate::style::{StyleProp, StylePropKey, StylePropVal, YogaNode};
+use crate::style::{ResolvedStyleProp, StyleProp, StylePropKey, StylePropVal, YogaNode};
 use crate::style::StyleProp::{BackgroundColor, Display, Left, MinWidth, Position, Top};
 use crate::style::StylePropKey::Height;
 use crate::timer::TimerHandle;
@@ -770,23 +770,21 @@ impl ElementBackend for Entry {
         //self.update_paint_offset(bounds.width, bounds.height);
     }
 
-    fn accept_style(&mut self, style: &StyleProp) -> bool {
-        let key = style.key();
+    fn apply_style_prop(&mut self, prop: &StyleProp) -> Option<(bool, bool, ResolvedStyleProp)> {
+        let key = prop.key();
         match key {
             StylePropKey::PaddingTop
             | StylePropKey::PaddingRight
             | StylePropKey::PaddingBottom
             | StylePropKey::PaddingLeft
             => {
-                self.paragraph_element.set_style_props(vec![style.clone()]);
-                self.placeholder_element.set_style_props(vec![style.clone()]);
-                return false;
+                self.placeholder_element.apply_style_prop(prop.clone());
+                Some(self.paragraph_element.apply_style_prop(prop.clone()))
             },
             _ => {
-
+                self.base.apply_style_prop(prop)
             }
         }
-        self.base.accept_style(style)
     }
 
 }

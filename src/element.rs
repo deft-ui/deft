@@ -138,7 +138,6 @@ impl Element {
         })));
         // let bk = backend(ele_cp);
         ele.backend = Box::new(backend(&mut ele));
-        ele.select_style();
         //ele.backend.bind(ele_cp);
         ele
     }
@@ -437,19 +436,6 @@ impl Element {
     }
 
     fn sync_style(&mut self) {
-        //TODO no clone
-        let mut styles = self.style_manager.get_styles(self.hover);
-        let mut remove_keys = Vec::new();
-        for (k, v) in styles {
-            if !self.backend.accept_style(&v) {
-                remove_keys.push(k);
-            }
-        }
-        if !remove_keys.is_empty() {
-            for k in remove_keys {
-                self.style_manager.remove_style(&k);
-            }
-        }
         self.mark_style_dirty();
     }
 
@@ -797,8 +783,8 @@ impl Element {
 
 
         let mut changed_list = Vec::new();
-        for sp in &mut changed_style_props {
-            let (repaint, need_layout, v) = self.style.set_style(sp.clone());
+        for sp in changed_style_props {
+            let (repaint, need_layout, v) = self.apply_style_prop(sp);
             if need_layout || repaint {
                 self.mark_dirty(need_layout);
                 changed_list.push(v);
@@ -807,6 +793,14 @@ impl Element {
         // debug!("changed list: {:?}", changed_list);
         self.applied_style = new_style;
         changed_list
+    }
+
+    pub fn apply_style_prop(&mut self, prop: StyleProp) -> (bool, bool, ResolvedStyleProp) {
+        if let Some(v) = self.backend.apply_style_prop(&prop) {
+            v
+        } else {
+            self.style.set_style(prop)
+        }
     }
 
     pub fn register_event_listener<T: 'static, H: EventListener<T, ElementWeak> + 'static>(&mut self, mut listener: H) -> u32 {
@@ -842,11 +836,19 @@ impl Element {
     fn handle_event<T: ViewEvent + 'static>(&mut self, event: &mut T, ctx: &mut EventContext<ElementWeak>) {
         if TypeId::of::<T>() == TypeId::of::<MouseEnterEvent>() {
             self.hover = true;
+            //TODO optimize performance
+            if self.parent.is_none() {
+                self.update_select_style_recurse();
+            }
             if self.style_manager.has_hover_style() {
                 self.mark_style_dirty();
             }
         } else if TypeId::of::<T>() == TypeId::of::<MouseLeaveEvent>() {
             self.hover = false;
+            //TODO optimize performance
+            if self.parent.is_none() {
+                self.update_select_style_recurse();
+            }
             if self.style_manager.has_hover_style() {
                 self.mark_style_dirty();
             }
@@ -1047,12 +1049,23 @@ impl Element {
             let style = CSS_MANAGER.with_borrow(|cm| {
                 cm.match_styles(&self)
             });
-            self.style_manager.set_selector_style(style);
+            if self.style_manager.set_selector_style(style) {
+                self.mark_style_dirty();
+            }
         }
     }
 
     pub fn set_element_type(&mut self, element_type: ElementType) {
-        self.element_type = element_type;
+        if self.element_type != element_type {
+            self.element_type = element_type;
+            if element_type == ElementType::Widget {
+                self.select_style();
+            }
+        }
+    }
+
+    pub fn update_select_style_recurse(&mut self) {
+        self.select_style_recurse();
     }
 
     fn select_style_recurse(&mut self) {
@@ -1093,13 +1106,13 @@ pub enum ElementType {
 pub struct Element {
     id: u32,
     backend: Box<dyn ElementBackend>,
-    parent: Option<ElementWeak>,
+    pub(crate) parent: Option<ElementWeak>,
     children: Vec<Element>,
     window: Option<WindowWeak>,
     event_registration: EventRegistration<ElementWeak>,
     pub style: StyleNode,
     animation_style_props: HashMap<StylePropKey, StyleProp>,
-    hover: bool,
+    pub(crate) hover: bool,
     auto_focus: bool,
     dirty_flags: StyleDirtyFlags,
     element_type: ElementType,
@@ -1213,8 +1226,9 @@ pub trait ElementBackend {
 
     fn handle_origin_bounds_change(&mut self, _bounds: &base::Rect) {}
 
-    fn accept_style(&mut self, style: &StyleProp) -> bool {
-        true
+    fn apply_style_prop(&mut self, prop: &StyleProp) -> Option<(bool, bool, ResolvedStyleProp)> {
+        let _ = prop;
+        None
     }
 
 }

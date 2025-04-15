@@ -1,5 +1,6 @@
 use crate as deft;
 use std::collections::HashMap;
+use std::mem;
 use deft_macros::mrc_object;
 use log::debug;
 use quick_js::JsValue;
@@ -107,7 +108,8 @@ impl StyleManager {
         }
     }
 
-    pub fn set_selector_style(&mut self, styles: Vec<String>) {
+    pub fn set_selector_style(&mut self, styles: Vec<String>) -> bool {
+        let old_style_props = mem::take(&mut self.selector_style_props);
         for s in &styles {
             let list = Self::parse_style_list(s);
             for (k, v) in list {
@@ -116,6 +118,7 @@ impl StyleManager {
                 });
             }
         }
+        self.selector_style_props != old_style_props
     }
 
     pub fn has_hover_style(&self) -> bool {

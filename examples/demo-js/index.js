@@ -1,5 +1,10 @@
 const stylesheet= `
-
+scroll {
+    color: #f9f9f9;
+    background: #2a2a2a;
+    padding: 5;
+    gap: 5;
+}
 `
 function assertEq(expected, actual) {
     if (expected !== actual) {
@@ -219,12 +224,6 @@ function main() {
     })
 
     const container = new ScrollElement();
-    container.style={
-        background: "#2a2a2a",
-        color: "#FFF",
-        padding: 5,
-        gap: 5,
-    }
     container.bindDroppedFile(e => {
         console.log("dropped file", e);
     })

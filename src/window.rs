@@ -813,18 +813,21 @@ impl Window {
         let focusing = Some(node.clone());
         if self.focusing != focusing {
             // debug!("focusing {:?}", node.get_id());
-            if let Some(old_focusing) = &mut self.focusing {
+            let mut old_focusing = self.focusing.clone();
+            self.focusing = focusing;
+            if let Some(old_focusing) = &mut old_focusing {
                 old_focusing.emit(BlurEvent);
 
                 old_focusing.emit(FocusShiftEvent);
                 if show_focus_hint() {
                     old_focusing.mark_dirty(false);
                 }
+                old_focusing.update_select_style_recurse();
             }
             if show_focus_hint() {
                 node.mark_dirty(false);
             }
-            self.focusing = focusing;
+            node.update_select_style_recurse();
             node.emit(FocusEvent);
         }
     }
