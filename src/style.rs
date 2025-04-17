@@ -580,18 +580,18 @@ define_style_props!(
     Position => PositionType, PositionType;
     Overflow => Overflow, Overflow;
 
-    BorderTopLeftRadius => f32, f32;
-    BorderTopRightRadius => f32, f32;
-    BorderBottomRightRadius => f32, f32;
-    BorderBottomLeftRadius => f32, f32;
+    BorderTopLeftRadius => AbsoluteLen, AbsoluteLen;
+    BorderTopRightRadius => AbsoluteLen, AbsoluteLen;
+    BorderBottomRightRadius => AbsoluteLen, AbsoluteLen;
+    BorderBottomLeftRadius => AbsoluteLen, AbsoluteLen;
 
     JustifyContent => Justify, Justify;
     FlexDirection => FlexDirection, FlexDirection;
     AlignContent => Align, Align;
     AlignItems => Align, Align;
     FlexWrap => Wrap, Wrap;
-    ColumnGap => GapLen, f32;
-    RowGap => GapLen, f32;
+    ColumnGap => AbsoluteLen, f32;
+    RowGap => AbsoluteLen, f32;
 
     Top => StyleUnit, StyleUnit;
     Right => StyleUnit, StyleUnit;
@@ -712,12 +712,12 @@ pub enum PropValue<T> {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct GapLen(pub f32);
+pub struct AbsoluteLen(pub f32);
 
-impl PropValueParse for GapLen {
+impl PropValueParse for AbsoluteLen {
     fn parse_prop_value(value: &str) -> Option<Self> {
         let v = value.strip_suffix("px").unwrap_or(value);
-        f32::from_str(v).ok().map(GapLen)
+        f32::from_str(v).ok().map(AbsoluteLen)
     }
 
     fn to_style_string(&self) -> String {
@@ -1023,16 +1023,16 @@ impl StyleNode {
                 ResolvedStyleProp::Overflow(Overflow::Hidden)
             },
             StylePropKey::BorderTopLeftRadius  =>   {
-                ResolvedStyleProp::BorderTopLeftRadius(0.0)
+                ResolvedStyleProp::BorderTopLeftRadius(AbsoluteLen(0.0))
             },
             StylePropKey::BorderTopRightRadius  =>   {
-                ResolvedStyleProp::BorderTopRightRadius(0.0)
+                ResolvedStyleProp::BorderTopRightRadius(AbsoluteLen(0.0))
             },
             StylePropKey::BorderBottomRightRadius  =>   {
-                ResolvedStyleProp::BorderBottomRightRadius(0.0)
+                ResolvedStyleProp::BorderBottomRightRadius(AbsoluteLen(0.0))
             },
             StylePropKey::BorderBottomLeftRadius  =>   {
-                ResolvedStyleProp::BorderBottomLeftRadius(0.0)
+                ResolvedStyleProp::BorderBottomLeftRadius(AbsoluteLen(0.0))
             },
             StylePropKey::Transform  =>   {
                 ResolvedStyleProp::Transform(StyleTransform::empty())
@@ -1063,10 +1063,10 @@ impl StyleNode {
                 ResolvedStyleProp::FlexWrap(Wrap::NoWrap)
             },
             StylePropKey::ColumnGap  =>   {
-                ResolvedStyleProp::ColumnGap(GapLen(0.0))
+                ResolvedStyleProp::ColumnGap(AbsoluteLen(0.0))
             },
             StylePropKey::RowGap  =>   {
-                ResolvedStyleProp::RowGap(GapLen(0.0))
+                ResolvedStyleProp::RowGap(AbsoluteLen(0.0))
             },
             //TODO aspectratio
         }
@@ -1371,16 +1371,16 @@ impl StyleNode {
                 self.yoga_node.set_overflow(value)
             },
             ResolvedStyleProp::BorderTopLeftRadius (value) =>   {
-                self.border_radius[0] = value
+                self.border_radius[0] = value.0;
             },
             ResolvedStyleProp::BorderTopRightRadius (value) =>   {
-                self.border_radius[1] = value
+                self.border_radius[1] = value.0;
             },
             ResolvedStyleProp::BorderBottomRightRadius (value) =>   {
-                self.border_radius[2] = value
+                self.border_radius[2] = value.0;
             },
             ResolvedStyleProp::BorderBottomLeftRadius (value) =>   {
-                self.border_radius[3] = value
+                self.border_radius[3] = value.0;
             },
             ResolvedStyleProp::Transform (value) =>   {
                 need_layout = false;

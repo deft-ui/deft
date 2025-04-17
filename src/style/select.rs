@@ -3,13 +3,15 @@ use crate::element::container::Container;
 use crate::element::{Element, ElementBackend, ElementData};
 use cssparser::{self, CowRcStr, ParseError, SourceLocation, ToCss};
 use selectors::attr::{AttrSelectorOperation, CaseSensitivity, NamespaceConstraint};
-use selectors::context::QuirksMode;
+use selectors::context::{MatchingMode, QuirksMode};
 use selectors::parser::SelectorParseErrorKind;
 use selectors::parser::{
     NonTSPseudoClass, Parser, Selector as GenericSelector, SelectorImpl, SelectorList,
 };
 use selectors::{self, matching, OpaqueElement};
 use std::fmt;
+use std::fmt::Write;
+use anyhow::{anyhow, Error};
 
 type LocalName = String;
 type Namespace = String;
@@ -58,6 +60,13 @@ impl<'i> Parser<'i> for DeftParser {
             )
         }
     }
+
+    fn parse_pseudo_element(&self, location: SourceLocation, name: CowRcStr<'i>) -> Result<<Self::Impl as SelectorImpl>::PseudoElement, ParseError<'i, Self::Error>> {
+        Ok(PseudoElement {
+            name: name.to_string(),
+        })
+    }
+
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, Hash)]
@@ -95,14 +104,17 @@ impl ToCss for PseudoClass {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, Hash)]
-pub enum PseudoElement {}
+pub struct PseudoElement {
+    pub name: String,
+}
 
 impl ToCss for PseudoElement {
-    fn to_css<W>(&self, _dest: &mut W) -> fmt::Result
+    fn to_css<W>(&self, dest: &mut W) -> fmt::Result
     where
         W: fmt::Write,
     {
-        match *self {}
+        dest.write_str(&format!("::{}", self.name));
+        Ok(())
     }
 }
 
@@ -198,10 +210,10 @@ impl selectors::Element for Element {
 
     fn match_pseudo_element(
         &self,
-        pseudo: &PseudoElement,
+        _pseudo: &PseudoElement,
         _context: &mut matching::MatchingContext<DeftSelectors>,
     ) -> bool {
-        match *pseudo {}
+        true
     }
 
     #[inline]
@@ -254,31 +266,46 @@ impl selectors::Element for Element {
 
 pub struct Selectors(pub Vec<Selector>);
 
+#[derive(Clone)]
 pub struct Selector(GenericSelector<DeftSelectors>);
 
 impl Selectors {
-    pub fn compile(s: &str) -> Result<Selectors, ()> {
+    pub fn compile(s: &str) -> Result<Selectors, Error> {
         let mut input = cssparser::ParserInput::new(s);
         match SelectorList::parse(&DeftParser, &mut cssparser::Parser::new(&mut input)) {
             Ok(list) => Ok(Selectors(list.0.into_iter().map(Selector).collect())),
-            Err(_) => Err(()),
+            Err(e) => Err(anyhow!("failed to parse css: {:?}", e)),
         }
     }
 
     pub fn matches(&self, element: &Element) -> bool {
         self.0.iter().any(|s| s.matches(element))
     }
+
+    pub fn selectors(&self) -> Vec<Selector> {
+        self.0.clone()
+    }
+
 }
 
 impl Selector {
     pub fn matches(&self, element: &Element) -> bool {
+        let mode = if self.pseudo_element().is_some() {
+            MatchingMode::ForStatelessPseudoElement
+        } else {
+            MatchingMode::Normal
+        };
         let mut context = matching::MatchingContext::new(
-            matching::MatchingMode::Normal,
+            mode,
             None,
             None,
             QuirksMode::NoQuirks,
         );
         matching::matches_selector(&self.0, 0, None, element, &mut context, &mut |_, _| {})
+    }
+
+    pub fn pseudo_element(&self) -> Option<&PseudoElement> {
+        self.0.pseudo_element()
     }
 }
 

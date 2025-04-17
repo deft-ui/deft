@@ -1,6 +1,6 @@
 use crate as deft;
 use crate::mrc::Mrc;
-use crate::style::{GapLen, ResolvedStyleProp, ScaleParams, StyleProp, StylePropKey, StylePropVal, StyleTransform, StyleTransformOp, TranslateLength, TranslateParams};
+use crate::style::{AbsoluteLen, ResolvedStyleProp, ScaleParams, StyleProp, StylePropKey, StylePropVal, StyleTransform, StyleTransformOp, TranslateLength, TranslateParams};
 use crate::timer::{set_timeout, set_timeout_nanos, TimerHandle};
 use crate::{js_value};
 use anyhow::{anyhow, Error};
@@ -62,8 +62,8 @@ fn interpolate_f32(prev: &f32, next: &f32, position: f32) -> Option<f32> {
     Some(prev + delta)
 }
 
-fn interpolate_gap_len(prev: &GapLen, next: &GapLen, position: f32) -> Option<GapLen> {
-    interpolate_f32(&prev.0, &next.0, position).map(GapLen)
+fn interpolate_absolute_len(prev: &AbsoluteLen, next: &AbsoluteLen, position: f32) -> Option<AbsoluteLen> {
+    interpolate_f32(&prev.0, &next.0, position).map(AbsoluteLen)
 }
 
 fn interpolate_style_unit(prev: &StyleUnit, next: &StyleUnit, position: f32) -> Option<StyleUnit> {
@@ -157,18 +157,18 @@ fn interpolate(pre_position: f32, pre_value: StyleProp, next_position: f32, next
         MarginBottom => interpolate_style_unit,
         MarginLeft => interpolate_style_unit,
 
-        BorderTopLeftRadius => interpolate_f32,
-        BorderTopRightRadius => interpolate_f32,
-        BorderBottomRightRadius => interpolate_f32,
-        BorderBottomLeftRadius => interpolate_f32,
+        BorderTopLeftRadius => interpolate_absolute_len,
+        BorderTopRightRadius => interpolate_absolute_len,
+        BorderBottomRightRadius => interpolate_absolute_len,
+        BorderBottomLeftRadius => interpolate_absolute_len,
 
         Top => interpolate_style_unit,
         Right => interpolate_style_unit,
         Bottom => interpolate_style_unit,
         Left => interpolate_style_unit,
 
-        RowGap => interpolate_gap_len,
-        ColumnGap => interpolate_gap_len,
+        RowGap => interpolate_absolute_len,
+        ColumnGap => interpolate_absolute_len,
 
         Transform => interpolate_transform,
     );

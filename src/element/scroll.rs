@@ -1,5 +1,6 @@
 use crate as deft;
 use std::any::Any;
+use std::collections::HashMap;
 use std::str::FromStr;
 use bezier_rs::{Bezier, TValue};
 use deft_macros::{element_backend, js_methods};
@@ -24,7 +25,7 @@ use crate::js::js_runtime::FromJsValue;
 use crate::js::JsError;
 use crate::layout::LayoutRoot;
 use crate::render::RenderFn;
-use crate::style::{GapLen, StyleProp, StylePropVal};
+use crate::style::{AbsoluteLen, StyleProp, StylePropVal};
 use crate::timer::{set_timeout, TimerHandle};
 
 const MOMENTUM_DURATION: f32 = 200.0;
@@ -579,8 +580,8 @@ impl ElementBackend for Scroll {
 
                     //TODO Don't use RowGap/ColumnGap
                     let animation = AnimationDef::new()
-                        .key_frame(0.0, vec![StyleProp::RowGap(StylePropVal::Custom(GapLen(0.0))), StyleProp::ColumnGap(StylePropVal::Custom(GapLen(0.0)))])
-                        .key_frame(1.0, vec![StyleProp::RowGap(StylePropVal::Custom(GapLen(1.0))), StyleProp::ColumnGap(StylePropVal::Custom(GapLen(1.0)))])
+                        .key_frame(0.0, vec![StyleProp::RowGap(StylePropVal::Custom(AbsoluteLen(0.0))), StyleProp::ColumnGap(StylePropVal::Custom(AbsoluteLen(0.0)))])
+                        .key_frame(1.0, vec![StyleProp::RowGap(StylePropVal::Custom(AbsoluteLen(1.0))), StyleProp::ColumnGap(StylePropVal::Custom(AbsoluteLen(1.0)))])
                         .build();
                     let window = some_or_return!(element.get_window(), false);
                     let frame_controller = WindowAnimationController::new(window);
@@ -596,12 +597,12 @@ impl ElementBackend for Scroll {
                         for style in styles {
                             match style {
                                 StyleProp::RowGap(value) => {
-                                    let new_left = old_left + left_dist * timing_func.evaluate(TValue::Parametric(value.resolve(&GapLen(0.0)).0 as f64)).y as f32;
+                                    let new_left = old_left + left_dist * timing_func.evaluate(TValue::Parametric(value.resolve(&AbsoluteLen(0.0)).0 as f64)).y as f32;
                                     ele.set_scroll_left(new_left);
                                     left_stopped = new_left < 0.0 || new_left > ele.get_max_scroll_left();
                                 },
                                 StyleProp::ColumnGap(value) => {
-                                    let new_top = old_top + top_dist * timing_func.evaluate(TValue::Parametric(value.resolve(&GapLen(0.0)).0 as f64)).y as f32;
+                                    let new_top = old_top + top_dist * timing_func.evaluate(TValue::Parametric(value.resolve(&AbsoluteLen(0.0)).0 as f64)).y as f32;
                                     ele.set_scroll_top(new_top);
                                     top_stooped = new_top < 0.0 || new_top > ele.get_max_scroll_top();
                                 },
@@ -665,6 +666,29 @@ impl ElementBackend for Scroll {
                 canvas.draw_rect(h_indicator_rect.to_skia_rect(), &indicator_paint);
             }
         })
+    }
+
+    fn accept_pseudo_styles(&mut self, styles: HashMap<String, Vec<StyleProp>>) {
+        if let Some(scrollbar_styles) = styles.get("scrollbar") {
+            for style in scrollbar_styles {
+                if let StyleProp::BackgroundColor(color) = style {
+                    if let StylePropVal::Custom(color) = color {
+                        self.bar_background_color = color.clone();
+                        self.element.mark_dirty(false);
+                    }
+                }
+            }
+        }
+        if let Some(thumb_styles) = styles.get("scrollbar-thumb") {
+            for style in thumb_styles {
+                if let StyleProp::BackgroundColor(color) = style {
+                    if let StylePropVal::Custom(color) = color {
+                        self.indicator_color = color.clone();
+                        self.element.mark_dirty(false);
+                    }
+                }
+            }
+        }
     }
 }
 

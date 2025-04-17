@@ -1049,11 +1049,19 @@ impl Element {
 
     pub(crate) fn select_style(&mut self) {
         if self.element_type == ElementType::Widget {
-            let style = CSS_MANAGER.with_borrow(|cm| {
+            let (style, pseudo_styles) = CSS_MANAGER.with_borrow(|cm| {
                 cm.match_styles(&self)
             });
             if self.style_manager.set_selector_style(style) {
                 self.mark_style_dirty();
+            }
+            if !pseudo_styles.is_empty() {
+                let mut ps = HashMap::new();
+                for (k, v) in pseudo_styles {
+                    let style_props = StyleManager::parse_style(&v);
+                    ps.insert(k, style_props);
+                }
+                self.backend.accept_pseudo_styles(ps);
             }
         }
     }
@@ -1232,6 +1240,10 @@ pub trait ElementBackend {
     fn apply_style_prop(&mut self, prop: &StyleProp) -> Option<(bool, bool, ResolvedStyleProp)> {
         let _ = prop;
         None
+    }
+
+    fn accept_pseudo_styles(&mut self, styles: HashMap<String, Vec<StyleProp>>) {
+        let _ = styles;
     }
 
 }

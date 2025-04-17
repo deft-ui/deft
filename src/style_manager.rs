@@ -111,14 +111,23 @@ impl StyleManager {
     pub fn set_selector_style(&mut self, styles: Vec<String>) -> bool {
         let old_style_props = mem::take(&mut self.selector_style_props);
         for s in &styles {
-            let list = Self::parse_style_list(s);
-            for (k, v) in list {
-                Self::str_to_style_prop(k, v, &mut |p: StyleProp| {
-                    self.selector_style_props.insert(p.key(), p);
-                });
+            let list = Self::parse_style(s);
+            for p in list {
+                self.selector_style_props.insert(p.key(), p);
             }
         }
         self.selector_style_props != old_style_props
+    }
+
+    pub fn parse_style(style: &str) -> Vec<StyleProp> {
+        let list = Self::parse_style_list(style);
+        let mut result = Vec::new();
+        for (k, v) in list {
+            Self::str_to_style_prop(k, v, &mut |p: StyleProp| {
+                result.push(p);
+            });
+        }
+        result
     }
 
     pub fn has_hover_style(&self) -> bool {
@@ -137,10 +146,11 @@ impl StyleManager {
     }
 
     fn str_to_style_prop<C: FnMut(StyleProp)>(k: &str, v_str: &str, c: &mut C) {
-        if let Some(sp) = StyleProp::parse(k, v_str) {
+        let k = k.to_lowercase().replace("-", "");
+        if let Some(sp) = StyleProp::parse(&k, v_str) {
             c(sp);
         } else {
-            match k.to_lowercase().as_str() {
+            match k.as_str() {
                 "background" => {
                     Self::str_to_style_prop("BackgroundColor", v_str, c);
                 }
