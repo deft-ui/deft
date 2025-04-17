@@ -1,0 +1,28 @@
+body {
+    color: #f9f9f9;
+    background: #2a2a2a;
+}
+
+button {
+    background: #31363B;
+    color: #f9f9f9;
+    border: 1px #6E7175;
+    borderRadius: 3;
+    padding: 4 8;
+}
+button:hover {
+    border: 1px #5993B2;
+}
+
+entry {
+    border: 1px #5F6265;
+    borderRadius: 3;
+    padding: 5;
+}
+
+entry:hover {
+    border: 1px #5993B2;
+}
+entry:focus {
+    border: 1px #5993B2;
+}

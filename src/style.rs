@@ -590,8 +590,8 @@ define_style_props!(
     AlignContent => Align, Align;
     AlignItems => Align, Align;
     FlexWrap => Wrap, Wrap;
-    ColumnGap => f32, f32;
-    RowGap => f32, f32;
+    ColumnGap => GapLen, f32;
+    RowGap => GapLen, f32;
 
     Top => StyleUnit, StyleUnit;
     Right => StyleUnit, StyleUnit;
@@ -709,6 +709,20 @@ pub enum ColorPropValue {
 pub enum PropValue<T> {
     Inherit,
     Custom(T),
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct GapLen(pub f32);
+
+impl PropValueParse for GapLen {
+    fn parse_prop_value(value: &str) -> Option<Self> {
+        let v = value.strip_suffix("px").unwrap_or(value);
+        f32::from_str(v).ok().map(GapLen)
+    }
+
+    fn to_style_string(&self) -> String {
+        format!("{}px", self.0)
+    }
 }
 
 impl<T: PropValueParse> PropValueParse for PropValue<T> {
@@ -1049,10 +1063,10 @@ impl StyleNode {
                 ResolvedStyleProp::FlexWrap(Wrap::NoWrap)
             },
             StylePropKey::ColumnGap  =>   {
-                ResolvedStyleProp::ColumnGap(0.0)
+                ResolvedStyleProp::ColumnGap(GapLen(0.0))
             },
             StylePropKey::RowGap  =>   {
-                ResolvedStyleProp::RowGap(0.0)
+                ResolvedStyleProp::RowGap(GapLen(0.0))
             },
             //TODO aspectratio
         }
@@ -1197,10 +1211,10 @@ impl StyleNode {
                 ComputedStyleProp::FlexWrap(v.clone())
             }
             ResolvedStyleProp::ColumnGap(v) => {
-                ComputedStyleProp::ColumnGap(v.clone())
+                ComputedStyleProp::ColumnGap(v.0)
             }
             ResolvedStyleProp::RowGap(v) => {
-                ComputedStyleProp::RowGap(v.clone())
+                ComputedStyleProp::RowGap(v.0)
             }
             ResolvedStyleProp::Top(v) => {
                 ComputedStyleProp::Top(v.clone())
@@ -1419,12 +1433,12 @@ impl StyleNode {
             },
             ResolvedStyleProp::ColumnGap (value) =>   {
                 self.with_container_node_mut(|layout| {
-                    layout.set_column_gap(value)
+                    layout.set_column_gap(value.0)
                 });
             },
             ResolvedStyleProp::RowGap (value) =>   {
                 self.with_container_node_mut(|layout| {
-                    layout.set_row_gap(value)
+                    layout.set_row_gap(value.0)
                 });
             },
             //TODO aspectratio

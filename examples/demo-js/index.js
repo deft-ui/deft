@@ -1,10 +1,5 @@
 const stylesheet= `
-scroll {
-    color: #f9f9f9;
-    background: #2a2a2a;
-    padding: 5;
-    gap: 5;
-}
+
 `
 function assertEq(expected, actual) {
     if (expected !== actual) {
@@ -224,6 +219,12 @@ function main() {
     })
 
     const container = new ScrollElement();
+    container.style = {
+        flex: 1,
+        width: '100%',
+        padding: 5,
+        gap: 5,
+    }
     container.bindDroppedFile(e => {
         console.log("dropped file", e);
     })
@@ -240,9 +241,12 @@ function main() {
     container.addChild(createPassword());
     container.addChild(createCenterElement());
     // batchCreateLabels(container);
-    window.body=(container);
+    // window.body=(container);
+    assertEq(null, window.body.parent);
+    window.body.addChild(container);
+
     assertEq(window, container.window);
-    assertEq(null, container.parent);
+
 }
 
 try {

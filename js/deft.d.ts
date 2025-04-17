@@ -320,18 +320,13 @@ declare class Window {
      *
      * @param attrs {WindowAttrs}
      */
-    constructor(attrs: WindowAttrs);
+    constructor(attrs?: WindowAttrs);
     get handle(): any;
     /**
      *
-     * @param element {Element}
+     * @returns {BodyElement}
      */
-    set body(element: Element);
-    /**
-     *
-     * @returns {Element}
-     */
-    get body(): Element;
+    get body(): BodyElement;
     /**
      *
      * @param title {string}
@@ -913,6 +908,9 @@ declare class ButtonElement extends ContainerBasedElement {
     constructor();
 }
 declare class ContainerElement extends ContainerBasedElement {
+    constructor();
+}
+declare class BodyElement extends ContainerBasedElement {
     constructor();
 }
 declare class ScrollElement extends ContainerBasedElement {

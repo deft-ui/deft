@@ -32,6 +32,7 @@ pub const ELEMENT_TYPE_ENTRY: i32 = 4;
 pub const ELEMENT_TYPE_SCROLL: i32 = 7;
 pub const ELEMENT_TYPE_TEXT_EDIT: i32 = 8;
 pub const ELEMENT_TYPE_IMAGE: i32 = 9;
+pub const ELEMENT_TYPE_BODY: i32 = 10;
 
 pub type ElementId = i32;
 

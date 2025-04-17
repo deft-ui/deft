@@ -49,10 +49,12 @@ pub mod label;
 mod edit_history;
 pub mod text;
 pub mod paragraph;
+pub mod body;
 
 use crate as deft;
 use crate::app::AppEvent;
 use crate::computed::ComputedValue;
+use crate::element::body::Body;
 use crate::js::JsError;
 use crate::layout::LayoutRoot;
 use crate::paint::{MatrixCalculator, Painter, RenderTree, UniqueRect};
@@ -186,6 +188,7 @@ impl Element {
             ELEMENT_TYPE_BUTTON => Element::create(Button::create),
             ELEMENT_TYPE_TEXT_EDIT => Element::create(TextEdit::create),
             ELEMENT_TYPE_IMAGE => Element::create(Image::create),
+            ELEMENT_TYPE_BODY => Element::create(Body::create),
             _ => return Err(anyhow!("invalid view_type")),
         };
         view.resource_table.put(ElementJsContext { context });

@@ -7,6 +7,7 @@ const VT_PROGRESS_BAR = 6
 const VT_SCROLL = 7
 const VT_TEXT_EDIT = 8
 const VT_IMAGE = 9;
+const VT_BODY = 10;
 
 class Clipboard {
     /**
@@ -101,14 +102,18 @@ export class Window {
 
     #windowHandle;
 
+    #body;
+
     /**
      *
      * @param attrs {WindowAttrs}
      */
-    constructor(attrs) {
+    constructor(attrs = null) {
         this.#windowHandle = Window_create(attrs || {});
         this.#eventBinder = new EventBinder(this.#windowHandle, Window_bind_js_event_listener, Window_unbind_js_event_listener, this);
         Window_set_js_context(this.#windowHandle, this);
+        this.#body = new BodyElement();
+        Window_set_body(this.#windowHandle, this.#body.handle);
     }
 
     /**
@@ -126,19 +131,10 @@ export class Window {
 
     /**
      *
-     * @param element {Element}
-     */
-    set body(element) {
-        Window_set_body(this.#windowHandle, element.handle);
-    }
-
-    /**
-     *
-     * @returns {Element}
+     * @returns {BodyElement}
      */
     get body() {
-        const handle = Window_get_body(this.#windowHandle);
-        return Element.fromHandle(handle);
+        return this.#body;
     }
 
     /**
@@ -1437,6 +1433,12 @@ export class ButtonElement extends ContainerBasedElement {
 export class ContainerElement extends ContainerBasedElement {
     constructor() {
         super(VT_CONTAINER);
+    }
+}
+
+export class BodyElement extends ContainerBasedElement {
+    constructor() {
+        super(VT_BODY);
     }
 }
 
