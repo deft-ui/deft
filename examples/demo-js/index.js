@@ -1,5 +1,7 @@
 const stylesheet= `
-
+.small-entry {
+    width: 200px;
+}
 `
 function assertEq(expected, actual) {
     if (expected !== actual) {
@@ -33,9 +35,7 @@ function createSystemTray() {
 
 function createEntry() {
     const entry = new EntryElement();
-    entry.style = {
-        width: 200,
-    }
+    entry.class = "small-entry";
     entry.placeholder = "Please input some text"
     console.log("entry id:", entry.eid)
     return entry;
@@ -43,9 +43,7 @@ function createEntry() {
 
 function createPassword() {
     const entry = new EntryElement();
-    entry.style = {
-        width: 200,
-    }
+    entry.class = "small-entry";
     entry.placeholder = "Input password"
     entry.type = "password";
     console.log("password id:", entry.eid)

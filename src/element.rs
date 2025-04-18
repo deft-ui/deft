@@ -147,6 +147,26 @@ impl Element {
     }
 
     #[js_func]
+    pub fn get_class(&self) -> String {
+        let classes: Vec<String> = self.classes.iter()
+            .map(|it| it.to_string())
+            .collect();
+        classes.join(" ")
+    }
+
+    #[js_func]
+    pub fn set_class(&mut self, class: String) {
+        let classes = class.split(" ");
+        self.classes.clear();
+        for c in classes {
+            let c = c.trim();
+            if !c.is_empty() {
+                self.classes.insert(c.to_string());
+            }
+        }
+    }
+
+    #[js_func]
     pub fn set_draggable(&mut self, draggable: bool) {
         self.draggable = draggable;
     }
@@ -1138,6 +1158,7 @@ pub struct Element {
     border_path: BorderPath,
     style_list: StyleList,
     focusable: bool,
+    pub(crate) classes: HashSet<String>,
 }
 
 pub struct PaintInfo {
@@ -1183,6 +1204,7 @@ impl ElementData {
             auto_focus: false,
             focusable: false,
             dirty_flags: StyleDirtyFlags::LayoutDirty,
+            classes: HashSet::new(),
         }
     }
 

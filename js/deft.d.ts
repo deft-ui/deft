@@ -470,6 +470,16 @@ declare class Element {
      */
     get eid(): number;
     /**
+     *
+     * @param clazz {string}
+     */
+    set class(clazz: string);
+    /**
+     *
+     * @returns {string}
+     */
+    get class(): string;
+    /**
      * Get the parent of element
      * @returns {Element | null}
      */

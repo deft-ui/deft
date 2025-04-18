@@ -234,8 +234,14 @@ impl selectors::Element for Element {
 
     #[inline]
     fn has_class(&self, name: &LocalName, case_sensitivity: CaseSensitivity) -> bool {
-        //TODO fix
-        false
+        match case_sensitivity {
+            CaseSensitivity::AsciiCaseInsensitive => {
+                self.classes.iter().find(|it| it.eq_ignore_ascii_case(name)).is_some()
+            }
+            CaseSensitivity::CaseSensitive => {
+                self.classes.contains(name)
+            }
+        }
     }
 
     #[inline]
