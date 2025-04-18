@@ -75,6 +75,26 @@ impl<T> Display for Id<T> {
     }
 }
 
+impl<T> ToJsValue for Id<T> {
+    fn to_js_value(self) -> Result<JsValue, ValueError> {
+        Ok(JsValue::String(self.id.to_string()))
+    }
+}
+
+impl<T> FromJsValue for Id<T> {
+    fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
+        if let JsValue::Int(id) = value {
+            Ok(Self { id: id as usize, _phantom: PhantomData })
+        } else if let JsValue::String(id) = value {
+            let id = usize::from_str(id.as_str())
+                .map_err(|e| ValueError::UnexpectedType)?;
+            Ok(Self { id, _phantom: PhantomData })
+        } else {
+            Err(ValueError::UnexpectedType)
+        }
+    }
+}
+
 impl<T> Id<T> {
     pub fn next(local_key: &'static LocalKey<IdKey>) -> Self {
         let id = {

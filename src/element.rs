@@ -18,7 +18,7 @@ use skia_safe::{Canvas, Color, Matrix, Paint, Path, Rect};
 use winit::window::CursorIcon;
 use yoga::{Direction, Edge, StyleUnit};
 
-use crate::base::{EventContext, EventListener, EventRegistration, ScrollEventDetail};
+use crate::base::{EventContext, EventListener, EventRegistration, Id, ScrollEventDetail};
 use crate::border::build_rect_with_radius;
 use crate::element::button::Button;
 use crate::element::container::Container;
@@ -60,8 +60,8 @@ use crate::layout::LayoutRoot;
 use crate::paint::{MatrixCalculator, Painter, RenderTree, UniqueRect};
 use crate::render::RenderFn;
 use crate::style::border_path::BorderPath;
-use crate::style::css_manager::CssManager;
-use crate::style_manager::StyleManager;
+use crate::style::css_manager::{CssManager, CSS};
+use crate::style_list::StyleList;
 
 thread_local! {
     pub static NEXT_ELEMENT_ID: Cell<u32> = Cell::new(1);
@@ -84,15 +84,6 @@ impl StyleDirtyFlags {
         self.contains(Self::LayoutDirty)
     }
 }
-
-#[js_func]
-pub fn stylesheet_add(source: String) {
-    CSS_MANAGER.with_borrow_mut(|mut manager| {
-        manager.add(&source);
-    });
-}
-
-
 
 struct ElementJsContext {
     context: JsValue,
@@ -431,7 +422,7 @@ impl Element {
     }
 
     pub fn refresh_style_variables(&mut self, variables: &HashMap<String, String>) {
-        self.style_manager.resolve_variables(variables);
+        self.style_list.resolve_variables(variables);
         self.sync_style();
         for mut c in self.get_children() {
             c.refresh_style_variables(variables);
@@ -656,7 +647,7 @@ impl Element {
     #[js_func]
     pub fn get_style(&self) -> JsValue {
         let mut result = HashMap::new();
-        for (_, v) in self.style_manager.get_styles(self.hover) {
+        for (_, v) in self.style_list.get_styles(self.hover) {
             result.insert(
                 v.name().to_string(),
                 JsValue::String(v.to_style_string())
@@ -667,21 +658,21 @@ impl Element {
 
     pub fn update_style(&mut self, style: JsValue, full: bool) {
         if full {
-            self.style_manager.clear();
+            self.style_list.clear();
         }
-        self.style_manager.set_style_obj(style);
+        self.style_list.set_style_obj(style);
         self.sync_style();
     }
 
     pub fn set_style_props(&mut self, styles: Vec<StyleProp>) {
         // self.style_props.clear();
-        self.style_manager.set_style_props(styles);
+        self.style_list.set_style_props(styles);
         self.sync_style();
     }
 
     #[js_func]
     pub fn set_hover_style(&mut self, style: JsValue) {
-        self.style_manager.set_hover_style(style);
+        self.style_list.set_hover_style(style);
         if self.hover {
             self.mark_style_dirty();
         }
@@ -776,7 +767,7 @@ impl Element {
     }
 
     pub fn apply_own_style(&mut self, parent_changed: &Vec<StylePropKey>) -> Vec<ResolvedStyleProp> {
-        let mut style_props = self.style_manager.get_styles(self.hover);
+        let mut style_props = self.style_list.get_styles(self.hover);
         for (k, v) in &self.animation_style_props {
             style_props.insert(k.clone(), v.clone());
         }
@@ -843,7 +834,7 @@ impl Element {
             if self.parent.is_none() {
                 self.update_select_style_recurse();
             }
-            if self.style_manager.has_hover_style() {
+            if self.style_list.has_hover_style() {
                 self.mark_style_dirty();
             }
         } else if TypeId::of::<T>() == TypeId::of::<MouseLeaveEvent>() {
@@ -852,7 +843,7 @@ impl Element {
             if self.parent.is_none() {
                 self.update_select_style_recurse();
             }
-            if self.style_manager.has_hover_style() {
+            if self.style_list.has_hover_style() {
                 self.mark_style_dirty();
             }
         }
@@ -1052,13 +1043,13 @@ impl Element {
             let (style, pseudo_styles) = CSS_MANAGER.with_borrow(|cm| {
                 cm.match_styles(&self)
             });
-            if self.style_manager.set_selector_style(style) {
+            if self.style_list.set_selector_style(style) {
                 self.mark_style_dirty();
             }
             if !pseudo_styles.is_empty() {
                 let mut ps = HashMap::new();
                 for (k, v) in pseudo_styles {
-                    let style_props = StyleManager::parse_style(&v);
+                    let style_props = StyleList::parse_style(&v);
                     ps.insert(k, style_props);
                 }
                 self.backend.accept_pseudo_styles(ps);
@@ -1145,7 +1136,7 @@ pub struct Element {
     pub need_snapshot: bool,
     pub render_object_idx: Option<usize>,
     border_path: BorderPath,
-    style_manager: StyleManager,
+    style_list: StyleList,
     focusable: bool,
 }
 
@@ -1188,7 +1179,7 @@ impl ElementData {
             need_snapshot: false,
             render_object_idx: None,
             border_path: BorderPath::new(0.0, 0.0, [0.0; 4], [0.0; 4]),
-            style_manager: StyleManager::new(),
+            style_list: StyleList::new(),
             auto_focus: false,
             focusable: false,
             dirty_flags: StyleDirtyFlags::LayoutDirty,

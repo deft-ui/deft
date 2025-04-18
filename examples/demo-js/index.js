@@ -200,7 +200,7 @@ function saveStartTime() {
 }
 
 function main() {
-    stylesheet_add(stylesheet);
+    navigator.stylesheet.append(stylesheet);
     saveStartTime();
     runWorker();
     createSystemTray();

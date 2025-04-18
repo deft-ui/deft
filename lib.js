@@ -27,14 +27,47 @@ class Clipboard {
         clipboard_write_text(text);
     }
 }
+
+class StylesheetItem {
+    id;
+    constructor(id) {
+        this.id = id;
+    }
+}
+
+class Stylesheet {
+    /**
+     *
+     * @param code {string}
+     * @returns {StylesheetItem}
+     */
+    append(code) {
+        const id = stylesheet_add(code);
+        return new StylesheetItem(id);
+    }
+
+    /**
+     *
+     * @param stylesheet {StylesheetItem}
+     */
+    remove(stylesheet) {
+        stylesheet_remove(stylesheet.id);
+    }
+}
+
 export class Navigator {
 
     /**
      * @var {Clipboard}
      */
     clipboard;
+    /**
+     * @var {Stylesheet}
+     */
+    stylesheet;
     constructor() {
         this.clipboard = new Clipboard();
+        this.stylesheet = new Stylesheet();
     }
 }
 

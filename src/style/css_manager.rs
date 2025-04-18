@@ -4,26 +4,47 @@ use lightningcss::rules::CssRule;
 use lightningcss::stylesheet::{ParserOptions, StyleSheet};
 use lightningcss::traits::ToCss;
 use std::collections::HashMap;
+use crate::base::{Id, IdKey};
 use crate::element::button::Button;
 use crate::element::container::Container;
 use crate::element::{Element, ElementBackend};
 use crate::style::select::{Selector, Selectors};
 
+thread_local! {
+    static STYLESHEET_ID_KEY: IdKey = IdKey::new();
+}
+
+pub struct CSS {
+    id: Id<CSS>,
+    rules: Vec<CSSRule>,
+}
+
+pub struct CSSRule {
+    selector: Selector,
+    declarations: String,
+    id: Id<CSS>,
+}
+
 pub struct CssManager {
-    rules: Vec<(Selector, String)>,
+    stylesheets: Vec<CSS>,
 }
 
 impl CssManager {
     pub fn new() -> Self {
         Self {
-            rules: Vec::new(),
+            stylesheets: Vec::new(),
         }
     }
 
-    pub fn add(&mut self, stylesheet_source: &str) -> Result<(), Error> {
+    pub fn add(&mut self, stylesheet_source: &str) -> Result<Id<CSS>, Error> {
         let mut stylesheet = StyleSheet::parse(&stylesheet_source, ParserOptions::default())
             .map_err(|e| anyhow!("failed to parse css"))?;
         let rules = &mut stylesheet.rules;
+        let id = Id::next(&STYLESHEET_ID_KEY);
+        let mut css = CSS {
+            id,
+            rules: Vec::new(),
+        };
         for rule in &mut rules.0 {
             if let CssRule::Style(rule) = rule {
                 let selectors = rule.selectors.to_css_string(PrinterOptions::default())?;
@@ -31,23 +52,35 @@ impl CssManager {
                 //println!("selectors: {:?} => {:?}", selectors, decl);
                 let selectors = Selectors::compile(&selectors)?;
                 for selector in selectors.0 {
-                    self.rules.push((selector, decl.clone()));
+                    let rule = CSSRule {
+                        selector,
+                        declarations: decl.clone(),
+                        id,
+                    };
+                    css.rules.push(rule);
                 }
             }
         }
-        Ok(())
+        self.stylesheets.push(css);
+        Ok(id)
+    }
+
+    pub fn remove(&mut self, id: &Id<CSS>) {
+        self.stylesheets.retain(|css| css.id != *id);
     }
 
     pub fn match_styles(&self, element: &Element) -> (Vec<String>, HashMap<String, String>) {
         let mut list = Vec::new();
         let mut pm = HashMap::new();
-        for (selector, rule) in &self.rules {
-            if selector.matches(element) {
-                let rule_str = rule.to_string();
-                if let Some(pe) = selector.pseudo_element() {
-                    pm.insert(pe.name.clone(), rule_str);
-                } else {
-                    list.push(rule_str);
+        for css in &self.stylesheets {
+            for rule in &css.rules {
+                if rule.selector.matches(element) {
+                    let rule_str = rule.declarations.clone();
+                    if let Some(pe) = rule.selector.pseudo_element() {
+                        pm.insert(pe.name.clone(), rule_str);
+                    } else {
+                        list.push(rule_str);
+                    }
                 }
             }
         }
@@ -60,7 +93,7 @@ impl CssManager {
 fn test_css_manager() {
     let mut manager = CssManager::new();
     manager.add(include_str!("../../tests/demo.css")).unwrap();
-    assert_eq!(2, manager.rules.len());
+    assert_eq!(1, manager.stylesheets.len());
     let button = Element::create(Button::create);
     let container = Element::create(Container::create);
     let (containers_styles, _) = manager.match_styles(&container);

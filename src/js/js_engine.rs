@@ -12,7 +12,7 @@ use winit::window::{CursorGrabMode, WindowId};
 
 use crate::app::{exit_app, IApp, App};
 use crate::console::Console;
-use crate::element::{stylesheet_add, Element, CSS_MANAGER};
+use crate::element::{Element, CSS_MANAGER};
 use crate::element::entry::Entry;
 use crate::element::image::Image;
 use crate::element::paragraph::Paragraph;
@@ -45,6 +45,7 @@ use crate::js::js_event_loop::js_create_event_loop_proxy;
 use crate::js::js_runtime::{JsContext, PromiseResolver};
 use crate::js::ToJsCallResult;
 use crate::mrc::Mrc;
+use crate::stylesheet::{stylesheet_add, stylesheet_remove};
 use crate::typeface::typeface_create;
 
 thread_local! {
@@ -165,6 +166,7 @@ impl JsEngine {
         engine.add_global_func(clipboard_write_text::new());
         engine.add_global_func(clipboard_read_text::new());
         engine.add_global_func(stylesheet_add::new());
+        engine.add_global_func(stylesheet_remove::new());
 
         Worker::init_js_api(WorkerInitParams { app });
         engine.add_global_functions(Worker::create_js_apis());

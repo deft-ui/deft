@@ -80,9 +80,10 @@ mod paint;
 mod layout;
 pub mod render;
 mod computed;
-mod style_manager;
+mod style_list;
 pub mod winit;
 mod task_executor;
+mod stylesheet;
 
 pub use deft_macros::*;
 use log::debug;

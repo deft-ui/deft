@@ -283,6 +283,10 @@ declare class Navigator {
      * @var {Clipboard}
      */
     clipboard: Clipboard;
+    /**
+     * @var {Stylesheet}
+     */
+    stylesheet: Stylesheet;
 }
 declare class Process {
     /**
@@ -1037,6 +1041,19 @@ declare class Clipboard {
      */
     writeText(text: string): Promise<void>;
 }
+declare class Stylesheet {
+    /**
+     *
+     * @param code {string}
+     * @returns {StylesheetItem}
+     */
+    append(code: string): StylesheetItem;
+    /**
+     *
+     * @param stylesheet {StylesheetItem}
+     */
+    remove(stylesheet: StylesheetItem): void;
+}
 declare class ContainerBasedElement extends Element {
     /**
      *
@@ -1067,5 +1084,9 @@ declare class ContainerBasedElement extends Element {
      */
     get children(): Element[];
     
+}
+declare class StylesheetItem {
+    constructor(id: any);
+    id: any;
 }
 

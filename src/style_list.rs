@@ -12,16 +12,16 @@ use crate::style::{parse_style_obj, Style, StyleProp, StylePropKey, StylePropert
 type CssValueResolver = Box<dyn Fn(&HashMap<String, String>) -> String>;
 
 #[mrc_object]
-pub struct StyleManager {
+pub struct StyleList {
     var_values: HashMap<String, CssValueResolver>,
     values: HashMap<StylePropKey, StyleProp>,
     hover_style_props: HashMap<StylePropKey, StyleProp>,
     selector_style_props: HashMap<StylePropKey, StyleProp>,
 }
 
-impl StyleManager {
-    pub fn new() -> StyleManager {
-        StyleManagerData {
+impl StyleList {
+    pub fn new() -> StyleList {
+        StyleListData {
             var_values: HashMap::new(),
             values: HashMap::new(),
             hover_style_props: HashMap::new(),
@@ -249,7 +249,7 @@ impl StyleManager {
 fn test_style_manager() {
     let style_vars = ComputedValue::new();
     style_vars.update_value("height", "5".to_string());
-    let mut sm = StyleManager::new();
+    let mut sm = StyleList::new();
     // sm.bind_style_variables(&style_vars);
     // sm.parse_style("width", "4");
     // sm.parse_style("transform", "translate(0, $height)");
