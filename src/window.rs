@@ -1062,7 +1062,7 @@ impl Window {
     }
 
     fn get_element_by_id(&self, element: &Element, id: u32) -> Option<Element> {
-        if element.get_id() == id {
+        if element.get_eid() == id {
             return Some(element.clone());
         }
         for child in element.get_children() {

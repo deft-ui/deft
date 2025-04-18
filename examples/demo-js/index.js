@@ -37,7 +37,7 @@ function createEntry() {
         width: 200,
     }
     entry.placeholder = "Please input some text"
-    console.log("entry id:", entry.id)
+    console.log("entry id:", entry.eid)
     return entry;
 }
 
@@ -48,7 +48,7 @@ function createPassword() {
     }
     entry.placeholder = "Input password"
     entry.type = "password";
-    console.log("password id:", entry.id)
+    console.log("password id:", entry.eid)
     return entry;
 }
 
@@ -67,7 +67,7 @@ function createTextEdit() {
         // "background": "#ccc",
         // "minWidth": 600,
     };
-    console.log("TextEdit id:", textEdit.id);
+    console.log("TextEdit id:", textEdit.eid);
     return textEdit;
 }
 
@@ -90,7 +90,7 @@ function createCenterElement() {
         background: '#ccc',
     };
     outer.addChild(inner);
-    console.log("innerId", inner.id);
+    console.log("innerId", inner.eid);
     return outer;
 }
 
@@ -160,7 +160,7 @@ function createAnimationButton() {
         animationDuration: 1000,
         animationIterationCount: Infinity,
     }
-    console.log("animationButtonId", animationButton.id);
+    console.log("animationButtonId", animationButton.eid);
     return animationButton;
 }
 

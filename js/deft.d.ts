@@ -465,10 +465,10 @@ declare class Element {
     handle: number;
     createEventBinder(target: any, addEventListenerApi: any, removeEventListenerApi: any): EventBinder;
     /**
-     * Get the id of element
+     * Get the eid of the element
      * @returns {number}
      */
-    get id(): number;
+    get eid(): number;
     /**
      * Get the parent of element
      * @returns {Element | null}

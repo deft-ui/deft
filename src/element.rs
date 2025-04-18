@@ -142,7 +142,7 @@ impl Element {
     }
 
     #[js_func]
-    pub fn get_id(&self) -> u32 {
+    pub fn get_eid(&self) -> u32 {
         self.id
     }
 
@@ -561,7 +561,7 @@ impl Element {
 
     pub fn add_child_view(&mut self, mut child: Element, position: Option<u32>) {
         if let Some(p) = child.get_parent() {
-            panic!("child({}) has parent({}) already", child.get_id(), p.get_id());
+            panic!("child({}) has parent({}) already", child.get_eid(), p.get_eid());
         }
         let pos = {
             let layout = &mut self.style;

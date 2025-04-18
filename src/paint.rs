@@ -197,7 +197,7 @@ impl RenderTree {
         let mut el = element.clone();
         let element_data = ElementObjectData {
             element: element.clone(),
-            element_id: element.get_id(),
+            element_id: element.get_eid(),
             coord: (bounds.x, bounds.y),
             children_viewport: element.get_children_viewport(),
             border_color: element.style.border_color,
@@ -352,7 +352,7 @@ impl RenderTree {
                 total_matrix: matrix_calculator.get_total_matrix(),
                 width,
                 height,
-                key: RenderLayerKey::new(self.id, element.get_id(), RenderLayerType::Children),
+                key: RenderLayerKey::new(self.id, element.get_eid(), RenderLayerType::Children),
                 invalid_area: InvalidArea::Full,
                 origin_absolute_pos: (origin_x, origin_y),
                 //TODO init surface_bounds?
@@ -398,7 +398,7 @@ impl RenderTree {
                 total_matrix: matrix_calculator.get_total_matrix(),
                 width: bounds.width(),
                 height: bounds.height(),
-                key: RenderLayerKey::new(self.id, element.get_id(), RenderLayerType::Root),
+                key: RenderLayerKey::new(self.id, element.get_eid(), RenderLayerType::Root),
                 invalid_area: InvalidArea::Full,
                 origin_absolute_pos: (origin_x, origin_y),
                 surface_bounds: Rect::default(),

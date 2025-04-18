@@ -586,11 +586,11 @@ export class Element {
     }
 
     /**
-     * Get the id of element
+     * Get the eid of the element
      * @returns {number}
      */
-    get id() {
-        return Element_get_id(this.handle)
+    get eid() {
+        return Element_get_eid(this.handle)
     }
 
     /**
