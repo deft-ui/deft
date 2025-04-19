@@ -167,6 +167,16 @@ impl Element {
     }
 
     #[js_func]
+    pub fn get_attribute(&self, key: String) -> Option<String> {
+        self.attributes.get(&key).map(|it| it.to_string())
+    }
+
+    #[js_func]
+    pub fn set_attribute(&mut self, key: String, value: String) {
+        self.attributes.insert(key, value);
+    }
+
+    #[js_func]
     pub fn set_draggable(&mut self, draggable: bool) {
         self.draggable = draggable;
     }
@@ -1159,6 +1169,7 @@ pub struct Element {
     style_list: StyleList,
     focusable: bool,
     pub(crate) classes: HashSet<String>,
+    pub(crate) attributes: HashMap<String, String>,
 }
 
 pub struct PaintInfo {
@@ -1205,6 +1216,7 @@ impl ElementData {
             focusable: false,
             dirty_flags: StyleDirtyFlags::LayoutDirty,
             classes: HashSet::new(),
+            attributes: HashMap::new(),
         }
     }
 

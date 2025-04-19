@@ -12,6 +12,7 @@ use selectors::{self, matching, OpaqueElement};
 use std::fmt;
 use std::fmt::Write;
 use anyhow::{anyhow, Error};
+use crate::some_or_return;
 
 type LocalName = String;
 type Namespace = String;
@@ -185,8 +186,22 @@ impl selectors::Element for Element {
         local_name: &LocalName,
         operation: &AttrSelectorOperation<&String>,
     ) -> bool {
-        //TODO fix
-        false
+        let attr = some_or_return!(self.attributes.get(local_name), false);
+        match operation {
+            AttrSelectorOperation::Exists => {
+                true
+            }
+            AttrSelectorOperation::WithValue { expected_value, operator, case_sensitivity } => {
+                match case_sensitivity {
+                    CaseSensitivity::CaseSensitive => {
+                        attr == *expected_value
+                    }
+                    CaseSensitivity::AsciiCaseInsensitive => {
+                        attr.eq_ignore_ascii_case(expected_value)
+                    }
+                }
+            }
+        }
     }
 
     fn match_non_ts_pseudo_class<F>(

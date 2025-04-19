@@ -2,6 +2,9 @@ const stylesheet= `
 .small-entry {
     width: 200px;
 }
+[color=red] {
+    border: #E00 1px;
+}
 `
 function assertEq(expected, actual) {
     if (expected !== actual) {
@@ -44,6 +47,7 @@ function createEntry() {
 function createPassword() {
     const entry = new EntryElement();
     entry.class = "small-entry";
+    entry.setAttribute("color", "red")
     entry.placeholder = "Input password"
     entry.type = "password";
     console.log("password id:", entry.eid)

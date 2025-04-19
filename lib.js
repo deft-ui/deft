@@ -793,6 +793,14 @@ export class Element {
         return Element_scroll_width(this.handle);
     }
 
+    setAttribute(key, value) {
+        Element_set_attribute(this.handle, key, value);
+    }
+
+    getAttribute(key) {
+        return Element_get_attribute(this.handle, key);
+    }
+
     /**
      *
      * @param callback {(event: IBoundsChangeEvent) => void}
