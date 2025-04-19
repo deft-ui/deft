@@ -288,7 +288,7 @@ impl selectors::Element for Element {
 pub struct Selectors(pub Vec<Selector>);
 
 #[derive(Clone)]
-pub struct Selector(GenericSelector<DeftSelectors>);
+pub struct Selector(pub GenericSelector<DeftSelectors>);
 
 impl Selectors {
     pub fn compile(s: &str) -> Result<Selectors, Error> {

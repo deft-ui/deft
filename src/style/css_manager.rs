@@ -72,16 +72,25 @@ impl CssManager {
     pub fn match_styles(&self, element: &Element) -> (Vec<String>, HashMap<String, String>) {
         let mut list = Vec::new();
         let mut pm = HashMap::new();
+        let mut rules = Vec::new();
         for css in &self.stylesheets {
             for rule in &css.rules {
                 if rule.selector.matches(element) {
-                    let rule_str = rule.declarations.clone();
-                    if let Some(pe) = rule.selector.pseudo_element() {
-                        pm.insert(pe.name.clone(), rule_str);
-                    } else {
-                        list.push(rule_str);
-                    }
+                    rules.push(rule);
                 }
+            }
+        }
+        rules.sort_by(|a, b| {
+            let a = a.selector.0.specificity();
+            let b = b.selector.0.specificity();
+            a.cmp(&b)
+        });
+        for rule in rules {
+            let rule_str = rule.declarations.clone();
+            if let Some(pe) = rule.selector.pseudo_element() {
+                pm.insert(pe.name.clone(), rule_str);
+            } else {
+                list.push(rule_str);
             }
         }
         (list, pm)
