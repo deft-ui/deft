@@ -3,7 +3,7 @@ const stylesheet= `
     width: 200px;
 }
 [color=red] {
-    border: #E00 1px;
+    border: #F00 1px;
 }
 `
 function assertEq(expected, actual) {

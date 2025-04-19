@@ -9,6 +9,7 @@ use std::f32::consts::PI;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use anyhow::{anyhow, Error};
+use cssparser::parse_color_keyword;
 use deft_macros::mrc_object;
 use ordered_float::{Float, OrderedFloat};
 use quick_js::JsValue;
@@ -45,11 +46,7 @@ pub trait PropValueParse: Sized {
 
 impl PropValueParse for StyleColor {
     fn parse_prop_value(value: &str) -> Option<Self> {
-        if let Some(hex) = value.strip_prefix("#") {
-            parse_hex_color(hex).map(|v| ColorPropValue::Color(v))
-        } else {
-            None
-        }
+        parse_color(value).map(|v| ColorPropValue::Color(v))
     }
     fn to_style_string(&self) -> String {
         match self {
@@ -65,11 +62,7 @@ impl PropValueParse for StyleColor {
 
 impl PropValueParse for Color {
     fn parse_prop_value(value: &str) -> Option<Self> {
-        if let Some(hex) = value.strip_prefix("#") {
-            parse_hex_color(hex)
-        } else {
-            None
-        }
+        parse_color(value)
     }
     fn to_style_string(&self) -> String {
         format!("#{:02X}{:02X}{:02X}{:02X}", self.r(), self.g(), self.b(), self.a())
@@ -1780,15 +1773,28 @@ fn parse_border(value: &str) -> Option<StyleBorder> {
     let mut color = Color::from_rgb(0, 0, 0);
     for p in parts {
         let p = p.trim();
-        if p.starts_with("#") {
-            if let Some(c) = parse_hex_color(p.strip_prefix('#').unwrap()) {
-                color = c;
-            }
+        if let Some(c) = parse_color(p) {
+            color = c;
         } else if let Some(w) = parse_style_unit(p) {
             width = w;
         }
     }
     Some(StyleBorder(width, StyleColor::Color(color)))
+}
+
+fn parse_color(value: &str) -> Option<Color> {
+    if let Some(hex) = value.strip_prefix("#") {
+        parse_hex_color(hex)
+    } else if let Ok(c) = parse_color_keyword(value) {
+        match c {
+            cssparser::Color::CurrentColor => None,
+            cssparser::Color::RGBA(rgba) => {
+                Some(Color::from_argb(rgba.alpha, rgba.red, rgba.green, rgba.blue))
+            }
+        }
+    } else {
+        None
+    }
 }
 
 #[test]
