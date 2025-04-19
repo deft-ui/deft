@@ -537,7 +537,7 @@ macro_rules! define_style_props {
 define_style_props!(
     Color => Color, Color;
     BackgroundColor => Color, Color;
-    FontSize        => f32, f32;
+    FontSize        => AbsoluteLen, f32;
     LineHeight      => f32, f32;
 
     BorderTop => StyleBorder, StyleBorder;
@@ -916,7 +916,7 @@ impl StyleNode {
                 ResolvedStyleProp::BackgroundColor(Color::TRANSPARENT)
             }
             StylePropKey::FontSize => {
-                ResolvedStyleProp::FontSize(12.0)
+                ResolvedStyleProp::FontSize(AbsoluteLen(12.0))
             }
             StylePropKey::LineHeight => {
                 //TODO use font-size
@@ -1090,7 +1090,7 @@ impl StyleNode {
                 ComputedStyleProp::BackgroundColor(v.clone())
             }
             ResolvedStyleProp::FontSize(v) => {
-                ComputedStyleProp::FontSize(v.clone())
+                ComputedStyleProp::FontSize(v.0)
             }
             ResolvedStyleProp::LineHeight(v) => {
                 ComputedStyleProp::LineHeight(v.clone())
@@ -1257,7 +1257,7 @@ impl StyleNode {
                 need_layout = false;
             }
             ResolvedStyleProp::FontSize(value) => {
-                self.computed_style.font_size = value;
+                self.computed_style.font_size = value.0;
             }
             ResolvedStyleProp::LineHeight(value) => {
                 self.computed_style.line_height = value;

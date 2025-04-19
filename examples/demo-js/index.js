@@ -5,6 +5,9 @@ const stylesheet= `
 [color=red] {
     border: #F00 1px;
 }
+.large-text {
+    font-size: 20px;
+}
 `
 function assertEq(expected, actual) {
     if (expected !== actual) {
@@ -96,9 +99,12 @@ function createCenterElement() {
     return outer;
 }
 
-function createLabel(text) {
+function createLabel(text, className = "") {
     const label = new LabelElement();
     label.text=text;
+    if (className) {
+        label.class = className;
+    }
     return label;
 }
 
@@ -233,7 +239,7 @@ function main() {
 
     container.addChild(createAddChildrenButton(container));
     container.addChild(createAnimationButton());
-    container.addChild(createLabel("测试test"));
+    container.addChild(createLabel("测试test", "large-text"));
     container.addChild(createParagraph());
     container.addChild(createTextEdit());
     const entry = createEntry();
