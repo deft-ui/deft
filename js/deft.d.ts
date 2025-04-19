@@ -588,6 +588,8 @@ declare class Element {
      * @returns {number}
      */
     get scrollWidth(): number;
+    setAttribute(key: any, value: any): void;
+    getAttribute(key: any): any;
     /**
      *
      * @param callback {(event: IBoundsChangeEvent) => void}
