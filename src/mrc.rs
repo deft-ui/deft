@@ -3,6 +3,7 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::ops::{Deref, DerefMut};
 use std::panic::{RefUnwindSafe};
+use std::ptr::null_mut;
 
 #[derive(Debug)]
 pub struct UpgradeError {}
@@ -122,6 +123,9 @@ impl<T> Clone for Mrc<T> {
 
 impl<T> Drop for MrcWeak<T> {
     fn drop(&mut self) {
+        if self.ptr.is_null() {
+            return;
+        }
         self.inner().dec_weak();
 
         if self.inner().weak.get() == 0 {
@@ -134,7 +138,16 @@ impl<T> Drop for MrcWeak<T> {
 
 impl<T> MrcWeak<T> {
 
+    pub fn new() -> Self {
+        Self {
+            ptr: null_mut(),
+        }
+    }
+
     pub fn upgrade(&self) -> Result<Mrc<T>, UpgradeError> {
+        if self.ptr.is_null() {
+            return Err(UpgradeError {});
+        }
         let strong = self.inner().strong.get();
         if strong == 0 {
             return Err(UpgradeError {});

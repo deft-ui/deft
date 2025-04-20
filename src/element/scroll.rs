@@ -26,6 +26,7 @@ use crate::js::JsError;
 use crate::layout::LayoutRoot;
 use crate::render::RenderFn;
 use crate::style::{AbsoluteLen, StyleProp, StylePropVal};
+use crate::style_list::ParsedStyleProp;
 use crate::timer::{set_timeout, TimerHandle};
 
 const MOMENTUM_DURATION: f32 = 200.0;
@@ -668,10 +669,10 @@ impl ElementBackend for Scroll {
         })
     }
 
-    fn accept_pseudo_styles(&mut self, styles: HashMap<String, Vec<StyleProp>>) {
+    fn accept_pseudo_styles(&mut self, styles: HashMap<String, Vec<ParsedStyleProp>>) {
         if let Some(scrollbar_styles) = styles.get("scrollbar") {
             for style in scrollbar_styles {
-                if let StyleProp::BackgroundColor(color) = style {
+                if let Some(StyleProp::BackgroundColor(color)) = style.resolved() {
                     if let StylePropVal::Custom(color) = color {
                         self.bar_background_color = color.clone();
                         self.element.mark_dirty(false);
@@ -681,7 +682,7 @@ impl ElementBackend for Scroll {
         }
         if let Some(thumb_styles) = styles.get("scrollbar-thumb") {
             for style in thumb_styles {
-                if let StyleProp::BackgroundColor(color) = style {
+                if let Some(StyleProp::BackgroundColor(color)) = style.resolved() {
                     if let StylePropVal::Custom(color) = color {
                         self.indicator_color = color.clone();
                         self.element.mark_dirty(false);

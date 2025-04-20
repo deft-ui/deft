@@ -6,6 +6,7 @@ use std::default::Default;
 use std::fmt::{Debug, Formatter};
 use std::mem;
 use std::ops::{Deref, DerefMut};
+use std::rc::{Rc, Weak};
 use std::str::FromStr;
 
 use anyhow::{anyhow, Error};
@@ -62,7 +63,7 @@ use crate::paint::{MatrixCalculator, Painter, RenderTree, UniqueRect};
 use crate::render::RenderFn;
 use crate::style::border_path::BorderPath;
 use crate::style::css_manager::{CssManager, CSS};
-use crate::style_list::StyleList;
+use crate::style_list::{ParsedStyleProp, StyleList};
 
 thread_local! {
     pub static NEXT_ELEMENT_ID: Cell<u32> = Cell::new(1);
@@ -443,7 +444,7 @@ impl Element {
         self.applied_style.clear();
         if let Some(win) = self.get_window() {
             if let Ok(mut win) = win.upgrade_mut() {
-                self.refresh_style_variables(&win.style_variables);
+                self.refresh_style_variables(&win.style_variables.as_weak());
             }
         }
         self.select_style_recurse();
@@ -464,8 +465,8 @@ impl Element {
         }
     }
 
-    pub fn refresh_style_variables(&mut self, variables: &HashMap<String, String>) {
-        self.style_list.resolve_variables(variables);
+    pub fn refresh_style_variables(&mut self, variables: &MrcWeak<HashMap<String, String>>) {
+        self.style_list.set_variables(variables.clone());
         self.sync_style();
         for mut c in self.get_children() {
             c.refresh_style_variables(variables);
@@ -1092,7 +1093,10 @@ impl Element {
             if !pseudo_styles.is_empty() {
                 let mut ps = HashMap::new();
                 for (k, v) in pseudo_styles {
-                    let style_props = StyleList::parse_style(&v);
+                    let mut style_props = StyleList::parse_style(&v);
+                    for p in &mut style_props {
+                        p.resolve(&self.style_list.variables)
+                    }
                     ps.insert(k, style_props);
                 }
                 self.backend.accept_pseudo_styles(ps);
@@ -1280,7 +1284,7 @@ pub trait ElementBackend {
         None
     }
 
-    fn accept_pseudo_styles(&mut self, styles: HashMap<String, Vec<StyleProp>>) {
+    fn accept_pseudo_styles(&mut self, styles: HashMap<String, Vec<ParsedStyleProp>>) {
         let _ = styles;
     }
 

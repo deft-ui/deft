@@ -27,6 +27,7 @@ use crate::event_loop::create_event_loop_callback;
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::paint::MatrixCalculator;
+use crate::style_list::{ParsedStyleProp, StyleList};
 use crate::timer::{set_timeout, TimerHandle};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -433,7 +434,7 @@ macro_rules! define_style_props {
         impl StylePropKey {
             pub fn parse(key: &str) -> Option<Self> {
                 $(
-                    if key == stringify!($name).to_lowercase().as_str() {
+                    if key.to_lowercase() == stringify!($name).to_lowercase() {
                         return Some(StylePropKey::$name);
                     }
                 )*
@@ -1589,7 +1590,7 @@ impl StyleNode {
     }
 }
 
-pub fn parse_style_obj(style: JsValue) -> Vec<StyleProp> {
+pub fn parse_style_obj(style: JsValue) -> Vec<ParsedStyleProp> {
     let mut result = Vec::new();
     if let Some(obj) = style.get_properties() {
         //TODO use default style
@@ -1601,8 +1602,9 @@ pub fn parse_style_obj(style: JsValue) -> Vec<StyleProp> {
                 _ => return,
             };
             let mut parse = |key: &str, value: &str| -> bool {
-                if let Some(p) = StyleProp::parse(key, value) {
-                    result.push(p);
+                let mut list = ParsedStyleProp::parse(key, value);
+                if !list.is_empty() {
+                    result.append(&mut list);
                     true
                 } else {
                     false

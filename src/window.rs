@@ -109,7 +109,7 @@ pub struct Window {
     next_frame_callbacks: Vec<Callback>,
     next_paint_callbacks: Vec<Callback>,
     pub render_tree: RenderTree,
-    pub style_variables: HashMap<String, String>,
+    pub style_variables: Mrc<HashMap<String, String>>,
     frame_rate_controller: FrameRateController,
     next_frame_timer_handle: Option<TimerHandle>,
     resource_table: ResourceTable,
@@ -246,7 +246,7 @@ impl Window {
             next_frame_callbacks: Vec::new(),
             next_paint_callbacks: Vec::new(),
             render_tree: RenderTree::new(0),
-            style_variables: HashMap::new(),
+            style_variables: Mrc::new(HashMap::new()),
             frame_rate_controller: FrameRateController::new(),
             next_frame_timer_handle: None,
             resource_table: ResourceTable::new(),
@@ -275,7 +275,7 @@ impl Window {
         debug!("updating style variable: {} {}", name, height);
         self.style_variables.insert(name.to_string(), format!("{:.6}", height));
         if let Some(mut body) = self.body.clone() {
-            body.refresh_style_variables(&self.style_variables);
+            body.refresh_style_variables(&self.style_variables.as_weak());
         }
     }
 
@@ -933,7 +933,7 @@ impl Window {
         if self.focusing.is_none() {
             self.focusing = Some(body.clone());
         }
-        body.refresh_style_variables(&self.style_variables);
+        body.refresh_style_variables(&self.style_variables.as_weak());
         self.body = Some(body);
         self.invalid_layout();
     }

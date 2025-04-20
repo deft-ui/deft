@@ -12,7 +12,12 @@ pub fn animation_create(name: String, key_frames: deft::JsValue) -> Result<(), J
     if let Some(ps) = key_frames.get_properties() {
         for (k, v) in ps {
             let p = f32::from_str(&k)?;
-            let styles = parse_style_obj(v);
+            let mut styles = Vec::new();
+            for item in parse_style_obj(v) {
+                if let Some(v) = item.resolved() {
+                    styles.push(v);
+                }
+            }
             // let styles = create_animation_style(styles);
             ad = ad.key_frame(p, styles);
         }
