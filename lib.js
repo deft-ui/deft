@@ -610,6 +610,22 @@ export class Element {
     }
 
     /**
+     *
+     * @param clazz {string}
+     */
+    set className(clazz) {
+        Element_set_class(this.handle, clazz);
+    }
+
+    /**
+     *
+     * @returns {string}
+     */
+    get className() {
+        return Element_get_class(this.handle);
+    }
+
+    /**
      * Get the parent of element
      * @returns {Element | null}
      */

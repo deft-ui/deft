@@ -480,6 +480,16 @@ declare class Element {
      */
     get class(): string;
     /**
+     *
+     * @param clazz {string}
+     */
+    set className(clazz: string);
+    /**
+     *
+     * @returns {string}
+     */
+    get className(): string;
+    /**
      * Get the parent of element
      * @returns {Element | null}
      */
