@@ -4,7 +4,7 @@ use crate::element::{Element, ElementBackend, ElementData};
 use cssparser::{self, CowRcStr, ParseError, SourceLocation, ToCss};
 use selectors::attr::{AttrSelectorOperation, CaseSensitivity, NamespaceConstraint};
 use selectors::context::{MatchingMode, QuirksMode};
-use selectors::parser::SelectorParseErrorKind;
+use selectors::parser::{Component, SelectorParseErrorKind};
 use selectors::parser::{
     NonTSPseudoClass, Parser, Selector as GenericSelector, SelectorImpl, SelectorList,
 };
@@ -288,13 +288,21 @@ impl selectors::Element for Element {
 pub struct Selectors(pub Vec<Selector>);
 
 #[derive(Clone)]
-pub struct Selector(pub GenericSelector<DeftSelectors>);
+pub struct Selector {
+    selector: GenericSelector<DeftSelectors>,
+    class_names: Vec<String>,
+    attribute_names: Vec<String>
+}
 
 impl Selectors {
     pub fn compile(s: &str) -> Result<Selectors, Error> {
         let mut input = cssparser::ParserInput::new(s);
         match SelectorList::parse(&DeftParser, &mut cssparser::Parser::new(&mut input)) {
-            Ok(list) => Ok(Selectors(list.0.into_iter().map(Selector).collect())),
+            Ok(list) => Ok(
+                Selectors(
+                    list.0.into_iter().map(|s| Selector::new(s)).collect()
+                )
+            ),
             Err(e) => Err(anyhow!("failed to parse css: {:?}", e)),
         }
     }
@@ -310,6 +318,60 @@ impl Selectors {
 }
 
 impl Selector {
+
+    pub fn new(selector: GenericSelector<DeftSelectors>) -> Self {
+        let mut list = Vec::new();
+        let mut attributes = Vec::new();
+        for e in selector.iter_raw_match_order() {
+            match e {
+                Component::Class(c) => {
+                    list.push(c.clone());
+                }
+                Component::AttributeInNoNamespaceExists { local_name, .. } => {
+                    attributes.push(local_name.clone());
+                }
+                Component::AttributeInNoNamespace { local_name, .. } => {
+                    attributes.push(local_name.clone());
+                }
+                Component::AttributeOther(a) => {
+                    attributes.push(a.local_name.clone());
+                }
+                Component::Combinator(_) => {}
+                Component::ExplicitAnyNamespace => {}
+                Component::ExplicitNoNamespace => {}
+                Component::DefaultNamespace(_) => {}
+                Component::Namespace(_, _) => {}
+                Component::ExplicitUniversalType => {}
+                Component::LocalName(_) => {}
+                Component::ID(_) => {}
+                Component::Negation(_) => {}
+                Component::FirstChild => {}
+                Component::LastChild => {}
+                Component::OnlyChild => {}
+                Component::Root => {}
+                Component::Empty => {}
+                Component::Scope => {}
+                Component::NthChild(_, _) => {}
+                Component::NthLastChild(_, _) => {}
+                Component::NthOfType(_, _) => {}
+                Component::NthLastOfType(_, _) => {}
+                Component::FirstOfType => {}
+                Component::LastOfType => {}
+                Component::OnlyOfType => {}
+                Component::NonTSPseudoClass(_) => {}
+                Component::Slotted(_) => {}
+                Component::Part(_) => {}
+                Component::Host(_) => {}
+                Component::PseudoElement(_) => {}
+            }
+        }
+        Self {
+            selector,
+            class_names: list,
+            attribute_names: Vec::new(),
+        }
+    }
+
     pub fn matches(&self, element: &Element) -> bool {
         let mode = if self.pseudo_element().is_some() {
             MatchingMode::ForStatelessPseudoElement
@@ -322,12 +384,25 @@ impl Selector {
             None,
             QuirksMode::NoQuirks,
         );
-        matching::matches_selector(&self.0, 0, None, element, &mut context, &mut |_, _| {})
+        matching::matches_selector(&self.selector, 0, None, element, &mut context, &mut |_, _| {})
     }
 
     pub fn pseudo_element(&self) -> Option<&PseudoElement> {
-        self.0.pseudo_element()
+        self.selector.pseudo_element()
     }
+
+    pub fn get_classes(&self) -> &Vec<String> {
+        &self.class_names
+    }
+
+    pub fn get_attribute_names(&self) -> &Vec<String> {
+        &self.attribute_names
+    }
+
+    pub fn specificity(&self) -> u32 {
+        self.selector.specificity()
+    }
+
 }
 
 #[test]
@@ -340,4 +415,12 @@ fn test_select() {
     assert!(container_selector.matches(&container));
     assert!(!btn_selector.matches(&container));
     assert!(!container_selector.matches(&button));
+}
+
+#[test]
+fn test_class() {
+    let selectors = Selectors::compile("p.a .b button").unwrap();
+    let selector = selectors.0.get(0).unwrap();
+    let classes = selector.get_classes();
+    assert_eq!(classes, &vec!["b", "a"]);
 }

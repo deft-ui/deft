@@ -17,6 +17,8 @@ thread_local! {
 pub struct CSS {
     id: Id<CSS>,
     rules: Vec<CSSRule>,
+    declared_classes: Vec<String>,
+    declared_attrs: Vec<String>,
 }
 
 pub struct CSSRule {
@@ -44,6 +46,8 @@ impl CssManager {
         let mut css = CSS {
             id,
             rules: Vec::new(),
+            declared_classes: Vec::new(),
+            declared_attrs: Vec::new(),
         };
         for rule in &mut rules.0 {
             if let CssRule::Style(rule) = rule {
@@ -52,6 +56,8 @@ impl CssManager {
                 //println!("selectors: {:?} => {:?}", selectors, decl);
                 let selectors = Selectors::compile(&selectors)?;
                 for selector in selectors.0 {
+                    css.declared_classes.append(&mut selector.get_classes().clone());
+                    css.declared_attrs.append(&mut selector.get_attribute_names().clone());
                     let rule = CSSRule {
                         selector,
                         declarations: decl.clone(),
@@ -69,6 +75,28 @@ impl CssManager {
         self.stylesheets.retain(|css| css.id != *id);
     }
 
+    pub fn contains_class(&self, clazz: &str)  -> bool {
+        for ss in &self.stylesheets {
+            for c in &ss.declared_classes {
+                if c == clazz {
+                   return true;
+                }
+            }
+        }
+        false
+    }
+
+    pub fn contains_attr(&self, attr: &str) -> bool {
+        for ss in &self.stylesheets {
+            for a in &ss.declared_attrs {
+                if a == attr {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
     pub fn match_styles(&self, element: &Element) -> (Vec<String>, HashMap<String, String>) {
         let mut list = Vec::new();
         let mut pm = HashMap::new();
@@ -81,8 +109,8 @@ impl CssManager {
             }
         }
         rules.sort_by(|a, b| {
-            let a = a.selector.0.specificity();
-            let b = b.selector.0.specificity();
+            let a = a.selector.specificity();
+            let b = b.selector.specificity();
             a.cmp(&b)
         });
         for rule in rules {

@@ -4,6 +4,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::default::Default;
 use std::fmt::{Debug, Formatter};
+use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 
@@ -156,13 +157,19 @@ impl Element {
 
     #[js_func]
     pub fn set_class(&mut self, class: String) {
-        let classes = class.split(" ");
-        self.classes.clear();
-        for c in classes {
+        let old_classes = mem::take(&mut self.classes);
+        for c in class.split(" ") {
             let c = c.trim();
             if !c.is_empty() {
                 self.classes.insert(c.to_string());
             }
+        }
+        let need_update = CSS_MANAGER.with_borrow_mut(|cm| {
+            old_classes.iter().find(|it| cm.contains_class(it)).is_some()
+                || self.classes.iter().find(|it| cm.contains_class(it)).is_some()
+        });
+        if need_update {
+            self.select_style_recurse();
         }
     }
 
@@ -173,7 +180,13 @@ impl Element {
 
     #[js_func]
     pub fn set_attribute(&mut self, key: String, value: String) {
+        let need_update_style = CSS_MANAGER.with_borrow(|cm| {
+            cm.contains_attr(&key)
+        });
         self.attributes.insert(key, value);
+        if need_update_style {
+            self.select_style_recurse();
+        }
     }
 
     #[js_func]
