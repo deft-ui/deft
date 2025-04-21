@@ -54,11 +54,7 @@ impl<'i> Parser<'i> for DeftParser {
         } else if name.eq_ignore_ascii_case("hover") {
             Ok(Hover)
         } else {
-            Err(
-                location.new_custom_error(SelectorParseErrorKind::UnsupportedPseudoClassOrElement(
-                    name,
-                )),
-            )
+            Ok(Unsupported(name.to_string()))
         }
     }
 
@@ -74,6 +70,7 @@ impl<'i> Parser<'i> for DeftParser {
 pub enum PseudoClass {
     Focus,
     Hover,
+    Unsupported(String),
 }
 
 impl NonTSPseudoClass for PseudoClass {
@@ -97,9 +94,10 @@ impl ToCss for PseudoClass {
     where
         W: fmt::Write,
     {
-        dest.write_str(match *self {
+        dest.write_str(match self.clone() {
             PseudoClass::Focus => ":focus",
             PseudoClass::Hover => ":hover",
+            PseudoClass::Unsupported(_s) => ":unsupported",
         })
     }
 }
@@ -219,6 +217,9 @@ impl selectors::Element for Element {
             }
             PseudoClass::Hover => {
                 self.hover
+            }
+            PseudoClass::Unsupported(_) => {
+                false
             }
         }
     }
