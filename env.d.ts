@@ -237,6 +237,7 @@ declare interface ShowFileDialogOptions {
 }
 declare function dialog_show_file_dialog(options ?: ShowFileDialogOptions): Promise<string[]>;
 
+declare function fs_read_dir(path: string): Promise<string[]>;
 declare function fs_exists(path: string): Promise<boolean>;
 declare function fs_rename(path: string, dest:string): Promise<void>;
 declare function fs_delete_file(path: string): Promise<void>;

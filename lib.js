@@ -33,6 +33,10 @@ class StylesheetItem {
     constructor(id) {
         this.id = id;
     }
+
+    update(code) {
+        stylesheet_update(this.id, code);
+    }
 }
 
 class Stylesheet {

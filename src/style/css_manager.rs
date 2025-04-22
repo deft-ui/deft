@@ -39,9 +39,6 @@ impl CssManager {
     }
 
     pub fn add(&mut self, stylesheet_source: &str) -> Result<Id<CSS>, Error> {
-        let mut stylesheet = StyleSheet::parse(&stylesheet_source, ParserOptions::default())
-            .map_err(|e| anyhow!("failed to parse css"))?;
-        let rules = &mut stylesheet.rules;
         let id = Id::next(&STYLESHEET_ID_KEY);
         let mut css = CSS {
             id,
@@ -49,26 +46,19 @@ impl CssManager {
             declared_classes: Vec::new(),
             declared_attrs: Vec::new(),
         };
-        for rule in &mut rules.0 {
-            if let CssRule::Style(rule) = rule {
-                let selectors = rule.selectors.to_css_string(PrinterOptions::default())?;
-                let decl = rule.declarations.to_css_string(PrinterOptions::default())?;
-                //println!("selectors: {:?} => {:?}", selectors, decl);
-                let selectors = Selectors::compile(&selectors)?;
-                for selector in selectors.0 {
-                    css.declared_classes.append(&mut selector.get_classes().clone());
-                    css.declared_attrs.append(&mut selector.get_attribute_names().clone());
-                    let rule = CSSRule {
-                        selector,
-                        declarations: decl.clone(),
-                        id,
-                    };
-                    css.rules.push(rule);
-                }
-            }
-        }
+        Self::update_css(&mut css, stylesheet_source)?;
         self.stylesheets.push(css);
         Ok(id)
+    }
+
+    pub fn update(&mut self, id: &Id<CSS>, stylesheet_source: &str) -> Result<(), Error> {
+        for css in &mut self.stylesheets {
+            if css.id == *id {
+                Self::update_css(css, stylesheet_source)?;
+                return Ok(());
+            }
+        }
+        Err(anyhow!("style sheet not found: {}", id))
     }
 
     pub fn remove(&mut self, id: &Id<CSS>) {
@@ -122,6 +112,34 @@ impl CssManager {
             }
         }
         (list, pm)
+    }
+
+    fn update_css(css: &mut CSS, stylesheet_source: &str) -> Result<(), Error> {
+        css.declared_classes.clear();
+        css.declared_attrs.clear();
+        css.rules.clear();
+        let mut stylesheet = StyleSheet::parse(&stylesheet_source, ParserOptions::default())
+            .map_err(|e| anyhow!("failed to parse css"))?;
+        let rules = &mut stylesheet.rules;
+        for rule in &mut rules.0 {
+            if let CssRule::Style(rule) = rule {
+                let selectors = rule.selectors.to_css_string(PrinterOptions::default())?;
+                let decl = rule.declarations.to_css_string(PrinterOptions::default())?;
+                //println!("selectors: {:?} => {:?}", selectors, decl);
+                let selectors = Selectors::compile(&selectors)?;
+                for selector in selectors.0 {
+                    css.declared_classes.append(&mut selector.get_classes().clone());
+                    css.declared_attrs.append(&mut selector.get_attribute_names().clone());
+                    let rule = CSSRule {
+                        selector,
+                        declarations: decl.clone(),
+                        id: css.id,
+                    };
+                    css.rules.push(rule);
+                }
+            }
+        }
+        Ok(())
     }
 
 }

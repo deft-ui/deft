@@ -26,6 +26,15 @@ pub fn stylesheet_remove(id: Id<CSS>) -> Result<(), JsError> {
     Ok(())
 }
 
+#[js_func]
+pub fn stylesheet_update(id: Id<CSS>, source: String) -> Result<(), JsError> {
+    CSS_MANAGER.with_borrow_mut(|mut manager| {
+        manager.update(&id, &source);
+    });
+    refresh_windows_style();
+    Ok(())
+}
+
 fn refresh_windows_style() {
     WINDOWS.with_borrow_mut(|windows| {
         for (_, window) in windows.iter_mut() {

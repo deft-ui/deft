@@ -45,7 +45,7 @@ use crate::js::js_event_loop::js_create_event_loop_proxy;
 use crate::js::js_runtime::{JsContext, PromiseResolver};
 use crate::js::ToJsCallResult;
 use crate::mrc::Mrc;
-use crate::stylesheet::{stylesheet_add, stylesheet_remove};
+use crate::stylesheet::{stylesheet_add, stylesheet_remove, stylesheet_update};
 use crate::typeface::typeface_create;
 
 thread_local! {
@@ -167,6 +167,7 @@ impl JsEngine {
         engine.add_global_func(clipboard_read_text::new());
         engine.add_global_func(stylesheet_add::new());
         engine.add_global_func(stylesheet_remove::new());
+        engine.add_global_func(stylesheet_update::new());
 
         Worker::init_js_api(WorkerInitParams { app });
         engine.add_global_functions(Worker::create_js_apis());
