@@ -43,8 +43,21 @@ impl ParagraphData {
         self.lines = line;
     }
 
+    pub fn force_layout(&mut self, width: f32) {
+        self.lines.iter_mut().for_each(|it| {
+            let layout_width = if self.text_wrap {
+                width
+            } else {
+                f32::NAN
+            };
+            it.paragraph.layout(layout_width);
+            it.paragraph_dirty = false;
+        });
+    }
+
     pub fn get_line(&mut self, width: f32) -> &mut Vec<Line> {
         self.lines.iter_mut().for_each(|it| {
+            //TODO remove layout here
             if it.paragraph_dirty {
                 let layout_width = if self.text_wrap {
                     width

@@ -57,6 +57,7 @@ extern "C" fn measure_label(node_ref: NodeRef, width: f32, width_mode: MeasureMo
     if let Some(ctx) = Node::get_context(&node_ref) {
         if let Some(paragraph_props_ptr) = ctx.downcast_ref::<ParagraphRef>() {
             let paragraph = &mut paragraph_props_ptr.data.borrow_mut();
+            paragraph.force_layout(width);
             let p_list = paragraph.get_line(width);
             let mut height = 0f32;
             let mut text_width = 0f32;
@@ -65,7 +66,7 @@ extern "C" fn measure_label(node_ref: NodeRef, width: f32, width_mode: MeasureMo
                 text_width = text_width.max(p.paragraph.max_intrinsic_width());
             }
             paragraph.measure_mode = Some((width_mode, height_mode));
-            // measure_time::print_time!("text len:{}, width:{}, height:{}", paragraph.paragraphs.len(), text_width, height);
+            // measure_time::print_time!("text {}  width:{}, height:{}, {}, {}", paragraph.lines.get(0).unwrap().paragraph.get_text(),  width, _height, text_width, height);
             return Size {
                 width: text_width,
                 height,
