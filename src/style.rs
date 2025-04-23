@@ -72,6 +72,34 @@ impl PropValueParse for Length {
     }
 }
 
+impl PropValueParse for LengthOrPercent {
+
+    fn parse_prop_value(value: &str) -> Option<Self> {
+        let value = value.trim();
+        if value.eq_ignore_ascii_case("auto") {
+            return Some(LengthOrPercent::Auto)
+        } else if let Some(v) = Length::from_str(value) {
+            return Some(Self::Length(v))
+        } else {
+            let value = value.trim();
+            if let Some(v) = value.strip_suffix("%") {
+                let value = f32::from_str(v).ok()?;
+                return Some(Self::Percent(value));
+            }
+        }
+        Some(LengthOrPercent::Undefined)
+    }
+
+    fn to_style_string(&self) -> String {
+        match self {
+            LengthOrPercent::Length(v) => v.to_style_string(),
+            LengthOrPercent::Percent(v) => format!("{}%", v),
+            LengthOrPercent::Undefined => "".to_string(),
+            LengthOrPercent::Auto => "auto".to_string(),
+        }
+    }
+}
+
 impl PropValueParse for Color {
     fn parse_prop_value(value: &str) -> Option<Self> {
         parse_color(value)
@@ -559,12 +587,12 @@ define_style_props!(
 
     Display => Display, Display;
 
-    Width => StyleUnit, StyleUnit;
-    Height => StyleUnit, StyleUnit;
-    MaxWidth => StyleUnit, StyleUnit;
-    MaxHeight => StyleUnit, StyleUnit;
-    MinWidth => StyleUnit, StyleUnit;
-    MinHeight => StyleUnit, StyleUnit;
+    Width => LengthOrPercent, StyleUnit;
+    Height => LengthOrPercent, StyleUnit;
+    MaxWidth => LengthOrPercent, StyleUnit;
+    MaxHeight => LengthOrPercent, StyleUnit;
+    MinWidth => LengthOrPercent, StyleUnit;
+    MinHeight => LengthOrPercent, StyleUnit;
 
     MarginTop => StyleUnit, StyleUnit;
     MarginRight => StyleUnit, StyleUnit;
@@ -720,7 +748,7 @@ pub struct AbsoluteLen(pub f32);
 #[derive(Clone, Debug, PartialEq)]
 pub struct LengthContext {
     pub root: f32,
-    pub parent: f32,
+    pub font_size: f32,
     pub viewport_width: f32,
     pub viewport_height: f32,
 }
@@ -737,6 +765,34 @@ pub enum Length {
     REM(f32),
     VH(f32),
     VW(f32),
+}
+
+#[derive(Clone, Debug, PartialEq, Copy)]
+pub enum LengthOrPercent {
+    Length(Length),
+    Percent(f32),
+    Undefined,
+    Auto,
+}
+
+impl LengthOrPercent {
+    pub fn to_style_unit(&self, ctx: &LengthContext) -> StyleUnit {
+        match self {
+            LengthOrPercent::Length(v) => {
+                let value = v.to_px(ctx);
+                StyleUnit::Point(OrderedFloat(value))
+            }
+            LengthOrPercent::Percent(p) => {
+                StyleUnit::Percent(OrderedFloat(*p))
+            }
+            LengthOrPercent::Undefined => {
+                StyleUnit::UndefinedValue
+            }
+            LengthOrPercent::Auto => {
+                StyleUnit::Auto
+            }
+        }
+    }
 }
 
 impl Length {
@@ -761,7 +817,8 @@ impl Length {
         } else if let Some(v) = value.strip_suffix("vw") {
             Self::VW(Self::parse_f32(v)?)
         } else {
-            return None;
+            let v = Self::parse_f32(value)?;
+            return Some(Self::PX(v));
         };
         Some(result)
     }
@@ -782,7 +839,7 @@ impl Length {
 
     pub fn to_px(&self, ctx: &LengthContext) -> f32 {
         match self {
-            Length::EM(em) => em * ctx.parent,
+            Length::EM(em) => em * ctx.font_size,
             Length::REM(rem) => rem * ctx.root,
             Length::VH(vh) => vh / 100.0 * ctx.viewport_height,
             Length::VW(vw) => vw / 100.0 * ctx.viewport_width,
@@ -966,10 +1023,17 @@ impl StyleNode {
         };
         inner.yoga_node.set_position_type(PositionType::Static);
         let mut inst = inner.to_ref();
-        inst.set_style(StyleProp::Position(StylePropVal::Custom(PositionType::Static)));
-        inst.set_style(StyleProp::Color(StylePropVal::Inherit));
-        inst.set_style(StyleProp::FontSize(StylePropVal::Inherit));
-        inst.set_style(StyleProp::LineHeight(StylePropVal::Inherit));
+        //TODO fix length context
+        let length_ctx = LengthContext {
+            root: 0.0,
+            font_size: 0.0,
+            viewport_width: 0.0,
+            viewport_height: 0.0,
+        };
+        inst.set_style(StyleProp::Position(StylePropVal::Custom(PositionType::Static)), &length_ctx);
+        inst.set_style(StyleProp::Color(StylePropVal::Inherit), &length_ctx);
+        inst.set_style(StyleProp::FontSize(StylePropVal::Inherit), &length_ctx);
+        inst.set_style(StyleProp::LineHeight(StylePropVal::Inherit), &length_ctx);
         inst
     }
 
@@ -1048,22 +1112,29 @@ impl StyleNode {
                 ResolvedStyleProp::Display(Display::Flex)
             }
             StylePropKey::Width  =>   {
-                ResolvedStyleProp::Width(standard_node.get_style_width())
+                // ResolvedStyleProp::Width(standard_node.get_style_width())
+                //TODO fix
+                ResolvedStyleProp::Width(LengthOrPercent::Undefined)
             },
             StylePropKey::Height  =>   {
-                ResolvedStyleProp::Height(standard_node.get_style_height())
+                //TODO fix
+                ResolvedStyleProp::Height(LengthOrPercent::Undefined)
             },
             StylePropKey::MaxWidth  =>   {
-                ResolvedStyleProp::MaxWidth(standard_node.get_style_max_width())
+                //TODO fix
+                ResolvedStyleProp::MaxWidth(LengthOrPercent::Undefined)
             },
             StylePropKey::MaxHeight  =>   {
-                ResolvedStyleProp::MaxHeight(standard_node.get_style_max_height())
+                //TODO fix
+                ResolvedStyleProp::MaxHeight(LengthOrPercent::Undefined)
             },
             StylePropKey::MinWidth  =>   {
-                ResolvedStyleProp::MinWidth(standard_node.get_style_min_width())
+                //TODO fix
+                ResolvedStyleProp::MinWidth(LengthOrPercent::Undefined)
             },
             StylePropKey::MinHeight  =>   {
-                ResolvedStyleProp::MinHeight(standard_node.get_style_min_height())
+                //TODO fix
+                ResolvedStyleProp::MinHeight(LengthOrPercent::Undefined)
             },
             StylePropKey::MarginTop  =>   {
                 ResolvedStyleProp::MarginTop(standard_node.get_style_margin_top())
@@ -1176,7 +1247,7 @@ impl StyleNode {
     }
 
     /// return (need_repaint, need_layout)
-    pub fn set_style(&mut self, p: StyleProp) -> (bool, bool, ResolvedStyleProp) {
+    pub fn set_style(&mut self, p: StyleProp, length_ctx: &LengthContext) -> (bool, bool, ResolvedStyleProp) {
         self.style_props.insert(p.key().clone(), p.clone());
         let v = p.resolve_value(|k| {
             self.get_default_value(k)
@@ -1187,167 +1258,11 @@ impl StyleNode {
                 self.get_default_value(k)
             }
         });
-        let (need_repaint, need_layout) = self.set_resolved_style_prop(v.clone());
+        let (need_repaint, need_layout) = self.set_resolved_style_prop(v.clone(), length_ctx);
         (need_repaint, need_layout, v)
     }
 
-    fn compute_style_prop(&self, p: &ResolvedStyleProp) -> ComputedStyleProp {
-        match p {
-            ResolvedStyleProp::Color(v) => {
-                ComputedStyleProp::Color(v.clone())
-            }
-            ResolvedStyleProp::BackgroundColor(v) => {
-                ComputedStyleProp::BackgroundColor(v.clone())
-            }
-            ResolvedStyleProp::FontSize(v) => {
-                //TODO remove
-                ComputedStyleProp::FontSize(12.0)
-            }
-            ResolvedStyleProp::LineHeight(v) => {
-                ComputedStyleProp::LineHeight(v.clone())
-            }
-            ResolvedStyleProp::BorderTop(v) => {
-                ComputedStyleProp::BorderTop(v.clone())
-            }
-            ResolvedStyleProp::BorderRight(v) => {
-                ComputedStyleProp::BorderRight(v.clone())
-            }
-            ResolvedStyleProp::BorderBottom(v) => {
-                ComputedStyleProp::BorderBottom(v.clone())
-            }
-            ResolvedStyleProp::BorderLeft(v) => {
-                ComputedStyleProp::BorderLeft(v.clone())
-            }
-            ResolvedStyleProp::Display(v) => {
-                ComputedStyleProp::Display(v.clone())
-            }
-            ResolvedStyleProp::Width(v) => {
-                ComputedStyleProp::Width(v.clone())
-            }
-            ResolvedStyleProp::Height(v) => {
-                ComputedStyleProp::Height(v.clone())
-            }
-            ResolvedStyleProp::MaxWidth(v) => {
-                ComputedStyleProp::MaxWidth(v.clone())
-            }
-            ResolvedStyleProp::MaxHeight(v) => {
-                ComputedStyleProp::MaxHeight(v.clone())
-            }
-            ResolvedStyleProp::MinWidth(v) => {
-                ComputedStyleProp::MinWidth(v.clone())
-            }
-            ResolvedStyleProp::MinHeight(v) => {
-                ComputedStyleProp::MinHeight(v.clone())
-            }
-            ResolvedStyleProp::MarginTop(v) => {
-                ComputedStyleProp::MarginTop(v.clone())
-            }
-            ResolvedStyleProp::MarginRight(v) => {
-                ComputedStyleProp::MarginRight(v.clone())
-            }
-            ResolvedStyleProp::MarginBottom(v) => {
-                ComputedStyleProp::MarginBottom(v.clone())
-            }
-            ResolvedStyleProp::MarginLeft(v) => {
-                ComputedStyleProp::MarginLeft(v.clone())
-            }
-            ResolvedStyleProp::PaddingTop(v) => {
-                ComputedStyleProp::PaddingTop(v.clone())
-            }
-            ResolvedStyleProp::PaddingRight(v) => {
-                ComputedStyleProp::PaddingRight(v.clone())
-            }
-            ResolvedStyleProp::PaddingBottom(v) => {
-                ComputedStyleProp::PaddingBottom(v.clone())
-            }
-            ResolvedStyleProp::PaddingLeft(v) => {
-                ComputedStyleProp::PaddingLeft(v.clone())
-            }
-            ResolvedStyleProp::Flex(v) => {
-                ComputedStyleProp::Flex(v.clone())
-            }
-            ResolvedStyleProp::FlexBasis(v) => {
-                ComputedStyleProp::FlexBasis(v.clone())
-            }
-            ResolvedStyleProp::FlexGrow(v) => {
-                ComputedStyleProp::FlexGrow(v.clone())
-            }
-            ResolvedStyleProp::FlexShrink(v) => {
-                ComputedStyleProp::FlexShrink(v.clone())
-            }
-            ResolvedStyleProp::AlignSelf(v) => {
-                ComputedStyleProp::AlignSelf(v.clone())
-            }
-            ResolvedStyleProp::Direction(v) => {
-                ComputedStyleProp::Direction(v.clone())
-            }
-            ResolvedStyleProp::Position(v) => {
-                ComputedStyleProp::Position(v.clone())
-            }
-            ResolvedStyleProp::Overflow(v) => {
-                ComputedStyleProp::Overflow(v.clone())
-            }
-            ResolvedStyleProp::BorderTopLeftRadius(v) => {
-                ComputedStyleProp::BorderTopLeftRadius(v.clone())
-            }
-            ResolvedStyleProp::BorderTopRightRadius(v) => {
-                ComputedStyleProp::BorderTopRightRadius(v.clone())
-            }
-            ResolvedStyleProp::BorderBottomRightRadius(v) => {
-                ComputedStyleProp::BorderBottomRightRadius(v.clone())
-            }
-            ResolvedStyleProp::BorderBottomLeftRadius(v) => {
-                ComputedStyleProp::BorderBottomLeftRadius(v.clone())
-            }
-            ResolvedStyleProp::JustifyContent(v) => {
-                ComputedStyleProp::JustifyContent(v.clone())
-            }
-            ResolvedStyleProp::FlexDirection(v) => {
-                ComputedStyleProp::FlexDirection(v.clone())
-            }
-            ResolvedStyleProp::AlignContent(v) => {
-                ComputedStyleProp::AlignContent(v.clone())
-            }
-            ResolvedStyleProp::AlignItems(v) => {
-                ComputedStyleProp::AlignItems(v.clone())
-            }
-            ResolvedStyleProp::FlexWrap(v) => {
-                ComputedStyleProp::FlexWrap(v.clone())
-            }
-            ResolvedStyleProp::ColumnGap(v) => {
-                ComputedStyleProp::ColumnGap(v.0)
-            }
-            ResolvedStyleProp::RowGap(v) => {
-                ComputedStyleProp::RowGap(v.0)
-            }
-            ResolvedStyleProp::Top(v) => {
-                ComputedStyleProp::Top(v.clone())
-            }
-            ResolvedStyleProp::Right(v) => {
-                ComputedStyleProp::Right(v.clone())
-            }
-            ResolvedStyleProp::Bottom(v) => {
-                ComputedStyleProp::Bottom(v.clone())
-            }
-            ResolvedStyleProp::Left(v) => {
-                ComputedStyleProp::Left(v.clone())
-            }
-            ResolvedStyleProp::Transform(v) => {
-                ComputedStyleProp::Transform(v.clone())
-            }
-            ResolvedStyleProp::AnimationName(v) => {
-                ComputedStyleProp::AnimationName(v.clone())
-            }
-            ResolvedStyleProp::AnimationDuration(v) => {
-                ComputedStyleProp::AnimationDuration(v.clone())
-            }
-            ResolvedStyleProp::AnimationIterationCount(v) => {
-                ComputedStyleProp::AnimationIterationCount(v.clone())
-            }
-        }
-    }
-
-    pub fn set_resolved_style_prop(&mut self, p: ResolvedStyleProp) -> (bool, bool) {
+    pub fn set_resolved_style_prop(&mut self, p: ResolvedStyleProp, length_ctx: &LengthContext) -> (bool, bool) {
         let prop_key = p.key();
         if self.resolved_style_props.get(&prop_key) == Some(&p) {
             return (false, false);
@@ -1390,22 +1305,22 @@ impl StyleNode {
                 self.yoga_node.set_display(value)
             }
             ResolvedStyleProp::Width (value) =>   {
-                self.yoga_node.set_width(value)
+                self.yoga_node.set_width(value.to_style_unit(&length_ctx));
             },
             ResolvedStyleProp::Height (value) =>   {
-                self.yoga_node.set_height(value)
+                self.yoga_node.set_height(value.to_style_unit(&length_ctx))
             },
             ResolvedStyleProp::MaxWidth (value) =>   {
-                self.yoga_node.set_max_width(value)
+                self.yoga_node.set_max_width(value.to_style_unit(&length_ctx))
             },
             ResolvedStyleProp::MaxHeight (value) =>   {
-                self.yoga_node.set_max_height(value)
+                self.yoga_node.set_max_height(value.to_style_unit(&length_ctx))
             },
             ResolvedStyleProp::MinWidth (value) =>   {
-                self.yoga_node.set_min_width(value)
+                self.yoga_node.set_min_width(value.to_style_unit(&length_ctx))
             },
             ResolvedStyleProp::MinHeight (value) =>   {
-                self.yoga_node.set_min_height(value)
+                self.yoga_node.set_min_height(value.to_style_unit(&length_ctx))
             },
             ResolvedStyleProp::MarginTop (value) =>   {
                 self.yoga_node.set_margin(Edge::Top, value)
@@ -1554,7 +1469,9 @@ impl StyleNode {
             }
         }
         for mut c in self.get_children() {
-            c.resolve_style_prop(prop_key);
+            let mut length_ctx = length_ctx.clone();
+            length_ctx.font_size = c.font_size;
+            c.resolve_style_prop(prop_key, &length_ctx);
         }
 
         return (repaint, need_layout)
@@ -1628,20 +1545,20 @@ impl StyleNode {
         self.with_container_node_mut(|n| {
             n.insert_child(&mut child.inner.yoga_node, index as usize)
         });
-        child.resolve_style_props();
+        // child.resolve_style_props();
     }
 
-    fn resolve_style_prop(&mut self, k: StylePropKey) {
+    fn resolve_style_prop(&mut self, k: StylePropKey, length_ctx: &LengthContext) {
         if let Some(p) = self.style_props.get(&k) {
-            self.set_style(p.clone());
+            self.set_style(p.clone(), length_ctx);
         }
     }
 
-    fn resolve_style_props(&mut self) {
-        for (_, p) in self.style_props.clone() {
-            self.set_style(p);
-        }
-    }
+    // fn resolve_style_props(&mut self) {
+    //     for (_, p) in self.style_props.clone() {
+    //         self.set_style(p);
+    //     }
+    // }
 
     pub fn get_children(&self) -> Vec<StyleNode> {
         self.children.clone()

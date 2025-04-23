@@ -994,13 +994,13 @@ impl Window {
             //TODO fix length context
             let length_ctx = LengthContext {
                 root: 12.0,
-                parent: 12.0,
+                font_size: 12.0,
                 viewport_width: 1000.0,
                 viewport_height: 1000.0,
             };
             //TODO compute font size only when any font size changed
             body.compute_font_size_recurse(&length_ctx);
-            body.apply_style_update(&Vec::new());
+            body.apply_style_update(&Vec::new(), &length_ctx);
         }
         if self.layout_dirty {
             self.update_layout();

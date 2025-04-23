@@ -144,8 +144,10 @@ fn interpolate(pre_position: f32, pre_value: StyleProp, next_position: f32, next
     let percent = (current_position - pre_position) / duration;
     interpolate_values!(
         &pre_value, &next_value, percent;
-        Width => interpolate_style_unit,
-        Height => interpolate_style_unit,
+        // TODO fix animation
+        // Width => interpolate_style_unit,
+        // TODO fix animation
+        // Height => interpolate_style_unit,
 
         PaddingTop => interpolate_style_unit,
         PaddingRight => interpolate_style_unit,

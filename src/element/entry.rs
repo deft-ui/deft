@@ -32,7 +32,7 @@ use crate::js::{FromJsValue, ToJsValue};
 use crate::window::Window;
 use crate::render::RenderFn;
 use crate::string::StringUtils;
-use crate::style::{ResolvedStyleProp, StyleProp, StylePropKey, StylePropVal, YogaNode};
+use crate::style::{LengthContext, LengthOrPercent, ResolvedStyleProp, StyleProp, StylePropKey, StylePropVal, YogaNode};
 use crate::style::StyleProp::{BackgroundColor, Display, Left, MinWidth, Position, Top};
 use crate::style::StylePropKey::Height;
 use crate::timer::TimerHandle;
@@ -641,7 +641,7 @@ impl ElementBackend for Entry {
             Position(StylePropVal::Custom(PositionType::Absolute)),
             Left(StylePropVal::Custom(StyleUnit::Point(OrderedFloat(0.0)))),
             Top(StylePropVal::Custom(StyleUnit::Point(OrderedFloat(0.0)))),
-            MinWidth(StylePropVal::Custom(StyleUnit::Percent(OrderedFloat(100.0)))),
+            MinWidth(StylePropVal::Custom(LengthOrPercent::Percent(100.0))),
             // BackgroundColor(StylePropVal::Custom(Color::from_argb(80,80, 80, 80))),
         ]);
         let mut paragraph = paragraph_element.get_backend_as::<Paragraph>().clone();
@@ -654,7 +654,7 @@ impl ElementBackend for Entry {
                 Position(StylePropVal::Custom(PositionType::Absolute)),
                 Left(StylePropVal::Custom(StyleUnit::Point(OrderedFloat(0.0)))),
                 Top(StylePropVal::Custom(StyleUnit::Point(OrderedFloat(0.0)))),
-                MinWidth(StylePropVal::Custom(StyleUnit::Percent(OrderedFloat(100.0)))),
+                MinWidth(StylePropVal::Custom(LengthOrPercent::Percent(100.0))),
             ]
         );
         let mut placeholder = placeholder_element.get_backend_as::<Label>().clone();
@@ -770,7 +770,7 @@ impl ElementBackend for Entry {
         //self.update_paint_offset(bounds.width, bounds.height);
     }
 
-    fn apply_style_prop(&mut self, prop: &StyleProp) -> Option<(bool, bool, ResolvedStyleProp)> {
+    fn apply_style_prop(&mut self, prop: &StyleProp, length_ctx: &LengthContext) -> Option<(bool, bool, ResolvedStyleProp)> {
         let key = prop.key();
         match key {
             StylePropKey::PaddingTop
@@ -778,11 +778,11 @@ impl ElementBackend for Entry {
             | StylePropKey::PaddingBottom
             | StylePropKey::PaddingLeft
             => {
-                self.placeholder_element.apply_style_prop(prop.clone());
-                Some(self.paragraph_element.apply_style_prop(prop.clone()))
+                self.placeholder_element.apply_style_prop(prop.clone(), length_ctx);
+                Some(self.paragraph_element.apply_style_prop(prop.clone(), length_ctx))
             },
             _ => {
-                self.base.apply_style_prop(prop)
+                self.base.apply_style_prop(prop, length_ctx)
             }
         }
     }

@@ -783,35 +783,36 @@ impl Element {
     }
 
     pub fn compute_font_size_recurse(&mut self, ctx: &LengthContext) {
-        let px = if let Some(StyleProp::FontSize(fs_prop)) = self.applied_style.get(&StylePropKey::FontSize) {
+        let style = self.style_list.get_styles(self.hover);
+        let px = if let Some(StyleProp::FontSize(fs_prop)) = style.get(&StylePropKey::FontSize) {
             match fs_prop {
                 StylePropVal::Custom(c) => {
                     c.to_px(&ctx)
                 }
                 _ => {
-                    ctx.parent
+                    ctx.font_size
                 }
             }
         } else {
-            ctx.parent
+            ctx.font_size
         };
         if self.style.font_size != px {
             self.style.font_size = px;
             self.backend.handle_style_changed(StylePropKey::FontSize);
         }
         let mut ctx = ctx.clone();
-        ctx.parent = px;
+        ctx.font_size = px;
         for mut c in self.get_children() {
             c.compute_font_size_recurse(&ctx);
         }
     }
 
-    pub fn apply_style_update(&mut self, parent_changed: &Vec<StylePropKey>) {
+    pub fn apply_style_update(&mut self, parent_changed: &Vec<StylePropKey>, length_ctx: &LengthContext) {
         let is_self_dirty = self.dirty_flags.contains(StyleDirtyFlags::SelfDirty);
         let is_children_dirty = self.dirty_flags.contains(StyleDirtyFlags::ChildrenDirty);
         let mut changed_keys = Vec::new();
         if is_self_dirty || !changed_keys.is_empty() {
-            let changed_styles = self.apply_own_style(parent_changed);
+            let changed_styles = self.apply_own_style(parent_changed, length_ctx);
             for s in changed_styles {
                 changed_keys.push(s.key());
             }
@@ -819,14 +820,14 @@ impl Element {
         if is_children_dirty || !changed_keys.is_empty() {
             let mut children = self.get_children();
             for c in &mut children {
-                c.apply_style_update(&changed_keys);
+                c.apply_style_update(&changed_keys, length_ctx);
             }
         }
         self.dirty_flags.remove(StyleDirtyFlags::ChildrenDirty);
         self.dirty_flags.remove(StyleDirtyFlags::SelfDirty);
     }
 
-    pub fn apply_own_style(&mut self, parent_changed: &Vec<StylePropKey>) -> Vec<ResolvedStyleProp> {
+    pub fn apply_own_style(&mut self, parent_changed: &Vec<StylePropKey>, length_ctx: &LengthContext) -> Vec<ResolvedStyleProp> {
         let mut style_props = self.style_list.get_styles(self.hover);
         for (k, v) in &self.animation_style_props {
             style_props.insert(k.clone(), v.clone());
@@ -837,7 +838,7 @@ impl Element {
 
         let mut changed_list = Vec::new();
         for sp in changed_style_props {
-            let (repaint, need_layout, v) = self.apply_style_prop(sp);
+            let (repaint, need_layout, v) = self.apply_style_prop(sp, length_ctx);
             if need_layout || repaint {
                 self.mark_dirty(need_layout);
                 changed_list.push(v);
@@ -848,11 +849,11 @@ impl Element {
         changed_list
     }
 
-    pub fn apply_style_prop(&mut self, prop: StyleProp) -> (bool, bool, ResolvedStyleProp) {
-        if let Some(v) = self.backend.apply_style_prop(&prop) {
+    pub fn apply_style_prop(&mut self, prop: StyleProp, length_ctx: &LengthContext) -> (bool, bool, ResolvedStyleProp) {
+        if let Some(v) = self.backend.apply_style_prop(&prop, length_ctx) {
             v
         } else {
-            self.style.set_style(prop)
+            self.style.set_style(prop, length_ctx)
         }
     }
 
@@ -1294,7 +1295,7 @@ pub trait ElementBackend {
 
     fn handle_origin_bounds_change(&mut self, _bounds: &base::Rect) {}
 
-    fn apply_style_prop(&mut self, prop: &StyleProp) -> Option<(bool, bool, ResolvedStyleProp)> {
+    fn apply_style_prop(&mut self, prop: &StyleProp, length_ctx: &LengthContext) -> Option<(bool, bool, ResolvedStyleProp)> {
         let _ = prop;
         None
     }
