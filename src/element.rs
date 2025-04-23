@@ -38,7 +38,7 @@ use crate::js::js_serde::JsValueSerializer;
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::resource_table::ResourceTable;
-use crate::style::{parse_style_obj, ColorHelper, ResolvedStyleProp, StyleNode, StyleProp, StylePropKey, StyleTransform};
+use crate::style::{parse_style_obj, ColorHelper, Length, LengthContext, ResolvedStyleProp, StyleNode, StyleProp, StylePropKey, StylePropVal, StyleTransform};
 use crate::{base, bind_js_event_listener, js_auto_upgrade, js_deserialize, js_serialize, js_value, js_weak_value, ok_or_return, send_app_event, some_or_continue, some_or_return};
 
 pub mod container;
@@ -729,19 +729,11 @@ impl Element {
 
     //TODO remove
     fn calculate_changed_style<'a>(
-        old_style: &'a Vec<StyleProp>,
-        new_style: &'a Vec<StyleProp>,
+        old_style_map: &'a HashMap<StylePropKey, StyleProp>,
+        new_style_map: &'a HashMap<StylePropKey, StyleProp>,
         parent_changed: &Vec<StylePropKey>,
     ) -> Vec<StyleProp> {
         let mut changed_style_props = HashMap::new();
-        let mut old_style_map = HashMap::new();
-        let mut new_style_map = HashMap::new();
-        for e in old_style {
-            old_style_map.insert(e.key(), e);
-        }
-        for e in new_style {
-            new_style_map.insert(e.key(), e);
-        }
         let mut keys = HashSet::new();
         for k in old_style_map.keys() {
             keys.insert(k);
@@ -754,9 +746,9 @@ impl Element {
             #[allow(suspicious_double_ref_op)]
             let new_value = match new_style_map.get(k) {
                 Some(t) => t.clone().clone(),
-                None => old_value.unwrap().clone().clone().unset(),
+                None => old_value.unwrap().clone().unset(),
             };
-            if old_value != Some(&&new_value) {
+            if old_value != Some(&new_value) {
                 changed_style_props.insert(new_value.key(), new_value);
             }
         }
@@ -790,6 +782,30 @@ impl Element {
         }
     }
 
+    pub fn compute_font_size_recurse(&mut self, ctx: &LengthContext) {
+        let px = if let Some(StyleProp::FontSize(fs_prop)) = self.applied_style.get(&StylePropKey::FontSize) {
+            match fs_prop {
+                StylePropVal::Custom(c) => {
+                    c.to_px(&ctx)
+                }
+                _ => {
+                    ctx.parent
+                }
+            }
+        } else {
+            ctx.parent
+        };
+        if self.style.font_size != px {
+            self.style.font_size = px;
+            self.backend.handle_style_changed(StylePropKey::FontSize);
+        }
+        let mut ctx = ctx.clone();
+        ctx.parent = px;
+        for mut c in self.get_children() {
+            c.compute_font_size_recurse(&ctx);
+        }
+    }
+
     pub fn apply_style_update(&mut self, parent_changed: &Vec<StylePropKey>) {
         let is_self_dirty = self.dirty_flags.contains(StyleDirtyFlags::SelfDirty);
         let is_children_dirty = self.dirty_flags.contains(StyleDirtyFlags::ChildrenDirty);
@@ -815,9 +831,8 @@ impl Element {
         for (k, v) in &self.animation_style_props {
             style_props.insert(k.clone(), v.clone());
         }
-        let mut new_style: Vec<StyleProp> = style_props.values().map(|t| t.clone()).collect();
         let old_style = self.applied_style.clone();
-        let mut changed_style_props = Self::calculate_changed_style(&old_style, &new_style, parent_changed);
+        let mut changed_style_props = Self::calculate_changed_style(&old_style, &style_props, parent_changed);
 
 
         let mut changed_list = Vec::new();
@@ -829,7 +844,7 @@ impl Element {
             }
         }
         // debug!("changed list: {:?}", changed_list);
-        self.applied_style = new_style;
+        self.applied_style = style_props;
         changed_list
     }
 
@@ -1166,7 +1181,7 @@ pub struct Element {
     dirty_flags: StyleDirtyFlags,
     element_type: ElementType,
 
-    applied_style: Vec<StyleProp>,
+    applied_style: HashMap<StylePropKey, StyleProp>,
     // animation_instance: Option<AnimationInstance>,
 
 
@@ -1212,7 +1227,7 @@ impl ElementData {
             event_registration: EventRegistration::new(),
             style: StyleNode::new(),
             animation_style_props: HashMap::new(),
-            applied_style: Vec::new(),
+            applied_style: HashMap::new(),
             hover: false,
             element_type: ElementType::Inner,
 

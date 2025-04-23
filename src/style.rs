@@ -27,6 +27,7 @@ use crate::event_loop::create_event_loop_callback;
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::paint::MatrixCalculator;
+use crate::string::StringUtils;
 use crate::style_list::{ParsedStyleProp, StyleList};
 use crate::timer::{set_timeout, TimerHandle};
 
@@ -58,6 +59,16 @@ impl PropValueParse for StyleColor {
                 c.to_style_string()
             }
         }
+    }
+}
+
+impl PropValueParse for Length {
+    fn parse_prop_value(value: &str) -> Option<Self> {
+        Self::from_str(value)
+    }
+
+    fn to_style_string(&self) -> String {
+        self.to_str()
     }
 }
 
@@ -538,7 +549,7 @@ macro_rules! define_style_props {
 define_style_props!(
     Color => Color, Color;
     BackgroundColor => Color, Color;
-    FontSize        => AbsoluteLen, f32;
+    FontSize        => Length, f32;
     LineHeight      => f32, f32;
 
     BorderTop => StyleBorder, StyleBorder;
@@ -678,7 +689,6 @@ pub struct Style {
 pub struct ComputedStyle {
     pub color: Color,
     pub background_color: Color,
-    pub font_size: f32,
     pub line_height: f32,
 }
 
@@ -687,7 +697,6 @@ impl ComputedStyle {
         Self {
             color: Color::new(0),
             background_color: Color::new(0),
-            font_size: 12.0,
             line_height: 12.0,
         }
     }
@@ -707,6 +716,104 @@ pub enum PropValue<T> {
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct AbsoluteLen(pub f32);
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct LengthContext {
+    pub root: f32,
+    pub parent: f32,
+    pub viewport_width: f32,
+    pub viewport_height: f32,
+}
+
+#[derive(Clone, Debug, PartialEq, Copy)]
+pub enum Length {
+    PX(f32),
+    CM(f32),
+    MM(f32),
+    IN(f32),
+    PT(f32),
+
+    EM(f32),
+    REM(f32),
+    VH(f32),
+    VW(f32),
+}
+
+impl Length {
+    pub fn from_str(value: &str) -> Option<Self> {
+        let value = value.trim();
+        let result = if let Some(v) = value.strip_suffix("px") {
+            Self::PX(Self::parse_f32(v)?)
+        } else if let Some(v) = value.strip_suffix("cm") {
+            Self::CM(Self::parse_f32(v)?)
+        } else if let Some(v) = value.strip_suffix("mm") {
+            Self::MM(Self::parse_f32(v)?)
+        } else if let Some(v) = value.strip_suffix("in") {
+            Self::IN(Self::parse_f32(v)?)
+        } else if let Some(v) = value.strip_suffix("pt") {
+            Self::PT(Self::parse_f32(v)?)
+        } else if let Some(v) = value.strip_suffix("em") {
+            Self::EM(Self::parse_f32(v)?)
+        } else if let Some(v) = value.strip_suffix("rem") {
+            Self::REM(Self::parse_f32(v)?)
+        } else if let Some(v) = value.strip_suffix("vh") {
+            Self::VH(Self::parse_f32(v)?)
+        } else if let Some(v) = value.strip_suffix("vw") {
+            Self::VW(Self::parse_f32(v)?)
+        } else {
+            return None;
+        };
+        Some(result)
+    }
+
+    pub fn update_value(&mut self, value: f32) {
+        match self {
+            Length::PX(x) => *x = value,
+            Length::CM(x) => *x = value,
+            Length::MM(x) => *x = value,
+            Length::IN(x) => *x = value,
+            Length::PT(x) => *x = value,
+            Length::EM(x) => *x = value,
+            Length::REM(x) => *x = value,
+            Length::VH(x) => *x = value,
+            Length::VW(x) => *x = value,
+        }
+    }
+
+    pub fn to_px(&self, ctx: &LengthContext) -> f32 {
+        match self {
+            Length::EM(em) => em * ctx.parent,
+            Length::REM(rem) => rem * ctx.root,
+            Length::VH(vh) => vh / 100.0 * ctx.viewport_height,
+            Length::VW(vw) => vw / 100.0 * ctx.viewport_width,
+            Length::PX(px) => *px,
+            Length::CM(cm) => cm * 96.0 / 2.54,
+            Length::MM(mm) => mm * 96.0 / 2.54 / 10.0,
+            Length::IN(i) => i * 96.0,
+            Length::PT(pt) => pt * 96.0 / 72.0,
+        }
+    }
+
+    pub fn to_str(&self) -> String {
+        match self {
+            Length::PX(v) => format!("{}px", v),
+            Length::CM(v) => format!("{}cm", v),
+            Length::MM(v) => format!("{}mm", v),
+            Length::IN(v) => format!("{}in", v),
+            Length::PT(v) => format!("{}pt", v),
+            Length::EM(v) => format!("{}em", v),
+           Length::REM(v) => format!("{}rem", v),
+            Length::VH(v) => format!("{}vh", v),
+            Length::VW(v) => format!("{}vw", v),
+        }
+    }
+
+    fn parse_f32(value: &str) -> Option<f32> {
+        let value = value.trim();
+        f32::from_str(value).ok()
+    }
+
+}
 
 impl PropValueParse for AbsoluteLen {
     fn parse_prop_value(value: &str) -> Option<Self> {
@@ -831,6 +938,7 @@ pub struct StyleNode {
     pub animation_renderer: Option<Mrc<Box<dyn FnMut(Vec<StyleProp>)>>>,
     pub style_props: HashMap<StylePropKey, StyleProp>,
     pub resolved_style_props: HashMap<StylePropKey, ResolvedStyleProp>,
+    pub font_size: f32,
 }
 
 
@@ -854,6 +962,7 @@ impl StyleNode {
             animation_renderer: None,
             resolved_style_props: HashMap::new(),
             style_props: HashMap::new(),
+            font_size: 12.0,
         };
         inner.yoga_node.set_position_type(PositionType::Static);
         let mut inst = inner.to_ref();
@@ -917,7 +1026,7 @@ impl StyleNode {
                 ResolvedStyleProp::BackgroundColor(Color::TRANSPARENT)
             }
             StylePropKey::FontSize => {
-                ResolvedStyleProp::FontSize(AbsoluteLen(12.0))
+                ResolvedStyleProp::FontSize(Length::PX(12.0))
             }
             StylePropKey::LineHeight => {
                 //TODO use font-size
@@ -1091,7 +1200,8 @@ impl StyleNode {
                 ComputedStyleProp::BackgroundColor(v.clone())
             }
             ResolvedStyleProp::FontSize(v) => {
-                ComputedStyleProp::FontSize(v.0)
+                //TODO remove
+                ComputedStyleProp::FontSize(12.0)
             }
             ResolvedStyleProp::LineHeight(v) => {
                 ComputedStyleProp::LineHeight(v.clone())
@@ -1258,7 +1368,8 @@ impl StyleNode {
                 need_layout = false;
             }
             ResolvedStyleProp::FontSize(value) => {
-                self.computed_style.font_size = value.0;
+                //TODO remove
+                // self.computed_style.font_size = value.0;
             }
             ResolvedStyleProp::LineHeight(value) => {
                 self.computed_style.line_height = value;

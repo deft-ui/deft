@@ -54,7 +54,7 @@ use crate::render::paint_object::{ElementPO};
 use crate::render::painter::ElementPainter;
 use crate::resource_table::ResourceTable;
 use crate::style::border_path::BorderPath;
-use crate::style::ColorHelper;
+use crate::style::{ColorHelper, LengthContext};
 
 #[derive(Clone)]
 struct MouseDownInfo {
@@ -991,6 +991,15 @@ impl Window {
         }
         warn_time!(16, "update window");
         if let Some(body) = &mut self.body {
+            //TODO fix length context
+            let length_ctx = LengthContext {
+                root: 12.0,
+                parent: 12.0,
+                viewport_width: 1000.0,
+                viewport_height: 1000.0,
+            };
+            //TODO compute font size only when any font size changed
+            body.compute_font_size_recurse(&length_ctx);
             body.apply_style_update(&Vec::new());
         }
         if self.layout_dirty {
