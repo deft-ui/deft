@@ -213,7 +213,9 @@ function main() {
     runWorker();
     createSystemTray();
     console.log("begin create window");
-    const window = new Window();
+    const window = new Window({
+        // decorations: false,
+    });
     testWindowHandle(window);
     window.title="DeftDemo";
     window.bindResize((e) => {

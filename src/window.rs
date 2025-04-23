@@ -43,7 +43,7 @@ use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use winit::keyboard::{Key, KeyCode, NamedKey, PhysicalKey};
 #[cfg(x11_platform)]
 use winit::platform::x11::WindowAttributesExtX11;
-use winit::window::{Cursor, CursorGrabMode, CursorIcon, Fullscreen, WindowAttributes, WindowId};
+use winit::window::{Cursor, CursorGrabMode, CursorIcon, Fullscreen, ResizeDirection, WindowAttributes, WindowId};
 use crate::{bind_js_event_listener, ok_or_return, send_app_event, show_focus_hint, show_repaint_area, some_or_continue, some_or_return, warn_time};
 use crate::computed::ComputedValue;
 use crate::element::button::Button;
@@ -504,6 +504,10 @@ impl Window {
             }
             WindowEvent::MouseInput { button, state, .. } => {
                 // debug!("mouse:{:?}:{:?}", button, state);
+                if let Some((dir, _)) = self.get_resize_direction() {
+                    self.window.drag_resize_window(dir);
+                    return;
+                }
                 if treat_mouse_as_touch() {
                     match state {
                         ElementState::Pressed => {
@@ -624,6 +628,12 @@ impl Window {
         let window_y = self.cursor_position.y as f32;
         let screen_x = self.cursor_root_position.x as f32;
         let screen_y = self.cursor_root_position.y as f32;
+
+        if let Some((_, icon)) = self.get_resize_direction() {
+            self.window.set_cursor(Cursor::Icon(icon));
+            return;
+        }
+
         let mut target_node = self.get_node_by_point();
         let dragging = self.dragging;
         if let Some((pressing, down_info)) = &mut self.pressing.clone() {
@@ -662,6 +672,43 @@ impl Window {
                 self.mouse_enter_node(node.clone(), window_x, window_y, screen_x, screen_y);
             }
         }
+    }
+
+    fn get_resize_direction(&self) -> Option<(ResizeDirection, CursorIcon)> {
+        if self.pressing.is_some() || self.window.is_decorated() {
+            return None;
+        }
+        let window_x = self.cursor_position.x as f32;
+        let window_y = self.cursor_position.y as f32;
+        let size = self.window.outer_size();
+        let scale_factor = self.window.scale_factor() as f32;
+        let win_width = size.width as f32 / scale_factor;
+        let win_height = size.height as f32 / scale_factor;
+        let delta = 3.0;
+        let is_left = window_x < delta;
+        let is_right = window_x > win_width - delta;
+        let is_top = window_y < delta;
+        let is_bottom = window_y > win_height - delta;
+        let (dir, icon) = if is_left && is_top {
+            (ResizeDirection::NorthWest, CursorIcon::NwResize)
+        } else if is_left && is_bottom {
+            (ResizeDirection::SouthWest, CursorIcon::SwResize)
+        } else if is_right && is_top {
+            (ResizeDirection::NorthEast, CursorIcon::NeResize)
+        } else if is_right && is_bottom {
+            (ResizeDirection::SouthEast, CursorIcon::SeResize)
+        } else if is_left {
+            (ResizeDirection::West, CursorIcon::WResize)
+        } else if is_top {
+            (ResizeDirection::North, CursorIcon::NResize)
+        } else if is_right {
+            (ResizeDirection::East, CursorIcon::EResize)
+        } else if is_bottom {
+            (ResizeDirection::South, CursorIcon::SResize)
+        } else {
+            return None;
+        };
+        Some((dir, icon))
     }
 
     fn update_cursor(&mut self, node: &Element) {
