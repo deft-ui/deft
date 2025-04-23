@@ -237,6 +237,7 @@ declare interface ShowFileDialogOptions {
 }
 declare function dialog_show_file_dialog(options ?: ShowFileDialogOptions): Promise<string[]>;
 
+declare function fs_read_dir(path: string): Promise<string[]>;
 declare function fs_exists(path: string): Promise<boolean>;
 declare function fs_rename(path: string, dest:string): Promise<void>;
 declare function fs_delete_file(path: string): Promise<void>;
@@ -346,6 +347,11 @@ declare class Window {
      * @param size {Size}
      */
     resize(size: Size): void;
+    drag(): void;
+    set minimized(minimized: any);
+    get minimized(): any;
+    set maximized(maximized: any);
+    get maximized(): any;
     /**
      *
      * @param owner {Window}
@@ -1110,5 +1116,6 @@ declare class ContainerBasedElement extends Element {
 declare class StylesheetItem {
     constructor(id: any);
     id: any;
+    update(code: any): void;
 }
 

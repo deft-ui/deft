@@ -8,7 +8,8 @@ use base64::prelude::*;
 use deft_macros::{element_backend, js_methods};
 use image::ImageReader;
 use quick_js::JsValue;
-use skia_safe::{Canvas};
+use skia_safe::{Canvas, Color, Paint};
+use skia_safe::resources::{LocalResourceProvider, NativeResourceProvider};
 use skia_safe::svg::Dom;
 use skia_safe::wrapper::PointerWrapper;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
@@ -18,6 +19,7 @@ use crate::element::label::FONT_MGR;
 use crate::img_manager::{dyn_image_to_skia_image, IMG_MANAGER};
 use crate::{ok_or_return};
 use crate::render::RenderFn;
+use crate::style::StylePropKey;
 
 extern "C" fn measure_image(node_ref: NodeRef, width: f32, _mode: MeasureMode, _height: f32, _height_mode: MeasureMode) -> Size {
     if let Some(ctx) = Node::get_context(&node_ref) {
@@ -154,16 +156,33 @@ impl ElementBackend for Image {
         "Image"
     }
 
+    fn handle_style_changed(&mut self, key: StylePropKey) {
+        match key {
+            StylePropKey::Color => {
+                if let ImageSrc::Svg(dom) = &mut self.img {
+                    self.element.mark_dirty(false);
+                }
+            },
+            _ => {}
+        }
+    }
+
     fn render(&mut self) -> RenderFn {
         let (img_width, img_height) = self.img.get_size();
         let element = self.element.upgrade_mut().unwrap();
         let (width, height) = element.get_size();
         let img = self.img.clone();
+
+        let element = self.element.clone();
+        let mut element = element.upgrade_mut().unwrap();
+        let color = element.style.computed_style.color;
+        
         RenderFn::new(move |canvas| {
             canvas.save();
             canvas.scale((width / img_width, height / img_height));
             match &img {
                 ImageSrc::Svg(dom) => {
+                    dom.root().set_color(color);
                     dom.render(canvas);
                 }
                 ImageSrc::Img(img) => {
