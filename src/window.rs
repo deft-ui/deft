@@ -46,6 +46,7 @@ use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorGrabMode, CursorIcon, Fullscreen, WindowAttributes, WindowId};
 use crate::{bind_js_event_listener, ok_or_return, send_app_event, show_focus_hint, show_repaint_area, some_or_continue, some_or_return, warn_time};
 use crate::computed::ComputedValue;
+use crate::element::button::Button;
 use crate::frame_rate::{FrameRateController};
 use crate::layout::LayoutRoot;
 use crate::paint::{InvalidArea, PartialInvalidArea, Painter, RenderTree, SkiaPainter, UniqueRect, InvalidRects, MatrixCalculator, RenderLayerKey, LayerState};
@@ -57,6 +58,7 @@ use crate::style::ColorHelper;
 
 #[derive(Clone)]
 struct MouseDownInfo {
+    button_enum: MouseButton,
     button: i32,
     window_x: f32,
     window_y: f32,
@@ -358,6 +360,31 @@ impl Window {
     }
 
     #[js_func]
+    fn drag(&mut self) {
+        let _ = self.window.drag_window();
+    }
+
+    #[js_func]
+    fn set_maximized(&mut self, maximized: bool) {
+        self.window.set_maximized(maximized);
+    }
+
+    #[js_func]
+    fn is_maximized(&self) -> bool {
+        self.window.is_maximized()
+    }
+
+    #[js_func]
+    fn set_minimized(&mut self, minimized: bool) {
+        self.window.set_minimized(minimized);
+    }
+
+    #[js_func]
+    fn is_minimized(&self) -> Option<bool> {
+        self.window.is_minimized()
+    }
+
+    #[js_func]
     pub fn set_js_context(&mut self, context: JsValue) {
         self.resource_table.put(JsValueContext { context });
     }
@@ -490,6 +517,11 @@ impl Window {
                     self.emit_click(button, state);
                 }
             }
+            WindowEvent::CursorLeft { .. } => {
+                if let Some((_, m)) = &self.pressing {
+                    self.emit_click(m.button_enum, ElementState::Released);
+                }
+            },
             WindowEvent::CursorMoved { position, root_position, .. } => {
                 //debug!("cursor moved:{:?}", position);
                 self.cursor_position = position.to_logical(self.window.scale_factor());
@@ -673,7 +705,7 @@ impl Window {
             };
             match state {
                 ElementState::Pressed => {
-                    self.pressing = Some((node.clone(), MouseDownInfo {button, window_x, window_y}));
+                    self.pressing = Some((node.clone(), MouseDownInfo {button, button_enum: mouse_button, window_x, window_y}));
                     self.emit_mouse_event( &mut node, event_type, button, window_x, window_y, screen_x, screen_y);
                 }
                 ElementState::Released => {

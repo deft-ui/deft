@@ -193,7 +193,7 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
-        // debug!("onWindowEvent: {:?}", event);
+        // debug!("onWindowEvent: {:?}, {:?}", &window_id, event);
         run_event_loop_task(event_loop, move || {
             self.js_engine.handle_window_event(window_id, event);
             self.execute_pending_jobs();

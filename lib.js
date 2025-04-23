@@ -198,6 +198,26 @@ export class Window {
         Window_resize(this.#windowHandle, size);
     }
 
+    drag() {
+        Window_drag(this.#windowHandle);
+    }
+
+    get minimized() {
+        return Window_is_minimized(this.#windowHandle);
+    }
+
+    set minimized(minimized) {
+        Window_set_minimized(this.#windowHandle, minimized);
+    }
+
+    get maximized() {
+        return Window_is_maximized(this.#windowHandle);
+    }
+
+    set maximized(maximized) {
+        Window_set_maximized(this.#windowHandle, maximized);
+    }
+
     /**
      *
      * @param owner {Window}

@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use anyhow::{anyhow, Error};
+use log::{debug, info, warn};
 use quick_js::{JsValue, ResourceValue, ValueError};
 use serde::{Deserialize, Serialize};
 use winit::event::WindowEvent;
@@ -69,6 +70,7 @@ pub fn handle_window_event(window_id: WinitWindowId, event: WindowEvent) {
                 m.iter().find(|(_, o)| o == &&window_id).is_some()
             });
             if has_modal {
+                debug!("modal window found");
                 return
             }
         }
@@ -89,6 +91,8 @@ pub fn handle_window_event(window_id: WinitWindowId, event: WindowEvent) {
                 window.handle_event(event);
             }
         }
+    } else {
+        warn!("No window found: {:?}", window_id);
     }
 }
 
