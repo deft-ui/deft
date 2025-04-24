@@ -32,7 +32,7 @@ use crate::js::{FromJsValue, ToJsValue};
 use crate::window::Window;
 use crate::render::RenderFn;
 use crate::string::StringUtils;
-use crate::style::{LengthContext, LengthOrPercent, ResolvedStyleProp, StyleProp, StylePropKey, StylePropVal, YogaNode};
+use crate::style::{Length, LengthContext, LengthOrPercent, ResolvedStyleProp, StyleProp, StylePropKey, StylePropVal, YogaNode};
 use crate::style::StyleProp::{BackgroundColor, Display, Left, MinWidth, Position, Top};
 use crate::style::StylePropKey::Height;
 use crate::timer::TimerHandle;
@@ -639,8 +639,8 @@ impl ElementBackend for Entry {
         let mut paragraph_element = Element::create(Paragraph::create);
         paragraph_element.set_style_props(vec![
             Position(StylePropVal::Custom(PositionType::Absolute)),
-            Left(StylePropVal::Custom(StyleUnit::Point(OrderedFloat(0.0)))),
-            Top(StylePropVal::Custom(StyleUnit::Point(OrderedFloat(0.0)))),
+            Left(StylePropVal::Custom(LengthOrPercent::Length(Length::PX(0.0)))),
+            Top(StylePropVal::Custom(LengthOrPercent::Length(Length::PX(0.0)))),
             MinWidth(StylePropVal::Custom(LengthOrPercent::Percent(100.0))),
             // BackgroundColor(StylePropVal::Custom(Color::from_argb(80,80, 80, 80))),
         ]);
@@ -652,8 +652,8 @@ impl ElementBackend for Entry {
         placeholder_element.set_style_props(
             vec![
                 Position(StylePropVal::Custom(PositionType::Absolute)),
-                Left(StylePropVal::Custom(StyleUnit::Point(OrderedFloat(0.0)))),
-                Top(StylePropVal::Custom(StyleUnit::Point(OrderedFloat(0.0)))),
+                Left(StylePropVal::Custom(LengthOrPercent::Length(Length::PX(0.0)))),
+                Top(StylePropVal::Custom(LengthOrPercent::Length(Length::PX(0.0)))),
                 MinWidth(StylePropVal::Custom(LengthOrPercent::Percent(100.0))),
             ]
         );

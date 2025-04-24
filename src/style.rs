@@ -38,28 +38,11 @@ pub enum StylePropertyValue {
     Invalid,
 }
 
-pub type StyleColor = ColorPropValue;
 
 //TODO rename
 pub trait PropValueParse: Sized {
     fn parse_prop_value(value: &str) -> Option<Self>;
     fn to_style_string(&self) -> String;
-}
-
-impl PropValueParse for StyleColor {
-    fn parse_prop_value(value: &str) -> Option<Self> {
-        parse_color(value).map(|v| ColorPropValue::Color(v))
-    }
-    fn to_style_string(&self) -> String {
-        match self {
-            StyleColor::Inherit => {
-                "inherit".to_string()
-            }
-            StyleColor::Color(c) => {
-                c.to_style_string()
-            }
-        }
-    }
 }
 
 impl PropValueParse for Length {
@@ -116,28 +99,6 @@ impl PropValueParse for StyleBorder {
     }
     fn to_style_string(&self) -> String {
         format!("solid {} {}", self.0.to_style_string(), self.1.to_style_string())
-    }
-}
-
-impl PropValueParse for StyleUnit {
-    fn parse_prop_value(value: &str) -> Option<Self> {
-        parse_style_unit(value)
-    }
-    fn to_style_string(&self) -> String {
-        match self {
-            StyleUnit::UndefinedValue => {
-                "".to_string()
-            }
-            StyleUnit::Point(v) => {
-                format!("{}px", v)
-            }
-            StyleUnit::Percent(v) => {
-                format!("{}%", v)
-            }
-            StyleUnit::Auto => {
-                "auto".to_string()
-            }
-        }
     }
 }
 
@@ -392,10 +353,7 @@ impl StyleTransform {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct StyleBorder(StyleUnit, StyleColor);
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct ComputedStyleBorder(f32, Color);
+pub struct StyleBorder(LengthOrPercent, Color);
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum StylePropVal<T: PropValueParse> {
@@ -594,18 +552,18 @@ define_style_props!(
     MinWidth => LengthOrPercent, StyleUnit;
     MinHeight => LengthOrPercent, StyleUnit;
 
-    MarginTop => StyleUnit, StyleUnit;
-    MarginRight => StyleUnit, StyleUnit;
-    MarginBottom => StyleUnit, StyleUnit;
-    MarginLeft => StyleUnit, StyleUnit;
+    MarginTop => LengthOrPercent, StyleUnit;
+    MarginRight => LengthOrPercent, StyleUnit;
+    MarginBottom => LengthOrPercent, StyleUnit;
+    MarginLeft => LengthOrPercent, StyleUnit;
 
-    PaddingTop => StyleUnit, StyleUnit;
-    PaddingRight => StyleUnit, StyleUnit;
-    PaddingBottom => StyleUnit, StyleUnit;
-    PaddingLeft => StyleUnit, StyleUnit;
+    PaddingTop => LengthOrPercent, StyleUnit;
+    PaddingRight => LengthOrPercent, StyleUnit;
+    PaddingBottom => LengthOrPercent, StyleUnit;
+    PaddingLeft => LengthOrPercent, StyleUnit;
     //
     Flex => f32, f32;
-    FlexBasis => StyleUnit, StyleUnit;
+    FlexBasis => LengthOrPercent, StyleUnit;
     FlexGrow => f32, f32;
     FlexShrink => f32, f32;
     AlignSelf => Align, Align;
@@ -613,23 +571,23 @@ define_style_props!(
     Position => PositionType, PositionType;
     Overflow => Overflow, Overflow;
 
-    BorderTopLeftRadius => AbsoluteLen, AbsoluteLen;
-    BorderTopRightRadius => AbsoluteLen, AbsoluteLen;
-    BorderBottomRightRadius => AbsoluteLen, AbsoluteLen;
-    BorderBottomLeftRadius => AbsoluteLen, AbsoluteLen;
+    BorderTopLeftRadius => Length, Length;
+    BorderTopRightRadius => Length, Length;
+    BorderBottomRightRadius => Length, Length;
+    BorderBottomLeftRadius => Length, Length;
 
     JustifyContent => Justify, Justify;
     FlexDirection => FlexDirection, FlexDirection;
     AlignContent => Align, Align;
     AlignItems => Align, Align;
     FlexWrap => Wrap, Wrap;
-    ColumnGap => AbsoluteLen, f32;
-    RowGap => AbsoluteLen, f32;
+    ColumnGap => Length, f32;
+    RowGap => Length, f32;
 
-    Top => StyleUnit, StyleUnit;
-    Right => StyleUnit, StyleUnit;
-    Bottom => StyleUnit, StyleUnit;
-    Left => StyleUnit, StyleUnit;
+    Top => LengthOrPercent, StyleUnit;
+    Right => LengthOrPercent, StyleUnit;
+    Bottom => LengthOrPercent, StyleUnit;
+    Left => LengthOrPercent, StyleUnit;
 
     Transform => StyleTransform, StyleTransform;
     AnimationName => String, String;
@@ -705,15 +663,6 @@ impl StylePropertyValue {
 
 }
 
-pub struct Style {
-    // (inherited, computed)
-    pub color: ColorPropValue,
-    pub border_radius: [f32; 4],
-    pub border_color: [Color;4],
-    pub background_color: ColorPropValue,
-    pub background_image: Option<Image>,
-}
-
 pub struct ComputedStyle {
     pub color: Color,
     pub background_color: Color,
@@ -729,21 +678,6 @@ impl ComputedStyle {
         }
     }
 }
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum ColorPropValue {
-    Inherit,
-    Color(Color),
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum PropValue<T> {
-    Inherit,
-    Custom(T),
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct AbsoluteLen(pub f32);
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct LengthContext {
@@ -870,46 +804,6 @@ impl Length {
         f32::from_str(value).ok()
     }
 
-}
-
-impl PropValueParse for AbsoluteLen {
-    fn parse_prop_value(value: &str) -> Option<Self> {
-        let v = value.strip_suffix("px").unwrap_or(value);
-        f32::from_str(v).ok().map(AbsoluteLen)
-    }
-
-    fn to_style_string(&self) -> String {
-        format!("{}px", self.0)
-    }
-}
-
-impl<T: PropValueParse> PropValueParse for PropValue<T> {
-    fn parse_prop_value(value: &str) -> Option<Self> {
-        if value == "inherit" {
-            Some(Self::Inherit)
-        } else {
-            Some(Self::Custom(T::parse_prop_value(value)?))
-        }
-    }
-    fn to_style_string(&self) -> String {
-        match self {
-            PropValue::Inherit => "inherit".to_string(),
-            PropValue::Custom(v) => v.to_style_string()
-        }
-    }
-}
-
-impl Style {
-    pub fn default() -> Self {
-        let transparent = Color::from_argb(0,0,0,0);
-        Self {
-            border_radius: [0.0, 0.0, 0.0, 0.0],
-            border_color: [transparent, transparent, transparent, transparent],
-            background_color: ColorPropValue::Color(Color::TRANSPARENT),
-            color: ColorPropValue::Inherit,
-            background_image: None,
-        }
-    }
 }
 
 pub trait ColorHelper {
@@ -1081,7 +975,7 @@ impl StyleNode {
 
     fn get_default_value(&self, key: StylePropKey) -> ResolvedStyleProp {
         let standard_node = Node::new();
-        let default_border = StyleBorder(StyleUnit::UndefinedValue, StyleColor::Color(Color::TRANSPARENT));
+        let default_border = StyleBorder(LengthOrPercent::Undefined, Color::TRANSPARENT);
         match key {
             StylePropKey::Color => {
                 ResolvedStyleProp::Color(Color::BLACK)
@@ -1137,34 +1031,34 @@ impl StyleNode {
                 ResolvedStyleProp::MinHeight(LengthOrPercent::Undefined)
             },
             StylePropKey::MarginTop  =>   {
-                ResolvedStyleProp::MarginTop(standard_node.get_style_margin_top())
+                ResolvedStyleProp::MarginTop(LengthOrPercent::Undefined)
             },
             StylePropKey::MarginRight  =>   {
-                ResolvedStyleProp::MarginRight(standard_node.get_style_margin_right())
+                ResolvedStyleProp::MarginRight(LengthOrPercent::Undefined)
             },
             StylePropKey::MarginBottom  =>   {
-                ResolvedStyleProp::MarginBottom(standard_node.get_style_margin_bottom())
+                ResolvedStyleProp::MarginBottom(LengthOrPercent::Undefined)
             },
             StylePropKey::MarginLeft  =>   {
-                ResolvedStyleProp::MarginLeft(standard_node.get_style_margin_left())
+                ResolvedStyleProp::MarginLeft(LengthOrPercent::Undefined)
             },
             StylePropKey::PaddingTop  =>   {
-                ResolvedStyleProp::PaddingTop(standard_node.get_style_padding_top())
+                ResolvedStyleProp::PaddingTop(LengthOrPercent::Undefined)
             },
             StylePropKey::PaddingRight  =>   {
-                ResolvedStyleProp::PaddingRight(standard_node.get_style_padding_right())
+                ResolvedStyleProp::PaddingRight(LengthOrPercent::Undefined)
             },
             StylePropKey::PaddingBottom  =>   {
-                ResolvedStyleProp::PaddingBottom(standard_node.get_style_padding_bottom())
+                ResolvedStyleProp::PaddingBottom(LengthOrPercent::Undefined)
             },
             StylePropKey::PaddingLeft  =>   {
-                ResolvedStyleProp::PaddingLeft(standard_node.get_style_padding_left())
+                ResolvedStyleProp::PaddingLeft(LengthOrPercent::Undefined)
             },
             StylePropKey::Flex  =>   {
                 ResolvedStyleProp::Flex(standard_node.get_flex())
             },
             StylePropKey::FlexBasis  =>   {
-                ResolvedStyleProp::FlexBasis(standard_node.get_flex_basis())
+                ResolvedStyleProp::FlexBasis(LengthOrPercent::Undefined)
             },
             StylePropKey::FlexGrow  =>   {
                 ResolvedStyleProp::FlexGrow(standard_node.get_flex_grow())
@@ -1182,31 +1076,31 @@ impl StyleNode {
                 ResolvedStyleProp::Position(PositionType::Static)
             },
             StylePropKey::Top  =>   {
-                ResolvedStyleProp::Top(StyleUnit::UndefinedValue)
+                ResolvedStyleProp::Top(LengthOrPercent::Undefined)
             },
             StylePropKey::Right  =>   {
-                ResolvedStyleProp::Right(StyleUnit::UndefinedValue)
+                ResolvedStyleProp::Right(LengthOrPercent::Undefined)
             },
             StylePropKey::Bottom  =>   {
-                ResolvedStyleProp::Bottom(StyleUnit::UndefinedValue)
+                ResolvedStyleProp::Bottom(LengthOrPercent::Undefined)
             },
             StylePropKey::Left  =>   {
-                ResolvedStyleProp::Left(StyleUnit::UndefinedValue)
+                ResolvedStyleProp::Left(LengthOrPercent::Undefined)
             },
             StylePropKey::Overflow  =>   {
                 ResolvedStyleProp::Overflow(Overflow::Hidden)
             },
             StylePropKey::BorderTopLeftRadius  =>   {
-                ResolvedStyleProp::BorderTopLeftRadius(AbsoluteLen(0.0))
+                ResolvedStyleProp::BorderTopLeftRadius(Length::PX(0.0))
             },
             StylePropKey::BorderTopRightRadius  =>   {
-                ResolvedStyleProp::BorderTopRightRadius(AbsoluteLen(0.0))
+                ResolvedStyleProp::BorderTopRightRadius(Length::PX(0.0))
             },
             StylePropKey::BorderBottomRightRadius  =>   {
-                ResolvedStyleProp::BorderBottomRightRadius(AbsoluteLen(0.0))
+                ResolvedStyleProp::BorderBottomRightRadius(Length::PX(0.0))
             },
             StylePropKey::BorderBottomLeftRadius  =>   {
-                ResolvedStyleProp::BorderBottomLeftRadius(AbsoluteLen(0.0))
+                ResolvedStyleProp::BorderBottomLeftRadius(Length::PX(0.0))
             },
             StylePropKey::Transform  =>   {
                 ResolvedStyleProp::Transform(StyleTransform::empty())
@@ -1237,10 +1131,10 @@ impl StyleNode {
                 ResolvedStyleProp::FlexWrap(Wrap::NoWrap)
             },
             StylePropKey::ColumnGap  =>   {
-                ResolvedStyleProp::ColumnGap(AbsoluteLen(0.0))
+                ResolvedStyleProp::ColumnGap(Length::PX(0.0))
             },
             StylePropKey::RowGap  =>   {
-                ResolvedStyleProp::RowGap(AbsoluteLen(0.0))
+                ResolvedStyleProp::RowGap(Length::PX(0.0))
             },
             //TODO aspectratio
         }
@@ -1290,16 +1184,16 @@ impl StyleNode {
                 self.computed_style.line_height = value;
             }
             ResolvedStyleProp::BorderTop (value) =>   {
-                self.set_border(&value, &vec![0])
+                self.set_border(&value, &vec![0], length_ctx);
             }
             ResolvedStyleProp::BorderRight (value) =>   {
-                self.set_border(&value, &vec![1])
+                self.set_border(&value, &vec![1], length_ctx);
             }
             ResolvedStyleProp::BorderBottom (value) =>   {
-                self.set_border(&value, &vec![2])
+                self.set_border(&value, &vec![2], length_ctx);
             }
             ResolvedStyleProp::BorderLeft (value) =>   {
-                self.set_border(&value, &vec![3])
+                self.set_border(&value, &vec![3], length_ctx);
             }
             ResolvedStyleProp::Display (value) =>   {
                 self.yoga_node.set_display(value)
@@ -1323,42 +1217,42 @@ impl StyleNode {
                 self.yoga_node.set_min_height(value.to_style_unit(&length_ctx))
             },
             ResolvedStyleProp::MarginTop (value) =>   {
-                self.yoga_node.set_margin(Edge::Top, value)
+                self.yoga_node.set_margin(Edge::Top, value.to_style_unit(&length_ctx))
             },
             ResolvedStyleProp::MarginRight (value) =>   {
-                self.yoga_node.set_margin(Edge::Right, value)
+                self.yoga_node.set_margin(Edge::Right, value.to_style_unit(&length_ctx))
             },
             ResolvedStyleProp::MarginBottom (value) =>   {
-                self.yoga_node.set_margin(Edge::Bottom, value)
+                self.yoga_node.set_margin(Edge::Bottom, value.to_style_unit(&length_ctx))
             },
             ResolvedStyleProp::MarginLeft (value) =>   {
-                self.yoga_node.set_margin(Edge::Left, value)
+                self.yoga_node.set_margin(Edge::Left, value.to_style_unit(&length_ctx))
             },
             ResolvedStyleProp::PaddingTop (value) =>   {
                 self.with_container_node_mut(|n| {
-                    n.set_padding(Edge::Top, value)
+                    n.set_padding(Edge::Top, value.to_style_unit(&length_ctx))
                 })
             },
             ResolvedStyleProp::PaddingRight (value) =>   {
                 self.with_container_node_mut(|n| {
-                    n.set_padding(Edge::Right, value)
+                    n.set_padding(Edge::Right, value.to_style_unit(&length_ctx))
                 })
             },
             ResolvedStyleProp::PaddingBottom (value) =>   {
                 self.with_container_node_mut(|n| {
-                    n.set_padding(Edge::Bottom, value)
+                    n.set_padding(Edge::Bottom, value.to_style_unit(&length_ctx))
                 })
             },
             ResolvedStyleProp::PaddingLeft (value) =>   {
                 self.with_container_node_mut(|n| {
-                    n.set_padding(Edge::Left, value)
+                    n.set_padding(Edge::Left, value.to_style_unit(&length_ctx))
                 })
             },
             ResolvedStyleProp::Flex (value) =>   {
                 self.yoga_node.set_flex(value)
             },
             ResolvedStyleProp::FlexBasis (value) =>   {
-                self.yoga_node.set_flex_basis(value)
+                self.yoga_node.set_flex_basis(value.to_style_unit(&length_ctx))
             },
             ResolvedStyleProp::FlexGrow (value) =>   {
                 self.yoga_node.set_flex_grow(value)
@@ -1376,31 +1270,31 @@ impl StyleNode {
                 self.yoga_node.set_position_type(value)
             },
             ResolvedStyleProp::Top (value) =>   {
-                self.yoga_node.set_position(Edge::Top, value);
+                self.yoga_node.set_position(Edge::Top, value.to_style_unit(&length_ctx));
             },
             ResolvedStyleProp::Right (value) =>   {
-                self.yoga_node.set_position(Edge::Right, value);
+                self.yoga_node.set_position(Edge::Right, value.to_style_unit(&length_ctx));
             },
             ResolvedStyleProp::Bottom (value) =>   {
-                self.yoga_node.set_position(Edge::Bottom, value);
+                self.yoga_node.set_position(Edge::Bottom, value.to_style_unit(&length_ctx));
             },
             ResolvedStyleProp::Left (value) =>   {
-                self.yoga_node.set_position(Edge::Left, value);
+                self.yoga_node.set_position(Edge::Left, value.to_style_unit(&length_ctx));
             },
             ResolvedStyleProp::Overflow (value) =>   {
                 self.yoga_node.set_overflow(value)
             },
             ResolvedStyleProp::BorderTopLeftRadius (value) =>   {
-                self.border_radius[0] = value.0;
+                self.border_radius[0] = value.to_px(&length_ctx);
             },
             ResolvedStyleProp::BorderTopRightRadius (value) =>   {
-                self.border_radius[1] = value.0;
+                self.border_radius[1] = value.to_px(&length_ctx);
             },
             ResolvedStyleProp::BorderBottomRightRadius (value) =>   {
-                self.border_radius[2] = value.0;
+                self.border_radius[2] = value.to_px(&length_ctx);
             },
             ResolvedStyleProp::BorderBottomLeftRadius (value) =>   {
-                self.border_radius[3] = value.0;
+                self.border_radius[3] = value.to_px(&length_ctx);
             },
             ResolvedStyleProp::Transform (value) =>   {
                 need_layout = false;
@@ -1453,12 +1347,12 @@ impl StyleNode {
             },
             ResolvedStyleProp::ColumnGap (value) =>   {
                 self.with_container_node_mut(|layout| {
-                    layout.set_column_gap(value.0)
+                    layout.set_column_gap(value.to_px(&length_ctx))
                 });
             },
             ResolvedStyleProp::RowGap (value) =>   {
                 self.with_container_node_mut(|layout| {
-                    layout.set_row_gap(value.0)
+                    layout.set_row_gap(value.to_px(&length_ctx))
                 });
             },
             //TODO aspectratio
@@ -1519,16 +1413,12 @@ impl StyleNode {
         return None
     }
 
-    fn set_border(&mut self, value: &StyleBorder, edges: &Vec<usize>) {
+    fn set_border(&mut self, value: &StyleBorder, edges: &Vec<usize>, length_ctx: &LengthContext) {
         // let default_border = StyleBorder(StyleUnit::UndefinedValue, StyleColor::Color(Color::TRANSPARENT));
         // let value = value.resolve(&default_border);
-        let color = match value.1 {
-            //TODO fix inherited color?
-            StyleColor::Inherit => {Color::TRANSPARENT}
-            StyleColor::Color(c) => {c}
-        };
+        let color = value.1;
         //TODO fix percent?
-        let width = match value.0 {
+        let width = match value.0.to_style_unit(length_ctx) {
             StyleUnit::Point(f) => {f.0},
             _ => 0.0,
         };
@@ -1689,24 +1579,6 @@ pub fn parse_float(value: &str) -> f32 {
     f32::from_str(value).unwrap_or(0.0)
 }
 
-pub fn parse_style_unit(value: &str) -> Option<StyleUnit> {
-    if let Some(v) = value.strip_suffix("%") {
-        let width = f32::from_str(v).unwrap();
-        Some(StyleUnit::Percent(OrderedFloat(width)))
-    } else {
-        let value = value.strip_suffix("px").unwrap_or_else(|| value);
-        match f32::from_str(value) {
-            Ok(v) => {
-                Some(StyleUnit::Point(OrderedFloat(v)))
-            }
-            Err(err) => {
-                eprintln!("Invalid value:{}", err);
-                None
-            }
-        }
-    }
-}
-
 pub fn parse_color_str(value: &str) -> Option<Color> {
     //TODO support white,black and so on
     if let Some(hex) = value.strip_prefix("#") {
@@ -1799,17 +1671,17 @@ fn parse_translate_length(value: &str) -> Option<TranslateLength> {
 
 fn parse_border(value: &str) -> Option<StyleBorder> {
     let parts = value.split(" ");
-    let mut width = StyleUnit::Point(OrderedFloat(0.0));
+    let mut width = LengthOrPercent::Length(Length::PX((0.0)));
     let mut color = Color::from_rgb(0, 0, 0);
     for p in parts {
         let p = p.trim();
         if let Some(c) = parse_color(p) {
             color = c;
-        } else if let Some(w) = parse_style_unit(p) {
+        } else if let Some(w) = LengthOrPercent::parse_prop_value(p) {
             width = w;
         }
     }
-    Some(StyleBorder(width, StyleColor::Color(color)))
+    Some(StyleBorder(width, color))
 }
 
 fn parse_color(value: &str) -> Option<Color> {

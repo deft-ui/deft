@@ -929,26 +929,31 @@ impl Window {
         }
     }
 
-    fn update_layout(&mut self) {
-        let auto_size = !self.attributes.resizable;
+    fn get_inner_size(&self) -> (f32, f32) {
         let size = self.window.inner_size();
         let scale_factor = self.window.scale_factor() as f32;
+        (size.width as f32 / scale_factor, size.height as f32 / scale_factor)
+    }
+
+    fn update_layout(&mut self) {
+        let auto_size = !self.attributes.resizable;
+        let (win_width, win_height) = self.get_inner_size();
         let width = if auto_size {
             self.init_width.unwrap_or(f32::NAN)
         } else {
-            size.width as f32 / scale_factor
+            win_width
         };
         let mut height = if auto_size {
             self.init_height.unwrap_or(f32::NAN)
         } else {
-            size.height as f32 / scale_factor
+            win_height
         };
-        // print_time!("calculate layout, {} x {}", width, height);
+        debug!("calculate layout, {} x {}", width, height);
         let body = some_or_return!(&mut self.body);
         body.calculate_layout(width, height);
         if auto_size {
             let (final_width, final_height) = body.get_size();
-            if size.width != final_width as u32 && size.height != final_height as u32 {
+            if win_width as u32 != final_width as u32 && win_height as u32 != final_height as u32 {
                 self.resize(crate::base::Size {
                     width: final_width,
                     height: final_height,
@@ -989,14 +994,14 @@ impl Window {
             // skip duplicate update
             return ResultWaiter::new_finished(false);
         }
+        let (viewport_width, viewport_height) = self.get_inner_size();
         warn_time!(16, "update window");
         if let Some(body) = &mut self.body {
-            //TODO fix length context
             let length_ctx = LengthContext {
-                root: 12.0,
-                font_size: 12.0,
-                viewport_width: 1000.0,
-                viewport_height: 1000.0,
+                root: body.style.font_size,
+                font_size: body.style.font_size,
+                viewport_width,
+                viewport_height,
             };
             //TODO compute font size only when any font size changed
             body.compute_font_size_recurse(&length_ctx);

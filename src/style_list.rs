@@ -8,7 +8,7 @@ use skia_safe::wrapper::NativeTransmutableWrapper;
 use crate::computed::{ComputedValue, ComputedValueHandle};
 use crate::{some_or_break, some_or_continue, some_or_return};
 use crate::mrc::MrcWeak;
-use crate::style::{parse_style_obj, Style, StyleProp, StylePropKey, StylePropertyValue};
+use crate::style::{parse_style_obj, StyleProp, StylePropKey, StylePropertyValue};
 
 type CssValueResolver = Box<dyn Fn(&HashMap<String, String>) -> String>;
 

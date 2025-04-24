@@ -25,7 +25,7 @@ use crate::js::js_runtime::FromJsValue;
 use crate::js::JsError;
 use crate::layout::LayoutRoot;
 use crate::render::RenderFn;
-use crate::style::{AbsoluteLen, StyleProp, StylePropVal};
+use crate::style::{Length, LengthContext, StyleProp, StylePropVal};
 use crate::style_list::ParsedStyleProp;
 use crate::timer::{set_timeout, TimerHandle};
 
@@ -581,8 +581,8 @@ impl ElementBackend for Scroll {
 
                     //TODO Don't use RowGap/ColumnGap
                     let animation = AnimationDef::new()
-                        .key_frame(0.0, vec![StyleProp::RowGap(StylePropVal::Custom(AbsoluteLen(0.0))), StyleProp::ColumnGap(StylePropVal::Custom(AbsoluteLen(0.0)))])
-                        .key_frame(1.0, vec![StyleProp::RowGap(StylePropVal::Custom(AbsoluteLen(1.0))), StyleProp::ColumnGap(StylePropVal::Custom(AbsoluteLen(1.0)))])
+                        .key_frame(0.0, vec![StyleProp::RowGap(StylePropVal::Custom(Length::PX(0.0))), StyleProp::ColumnGap(StylePropVal::Custom(Length::PX(0.0)))])
+                        .key_frame(1.0, vec![StyleProp::RowGap(StylePropVal::Custom(Length::PX(1.0))), StyleProp::ColumnGap(StylePropVal::Custom(Length::PX(1.0)))])
                         .build();
                     let window = some_or_return!(element.get_window(), false);
                     let frame_controller = WindowAnimationController::new(window);
@@ -595,15 +595,21 @@ impl ElementBackend for Scroll {
                         let mut left_stopped = left_dist == 0.0;
                         let mut top_stooped = top_dist == 0.0;
                         let mut ele = ok_or_return!(element.upgrade_mut());
+                        let length_ctx = LengthContext {
+                            root: 0.0,
+                            font_size: 0.0,
+                            viewport_width: 0.0,
+                            viewport_height: 0.0,
+                        };
                         for style in styles {
                             match style {
                                 StyleProp::RowGap(value) => {
-                                    let new_left = old_left + left_dist * timing_func.evaluate(TValue::Parametric(value.resolve(&AbsoluteLen(0.0)).0 as f64)).y as f32;
+                                    let new_left = old_left + left_dist * timing_func.evaluate(TValue::Parametric(value.resolve(&Length::PX(0.0)).to_px(&length_ctx) as f64)).y as f32;
                                     ele.set_scroll_left(new_left);
                                     left_stopped = new_left < 0.0 || new_left > ele.get_max_scroll_left();
                                 },
                                 StyleProp::ColumnGap(value) => {
-                                    let new_top = old_top + top_dist * timing_func.evaluate(TValue::Parametric(value.resolve(&AbsoluteLen(0.0)).0 as f64)).y as f32;
+                                    let new_top = old_top + top_dist * timing_func.evaluate(TValue::Parametric(value.resolve(&Length::PX(0.0)).to_px(&length_ctx) as f64)).y as f32;
                                     ele.set_scroll_top(new_top);
                                     top_stooped = new_top < 0.0 || new_top > ele.get_max_scroll_top();
                                 },

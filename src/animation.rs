@@ -1,6 +1,6 @@
 use crate as deft;
 use crate::mrc::Mrc;
-use crate::style::{AbsoluteLen, ResolvedStyleProp, ScaleParams, StyleProp, StylePropKey, StylePropVal, StyleTransform, StyleTransformOp, TranslateLength, TranslateParams};
+use crate::style::{ResolvedStyleProp, ScaleParams, StyleProp, StylePropKey, StylePropVal, StyleTransform, StyleTransformOp, TranslateLength, TranslateParams};
 use crate::timer::{set_timeout, set_timeout_nanos, TimerHandle};
 use crate::{js_value};
 use anyhow::{anyhow, Error};
@@ -60,10 +60,6 @@ thread_local! {
 fn interpolate_f32(prev: &f32, next: &f32, position: f32) -> Option<f32> {
     let delta = (next - prev) * position;
     Some(prev + delta)
-}
-
-fn interpolate_absolute_len(prev: &AbsoluteLen, next: &AbsoluteLen, position: f32) -> Option<AbsoluteLen> {
-    interpolate_f32(&prev.0, &next.0, position).map(AbsoluteLen)
 }
 
 fn interpolate_style_unit(prev: &StyleUnit, next: &StyleUnit, position: f32) -> Option<StyleUnit> {
@@ -149,6 +145,7 @@ fn interpolate(pre_position: f32, pre_value: StyleProp, next_position: f32, next
         // TODO fix animation
         // Height => interpolate_style_unit,
 
+        /*
         PaddingTop => interpolate_style_unit,
         PaddingRight => interpolate_style_unit,
         PaddingBottom => interpolate_style_unit,
@@ -158,7 +155,9 @@ fn interpolate(pre_position: f32, pre_value: StyleProp, next_position: f32, next
         MarginRight => interpolate_style_unit,
         MarginBottom => interpolate_style_unit,
         MarginLeft => interpolate_style_unit,
+         */
 
+        /*
         BorderTopLeftRadius => interpolate_absolute_len,
         BorderTopRightRadius => interpolate_absolute_len,
         BorderBottomRightRadius => interpolate_absolute_len,
@@ -169,8 +168,10 @@ fn interpolate(pre_position: f32, pre_value: StyleProp, next_position: f32, next
         Bottom => interpolate_style_unit,
         Left => interpolate_style_unit,
 
+
         RowGap => interpolate_absolute_len,
         ColumnGap => interpolate_absolute_len,
+        */
 
         Transform => interpolate_transform,
     );
