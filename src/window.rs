@@ -94,6 +94,7 @@ pub struct Window {
     focusing: Option<Element>,
     /// (element, button)
     pressing: Option<(Element, MouseDownInfo)>,
+    drag_window_called: bool,
     touching: TouchingInfo,
     dragging: bool,
     last_drag_over: Option<Element>,
@@ -252,6 +253,7 @@ impl Window {
             frame_rate_controller: FrameRateController::new(),
             next_frame_timer_handle: None,
             resource_table: ResourceTable::new(),
+            drag_window_called: false,
         };
         let mut handle = Window {
             inner: Mrc::new(state),
@@ -361,6 +363,7 @@ impl Window {
 
     #[js_func]
     fn drag(&mut self) {
+        self.drag_window_called = true;
         let _ = self.window.drag_window();
     }
 
@@ -522,8 +525,11 @@ impl Window {
                 }
             }
             WindowEvent::CursorLeft { .. } => {
-                if let Some((_, m)) = &self.pressing {
-                    self.emit_click(m.button_enum, ElementState::Released);
+                if self.drag_window_called {
+                    self.drag_window_called = false;
+                    if let Some((_, m)) = &self.pressing {
+                        self.emit_click(m.button_enum, ElementState::Released);
+                    }
                 }
             },
             WindowEvent::CursorMoved { position, root_position, .. } => {
