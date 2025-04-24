@@ -175,7 +175,7 @@ impl ElementBackend for Image {
 
         let element = self.element.clone();
         let mut element = element.upgrade_mut().unwrap();
-        let color = element.style.computed_style.color;
+        let color = element.style.color;
         
         RenderFn::new(move |canvas| {
             canvas.save();

@@ -658,22 +658,6 @@ impl StylePropertyValue {
 
 }
 
-pub struct ComputedStyle {
-    pub color: Color,
-    pub background_color: Color,
-    pub line_height: f32,
-}
-
-impl ComputedStyle {
-    pub fn default() -> Self {
-        Self {
-            color: Color::new(0),
-            background_color: Color::new(0),
-            line_height: 12.0,
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct LengthContext {
     pub root: f32,
@@ -877,16 +861,15 @@ pub struct StyleNode {
     pub border_color: [Color;4],
     pub background_image: Option<Image>,
     pub transform: Option<StyleTransform>,
-    pub computed_style: ComputedStyle,
     animation_params: AnimationParams,
     animation_instance: Option<AnimationInstance>,
     pub on_changed: Option<Box<dyn FnMut(StylePropKey)>>,
     pub animation_renderer: Option<Mrc<Box<dyn FnMut(Vec<StyleProp>)>>>,
-    pub style_props: HashMap<StylePropKey, StyleProp>,
     pub resolved_style_props: HashMap<StylePropKey, ResolvedStyleProp>,
-    //TODO remove
-    length_context: Option<LengthContext>,
     pub font_size: f32,
+    pub color: Color,
+    pub background_color: Color,
+    pub line_height: f32,
 }
 
 
@@ -905,13 +888,13 @@ impl StyleNode {
             transform: None,
             animation_instance: None,
             animation_params: AnimationParams::new(),
-            computed_style: ComputedStyle::default(),
             on_changed: None,
             animation_renderer: None,
             resolved_style_props: HashMap::new(),
-            style_props: HashMap::new(),
             font_size: 12.0,
-            length_context: None,
+            color: Color::new(0),
+            background_color: Color::new(0),
+            line_height: 12.0,
         };
         inner.yoga_node.set_position_type(PositionType::Static);
         let mut inst = inner.to_ref();
@@ -922,10 +905,6 @@ impl StyleNode {
             viewport_width: 0.0,
             viewport_height: 0.0,
         };
-        inst.set_style(StyleProp::Position(StylePropVal::Custom(PositionType::Static)), &length_ctx);
-        inst.set_style(StyleProp::Color(StylePropVal::Inherit), &length_ctx);
-        inst.set_style(StyleProp::FontSize(StylePropVal::Inherit), &length_ctx);
-        inst.set_style(StyleProp::LineHeight(StylePropVal::Inherit), &length_ctx);
         inst
     }
 
@@ -1153,7 +1132,6 @@ impl StyleNode {
 
     /// return (need_repaint, need_layout)
     pub fn set_style(&mut self, p: StyleProp, length_ctx: &LengthContext) -> (bool, bool, ResolvedStyleProp) {
-        self.style_props.insert(p.key().clone(), p.clone());
         let v = p.resolve_value(|k| {
             self.get_default_value(k)
         }, |k| {
@@ -1180,11 +1158,11 @@ impl StyleNode {
 
         match p {
             ResolvedStyleProp::Color(v) => {
-                self.computed_style.color = v;
+                self.color = v;
                 need_layout = false;
             }
             ResolvedStyleProp::BackgroundColor (value) =>   {
-                self.computed_style.background_color = value;
+                self.background_color = value;
                 need_layout = false;
             }
             ResolvedStyleProp::FontSize(value) => {
@@ -1192,7 +1170,7 @@ impl StyleNode {
                 // self.computed_style.font_size = value.0;
             }
             ResolvedStyleProp::LineHeight(value) => {
-                self.computed_style.line_height = value;
+                self.line_height = value;
             }
             ResolvedStyleProp::BorderTopWidth (value) =>   {
                 self.set_border_width(&value, &vec![0], length_ctx);
@@ -1389,14 +1367,8 @@ impl StyleNode {
                 on_changed(prop_key);
             }
         }
-        self.length_context = Some(length_ctx.clone());
-        for mut c in self.get_children() {
-            let mut length_ctx = length_ctx.clone();
-            length_ctx.font_size = c.font_size;
-            c.resolve_style_prop(prop_key, &length_ctx);
-        }
 
-        return (repaint, need_layout)
+        (repaint, need_layout)
     }
 
     fn update_animation(&mut self) {
@@ -1467,26 +1439,6 @@ impl StyleNode {
         self.with_container_node_mut(|n| {
             n.insert_child(&mut child.inner.yoga_node, index as usize)
         });
-        //TODO refactor
-        child.resolve_style_props();
-    }
-
-    fn resolve_style_prop(&mut self, k: StylePropKey, length_ctx: &LengthContext) {
-        if let Some(p) = self.style_props.get(&k) {
-            self.set_style(p.clone(), length_ctx);
-        }
-    }
-
-    fn resolve_style_props(&mut self) {
-        let length_ctx = self.length_context.clone().unwrap_or_else(|| LengthContext {
-            root: 0.0,
-            font_size: 0.0,
-            viewport_width: 0.0,
-            viewport_height: 0.0,
-        });
-        for (_, p) in self.style_props.clone() {
-            self.set_style(p, &length_ctx);
-        }
     }
 
     pub fn get_children(&self) -> Vec<StyleNode> {

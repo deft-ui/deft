@@ -31,7 +31,7 @@ use crate::element::text::Text;
 use crate::element::textedit::TextEdit;
 use crate::event::{DragOverEventListener, BlurEventListener, BoundsChangeEventListener, CaretChangeEventListener, ClickEventListener, DragStartEventListener, DropEventListener, FocusEventListener, FocusShiftEventListener, KeyDownEventListener, KeyUpEventListener, MouseDownEventListener, MouseEnterEvent, MouseEnterEventListener, MouseLeaveEvent, MouseLeaveEventListener, MouseMoveEventListener, MouseUpEventListener, MouseWheelEventListener, ScrollEvent, ScrollEventListener, TextChangeEventListener, TextUpdateEventListener, TouchCancelEventListener, TouchEndEventListener, TouchMoveEventListener, TouchStartEventListener, BoundsChangeEvent, ContextMenuEventListener, MouseDownEvent, TouchStartEvent, DroppedFileEventListener, HoveredFileEventListener};
 use crate::event_loop::{create_event_loop_callback};
-use crate::ext::ext_window::{ELEMENT_TYPE_BUTTON, ELEMENT_TYPE_CONTAINER, ELEMENT_TYPE_ENTRY, ELEMENT_TYPE_IMAGE, ELEMENT_TYPE_LABEL, ELEMENT_TYPE_SCROLL, ELEMENT_TYPE_TEXT_EDIT};
+use crate::ext::ext_window::{ELEMENT_TYPE_BUTTON, ELEMENT_TYPE_CONTAINER, ELEMENT_TYPE_ENTRY, ELEMENT_TYPE_IMAGE, ELEMENT_TYPE_LABEL, ELEMENT_TYPE_SCROLL, ELEMENT_TYPE_TEXT_EDIT, ELEMENT_TYPE_BODY};
 use crate::window::{Window, WindowWeak};
 use crate::img_manager::IMG_MANAGER;
 use crate::js::js_serde::JsValueSerializer;
@@ -782,7 +782,7 @@ impl Element {
         }
     }
 
-    pub fn compute_font_size_recurse(&mut self, ctx: &LengthContext) {
+    pub(crate) fn compute_font_size_recurse(&mut self, ctx: &LengthContext) {
         let style = self.style_list.get_styles(self.hover);
         let px = if let Some(StyleProp::FontSize(fs_prop)) = style.get(&StylePropKey::FontSize) {
             match fs_prop {
@@ -807,7 +807,7 @@ impl Element {
         }
     }
 
-    pub fn apply_style_update(&mut self, parent_changed: &Vec<StylePropKey>, length_ctx: &LengthContext) {
+    pub(crate) fn apply_style_update(&mut self, parent_changed: &Vec<StylePropKey>, length_ctx: &LengthContext) {
         let is_self_dirty = self.dirty_flags.contains(StyleDirtyFlags::SelfDirty);
         let is_children_dirty = self.dirty_flags.contains(StyleDirtyFlags::ChildrenDirty);
         let mut changed_keys = Vec::new();
@@ -834,6 +834,7 @@ impl Element {
         }
         let old_style = self.applied_style.clone();
         let mut changed_style_props = Self::calculate_changed_style(&old_style, &style_props, parent_changed);
+        // println!("new styles {} => {:?}", self.id, style_props);
 
 
         let mut changed_list = Vec::new();

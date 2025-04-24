@@ -4,11 +4,13 @@ use std::mem;
 use deft_macros::mrc_object;
 use log::debug;
 use quick_js::JsValue;
+use skia_safe::stroke_rec::Style;
 use skia_safe::wrapper::NativeTransmutableWrapper;
+use yoga::PositionType;
 use crate::computed::{ComputedValue, ComputedValueHandle};
 use crate::{some_or_break, some_or_continue, some_or_return};
 use crate::mrc::MrcWeak;
-use crate::style::{parse_border, parse_style_obj, PropValueParse, StyleBorder, StyleProp, StylePropKey, StylePropertyValue};
+use crate::style::{parse_border, parse_style_obj, PropValueParse, StyleBorder, StyleProp, StylePropKey, StylePropVal, StylePropertyValue};
 
 type CssValueResolver = Box<dyn Fn(&HashMap<String, String>) -> String>;
 
@@ -86,6 +88,7 @@ impl ParsedStyleProp {
 
 #[mrc_object]
 pub struct StyleList {
+    default_style_props: HashMap<StylePropKey, ParsedStyleProp>,
     values: HashMap<StylePropKey, ParsedStyleProp>,
     hover_style_props: HashMap<StylePropKey, ParsedStyleProp>,
     selector_style_props: HashMap<StylePropKey, ParsedStyleProp>,
@@ -94,7 +97,18 @@ pub struct StyleList {
 
 impl StyleList {
     pub fn new() -> StyleList {
+        let mut default_style_props = HashMap::new();
+        let default_styles = vec![
+            StyleProp::Position(StylePropVal::Custom(PositionType::Static)),
+            StyleProp::Color(StylePropVal::Inherit),
+            StyleProp::FontSize(StylePropVal::Inherit),
+            StyleProp::LineHeight(StylePropVal::Inherit),
+        ];
+        for d in default_styles {
+            default_style_props.insert(d.key(), ParsedStyleProp::Fixed(d));
+        }
         StyleListData {
+            default_style_props,
             values: HashMap::new(),
             hover_style_props: HashMap::new(),
             selector_style_props: HashMap::new(),
@@ -163,6 +177,7 @@ impl StyleList {
 
     pub fn get_styles(&self, is_hover: bool) -> HashMap<StylePropKey, StyleProp> {
         let mut result = HashMap::new();
+        Self::collect_resolved_props(&self.default_style_props, &mut result);
         Self::collect_resolved_props(&self.selector_style_props, &mut result);
         Self::collect_resolved_props(&self.values, &mut result);
         if is_hover {

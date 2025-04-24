@@ -711,13 +711,13 @@ impl ElementBackend for Paragraph {
         let mut rebuild = true;
         match key {
             StylePropKey::Color => {
-                self.params.color = self.element.style.computed_style.color;
+                self.params.color = self.element.style.color;
             }
             StylePropKey::FontSize => {
                 self.params.font_size = self.element.style.font_size;
             }
             StylePropKey::LineHeight => {
-                self.params.line_height = Some(self.element.style.computed_style.line_height);
+                self.params.line_height = Some(self.element.style.line_height);
             }
             _ => {
                 rebuild = false;

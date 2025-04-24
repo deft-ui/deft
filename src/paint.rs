@@ -203,7 +203,7 @@ impl RenderTree {
             border_color: element.style.border_color,
             renderer: Box::new(move || el.get_backend_mut().render()),
             background_image: element.style.background_image.clone(),
-            background_color: element.style.computed_style.background_color,
+            background_color: element.style.background_color,
             border_width: element.get_border_width(),
             width: bounds.width,
             height: bounds.height,
@@ -444,7 +444,7 @@ impl RenderTree {
         let element_data = &mut self.element_objects[element_object_idx];
         element_data.border_color = element.style.border_color;
         element_data.background_image = element.style.background_image.clone();
-        element_data.background_color = element.style.computed_style.background_color;
+        element_data.background_color = element.style.background_color;
         element_data.border_width = element.get_border_width();
         element_data.coord = (bounds.left, bounds.top);
         element_data.layer_object_idx = Some(layer_object_idx);

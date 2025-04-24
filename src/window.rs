@@ -935,7 +935,7 @@ impl Window {
         }
     }
 
-    fn get_inner_size(&self) -> (f32, f32) {
+    pub fn get_inner_size(&self) -> (f32, f32) {
         let size = self.window.inner_size();
         let scale_factor = self.window.scale_factor() as f32;
         (size.width as f32 / scale_factor, size.height as f32 / scale_factor)

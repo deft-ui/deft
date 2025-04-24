@@ -710,7 +710,7 @@ impl ElementBackend for Entry {
     fn render(&mut self) -> RenderFn {
         let mut element = ok_or_return!(self.element.upgrade_mut(), RenderFn::empty());
         let mut paint = Paint::default();
-        paint.set_color(element.style.computed_style.color);
+        paint.set_color(element.style.color);
 
         let mut base_render_fn = self.base.render();
         let focusing = self.focusing;

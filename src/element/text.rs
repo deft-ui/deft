@@ -601,7 +601,7 @@ impl ElementBackend for Text {
     fn handle_style_changed(&mut self, key: StylePropKey) {
         match key {
             StylePropKey::Color => {
-                let color = self.element.style.computed_style.color;
+                let color = self.element.style.color;
                 self.text_params.paint.set_color(color);
                 self.refresh_lines();
                 self.mark_dirty(false);
