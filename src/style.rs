@@ -884,6 +884,8 @@ pub struct StyleNode {
     pub animation_renderer: Option<Mrc<Box<dyn FnMut(Vec<StyleProp>)>>>,
     pub style_props: HashMap<StylePropKey, StyleProp>,
     pub resolved_style_props: HashMap<StylePropKey, ResolvedStyleProp>,
+    //TODO remove
+    length_context: Option<LengthContext>,
     pub font_size: f32,
 }
 
@@ -909,6 +911,7 @@ impl StyleNode {
             resolved_style_props: HashMap::new(),
             style_props: HashMap::new(),
             font_size: 12.0,
+            length_context: None,
         };
         inner.yoga_node.set_position_type(PositionType::Static);
         let mut inst = inner.to_ref();
@@ -1386,6 +1389,7 @@ impl StyleNode {
                 on_changed(prop_key);
             }
         }
+        self.length_context = Some(length_ctx.clone());
         for mut c in self.get_children() {
             let mut length_ctx = length_ctx.clone();
             length_ctx.font_size = c.font_size;
@@ -1463,7 +1467,8 @@ impl StyleNode {
         self.with_container_node_mut(|n| {
             n.insert_child(&mut child.inner.yoga_node, index as usize)
         });
-        // child.resolve_style_props();
+        //TODO refactor
+        child.resolve_style_props();
     }
 
     fn resolve_style_prop(&mut self, k: StylePropKey, length_ctx: &LengthContext) {
@@ -1472,11 +1477,17 @@ impl StyleNode {
         }
     }
 
-    // fn resolve_style_props(&mut self) {
-    //     for (_, p) in self.style_props.clone() {
-    //         self.set_style(p);
-    //     }
-    // }
+    fn resolve_style_props(&mut self) {
+        let length_ctx = self.length_context.clone().unwrap_or_else(|| LengthContext {
+            root: 0.0,
+            font_size: 0.0,
+            viewport_width: 0.0,
+            viewport_height: 0.0,
+        });
+        for (_, p) in self.style_props.clone() {
+            self.set_style(p, &length_ctx);
+        }
+    }
 
     pub fn get_children(&self) -> Vec<StyleNode> {
         self.children.clone()
