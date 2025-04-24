@@ -8,7 +8,7 @@ use skia_safe::wrapper::NativeTransmutableWrapper;
 use crate::computed::{ComputedValue, ComputedValueHandle};
 use crate::{some_or_break, some_or_continue, some_or_return};
 use crate::mrc::MrcWeak;
-use crate::style::{parse_style_obj, StyleProp, StylePropKey, StylePropertyValue};
+use crate::style::{parse_border, parse_style_obj, PropValueParse, StyleBorder, StyleProp, StylePropKey, StylePropertyValue};
 
 type CssValueResolver = Box<dyn Fn(&HashMap<String, String>) -> String>;
 
@@ -229,13 +229,12 @@ impl StyleList {
                 ]
             }
             "border" => {
-                vec![
-                    ("BorderTop", v_str.to_string()),
-                    ("BorderRight", v_str.to_string()),
-                    ("BorderBottom", v_str.to_string()),
-                    ("BorderLeft", v_str.to_string()),
-
-                ]
+                let mut result = Vec::new();
+                result.append(&mut Self::expand_style("BorderTop", v_str));
+                result.append(&mut Self::expand_style("BorderRight", v_str));
+                result.append(&mut Self::expand_style("BorderBottom", v_str));
+                result.append(&mut Self::expand_style("BorderLeft", v_str));
+                result
             }
             "margin" => {
                 let (t, r, b, l) = crate::style::parse_box_prop(StylePropertyValue::String(v_str.to_string()));
@@ -262,6 +261,38 @@ impl StyleList {
                     ("BorderTopRightRadius", r.to_str("none")),
                     ("BorderBottomRightRadius", b.to_str("none")),
                     ("BorderBottomLeftRadius", l.to_str("none")),
+                ]
+            }
+            "bordertop" => {
+                let (width, color) = parse_border(v_str);
+                //TODO no re-encoding?
+                vec![
+                    ("BorderTopWidth", width.to_style_string()),
+                    ("BorderTopColor", color.to_style_string()),
+                ]
+            }
+            "borderright" => {
+                let (width, color) = parse_border(v_str);
+                //TODO no re-encoding?
+                vec![
+                    ("BorderRightWidth", width.to_style_string()),
+                    ("BorderRightColor", color.to_style_string()),
+                ]
+            }
+            "borderbottom" => {
+                let (width, color) = parse_border(v_str);
+                //TODO no re-encoding?
+                vec![
+                    ("BorderBottomWidth", width.to_style_string()),
+                    ("BorderBottomColor", color.to_style_string()),
+                ]
+            }
+            "borderleft" => {
+                let (width, color) = parse_border(v_str);
+                //TODO no re-encoding?
+                vec![
+                    ("BorderLeftWidth", width.to_style_string()),
+                    ("BorderLeftColor", color.to_style_string()),
                 ]
             }
             _ => {

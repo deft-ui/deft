@@ -92,16 +92,6 @@ impl PropValueParse for Color {
     }
 }
 
-
-impl PropValueParse for StyleBorder {
-    fn parse_prop_value(value: &str) -> Option<Self> {
-        parse_border(value)
-    }
-    fn to_style_string(&self) -> String {
-        format!("solid {} {}", self.0.to_style_string(), self.1.to_style_string())
-    }
-}
-
 impl PropValueParse for Display {
     fn parse_prop_value(value: &str) -> Option<Self> {
         Display::from_str(value).ok()
@@ -538,10 +528,15 @@ define_style_props!(
     FontSize        => Length, f32;
     LineHeight      => f32, f32;
 
-    BorderTop => StyleBorder, StyleBorder;
-    BorderRight => StyleBorder, StyleBorder;
-    BorderBottom => StyleBorder,StyleBorder;
-    BorderLeft => StyleBorder,StyleBorder;
+    BorderTopWidth => LengthOrPercent, f32;
+    BorderRightWidth => LengthOrPercent, f32;
+    BorderBottomWidth => LengthOrPercent, f32;
+    BorderLeftWidth => LengthOrPercent, f32;
+
+    BorderTopColor => Color, Color;
+    BorderRightColor => Color, Color;
+    BorderBottomColor => Color, Color;
+    BorderLeftColor => Color, Color;
 
     Display => Display, Display;
 
@@ -975,7 +970,8 @@ impl StyleNode {
 
     fn get_default_value(&self, key: StylePropKey) -> ResolvedStyleProp {
         let standard_node = Node::new();
-        let default_border = StyleBorder(LengthOrPercent::Undefined, Color::TRANSPARENT);
+        let default_border_width = LengthOrPercent::Length(Length::PX(0.0));
+        let default_border_color = Color::TRANSPARENT;
         match key {
             StylePropKey::Color => {
                 ResolvedStyleProp::Color(Color::BLACK)
@@ -990,17 +986,29 @@ impl StyleNode {
                 //TODO use font-size
                 ResolvedStyleProp::LineHeight(12.0)
             }
-            StylePropKey::BorderTop  =>   {
-                ResolvedStyleProp::BorderTop(default_border)
+            StylePropKey::BorderTopWidth  =>   {
+                ResolvedStyleProp::BorderTopWidth(default_border_width)
             }
-            StylePropKey::BorderRight  =>   {
-                ResolvedStyleProp::BorderRight(default_border)
+            StylePropKey::BorderRightWidth  =>   {
+                ResolvedStyleProp::BorderRightWidth(default_border_width)
             }
-            StylePropKey::BorderBottom  =>   {
-                ResolvedStyleProp::BorderBottom(default_border)
+            StylePropKey::BorderBottomWidth  =>   {
+                ResolvedStyleProp::BorderBottomWidth(default_border_width)
             }
-            StylePropKey::BorderLeft  =>   {
-                ResolvedStyleProp::BorderLeft(default_border)
+            StylePropKey::BorderLeftWidth  =>   {
+                ResolvedStyleProp::BorderLeftWidth(default_border_width)
+            }
+            StylePropKey::BorderTopColor => {
+                ResolvedStyleProp::BorderTopColor(default_border_color)
+            }
+            StylePropKey::BorderRightColor => {
+                ResolvedStyleProp::BorderRightColor(default_border_color)
+            }
+            StylePropKey::BorderBottomColor => {
+                ResolvedStyleProp::BorderBottomColor(default_border_color)
+            }
+            StylePropKey::BorderLeftColor => {
+                ResolvedStyleProp::BorderLeftColor(default_border_color)
             }
             StylePropKey::Display  =>   {
                 ResolvedStyleProp::Display(Display::Flex)
@@ -1183,17 +1191,33 @@ impl StyleNode {
             ResolvedStyleProp::LineHeight(value) => {
                 self.computed_style.line_height = value;
             }
-            ResolvedStyleProp::BorderTop (value) =>   {
-                self.set_border(&value, &vec![0], length_ctx);
+            ResolvedStyleProp::BorderTopWidth (value) =>   {
+                self.set_border_width(&value, &vec![0], length_ctx);
             }
-            ResolvedStyleProp::BorderRight (value) =>   {
-                self.set_border(&value, &vec![1], length_ctx);
+            ResolvedStyleProp::BorderRightWidth (value) =>   {
+                self.set_border_width(&value, &vec![1], length_ctx);
             }
-            ResolvedStyleProp::BorderBottom (value) =>   {
-                self.set_border(&value, &vec![2], length_ctx);
+            ResolvedStyleProp::BorderBottomWidth (value) =>   {
+                self.set_border_width(&value, &vec![2], length_ctx);
             }
-            ResolvedStyleProp::BorderLeft (value) =>   {
-                self.set_border(&value, &vec![3], length_ctx);
+            ResolvedStyleProp::BorderLeftWidth (value) =>   {
+                self.set_border_width(&value, &vec![3], length_ctx);
+            }
+            ResolvedStyleProp::BorderTopColor (value) =>   {
+                self.set_border_color(&value, &vec![0], length_ctx);
+                need_layout = false;
+            }
+            ResolvedStyleProp::BorderRightColor (value) =>   {
+                self.set_border_color(&value, &vec![1], length_ctx);
+                need_layout = false;
+            }
+            ResolvedStyleProp::BorderBottomColor (value) =>   {
+                self.set_border_color(&value, &vec![2], length_ctx);
+                need_layout = false;
+            }
+            ResolvedStyleProp::BorderLeftColor (value) =>   {
+                self.set_border_color(&value, &vec![3], length_ctx);
+                need_layout = false;
             }
             ResolvedStyleProp::Display (value) =>   {
                 self.yoga_node.set_display(value)
@@ -1413,19 +1437,23 @@ impl StyleNode {
         return None
     }
 
-    fn set_border(&mut self, value: &StyleBorder, edges: &Vec<usize>, length_ctx: &LengthContext) {
+    fn set_border_width(&mut self, value: &LengthOrPercent, edges: &Vec<usize>, length_ctx: &LengthContext) {
         // let default_border = StyleBorder(StyleUnit::UndefinedValue, StyleColor::Color(Color::TRANSPARENT));
         // let value = value.resolve(&default_border);
-        let color = value.1;
         //TODO fix percent?
-        let width = match value.0.to_style_unit(length_ctx) {
+        let width = match value.to_style_unit(length_ctx) {
             StyleUnit::Point(f) => {f.0},
             _ => 0.0,
         };
         for index in edges {
-            self.border_color[*index] = color;
             let edges_list = [Edge::Top, Edge::Right, Edge::Bottom, Edge::Left];
             self.yoga_node.set_border(edges_list[*index], width);
+        }
+    }
+
+    fn set_border_color(&mut self, color: &Color, edges: &Vec<usize>, length_ctx: &LengthContext) {
+        for index in edges {
+            self.border_color[*index] = *color;
         }
     }
 
@@ -1669,7 +1697,7 @@ fn parse_translate_length(value: &str) -> Option<TranslateLength> {
     }
 }
 
-fn parse_border(value: &str) -> Option<StyleBorder> {
+pub fn parse_border(value: &str) -> (LengthOrPercent, Color) {
     let parts = value.split(" ");
     let mut width = LengthOrPercent::Length(Length::PX((0.0)));
     let mut color = Color::from_rgb(0, 0, 0);
@@ -1681,7 +1709,7 @@ fn parse_border(value: &str) -> Option<StyleBorder> {
             width = w;
         }
     }
-    Some(StyleBorder(width, color))
+    (width, color)
 }
 
 fn parse_color(value: &str) -> Option<Color> {
