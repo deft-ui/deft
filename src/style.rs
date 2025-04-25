@@ -658,7 +658,7 @@ impl StylePropertyValue {
 
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct LengthContext {
     pub root: f32,
     pub font_size: f32,
@@ -1694,9 +1694,11 @@ fn parse_color(value: &str) -> Option<Color> {
 fn test_inherit() {
     let color = Color::from_rgb(10, 20, 30);
     let mut p = StyleNode::new();
-    p.set_style(StyleProp::Color(StylePropVal::Custom(color)));
+    let length_context = LengthContext::default();
+    p.set_style(StyleProp::Color(StylePropVal::Custom(color)), &length_context);
     let mut c = StyleNode::new();
     p.insert_child(&mut c, 0);
+    c.set_style(StyleProp::Color(StylePropVal::Inherit), &length_context);
     let child_color = c.get_resolved_value(StylePropKey::Color);
     assert_eq!(child_color, ResolvedStyleProp::Color(color));
 }
