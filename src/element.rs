@@ -811,7 +811,7 @@ impl Element {
         let is_self_dirty = self.dirty_flags.contains(StyleDirtyFlags::SelfDirty);
         let is_children_dirty = self.dirty_flags.contains(StyleDirtyFlags::ChildrenDirty);
         let mut changed_keys = Vec::new();
-        if is_self_dirty || !changed_keys.is_empty() {
+        if is_self_dirty || !parent_changed.is_empty() {
             let changed_styles = self.apply_own_style(parent_changed, length_ctx);
             for s in changed_styles {
                 changed_keys.push(s.key());
