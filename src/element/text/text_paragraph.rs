@@ -1,12 +1,11 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use skia_safe::{Font, Paint};
-use skia_safe::textlayout::TextAlign;
 use yoga::MeasureMode;
 use crate::element::text::{AtomOffset, ColOffset};
 use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
-use crate::element::text::skia_text_paragraph::SkiaTextParagraph;
 use crate::string::StringUtils;
+use crate::text::TextAlign;
 
 #[derive(Clone)]
 pub struct ParagraphRef {
@@ -24,7 +23,6 @@ pub struct ParagraphData {
 pub struct Line {
     /// Atom count; \r\n is treated as one atom
     pub atom_count: AtomOffset,
-    // pub paragraph: SkiaTextParagraph,
     pub paragraph: SimpleTextParagraph,
     pub paragraph_dirty: bool,
 }

@@ -1,14 +1,24 @@
-use skia_safe::{scalar, Canvas, Font, FontMetrics, GlyphId, Paint, Point, Rect};
+use std::ffi::c_void;
+use std::ptr::{slice_from_raw_parts, slice_from_raw_parts_mut};
+use font_kit::canvas::{Format, RasterizationOptions};
+use font_kit::hinting::HintingOptions;
+use font_kit::loader::Loader;
+use libc::memcpy;
+use log::warn;
+use skia_safe::{scalar, AlphaType, Bitmap, Canvas, ColorType, Image, ImageInfo, Paint, Point, Rect};
 use skia_safe::canvas::GlyphPositions;
-use skia_safe::textlayout::{LineMetrics, PositionWithAffinity, TextStyle};
-use skia_safe::textlayout::paragraph::{GlyphInfo, VisitorInfo};
+use swash::GlyphId;
+use swash::scale::image::Content;
 use crate::base;
 use crate::canvas_util::CanvasHelper;
 use crate::element::paragraph::TextUnit;
 use crate::element::text::text_paragraph::TextParams;
+use crate::font::Font;
 use crate::number::DeNan;
 use crate::string::StringUtils;
-use crate::text::calculate_line_char_count;
+use crate::style::ColorHelper;
+use crate::text::{calculate_line_char_count, TextStyle};
+
 
 #[derive(Clone)]
 struct LineUnit {
@@ -33,7 +43,7 @@ impl BoundsWithOffset {
 
 impl LineUnit {
     fn get_inner_layout_bounds(&self, compact: bool) -> Vec<BoundsWithOffset> {
-        let glyph_ids = self.block.font.str_to_glyphs_vec(self.block.text.as_str());
+        let glyph_ids = str_to_glyphs_vec(&self.block.font, self.block.text.as_str());
         let mut bounds = Vec::with_capacity(glyph_ids.len());
         let mut widths = Vec::with_capacity(glyph_ids.len());
         let mut result = Vec::with_capacity(glyph_ids.len());
@@ -41,15 +51,22 @@ impl LineUnit {
             bounds.set_len(glyph_ids.len());
             widths.set_len(glyph_ids.len());
         }
-        get_fixed_widths_bounds(&self.block.font, &glyph_ids, &mut widths, &mut bounds, Some(&self.block.style.foreground()));
+        get_fixed_widths_bounds(
+            &self.block.font,
+            &glyph_ids,
+            &mut widths,
+            &mut bounds,
+            Some(&self.block.style.foreground()),
+            self.block.style.font_size(),
+        );
         let mut x = 0.0;
-        let (_, metrics) = self.block.font.metrics();
+        let metrics = self.block.font.metrics();
         for i in 0..glyph_ids.len() {
             if !compact {
                 bounds[i].left = 0.0;
                 bounds[i].right = widths[i];
-                bounds[i].bottom = metrics.descent;
-                bounds[i].top = metrics.ascent;
+                bounds[i].bottom = metrics.descent / metrics.units_per_em as f32 * self.block.style.font_size();
+                bounds[i].top = -metrics.ascent / metrics.units_per_em as f32 * self.block.style.font_size();
             }
             result.push(BoundsWithOffset::new(x, bounds[i]));
             x += widths[i];
@@ -59,10 +76,11 @@ impl LineUnit {
 
     fn paint(&self, canvas: &Canvas, origin: Point, range: Option<(usize, usize)>, paint: Option<&Paint>) {
         let font = &self.block.font;
+        let font_size = self.block.style.font_size();
         let foreground = self.block.style.foreground();
         let paint = paint.unwrap_or(&foreground);
-        let mut glyphs = font.str_to_glyphs_vec(self.block.text.as_str());
-        let mut layout_bounds = self.get_inner_layout_bounds(true)
+        let mut glyphs = str_to_glyphs_vec(&font, self.block.text.as_str());
+        let mut layout_bounds = self.get_inner_layout_bounds(false)
             .iter().map(|b| Point::new(b.x, 0.0)).collect::<Vec<_>>();
         let mut offset = 0;
         let (mut range_start, mut range_end) = range.unwrap_or((0, glyphs.len()));
@@ -80,7 +98,62 @@ impl LineUnit {
                 }
             }
         }
-        canvas.draw_glyphs_at(&glyphs[range_start..range_end], GlyphPositions::Points(&layout_bounds[range_start..range_end]), origin , &font, &paint);
+
+        //TODO fix scale
+        let scale = 2.0;
+        canvas.save();
+        canvas.scale((1.0 / scale, 1.0 / scale));
+        let color = paint.color();
+        for idx in range_start..range_end {
+            let lb = layout_bounds[idx];
+            if let Some(img) = font.rasterize_glyph(glyphs[idx], font_size * scale) {
+                let width = img.placement.width;
+                let height = img.placement.height;
+                let x = img.placement.left;
+                let y = img.placement.top;
+                if width == 0 || height == 0 {
+                    continue;
+                }
+                let size = (width as i32, height as i32);
+                let pixels_count = (width * height * 4) as usize;
+                let mut bmp = Bitmap::new();
+                let image_info = ImageInfo::new(size, ColorType::RGBA8888, AlphaType::Unpremul, None);
+                bmp.set_info(&image_info, None);
+                bmp.alloc_pixels();
+                match img.content {
+                    Content::Mask => {
+                        let mut bytes = unsafe {
+                            slice_from_raw_parts_mut(bmp.pixels() as *mut u8, pixels_count)
+                        };
+                        let mut i = 0;
+                        for y in 0..height {
+                            let row_offset = y * width * 4;
+                            for x in 0..width {
+                                let pixel_offset = (row_offset + x * 4) as usize;
+                                unsafe {
+                                    (*bytes)[pixel_offset] = color.r();
+                                    (*bytes)[pixel_offset + 1] = color.g();
+                                    (*bytes)[pixel_offset + 2] = color.b();
+                                    (*bytes)[pixel_offset + 3] = img.data[i];
+                                }
+                                i += 1;
+                            }
+                        }
+                    }
+                    Content::SubpixelMask => {
+                        warn!("SubpixelMast is unsupported yet");
+                    }
+                    Content::Color => {
+                        unsafe {
+                            memcpy(bmp.pixels(),  img.data.as_ptr() as *const c_void, img.data.len());
+                        }
+                    }
+                };
+                canvas.draw_image(bmp.as_image(), ((origin.x + lb.x) * scale + x as f32, origin.y * scale - y as f32), None);
+            }
+        }
+        canvas.restore();
+
     }
 
 }
@@ -119,7 +192,7 @@ pub struct SimpleTextParagraph {
 }
 
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct TextBlock {
     pub text: String,
     pub style: TextStyle,
@@ -157,7 +230,7 @@ impl SimpleTextParagraph {
         let mut current_line = TextLine::new(0, 0);
 
         for tb in &self.text_blocks {
-            let glyphs = tb.font.str_to_glyphs_vec(&tb.text);
+            let glyphs = str_to_glyphs_vec(&tb.font, &tb.text);
             let char_count = glyphs.len();
             if char_count == 0 {
                 continue;
@@ -170,7 +243,14 @@ impl SimpleTextParagraph {
                 bounds.set_len(char_count);
                 x_pos.set_len(char_count + 1);
             }
-            get_fixed_widths_bounds(&tb.font, &glyphs, &mut widths, &mut bounds, Some(&tb.style.foreground()));
+            get_fixed_widths_bounds(
+                &tb.font,
+                &glyphs,
+                &mut widths,
+                &mut bounds,
+                Some(&tb.style.foreground()),
+                tb.style.font_size(),
+            );
             x_pos[0] = 0.0;
             for i in 0..char_count {
                 if glyphs[i] == 0 {
@@ -178,8 +258,9 @@ impl SimpleTextParagraph {
                 }
                 x_pos[i + 1] = x_pos[i] + widths[i];
             }
-            let (_, font_metrics) = tb.font.metrics();
 
+            let font_metrics = tb.font.metrics();
+            let metrics_scale = tb.style.font_size() / font_metrics.units_per_em as f32;
             let mut consumed_char_count = 0;
             while consumed_char_count < char_count {
                 let mut cc = calculate_line_char_count(&x_pos[consumed_char_count..], available_width - left);
@@ -207,8 +288,10 @@ impl SimpleTextParagraph {
                 char_offset += cc;
                 left += x_pos[consumed_char_count + cc - 1] - x_pos[consumed_char_count] + widths[consumed_char_count + cc - 1];
                 consumed_char_count += cc;
-                current_line.baseline = f32::max(current_line.baseline, -font_metrics.ascent + font_metrics.leading);
-                current_line.height = f32::max(current_line.height, -font_metrics.ascent + font_metrics.descent + font_metrics.leading);
+                //TODO fix leading?
+                current_line.baseline = f32::max(current_line.baseline, font_metrics.ascent * metrics_scale /* + font_metrics.leading */);
+                //TODO check line height
+                current_line.height =  f32::max(current_line.height, (font_metrics.ascent + font_metrics.descent  + font_metrics.leading) * metrics_scale);
                 max_intrinsic_width = f32::max(max_intrinsic_width, left);
             }
         }
@@ -297,6 +380,9 @@ impl SimpleTextParagraph {
             let y = ln.y + ln.baseline;
             for unit in &ln.units {
                 let tb = &unit.block;
+                if tb.style.foreground().color().is_transparent() {
+                    continue;
+                }
                 let x = unit.x;
                 unit.paint(&canvas, Point::new(x, y), None, None);
             }
@@ -339,12 +425,37 @@ pub fn get_fixed_widths_bounds(
     mut widths: &mut [scalar],
     mut bounds: &mut [Rect],
     paint: Option<&Paint>,
+    font_size: f32,
 ) {
-    font.get_widths_bounds(glyphs, Some(widths), Some(bounds), paint);
+    get_widths_bounds(font, glyphs, widths, bounds, font_size);
     for i in 0..glyphs.len() {
         if glyphs[i] == 0 {
             widths[i] = 0.0;
             bounds[i] = Rect::new(0.0, 0.0, 0.0, 0.0);
         }
     }
+}
+
+pub fn get_widths_bounds(
+    font: &Font,
+    glyphs: &[GlyphId],
+    mut widths: &mut [scalar],
+    mut bounds: &mut [Rect],
+    font_size: f32,
+) {
+    for i in 0..glyphs.len() {
+        if let Ok(b) = font.raster_bounds(glyphs[i], font_size) {
+            bounds[i] = b;
+            widths[i] = b.width();
+        }
+    }
+}
+
+pub fn str_to_glyphs_vec(font: &Font,text: &str) -> Vec<GlyphId> {
+    let mut glyphs = Vec::with_capacity(text.chars().count());
+    for c in text.chars() {
+        let glyph = font.glyph_for_char(c).unwrap_or(0);
+        glyphs.push(glyph);
+    }
+    glyphs
 }

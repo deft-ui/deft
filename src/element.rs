@@ -52,6 +52,7 @@ mod edit_history;
 pub mod text;
 pub mod paragraph;
 pub mod body;
+mod font_manager;
 
 use crate as deft;
 use crate::app::AppEvent;

@@ -8,7 +8,7 @@ use std::io::Write;
 use crate as deft;
 use crate::color::parse_hex_color;
 use crate::element::text::text_paragraph::ParagraphRef;
-use crate::element::text::{intersect_range, ColOffset, RowOffset, FONT_COLLECTION, FONT_MGR};
+use crate::element::text::{intersect_range, ColOffset, RowOffset};
 use crate::element::{text, Element, ElementBackend, ElementWeak};
 use crate::js::JsError;
 use crate::number::DeNan;
@@ -19,11 +19,6 @@ use deft_macros::{element_backend, js_methods, mrc_object};
 use rodio::cpal::available_hosts;
 use serde::{Deserialize, Serialize};
 use skia_safe::font_style::{Slant, Weight, Width};
-use skia_safe::textlayout::{
-    Decoration, FontFamilies, Paragraph as SkParagraph, ParagraphBuilder, ParagraphStyle,
-    PlaceholderStyle, StrutStyle, TextAlign, TextDecoration, TextDirection, TextStyle,
-    TypefaceFontProvider,
-};
 use skia_safe::{Canvas, Color, Font, FontMgr, FontStyle, Paint, Point, Rect};
 use std::str::FromStr;
 use clipboard::{ClipboardContext, ClipboardProvider};
@@ -36,9 +31,9 @@ use crate::element::paragraph::simple_paragraph_builder::SimpleParagraphBuilder;
 use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
 use crate::event::{FocusShiftEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent, SelectEndEvent, SelectMoveEvent, SelectStartEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
 use crate::render::RenderFn;
-use crate::typeface::get_font_mgr;
+use crate::text::{TextAlign, TextDecoration, TextStyle};
 
-const DEFAULT_FONT_NAME: &str = "system-ui";
+const DEFAULT_FONT_NAME: &str = "sans-serif,Noto Color Emoji,Segoe UI Emoji,Apple Color Emoji";
 
 const ZERO_WIDTH_WHITESPACE: &str = "\u{200B}";
 
@@ -592,18 +587,8 @@ impl Paragraph {
     ) -> SimpleTextParagraph {
         // let mut text = text.trim_line_endings().to_string();
         // text.push_str(ZERO_WIDTH_WHITESPACE);
-        let mut paragraph_style = ParagraphStyle::new();
-        paragraph_style.set_text_align(paragraph_params.align);
 
         let default_font_families:Vec<&str> = DEFAULT_FONT_NAME.split(",").collect();
-        if let Some(line_height) = paragraph_params.line_height {
-            let mut strut_style = StrutStyle::default();
-            strut_style.set_font_families(default_font_families.as_slice());
-            strut_style.set_strut_enabled(true);
-            strut_style.set_font_size(line_height);
-            strut_style.set_force_strut_height(true);
-            paragraph_style.set_strut_style(strut_style);
-        }
 
         let mut pb = SimpleParagraphBuilder::new(&paragraph_params);
         let p_color = paragraph_params.color;
@@ -872,7 +857,7 @@ fn test_layout_performance() {
     let text_demo = include_str!("../../Cargo.lock");
     let params = ParagraphParams {
         line_height: Some(20.0),
-        align: Default::default(),
+        align: TextAlign::Left,
         color: Default::default(),
         font_size: 16.0,
         font_families: vec!["monospace".to_string()],

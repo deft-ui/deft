@@ -1,4 +1,4 @@
-pub mod skia_text_paragraph;
+// pub mod skia_text_paragraph;
 pub mod text_paragraph;
 pub mod simple_text_paragraph;
 
@@ -10,13 +10,11 @@ use std::rc::Rc;
 use anyhow::Error;
 use quick_js::{JsValue, ValueError};
 use skia_safe::{Canvas, Color, Font, FontMgr, FontStyle, Paint, Typeface};
-use skia_safe::textlayout::{FontCollection, TextAlign, TextStyle};
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 use deft_macros::{js_methods, mrc_object};
 use crate::base::{EventContext, MouseDetail, MouseEventType, Rect, TextUpdateDetail};
 use crate::color::parse_hex_color;
 use crate::element::{ElementBackend, Element, ElementWeak};
-use crate::element::text::skia_text_paragraph::{SkiaTextParagraph};
 use crate::element::text::text_paragraph::{ParagraphData, Line, ParagraphRef, TextParams};
 use crate::element::paragraph::ParagraphParams;
 use crate::element::paragraph::simple_paragraph_builder::SimpleParagraphBuilder;
@@ -26,6 +24,7 @@ use crate::number::DeNan;
 use crate::render::RenderFn;
 use crate::string::StringUtils;
 use crate::style::StylePropKey;
+use crate::text::{TextAlign, TextStyle};
 
 // zero-width space for caret
 const ZERO_WIDTH_WHITESPACE: &str = "\u{200B}";
@@ -46,11 +45,6 @@ pub struct Text {
     selection: Option<(AtomOffset, AtomOffset)>,
     element: Element,
     selecting_begin: Option<AtomOffset>,
-}
-
-thread_local! {
-    pub static FONT_MGR: FontMgr = FontMgr::new();
-    pub static FONT_COLLECTION: FontCollection = FontCollection::new();
 }
 
 extern "C" fn measure_label(node_ref: NodeRef, width: f32, width_mode: MeasureMode, _height: f32, height_mode: MeasureMode) -> Size {

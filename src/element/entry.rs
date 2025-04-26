@@ -8,7 +8,6 @@ use clipboard::{ClipboardContext, ClipboardProvider};
 use ordered_float::OrderedFloat;
 use quick_js::{JsValue, ValueError};
 use skia_safe::{Canvas, Color, Font, Paint};
-use skia_safe::textlayout::{Placeholder, TextAlign};
 use skia_safe::wrapper::NativeTransmutableWrapper;
 use winit::dpi::{LogicalPosition, LogicalSize, Size};
 use winit::keyboard::NamedKey;
@@ -35,6 +34,7 @@ use crate::string::StringUtils;
 use crate::style::{Length, LengthContext, LengthOrPercent, ResolvedStyleProp, StyleProp, StylePropKey, StylePropVal, YogaNode};
 use crate::style::StyleProp::{BackgroundColor, Display, Left, MinWidth, Position, Top};
 use crate::style::StylePropKey::Height;
+use crate::text::TextAlign;
 use crate::timer::TimerHandle;
 
 const COPY_KEY: &str = "\x03";

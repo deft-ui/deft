@@ -4,9 +4,9 @@
 
 use crate::app::{WinitApp, AppEvent, AppEventPayload, IApp, App};
 use crate::data_dir::get_data_path;
-use crate::element::label::{AttributeText, DEFAULT_TYPE_FACE};
+use crate::element::label::{AttributeText};
 use crate::element::text::text_paragraph::TextParams;
-use crate::element::text::{Text, FONT_MGR};
+use crate::element::text::{Text};
 use crate::element::ScrollByOption;
 use crate::js::js_deserialze::JsDeserializer;
 use crate::loader::{RemoteModuleLoader, StaticModuleLoader};
@@ -18,7 +18,6 @@ use measure_time::{debug_time, info, print_time};
 use memory_stats::memory_stats;
 use quick_js::loader::FsJsModuleLoader;
 use serde::{Deserialize, Serialize};
-use skia_safe::textlayout::{paragraph, TextAlign};
 use skia_safe::{Font, FontMetrics, FontStyle, Paint};
 use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 use std::collections::HashMap;
@@ -84,6 +83,7 @@ mod style_list;
 pub mod winit;
 mod task_executor;
 mod stylesheet;
+mod font;
 
 pub use deft_macros::*;
 use log::debug;

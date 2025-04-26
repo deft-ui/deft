@@ -5,7 +5,6 @@ use std::str::FromStr;
 use anyhow::Error;
 use log::error;
 use quick_js::{Context, ExecutionError, JsPromise, JsValue, ValueError};
-use skia_safe::textlayout::TextAlign;
 use skia_safe::wrapper::NativeTransmutableWrapper;
 use tokio::runtime::Runtime;
 use winit::event_loop::EventLoopProxy;
@@ -17,6 +16,7 @@ use crate::element::label::parse_align;
 use crate::js::{JsError, ToJsCallResult};
 use crate::js::js_event_loop::{js_create_event_loop_proxy, JsEvent, JsEventLoopProxy};
 use crate::resource_table::ResourceTable;
+use crate::text::TextAlign;
 
 pub struct JsContext {
     context: Context,

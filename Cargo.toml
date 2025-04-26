@@ -30,7 +30,7 @@ tokio = { version = "1.38.0", features = ["rt-multi-thread", "fs", "macros", "io
 tokio-tungstenite = { version = "0.23.1", features = ["native-tls"] }
 futures-util = "0.3.30"
 clipboard = "0.5.0"
-image = "0.25.2"
+image = { version = "0.25.2", default-features = false, features = ["bmp", "jpeg", "png", "gif"] }
 libc = "0.2.155"
 sled = "0.34.7"
 ksni = { version = "0.2.2", optional = true }
@@ -46,12 +46,14 @@ rusqlite = { version = "0.32.0", features = ["bundled"] }
 bezier-rs = "0.4.0"
 raw-window-handle = "0.5.2"
 log = "0.4.25"
-skia-safe = {package = "deft-skia-safe", version = "0.81.0", features = ["binary-cache", "textlayout", "svg"], default-features = false}
+skia-safe = {package = "deft-skia-safe", version = "0.81.0", features = ["binary-cache"], default-features = false}
 env_logger = "0.11.6"
 bitflags = "2.6.0"
 lightningcss = "1.0.0-alpha.65"
 cssparser = "0.27"
 selectors = "0.22"
+font-kit = { version = "0.14.2" }
+swash = "0.2.2"
 
 [features]
 default = []

@@ -180,7 +180,7 @@ function createParagraph() {
             text: "Normal",
             fontSize: 20,
             backgroundColor: "#6666",
-            fontFamilies: ["auto-mono"],
+            // fontFamilies: ["auto-mono"],
         }, {
             type: "text",
             text: "Small red",
@@ -241,7 +241,7 @@ function main() {
 
     container.addChild(createAddChildrenButton(container));
     container.addChild(createAnimationButton());
-    container.addChild(createLabel("测试test", "large-text"));
+    container.addChild(createLabel("测试test😃", "large-text"));
     container.addChild(createParagraph());
     container.addChild(createTextEdit());
     const entry = createEntry();

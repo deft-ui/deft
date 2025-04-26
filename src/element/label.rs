@@ -4,7 +4,6 @@ use anyhow::{Error};
 use quick_js::JsValue;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 use skia_safe::{Canvas, Color, Color4f, Font, FontMgr, FontStyle, Paint, Typeface};
-use skia_safe::textlayout::{FontCollection, Paragraph, ParagraphBuilder, ParagraphStyle, StrutStyle, TextAlign, TextStyle};
 use crate::base::{Rect, TextUpdateDetail};
 use crate::color::parse_hex_color;
 use crate::element::{ElementData, ElementBackend, Element};
@@ -13,6 +12,7 @@ use crate::js::js_value_util::JsValueHelper;
 use crate::number::DeNan;
 use crate::string::StringUtils;
 use crate::style::StylePropKey;
+use crate::text::TextAlign;
 
 pub struct AttributeText {
     pub text: String,
@@ -20,9 +20,8 @@ pub struct AttributeText {
 }
 
 thread_local! {
-    pub static DEFAULT_TYPE_FACE: Typeface = default_typeface();
+    //TODO remove
     pub static FONT_MGR: FontMgr = FontMgr::new();
-    pub static FONT_COLLECTION: FontCollection = FontCollection::new();
 }
 
 
