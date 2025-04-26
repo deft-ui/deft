@@ -13,6 +13,12 @@ pub enum TextAlign {
     End = 5,
 }
 
+impl Default for TextAlign {
+    fn default() -> Self {
+        Self::Left
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct TextStyle {
     font_size: f32,

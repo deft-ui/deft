@@ -33,7 +33,16 @@ use crate::event::{FocusShiftEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent
 use crate::render::RenderFn;
 use crate::text::{TextAlign, TextDecoration, TextStyle};
 
-const DEFAULT_FONT_NAME: &str = "sans-serif,Noto Color Emoji,Segoe UI Emoji,Apple Color Emoji";
+#[cfg(target_os = "windows")]
+const DEFAULT_FONT_NAME: &str = "sans-serif,Microsoft YaHei,Segoe UI Emoji";
+#[cfg(target_os = "linux")]
+const DEFAULT_FONT_NAME: &str = "sans-serif,Noto Color Emoji";
+#[cfg(target_os = "macos")]
+const DEFAULT_FONT_NAME: &str = "sans-serif,Apple Color Emoji";
+#[cfg(target_os = "android")]
+const DEFAULT_FONT_NAME: &str = "Roboto,Noto Sans CJK SC,Noto Sans CJK TC,Noto Sans CJK HK,Noto Sans CJK KR,Noto Sans CJK JP,Noto Color Emoji";
+#[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos", target_os = "android")))]
+const DEFAULT_FONT_NAME: &str = "sans-serif";
 
 const ZERO_WIDTH_WHITESPACE: &str = "\u{200B}";
 

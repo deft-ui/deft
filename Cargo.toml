@@ -52,7 +52,7 @@ bitflags = "2.6.0"
 lightningcss = "1.0.0-alpha.65"
 cssparser = "0.27"
 selectors = "0.22"
-font-kit = { version = "0.14.2" }
+font-kit = { version = "0.14.2", package = "deft-font-kit" }
 swash = "0.2.2"
 
 [features]

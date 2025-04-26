@@ -16,27 +16,29 @@ pub struct Font {
     offset: u32,
     // Cache key
     key: CacheKey,
+
+    family_name: String,
 }
 
 unsafe impl Send for Font {}
 unsafe impl Sync for Font {}
 
 impl Font {
-    pub fn from_file<P: AsRef<Path>>(path: P, index: usize) -> Option<Self> {
+    pub fn from_file<P: AsRef<Path>>(path: P, index: usize, family_name: String) -> Option<Self> {
         // Read the full font file
         let data = std::fs::read(path).ok()?;
         // Create a temporary font reference for the first font in the file.
         // This will do some basic validation, compute the necessary offset
         // and generate a fresh cache key for us.
-        Self::from_bytes(data, index)
+        Self::from_bytes(data, index, family_name)
     }
 
-    pub fn from_bytes(data: Vec<u8>, index: usize) -> Option<Self> {
+    pub fn from_bytes(data: Vec<u8>, index: usize, family_name: String) -> Option<Self> {
         let font = FontRef::from_index(&data, index)?;
         let (offset, key) = (font.offset, font.key);
         // Return our struct with the original file data and copies of the
         // offset and key from the font reference
-        Some(FontData { data, offset, key }.to_ref())
+        Some(FontData { data, offset, key, family_name }.to_ref())
     }
 
     // As a convenience, you may want to forward some methods.
@@ -75,15 +77,21 @@ impl Font {
         Render::new(&[
             // Color outline with the first palette
             Source::ColorOutline(0),
+            Source::Bitmap(StrikeWith::BestFit),
             // Color bitmap with best fit selection mode
             Source::ColorBitmap(StrikeWith::BestFit),
             // Standard scalable outline
             Source::Outline,
         ])
             // Select a subpixel format
-            .format(Format::Alpha)
+            .format(Format::Subpixel)
             // Render the image
             .render(&mut scaler, glyph_id)
+    }
+
+    /// Just for debug
+    pub fn name(&self) -> &str {
+       &self.family_name
     }
 
     // Create the transient font reference for accessing this crate's

@@ -25,6 +25,7 @@ struct FontCacheKey {
 impl FontManager {
     pub fn new() -> FontManager {
         let source = SystemSource::new();
+        // source.all_families().unwrap().iter().for_each(|family| println!("{}", family));
         FontManagerData {
             source,
             cache: HashMap::new(),
@@ -56,12 +57,12 @@ impl FontManager {
             if let Ok(h) = self.source.select_best_match(&[family_name], &properties) {
                 match h {
                     Handle::Path { path, font_index } => {
-                        if let Some(font) = Font::from_file(path, font_index as usize) {
+                        if let Some(font) = Font::from_file(path, font_index as usize, name.to_string()) {
                             return Some(font);
                         }
                     }
                     Handle::Memory { bytes, font_index } => {
-                        if let Some(font) = Font::from_bytes(bytes.to_vec(), font_index as usize) {
+                        if let Some(font) = Font::from_bytes(bytes.to_vec(), font_index as usize, name.to_string()) {
                             return Some(font);
                         }
                     }

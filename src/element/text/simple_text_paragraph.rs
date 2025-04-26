@@ -111,6 +111,7 @@ impl LineUnit {
                 let height = img.placement.height;
                 let x = img.placement.left;
                 let y = img.placement.top;
+                // println!("placement {} {:?}", font.name(), img.placement);
                 if width == 0 || height == 0 {
                     continue;
                 }
