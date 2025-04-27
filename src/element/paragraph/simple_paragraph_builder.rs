@@ -6,7 +6,7 @@ use skia_safe::{FontStyle, Paint, Typeface, Unichar};
 use skia_safe::wrapper::ValueWrapper;
 use crate::element::font_manager::FontManager;
 use crate::element::paragraph::{ParagraphParams, DEFAULT_FONT_NAME, ZERO_WIDTH_WHITESPACE};
-use crate::element::text::simple_text_paragraph::{str_to_glyphs_vec, SimpleTextParagraph, TextBlock};
+use crate::element::text::simple_text_paragraph::{chars_to_glyphs_vec, str_to_glyphs_vec, SimpleTextParagraph, TextBlock};
 use crate::element::text::text_paragraph::TextParams;
 use crate::font::Font;
 use crate::some_or_continue;
@@ -71,17 +71,7 @@ impl SimpleParagraphBuilder {
             return Vec::new();
         }
         let mut chars = text.chars().collect::<Vec<_>>();
-        let mut resolved_typefaces: Vec<i32> = Vec::new();
-        resolved_typefaces.resize(chars.len(), -1);
-        for tf_idx in 0..fonts.len() {
-            let font = fonts[tf_idx].clone();
-            let glyphs_ids = str_to_glyphs_vec(&font, text);
-            for i in 0..glyphs_ids.len() {
-                if resolved_typefaces[i] == -1 && glyphs_ids[i] != 0 {
-                    resolved_typefaces[i] = tf_idx as i32;
-                }
-            }
-        }
+        let (mut resolved_typefaces, unresolved_count) = Self::do_resolve_font(&chars, &fonts);
         for i in 0..chars.len() {
             if resolved_typefaces[i] != -1 {
                 continue;
@@ -145,6 +135,26 @@ impl SimpleParagraphBuilder {
         let mut text = String::new();
         SimpleTextParagraph::new(self.text_blocks)
     }
+
+    fn do_resolve_font(chars: &Vec<char>, fonts: &Vec<Font>) -> (Vec<i32>, usize) {
+        let mut resolved_typefaces: Vec<i32> = Vec::new();
+        resolved_typefaces.resize(chars.len(), -1);
+        let mut unresolved_char_count = resolved_typefaces.len();
+        for tf_idx in 0..fonts.len() {
+            let glyphs_ids = chars_to_glyphs_vec(&fonts[tf_idx], chars);
+            for i in 0..glyphs_ids.len() {
+                if resolved_typefaces[i] == -1 && glyphs_ids[i] != 0 {
+                    resolved_typefaces[i] = tf_idx as i32;
+                    unresolved_char_count -= 1;
+                }
+            }
+            if unresolved_char_count == 0 {
+                break;
+            }
+        }
+        (resolved_typefaces, unresolved_char_count)
+    }
+
 }
 
 #[test]

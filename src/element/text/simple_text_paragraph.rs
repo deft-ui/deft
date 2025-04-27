@@ -452,10 +452,15 @@ pub fn get_widths_bounds(
     }
 }
 
-pub fn str_to_glyphs_vec(font: &Font,text: &str) -> Vec<GlyphId> {
-    let mut glyphs = Vec::with_capacity(text.chars().count());
-    for c in text.chars() {
-        let glyph = font.glyph_for_char(c).unwrap_or(0);
+pub fn str_to_glyphs_vec(font: &Font, text: &str) -> Vec<GlyphId> {
+    let chars = text.chars().collect::<Vec<_>>();
+    chars_to_glyphs_vec(font, &chars)
+}
+
+pub fn chars_to_glyphs_vec(font: &Font, chars: &Vec<char>) -> Vec<GlyphId> {
+    let mut glyphs = Vec::with_capacity(chars.len());
+    for c in chars {
+        let glyph = font.glyph_for_char(*c).unwrap_or(0);
         glyphs.push(glyph);
     }
     glyphs
