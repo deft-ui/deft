@@ -1,9 +1,6 @@
 use anyhow::{anyhow, Error};
-use lightningcss::printer::PrinterOptions;
-use lightningcss::rules::CssRule;
-use lightningcss::stylesheet::{ParserOptions, StyleSheet};
-use lightningcss::traits::ToCss;
 use std::collections::HashMap;
+use simplecss::StyleSheet;
 use crate::base::{Id, IdKey};
 use crate::element::button::Button;
 use crate::element::container::Container;
@@ -118,25 +115,24 @@ impl CssManager {
         css.declared_classes.clear();
         css.declared_attrs.clear();
         css.rules.clear();
-        let mut stylesheet = StyleSheet::parse(&stylesheet_source, ParserOptions::default())
-            .map_err(|e| anyhow!("failed to parse css"))?;
-        let rules = &mut stylesheet.rules;
-        for rule in &mut rules.0 {
-            if let CssRule::Style(rule) = rule {
-                let selectors = rule.selectors.to_css_string(PrinterOptions::default())?;
-                let decl = rule.declarations.to_css_string(PrinterOptions::default())?;
-                //println!("selectors: {:?} => {:?}", selectors, decl);
-                let selectors = Selectors::compile(&selectors)?;
-                for selector in selectors.0 {
-                    css.declared_classes.append(&mut selector.get_classes().clone());
-                    css.declared_attrs.append(&mut selector.get_attribute_names().clone());
-                    let rule = CSSRule {
-                        selector,
-                        declarations: decl.clone(),
-                        id: css.id,
-                    };
-                    css.rules.push(rule);
-                }
+        let mut stylesheet = StyleSheet::parse(&stylesheet_source);
+        for rule in &stylesheet.rules {
+            let selectors = rule.selector.to_string();
+            let mut declarations = Vec::new();
+            for decl in &rule.declarations {
+                declarations.push(format!("{}:{}", decl.name, decl.value));
+            }
+            //println!("selectors: {:?} => {:?}", selectors, declarations.join(";"));
+            let selectors = Selectors::compile(&selectors)?;
+            for selector in selectors.0 {
+                css.declared_classes.append(&mut selector.get_classes().clone());
+                css.declared_attrs.append(&mut selector.get_attribute_names().clone());
+                let rule = CSSRule {
+                    selector,
+                    declarations: declarations.join(";"),
+                    id: css.id,
+                };
+                css.rules.push(rule);
             }
         }
         Ok(())
