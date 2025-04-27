@@ -663,7 +663,8 @@ impl ElementBackend for Scroll {
         let vertical_bar_rect = self.vertical_bar_rect.to_skia_rect();
         let horizontal_bar_rect = self.horizontal_bar_rect.to_skia_rect();
 
-        RenderFn::new(move |canvas| {
+        RenderFn::new(move |painter| {
+            let canvas = painter.canvas;
             if vertical_bar_rect_visible {
                 canvas.draw_rect(vertical_bar_rect, &paint);
                 canvas.draw_rect(v_indicator_rect.to_skia_rect(), &indicator_paint);

@@ -49,9 +49,9 @@ use crate::computed::ComputedValue;
 use crate::element::button::Button;
 use crate::frame_rate::{FrameRateController};
 use crate::layout::LayoutRoot;
-use crate::paint::{InvalidArea, PartialInvalidArea, Painter, RenderTree, SkiaPainter, UniqueRect, InvalidRects, MatrixCalculator, RenderLayerKey, LayerState};
+use crate::paint::{InvalidArea, PartialInvalidArea, RenderTree, UniqueRect, InvalidRects, MatrixCalculator, RenderLayerKey, LayerState, PaintContext, Painter};
 use crate::render::paint_object::{ElementPO};
-use crate::render::painter::ElementPainter;
+use crate::render::painter::{ElementPainter};
 use crate::resource_table::ResourceTable;
 use crate::style::border_path::BorderPath;
 use crate::style::{ColorHelper, LengthContext};
@@ -1139,7 +1139,9 @@ impl Window {
             let mut element_painter = ElementPainter::take(ctx);
             element_painter.update_viewport(scale_factor, viewport);
             element_painter.set_layer_cache(layer_cache_enabled);
-            element_painter.draw_root(canvas, &mut paint_tree, ctx);
+            let paint_context = PaintContext { scale_factor };
+            let painter = Painter::new(canvas, paint_context);
+            element_painter.draw_root(&painter, &mut paint_tree, ctx);
             element_painter.put(ctx);
             canvas.restore();
         }), move|r| {

@@ -718,9 +718,10 @@ impl ElementBackend for Entry {
 
         let caret_pos = some_or_return!(self.get_caret_pixels_position(), RenderFn::empty());
 
-        RenderFn::new(move |canvas| {
+        RenderFn::new(move |painter| {
+            let canvas = painter.canvas;
             canvas.save();
-            base_render_fn.run(canvas);
+            base_render_fn.run(painter);
             if focusing && caret_visible {
                 paint.set_stroke_width(2.0);
                 let start = (caret_pos.x, caret_pos.y);

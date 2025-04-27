@@ -616,7 +616,8 @@ impl ElementBackend for Text {
         let selection_paint = self.selection_paint.clone();
 
         let mut p_list = self.with_lines_mut(|ln| ln.clone());
-        RenderFn::new(move |canvas| {
+        RenderFn::new(move |painter| {
+            let canvas = painter.canvas;
             let clip_rect = canvas.local_clip_bounds();
             // if let Some(clip_r) = canvas.local_clip_bounds() {
             //     debug!("clip_r:{:?}", clip_r);

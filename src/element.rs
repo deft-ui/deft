@@ -60,7 +60,7 @@ use crate::computed::ComputedValue;
 use crate::element::body::Body;
 use crate::js::JsError;
 use crate::layout::LayoutRoot;
-use crate::paint::{MatrixCalculator, Painter, RenderTree, UniqueRect};
+use crate::paint::{MatrixCalculator, RenderTree, UniqueRect};
 use crate::render::RenderFn;
 use crate::style::border_path::BorderPath;
 use crate::style::css_manager::{CssManager, CSS};

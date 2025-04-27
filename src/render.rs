@@ -3,22 +3,23 @@ pub mod layout_tree;
 pub mod painter;
 
 use skia_safe::Canvas;
+use crate::paint::Painter;
 
 pub struct RenderFn {
-    render: Box<dyn FnOnce(&Canvas) + Send>,
+    render: Box<dyn FnOnce(&Painter) + Send>,
 }
 
 impl RenderFn {
     pub fn empty() -> RenderFn {
-        RenderFn::new(|_canvas| {})
+        RenderFn::new(|_painter| {})
     }
 
-    pub fn new<F: FnOnce(&Canvas) + Send + 'static>(render: F) -> RenderFn {
+    pub fn new<F: FnOnce(&Painter) + Send + 'static>(render: F) -> RenderFn {
         Self {
             render: Box::new(render),
         }
     }
-    pub fn new_multiple<F: FnOnce(&Canvas) + Send + 'static>(renders: Vec<F>) -> RenderFn {
+    pub fn new_multiple<F: FnOnce(&Painter) + Send + 'static>(renders: Vec<F>) -> RenderFn {
         Self::new(move |canvas| {
             for render in renders {
                 render(canvas);
@@ -26,7 +27,7 @@ impl RenderFn {
         })
     }
 
-    pub fn run(self, canvas: &Canvas) {
+    pub fn run(self, canvas: &Painter) {
         (self.render)(canvas);
     }
 }

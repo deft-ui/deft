@@ -177,7 +177,8 @@ impl ElementBackend for Image {
         let mut element = element.upgrade_mut().unwrap();
         let color = element.style.color;
         
-        RenderFn::new(move |canvas| {
+        RenderFn::new(move |painter| {
+            let canvas = painter.canvas;
             canvas.save();
             canvas.scale((width / img_width, height / img_height));
             match &img {

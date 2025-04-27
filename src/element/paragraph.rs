@@ -735,7 +735,8 @@ impl ElementBackend for Paragraph {
         let selection_bg = self.selection_bg.clone();
         let selection_fg = self.selection_fg.clone();
 
-        RenderFn::new(move |canvas| {
+        RenderFn::new(move |painter| {
+            let canvas = painter.canvas;
             canvas.translate((padding.3, padding.0));
             let clip_rect = canvas.local_clip_bounds();
             for ln in &mut lines {

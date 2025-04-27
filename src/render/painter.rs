@@ -4,9 +4,10 @@ use skia_safe::{Canvas, ClipOp, Color, FilterMode, Image, Matrix, Paint, PaintSt
 use skia_safe::canvas::SetMatrix;
 use skia_window::context::RenderContext;
 use crate::canvas_util::CanvasHelper;
-use crate::paint::{InvalidRects, LayerState, RenderLayerKey};
+use crate::paint::{InvalidRects, LayerState, Painter, RenderLayerKey};
 use crate::render::paint_object::{ElementPO, LayerPO};
 use crate::{show_focus_hint, show_layer_hint, show_repaint_area, some_or_continue, some_or_return};
+
 
 pub struct ElementPainter {
     scale: f32,
@@ -47,12 +48,13 @@ impl ElementPainter {
         }
     }
 
-    pub fn draw_root(&mut self, canvas: &Canvas, root: &mut LayerPO, context: &mut RenderContext) {
+    pub fn draw_root(&mut self, painter: &Painter, root: &mut LayerPO, context: &mut RenderContext) {
         let mut state = mem::take(&mut self.layer_state_map);
-        self.draw_layer(canvas, context, root, &mut state);
+        self.draw_layer(painter, context, root, &mut state);
     }
 
-    fn draw_element_object_recurse(&mut self, canvas: &Canvas, epo: &mut ElementPO, context: &mut RenderContext) {
+    fn draw_element_object_recurse(&mut self, painter: &Painter, epo: &mut ElementPO, context: &mut RenderContext) {
+        let canvas = painter.canvas;
         // debug!("Painting {}", epo.element_id);
         //TODO optimize
         if !epo.need_paint && epo.children.is_empty() {
@@ -62,16 +64,17 @@ impl ElementPainter {
         canvas.translate(epo.coord);
         canvas.clip_path(&epo.border_box_path, ClipOp::Intersect, false);
         if epo.need_paint {
-            self.draw_element_paint_object(canvas, epo);
+            self.draw_element_paint_object(painter, epo);
         }
         for e in &mut epo.children {
-            self.draw_element_object_recurse(canvas, e, context);
+            self.draw_element_object_recurse(painter, e, context);
         }
         canvas.restore();
     }
 
-    fn submit_layer(&mut self, canvas: &Canvas, context: &mut RenderContext, lpo: &mut LayerPO, layer: &mut LayerState) {
+    fn submit_layer(&mut self, painter: &Painter, context: &mut RenderContext, lpo: &mut LayerPO, layer: &mut LayerState) {
         let img = layer.layer.as_image();
+        let canvas = painter.canvas;
         canvas.save();
         canvas.translate((layer.surface_bounds.left, layer.surface_bounds.top));
         canvas.scale((1.0 / self.scale, 1.0 / self.scale));
@@ -108,11 +111,12 @@ impl ElementPainter {
 
     pub fn draw_layer(
         &mut self,
-        root_canvas: &Canvas,
+        painter: &Painter,
         context: &mut RenderContext,
         layer: &mut LayerPO,
         layer_state_map: &mut HashMap<RenderLayerKey, LayerState>,
     ) {
+        let root_canvas = painter.canvas;
         let viewport = &self.viewport;
         let scale = self.scale;
         let surface_width = (layer.surface_bounds.width() * scale) as usize;
@@ -174,8 +178,9 @@ impl ElementPainter {
                 layer_canvas.clip_rect(&Rect::from_xywh(0.0, 0.0, layer.width, layer.height), ClipOp::Intersect, false);
                 layer_canvas.clear(Color::TRANSPARENT);
             }
+            let layer_painter = Painter::new(layer_canvas, painter.context.clone());
             for e in &mut layer.elements {
-                self.draw_element_object_recurse(layer_canvas, e, context);
+                self.draw_element_object_recurse(&layer_painter, e, context);
             }
             layer_canvas.restore();
             context.flush();
@@ -190,7 +195,7 @@ impl ElementPainter {
                 let rect = Rect::from_xywh(0.0, 0.0, layer.width, layer.height);
                 root_canvas.clip_rect(&rect, ClipOp::Intersect, false);
             }
-            self.submit_layer(root_canvas, context, layer, &mut graphic_layer);
+            self.submit_layer(painter, context, layer, &mut graphic_layer);
             context.flush();
             if self.layer_cache_enabled {
                 self.layer_state_map.insert(layer.key.clone(), graphic_layer);
@@ -199,12 +204,12 @@ impl ElementPainter {
         }
 
         for l in &mut layer.layers {
-            self.draw_layer(root_canvas, context, l, layer_state_map);
+            self.draw_layer(painter, context, l, layer_state_map);
         }
         root_canvas.restore();
     }
 
-    fn draw_element_paint_object(&mut self, canvas: &Canvas, node: &mut ElementPO) {
+    fn draw_element_paint_object(&mut self, painter: &Painter, node: &mut ElementPO) {
         let width = node.width;
         let height = node.height;
         //TODO fix clip
@@ -212,7 +217,7 @@ impl ElementPainter {
         // canvas.concat(&node.total_matrix);
         // node.clip_path.apply(canvas);
 
-        canvas.session(move |canvas| {
+        painter.canvas.session(move |canvas| {
 
             // draw background and border
             node.draw_background(&canvas);
@@ -227,7 +232,7 @@ impl ElementPainter {
                 canvas.translate((border_left_width, border_top_width));
                 // let paint_info = some_or_return!(&mut node.paint_info);
                 if let Some(render_fn) = node.render_fn.take() {
-                    render_fn.run(canvas);
+                    render_fn.run(painter);
                 }
             }
             canvas.restore();

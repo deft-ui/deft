@@ -27,6 +27,22 @@ thread_local! {
     pub static RENDER_TREE_ID_KEY: IdKey = IdKey::new();
 }
 
+#[derive(Debug, Clone)]
+pub struct PaintContext {
+    pub scale_factor: f32,
+}
+
+pub struct Painter<'a> {
+    pub canvas: &'a Canvas,
+    pub context: PaintContext,
+}
+
+impl<'a> Painter<'a> {
+    pub fn new(canvas: &'a Canvas, context: PaintContext) -> Painter<'a> {
+        Self { canvas, context }
+    }
+}
+
 pub struct LayerState {
     pub layer: Layer,
     pub matrix: Matrix,
@@ -800,38 +816,6 @@ impl InvalidArea {
 
 }
 
-pub trait Painter {
-    fn set_invalid_rects(&mut self, invalid_area: InvalidRects);
-    fn is_visible_origin(&self, bounds: &Rect) -> bool;
-}
-
-pub struct SkiaPainter<'a> {
-    invalid_rects: InvalidRects,
-    canvas: &'a Canvas,
-}
-
-impl<'a> SkiaPainter<'a> {
-    pub fn new(canvas: &'a Canvas) -> SkiaPainter {
-        Self {
-            invalid_rects: InvalidRects::default(),
-            canvas,
-        }
-    }
-}
-
-impl<'a> Painter for SkiaPainter<'a> {
-    fn set_invalid_rects(&mut self, invalid_rects: InvalidRects) {
-        let mut path = Path::new();
-        for r in &invalid_rects.rects {
-            path.add_rect(r, None);
-        }
-        self.canvas.clip_path(&path, ClipOp::Intersect, false);
-        self.invalid_rects = invalid_rects;
-    }
-    fn is_visible_origin(&self, bounds: &Rect) -> bool {
-        self.invalid_rects.has_intersects(bounds)
-    }
-}
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct PartialInvalidArea {
