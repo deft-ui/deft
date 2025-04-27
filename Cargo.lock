@@ -1086,6 +1086,7 @@ dependencies = [
  "lightningcss",
  "log",
  "measure_time",
+ "memmap2",
  "memory-stats",
  "native-dialog",
  "ordered-float",

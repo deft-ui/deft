@@ -4,10 +4,10 @@ use deft_macros::mrc_object;
 use font_kit::family_name::FamilyName;
 use crate::font::Font;
 use font_kit::handle::Handle;
-use font_kit::properties::{Properties, Weight};
 use font_kit::source::{Source, SystemSource};
 use skia_safe::FontStyle;
 use skia_safe::wrapper::NativeTransmutableWrapper;
+use swash::Weight;
 use crate::text::TextStyle;
 
 #[mrc_object]
@@ -19,7 +19,7 @@ pub struct FontManager {
 #[derive(Hash, PartialEq, Eq, Clone)]
 struct FontCacheKey {
     family_name: String,
-    weight: i32,
+    weight: u16,
 }
 
 impl FontManager {
@@ -44,32 +44,41 @@ impl FontManager {
     }
 
     fn get_by_family_name(&self, name: &str, style: &FontStyle) -> Option<Font> {
-        let weight = style.weight().unwrap();
+        let weight = style.weight().unwrap() as u16;
         let cache_key = FontCacheKey {
             family_name: name.to_string(),
             weight,
         };
         let mut me = self.clone();
         me.cache.entry(cache_key).or_insert_with(move || {
-            let mut properties = Properties::new();
-            properties.weight(Weight(weight as f32));
             let family_name = Self::str_to_family_name(name);
-            if let Ok(h) = self.source.select_best_match(&[family_name], &properties) {
-                match h {
-                    Handle::Path { path, font_index } => {
-                        if let Some(font) = Font::from_file(path, font_index as usize, name.to_string()) {
-                            return Some(font);
-                        }
-                    }
-                    Handle::Memory { bytes, font_index } => {
-                        if let Some(font) = Font::from_bytes(bytes.to_vec(), font_index as usize, name.to_string()) {
-                            return Some(font);
-                        }
+            let fh = self.source.select_family_by_generic_name(&family_name).ok()?;
+            for h in fh.fonts() {
+                if let Some(font) = Self::load_font(h, name) {
+                    let attrs = font.attributes();
+                    if attrs.weight() == Weight(weight) {
+                        return Some(font)
                     }
                 }
             }
             None
         }).clone()
+    }
+
+    fn load_font(h: &Handle, name: &str) -> Option<Font> {
+        match h {
+            Handle::Path { path, font_index } => {
+                if let Some(font) = Font::from_file(path, *font_index as usize, name.to_string()) {
+                    return Some(font);
+                }
+            }
+            Handle::Memory { bytes, font_index } => {
+                if let Some(font) = Font::from_bytes(bytes.to_vec(), *font_index as usize, name.to_string()) {
+                    return Some(font);
+                }
+            }
+        }
+        None
     }
 
     fn str_to_family_name(family_name: &str) -> FamilyName {

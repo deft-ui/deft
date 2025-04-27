@@ -209,7 +209,7 @@ function saveStartTime() {
 
 function main() {
     navigator.stylesheet.append(stylesheet);
-    saveStartTime();
+    // saveStartTime();
     runWorker();
     createSystemTray();
     console.log("begin create window");

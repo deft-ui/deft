@@ -1,17 +1,34 @@
 use crate as deft;
-use std::path::Path;
-use deft_macros::mrc_object;
-use skia_safe::Rect;
-use swash::{Attributes, CacheKey, Charmap, FontRef, GlyphId, Metrics};
-use swash::scale::{Render, ScaleContext, Source, StrikeWith};
-use swash::scale::image::Image;
-use swash::zeno::Format;
 use crate::element::text::simple_text_paragraph::TextBlock;
+use deft_macros::mrc_object;
+use memmap2::{Mmap, MmapOptions};
+use skia_safe::Rect;
+use std::fs::File;
+use std::ops::Deref;
+use std::path::Path;
+use swash::scale::image::Image;
+use swash::scale::{Render, ScaleContext, Source, StrikeWith};
+use swash::zeno::Format;
+use swash::{Attributes, CacheKey, Charmap, FontRef, GlyphId, Metrics};
+
+enum FontContent {
+    Mmap(Mmap),
+    Mem(Vec<u8>),
+}
+
+impl FontContent {
+    pub fn as_ref(&self) -> &[u8] {
+        match self {
+            FontContent::Mmap(mm) => mm.as_ref(),
+            FontContent::Mem(data) => data.deref(),
+        }
+    }
+}
 
 #[mrc_object]
 pub struct Font {
     // Full content of the font file
-    data: Vec<u8>,
+    data: FontContent,
     // Offset to the table directory
     offset: u32,
     // Cache key
@@ -25,20 +42,27 @@ unsafe impl Sync for Font {}
 
 impl Font {
     pub fn from_file<P: AsRef<Path>>(path: P, index: usize, family_name: String) -> Option<Self> {
-        // Read the full font file
-        let data = std::fs::read(path).ok()?;
-        // Create a temporary font reference for the first font in the file.
-        // This will do some basic validation, compute the necessary offset
-        // and generate a fresh cache key for us.
-        Self::from_bytes(data, index, family_name)
+        let file = File::open(path).ok()?;
+        let mmap = unsafe { MmapOptions::new().map(&file).ok()? };
+        Self::new(FontContent::Mmap(mmap), index, family_name)
     }
 
     pub fn from_bytes(data: Vec<u8>, index: usize, family_name: String) -> Option<Self> {
-        let font = FontRef::from_index(&data, index)?;
+        Self::new(FontContent::Mem(data), index, family_name)
+    }
+
+    fn new(data: FontContent, index: usize, family_name: String) -> Option<Self> {
+        let font = FontRef::from_index(data.as_ref(), index)?;
         let (offset, key) = (font.offset, font.key);
-        // Return our struct with the original file data and copies of the
-        // offset and key from the font reference
-        Some(FontData { data, offset, key, family_name }.to_ref())
+        Some(
+            FontData {
+                data,
+                offset,
+                key,
+                family_name,
+            }
+            .to_ref(),
+        )
     }
 
     // As a convenience, you may want to forward some methods.
@@ -70,7 +94,8 @@ impl Font {
 
     pub fn rasterize_glyph(&self, glyph_id: GlyphId, font_size: f32) -> Option<Image> {
         let mut context = ScaleContext::new();
-        let mut scaler = context.builder(self.as_ref())
+        let mut scaler = context
+            .builder(self.as_ref())
             .size(font_size)
             .hint(true)
             .build();
@@ -83,15 +108,15 @@ impl Font {
             // Standard scalable outline
             Source::Outline,
         ])
-            // Select a subpixel format
-            .format(Format::Alpha)
-            // Render the image
-            .render(&mut scaler, glyph_id)
+        // Select a subpixel format
+        .format(Format::Alpha)
+        // Render the image
+        .render(&mut scaler, glyph_id)
     }
 
     /// Just for debug
     pub fn name(&self) -> &str {
-       &self.family_name
+        &self.family_name
     }
 
     // Create the transient font reference for accessing this crate's
@@ -102,7 +127,7 @@ impl Font {
         // while completely safe, will nullify the performance optimizations of
         // the caching mechanisms used in this crate.
         FontRef {
-            data: &self.data,
+            data: self.data.as_ref(),
             offset: self.offset,
             key: self.key,
         }
