@@ -661,7 +661,7 @@ impl ElementBackend for Text {
                         }
                     }
                 }
-                p.paragraph.paint(canvas, (0.0, p_top));
+                p.paragraph.paint(painter, (0.0, p_top));
             }
         })
     }

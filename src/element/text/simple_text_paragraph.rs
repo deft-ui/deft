@@ -15,6 +15,7 @@ use crate::element::paragraph::TextUnit;
 use crate::element::text::text_paragraph::TextParams;
 use crate::font::Font;
 use crate::number::DeNan;
+use crate::paint::Painter;
 use crate::string::StringUtils;
 use crate::style::ColorHelper;
 use crate::text::{calculate_line_char_count, TextStyle};
@@ -74,7 +75,7 @@ impl LineUnit {
         result
     }
 
-    fn paint(&self, canvas: &Canvas, origin: Point, range: Option<(usize, usize)>, paint: Option<&Paint>) {
+    fn paint(&self, painter: &Painter, origin: Point, range: Option<(usize, usize)>, paint: Option<&Paint>) {
         let font = &self.block.font;
         let font_size = self.block.style.font_size();
         let foreground = self.block.style.foreground();
@@ -99,8 +100,8 @@ impl LineUnit {
             }
         }
 
-        //TODO fix scale
-        let scale = 2.0;
+        let scale = painter.context.scale_factor;
+        let canvas = painter.canvas;
         canvas.save();
         canvas.scale((1.0 / scale, 1.0 / scale));
         let color = paint.color();
@@ -373,7 +374,8 @@ impl SimpleTextParagraph {
         }
     }
 
-    pub fn paint(&self, canvas: &Canvas, p: impl Into<Point>) {
+    pub fn paint(&self, painter: &Painter, p: impl Into<Point>) {
+        let canvas = painter.canvas;
         canvas.save();
         let p = p.into();
         canvas.translate(p);
@@ -385,7 +387,7 @@ impl SimpleTextParagraph {
                     continue;
                 }
                 let x = unit.x;
-                unit.paint(&canvas, Point::new(x, y), None, None);
+                unit.paint(painter, Point::new(x, y), None, None);
             }
         }
         canvas.restore();
@@ -405,12 +407,12 @@ impl SimpleTextParagraph {
         Some(ln.height)
     }
 
-    pub fn paint_chars(&self,canvas: &Canvas, mut start: usize, end: usize, paint: Option<&Paint>) {
+    pub fn paint_chars(&self, painter: &Painter, mut start: usize, end: usize, paint: Option<&Paint>) {
         while start < end {
             if let Some((ln, unit)) = self.get_unit_at_char_offset(start) {
                 let unit_start = start - unit.char_offset;
                 let paint_char_count = usize::min(unit.block.text.chars_count() - unit_start, end - start);
-                unit.paint(canvas, Point::new(unit.x, ln.y + ln.baseline), Some((unit_start, unit_start + paint_char_count)), paint);
+                unit.paint(painter, Point::new(unit.x, ln.y + ln.baseline), Some((unit_start, unit_start + paint_char_count)), paint);
                 start += paint_char_count;
             } else {
                 return;

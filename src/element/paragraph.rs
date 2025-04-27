@@ -29,6 +29,7 @@ use crate::base::{EventContext, MouseDetail, MouseEventType};
 use crate::element::paragraph::simple_paragraph_builder::SimpleParagraphBuilder;
 use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
 use crate::event::{FocusShiftEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent, SelectEndEvent, SelectMoveEvent, SelectStartEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
+use crate::paint::Painter;
 use crate::render::RenderFn;
 use crate::text::{TextAlign, TextDecoration, TextStyle};
 
@@ -209,12 +210,13 @@ impl Line {
 
     fn paint_selection(
         &mut self,
-        canvas: &Canvas,
+        painter: &Painter,
         line_offset: (f32,f32),
         selection: (usize, usize),
         bg_paint: &Paint,
         fg_paint: &Paint,
     ) {
+        let canvas = painter.canvas;
         let (start_offset, end_offset) = selection;
         let line_offset = Point { x: line_offset.0, y: line_offset.1 };
         canvas.save();
@@ -225,7 +227,7 @@ impl Line {
             }
         }
 
-        self.sk_paragraph.paint_chars(canvas, start_offset, end_offset, Some(fg_paint));
+        self.sk_paragraph.paint_chars(painter, start_offset, end_offset, Some(fg_paint));
         canvas.restore();
     }
 
@@ -755,7 +757,7 @@ impl ElementBackend for Paragraph {
                         break;
                     }
                 }
-                ln.sk_paragraph.paint(canvas, (0.0, ln_top));
+                ln.sk_paragraph.paint(painter, (0.0, ln_top));
 
                 let atom_count = ln.atom_count();
                 if atom_count > 0 {
@@ -763,7 +765,7 @@ impl ElementBackend for Paragraph {
                         let ln_range = (TextCoord(ln_row, 0), TextCoord(ln_row, atom_count));
                         if let Some((begin, end)) = intersect_range(selection_range, ln_range) {
                             ln.paint_selection(
-                                canvas,
+                                painter,
                                 (0.0, ln_top),
                                 (begin.1, end.1),
                                 &selection_bg,

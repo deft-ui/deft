@@ -1,7 +1,3 @@
-use std::env;
-use std::fs::File;
-use std::path::PathBuf;
-
 use cfg_aliases::cfg_aliases;
 
 fn main() {
