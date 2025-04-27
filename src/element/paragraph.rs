@@ -38,7 +38,7 @@ const DEFAULT_FONT_NAME: &str = "sans-serif,Microsoft YaHei,Segoe UI Emoji";
 #[cfg(target_os = "linux")]
 const DEFAULT_FONT_NAME: &str = "sans-serif,Noto Color Emoji";
 #[cfg(target_os = "macos")]
-const DEFAULT_FONT_NAME: &str = "sans-serif,Apple Color Emoji";
+const DEFAULT_FONT_NAME: &str = "sans-serif,PingFang SC,Apple Color Emoji";
 #[cfg(target_os = "android")]
 const DEFAULT_FONT_NAME: &str = "Roboto,Noto Sans CJK SC,Noto Sans CJK TC,Noto Sans CJK HK,Noto Sans CJK KR,Noto Sans CJK JP,Noto Color Emoji";
 #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos", target_os = "android")))]
