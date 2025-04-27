@@ -84,7 +84,7 @@ impl Font {
             Source::Outline,
         ])
             // Select a subpixel format
-            .format(Format::Subpixel)
+            .format(Format::Alpha)
             // Render the image
             .render(&mut scaler, glyph_id)
     }

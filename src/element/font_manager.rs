@@ -53,7 +53,7 @@ impl FontManager {
         me.cache.entry(cache_key).or_insert_with(move || {
             let mut properties = Properties::new();
             properties.weight(Weight(weight as f32));
-            let family_name = FamilyName::Title(name.to_string());
+            let family_name = Self::str_to_family_name(name);
             if let Ok(h) = self.source.select_best_match(&[family_name], &properties) {
                 match h {
                     Handle::Path { path, font_index } => {
@@ -70,6 +70,17 @@ impl FontManager {
             }
             None
         }).clone()
+    }
+
+    fn str_to_family_name(family_name: &str) -> FamilyName {
+        match family_name {
+            "serif" => FamilyName::Serif,
+            "sans-serif" => FamilyName::SansSerif,
+            "monospace" => FamilyName::Monospace,
+            "cursive" => FamilyName::Cursive,
+            "fantasy" => FamilyName::Fantasy,
+            _ => FamilyName::Title(family_name.to_string()),
+        }
     }
 
 }
