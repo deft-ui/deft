@@ -2,7 +2,9 @@ use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use anyhow::Error;
+#[cfg(target_os = "android")]
 use jni::objects::JValue;
+#[cfg(target_os = "android")]
 use jni::sys::{jboolean, jlong};
 use log::debug;
 use measure_time::debug_time;

@@ -17,39 +17,32 @@ yoga = { package = "deft-yoga", version = "0.6.0" }
 winit = { package = "deft-winit", version = "0.30.8", features = ["android-native-activity", "rwh_06"] }
 skia-window = { path = "skia-window", version = "0.3.1" }
 
-lazy_static = "1.4"
-
-
 base64 = { version = "0.22.0" }
 ordered-float = "3.9.2"
-serde_json = "1.0.117"
 serde = { version = "1.0.203", features = ["derive"] }
 anyhow = { version = "1.0.75" }
-reqwest = { version = "0.11.27",default-features = false, features = ["blocking", "native-tls-vendored", "multipart", "stream"] }
 tokio = { version = "1.38.0", features = ["rt-multi-thread", "fs", "macros", "io-std", "io-util", "sync"] }
-tokio-tungstenite = { version = "0.23.1", features = ["native-tls"] }
+tokio-tungstenite = { version = "0.23.1", features = ["native-tls"], optional = true }
 futures-util = "0.3.30"
 clipboard = "0.5.0"
 image = { version = "0.25.2", default-features = false, features = ["bmp", "jpeg", "png", "gif"] }
 libc = "0.2.155"
 sled = "0.34.7"
 ksni = { version = "0.2.2", optional = true }
-rodio = "0.19.0"
+rodio = { version = "0.19.0", optional = true }
 measure_time = "0.8.3"
-memory-stats = "1.2.0"
 backtrace = "0.3.73"
 sha1 = "0.10.6"
 base16ct = { version = "0.2.0", features = ["alloc"] }
-jni = "0.21.1"
 tokio-util = { version = "0.7.12", features = ["codec"] }
-rusqlite = { version = "0.32.0", features = ["bundled"] }
+rusqlite = { version = "0.32.0", features = ["bundled"], optional = true }
 bezier-rs = "0.4.0"
 raw-window-handle = "0.5.2"
 log = "0.4.25"
 skia-safe = {package = "deft-skia-safe", version = "0.81.0", features = ["binary-cache"], default-features = false}
 env_logger = "0.11.6"
 bitflags = "2.6.0"
-lightningcss = "1.0.0-alpha.65"
+lightningcss = { version = "1.0.0-alpha.65", default-features = false, features = ["grid"] }
 cssparser = "0.27"
 selectors = "0.22"
 font-kit = { version = "0.14.2", package = "deft-font-kit" }
@@ -61,12 +54,19 @@ default = []
 tray = ["ksni"]
 x11 = ["skia-safe/x11", "skia-window/x11"]
 wayland = ["skia-safe/wayland", "skia-window/wayland"]
+sqlite = ["rusqlite"]
+websocket = ["tokio-tungstenite"]
+audio = ["rodio"]
+gl = ["skia-window/gpu"]
 
 [target.'cfg(not(target_os = "android"))'.dependencies]
 native-dialog = "0.7.0"
+reqwest = { version = "0.11.27",default-features = false, features = ["blocking", "multipart", "stream"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
 android_logger = "0.11.0"
+jni = "0.21.1"
+reqwest = { version = "0.11.27",default-features = false, features = ["blocking", "native-tls-vendored", "multipart", "stream"] }
 
 [build-dependencies]
 cfg_aliases = "0.2.1"

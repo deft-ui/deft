@@ -5,6 +5,7 @@ mod context;
 pub mod surface_presenter;
 #[cfg(not(target_os = "android"))]
 pub mod softbuffer_surface_presenter;
+#[cfg(feature = "gpu")]
 pub mod gl_presenter;
 
 pub use soft_surface::SoftSurface;

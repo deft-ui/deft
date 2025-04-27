@@ -7,36 +7,35 @@ license = "MIT"
 
 
 [features]
-default = ["egl", "wayland", "wgl"]
+default = []
 
 desktop = []
 
-egl = ["glutin/egl"]
-glx = ["glutin/glx", "glutin/x11", "winit/x11", "x11"]
-wgl = ["glutin/wgl"]
-x11 = ["glutin/x11", "winit/x11", "skia-safe/x11"]
-wayland = ["glutin/wayland", "winit/wayland", "winit/wayland-dlopen", "winit/wayland-csd-adwaita-notitle"]
+egl = ["gpu", "glutin/egl"]
+glx = ["gpu", "glutin/glx", "glutin/x11", "winit/x11", "x11"]
+wgl = ["gpu", "glutin/wgl"]
+x11 = ["winit/x11", "skia-safe/x11"]
+wayland = ["winit/wayland", "winit/wayland-dlopen", "winit/wayland-csd-adwaita-notitle"]
+gpu = ["gl", "glutin", "skia-safe/gl"]
 
 
 [dependencies]
 log = "0.4"
 winit = { package = "deft-winit", version = "0.30.5", features = ["android-native-activity", "rwh_05"] }
-glutin = "0.31"
+glutin = { version = "0.31", optional = true }
 measure_time = "0.8.3"
 raw-window-handle = "0.5.0"
 skia-safe = { package = "deft-skia-safe", features = ["binary-cache", "svg", "gl"], default-features = false, version = "0.81.2" }
-gl = "0.14.0"
+gl = { version = "0.14.0", optional = true }
 # sparkle = { version = "0.1.25" }
 
 [target.'cfg(not(target_os = "android"))'.dependencies]
-env_logger = "0.10"
 softbuffer = "0.4.6"
 
 [target.'cfg(target_os = "android")'.dependencies]
 android_logger = "0.11.0"
 
 [build-dependencies]
-gl_generator = "0.14"
 cfg_aliases = "0.1.1"
 
 

@@ -9,7 +9,6 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
 use anyhow::{anyhow, Error};
-use lazy_static::lazy_static;
 use deft_macros::{js_func, js_methods};
 use log::debug;
 use skia_safe::wrapper::NativeTransmutableWrapper;

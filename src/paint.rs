@@ -6,7 +6,6 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use log::debug;
 use measure_time::print_time;
-use sha1::digest::generic_array::functional::FunctionalSequence;
 use skia_safe::{scalar, ClipOp, Color, Contains, IRect, Image, Matrix, Paint, Path, PathOp, Point, Rect, Vector};
 use skia_safe::Canvas;
 use skia_window::context::{RenderContext, UserContext};

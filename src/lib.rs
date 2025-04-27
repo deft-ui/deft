@@ -10,12 +10,9 @@ use crate::element::text::{Text};
 use crate::element::ScrollByOption;
 use crate::js::js_deserialze::JsDeserializer;
 use crate::loader::{RemoteModuleLoader, StaticModuleLoader};
-use crate::performance::MemoryUsage;
 use crate::renderer::CpuRenderer;
-use crate::websocket::WebSocketManager;
 use futures_util::StreamExt;
 use measure_time::{debug_time, info, print_time};
-use memory_stats::memory_stats;
 use quick_js::loader::FsJsModuleLoader;
 use serde::{Deserialize, Serialize};
 use skia_safe::{Font, FontMetrics, FontStyle, Paint};
@@ -26,7 +23,6 @@ use std::str::FromStr;
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
 use std::time::SystemTime;
 use anyhow::{anyhow, Error};
-use tokio_tungstenite::connect_async;
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 #[cfg(target_os = "android")]
@@ -50,6 +46,7 @@ pub mod element;
 pub mod loader;
 pub mod time;
 pub mod resource_table;
+#[cfg(feature = "websocket")]
 pub mod websocket;
 pub mod number;
 pub mod timer;
@@ -87,7 +84,6 @@ mod font;
 
 pub use deft_macros::*;
 use log::debug;
-use rodio::cpal::available_hosts;
 use skia_safe::font_style::{Weight, Width};
 use skia_safe::font_style::Slant::Upright;
 use skia_safe::wrapper::ValueWrapper;

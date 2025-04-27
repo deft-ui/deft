@@ -3,8 +3,9 @@ use std::collections::HashMap;
 use quick_js::JsValue;
 use serde::de::{DeserializeSeed, Error, MapAccess, SeqAccess, Visitor};
 use serde::Deserializer;
-use serde_json::Error as JsError;
 use crate::js::js_value_util::JsValueHelper;
+
+type JsError = serde::de::value::Error;
 
 pub struct JsDeserializer {
     pub value: JsValue,

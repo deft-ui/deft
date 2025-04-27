@@ -5,21 +5,20 @@ use winit::event_loop::ActiveEventLoop;
 #[cfg(target_os = "android")]
 use winit::platform::android::activity::AndroidApp;
 use winit::window::{Window, WindowAttributes};
-use crate::gl::SurfaceState;
 use crate::renderer::Renderer;
-use crate::soft::gl_presenter::GlPresenter;
 use crate::soft::SoftSurface;
 use crate::surface::RenderBackend;
 
 pub struct SkiaWindow {
-    //surface_state: SurfaceState,
     surface_state: Box<dyn RenderBackend>,
 }
 
 #[derive(Debug, Copy, Clone)]
 pub enum RenderBackendType {
     SoftBuffer,
+    #[cfg(feature = "gpu")]
     GL,
+    #[cfg(feature = "gpu")]
     SoftGL,
 }
 
@@ -36,11 +35,13 @@ impl SkiaWindow {
                     Box::new(SoftSurface::new(event_loop, SoftBufferSurfacePresenter::new(window)))
                 }
             }
+            #[cfg(feature = "gpu")]
             RenderBackendType::SoftGL => {
-                Box::new(SoftSurface::new(event_loop, GlPresenter::new(event_loop, window)?))
+                Box::new(SoftSurface::new(event_loop, crate::soft::gl_presenter::GlPresenter::new(event_loop, window)?))
             }
+            #[cfg(feature = "gpu")]
             RenderBackendType::GL => {
-                Box::new(SurfaceState::new(event_loop, window)?)
+                Box::new(crate::gl::SurfaceState::new(event_loop, window)?)
             }
         };
         Some(Self { surface_state })

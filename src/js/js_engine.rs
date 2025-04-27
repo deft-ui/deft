@@ -20,7 +20,6 @@ use crate::element::text::Text;
 use crate::event_loop::run_with_event_loop;
 use crate::ext::ext_animation::animation_create;
 use crate::ext::ext_appfs::appfs;
-use crate::ext::ext_audio::Audio;
 use crate::ext::ext_base64::Base64;
 use crate::ext::ext_clipboard::{clipboard_read_text, clipboard_write_text};
 use crate::ext::ext_console::Console as ExtConsole;
@@ -33,11 +32,9 @@ use crate::ext::ext_localstorage::localstorage;
 use crate::ext::ext_path::path;
 use crate::ext::ext_process::process;
 use crate::ext::ext_shell::shell;
-use crate::ext::ext_sqlite::SqliteConn;
 use crate::ext::ext_timer::{timer_clear_interval, timer_clear_timeout, timer_set_interval, timer_set_timeout};
 #[cfg(feature = "tray")]
 use crate::ext::ext_tray::SystemTray;
-use crate::ext::ext_websocket::WsConnection;
 use crate::ext::ext_worker::{SharedModuleLoader, Worker, WorkerInitParams};
 use crate::window::{Window, WindowType};
 use crate::js::js_binding::{JsCallError, JsFunc};
@@ -124,7 +121,8 @@ impl JsEngine {
         engine.add_global_functions(Paragraph::create_js_apis());
         engine.add_global_functions(Text::create_js_apis());
         engine.add_global_functions(Image::create_js_apis());
-        engine.add_global_functions(SqliteConn::create_js_apis());
+        #[cfg(feature = "sqlite")]
+        engine.add_global_functions(crate::ext::ext_sqlite::SqliteConn::create_js_apis());
         #[cfg(feature = "tray")]
         {
             engine.add_global_functions(SystemTray::create_js_apis());
@@ -134,14 +132,16 @@ impl JsEngine {
         engine.add_global_functions(crate::ext::ext_dialog::dialog::create_js_apis());
         engine.add_global_functions(Base64::create_js_apis());
         engine.add_global_functions(shell::create_js_apis());
-        engine.add_global_functions(Audio::create_js_apis());
+        #[cfg(feature = "audio")]
+        engine.add_global_functions(crate::ext::ext_audio::Audio::create_js_apis());
         engine.add_global_functions(path::create_js_apis());
         engine.add_global_functions(env::create_js_apis());
         engine.add_global_functions(http::create_js_apis());
         engine.add_global_functions(appfs::create_js_apis());
         engine.add_global_functions(localstorage::create_js_apis());
         // websocket
-        engine.add_global_functions(WsConnection::create_js_apis());
+        #[cfg(feature = "websocket")]
+        engine.add_global_functions(crate::ext::ext_websocket::WsConnection::create_js_apis());
         engine.add_global_functions(fetch::create_js_apis());
 
         engine.add_global_functions(Window::create_js_apis());

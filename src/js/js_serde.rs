@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use quick_js::JsValue;
 use serde::{Serialize, Serializer};
 use serde::ser::{SerializeMap, SerializeSeq, SerializeStruct, SerializeStructVariant, SerializeTuple, SerializeTupleStruct, SerializeTupleVariant};
-use serde_json::Error;
+
+type Error = std::fmt::Error;
 
 pub struct JsValueSerializer {
 

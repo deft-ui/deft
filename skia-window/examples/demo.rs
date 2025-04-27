@@ -95,10 +95,10 @@ fn android_main(app: AndroidApp) {
 // declared as pub to avoid dead_code warnings from cdylib target build
 #[cfg(not(target_os = "android"))]
 pub fn main() {
-    env_logger::builder()
-        .filter_level(log::LevelFilter::Debug) // Default Log Level
-        .parse_default_env()
-        .init();
+    // env_logger::builder()
+    //     .filter_level(log::LevelFilter::Debug) // Default Log Level
+    //     .parse_default_env()
+    //     .init();
 
     let event_loop = EventLoop::with_user_event().build().unwrap();
     run(event_loop);

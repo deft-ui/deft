@@ -1220,14 +1220,17 @@ impl Window {
             //TODO support RenderBackedType parameter
             let mut backend_types = vec![
                 RenderBackendType::SoftBuffer,
+                #[cfg(feature = "gl")]
                 RenderBackendType::GL,
             ];
             if let Ok(backend_type_str) = env::var("DEFT_RENDERERS") {
                 backend_types.clear();
                 for bt_str in backend_type_str.split(",") {
                     let bt = match bt_str.to_lowercase().as_str() {
+                        #[cfg(feature = "gl")]
                         "softgl" => Some(RenderBackendType::SoftGL),
                         "softbuffer" => Some(RenderBackendType::SoftBuffer),
+                        #[cfg(feature = "gl")]
                         "gl" => Some(RenderBackendType::GL),
                         _ => None,
                     };

@@ -6,12 +6,15 @@ pub mod ext_fs;
 pub mod ext_env;
 pub mod ext_path;
 pub mod ext_http;
+#[cfg(feature = "websocket")]
 pub mod ext_websocket;
 pub mod common;
 pub mod ext_timer;
 pub mod ext_window;
+#[cfg(feature = "audio")]
 pub mod ext_audio;
 pub mod ext_fetch;
+#[cfg(feature = "audio")]
 mod audio_player;
 pub mod ext_base64;
 pub mod ext_shell;
@@ -24,4 +27,5 @@ pub mod ext_animation;
 pub mod ext_clipboard;
 pub mod ext_worker;
 pub mod service;
+#[cfg(feature = "sqlite")]
 pub mod ext_sqlite;

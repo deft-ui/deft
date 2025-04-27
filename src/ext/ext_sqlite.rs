@@ -4,7 +4,6 @@ use crate::js::js_engine::JsEngine;
 use crate::js::{JsError, ToJsValue};
 use crate::task_executor::TaskExecutor;
 use crate::{js_value, js_weak_value};
-use backtrace::resolve;
 use deft_macros::{js_methods, mrc_object};
 use futures_util::FutureExt;
 use quick_js::JsValue;
