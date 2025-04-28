@@ -47,7 +47,7 @@ selectors = "0.22"
 font-kit = { version = "0.15.0", package = "deft-font-kit" }
 swash = "0.2.2"
 memmap2 = "0.9.5"
-simplecss = { version = "0.2.2", package = "deft-simplecss" }
+simplecss = { version = "0.3.0", package = "deft-simplecss" }
 
 [features]
 default = []

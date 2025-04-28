@@ -117,7 +117,7 @@ impl CssManager {
         css.rules.clear();
         let mut stylesheet = StyleSheet::parse(&stylesheet_source);
         for rule in &stylesheet.rules {
-            let selectors = rule.selector.to_string();
+            let selectors = rule.selector.source().to_string();
             let mut declarations = Vec::new();
             for decl in &rule.declarations {
                 declarations.push(format!("{}:{}", decl.name, decl.value));

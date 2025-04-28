@@ -1014,9 +1014,9 @@ dependencies = [
 
 [[package]]
 name = "deft-simplecss"
-version = "0.2.2"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d848d5e0a940edcb15957d33749437ca5e0dd1662dc7b4ae548441b094b1732e"
+checksum = "cea4dc9dd953aeb5f70f4a0092331f7703f184b84de516bb444434d9a6e5d7ba"
 dependencies = [
  "log",
 ]
