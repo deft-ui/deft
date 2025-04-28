@@ -5,7 +5,7 @@ use font_kit::hinting::HintingOptions;
 use font_kit::loader::Loader;
 use libc::memcpy;
 use log::warn;
-use skia_safe::{scalar, AlphaType, Bitmap, Canvas, ColorType, Image, ImageInfo, Paint, Point, Rect};
+use skia_safe::{scalar, AlphaType, Bitmap, Canvas, ColorType, FilterMode, Image, ImageInfo, Paint, Point, Rect, SamplingOptions};
 use skia_safe::canvas::GlyphPositions;
 use swash::GlyphId;
 use swash::scale::image::Content;
@@ -151,7 +151,14 @@ impl LineUnit {
                         }
                     }
                 };
-                canvas.draw_image(bmp.as_image(), ((origin.x + lb.x) * scale + x as f32, origin.y * scale - y as f32), None);
+                let mut options = SamplingOptions::default();
+                options.filter = FilterMode::Linear;
+                canvas.draw_image_with_sampling_options(
+                    bmp.as_image(),
+                    ((origin.x + lb.x) * scale + x as f32, origin.y * scale - y as f32),
+                    options,
+                    None
+                );
             }
         }
         canvas.restore();
