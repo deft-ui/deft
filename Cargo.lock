@@ -968,9 +968,9 @@ dependencies = [
 
 [[package]]
 name = "deft-font-kit"
-version = "0.14.2"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db2525ec58415261860f5177cce910bae3135e7e6652a6712c0f0bb148c11543"
+checksum = "2161a2486a58444664eca491d03914aeaee32832213fbbc3eb0c8a1938b83388"
 dependencies = [
  "bitflags 2.9.0",
  "byteorder",
@@ -980,6 +980,7 @@ dependencies = [
  "dirs",
  "dwrote",
  "float-ord",
+ "freetype",
  "freetype-sys",
  "lazy_static",
  "libc",
@@ -1471,6 +1472,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e13624c2627564efccf4934284bdd98cbaa14e79b0b5a141218e507b3a823456"
 dependencies = [
  "percent-encoding",
+]
+
+[[package]]
+name = "freetype"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a440748e063798e4893ceb877151e84acef9bea9a8c6800645cf3f1b3a7806e"
+dependencies = [
+ "freetype-sys",
+ "libc",
 ]
 
 [[package]]
