@@ -9,7 +9,7 @@ use crate::element::text::text_paragraph::TextParams;
 use crate::element::text::{Text};
 use crate::element::ScrollByOption;
 use crate::js::js_deserialze::JsDeserializer;
-use crate::loader::{RemoteModuleLoader, StaticModuleLoader};
+use crate::loader::{StaticModuleLoader};
 use crate::renderer::CpuRenderer;
 use futures_util::StreamExt;
 use measure_time::{debug_time, info, print_time};

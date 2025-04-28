@@ -79,6 +79,7 @@ impl AudioSources {
         let idx = self.next_index;
         if let Some(s) = self.urls.get(idx) {
             self.next_index += 1;
+            #[cfg(feature = "http")]
             if s.starts_with("http://") || s.starts_with("https://") {
                 let s = s.to_string();
                 self.download_handle = Some(thread::spawn(move || {

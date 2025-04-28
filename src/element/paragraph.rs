@@ -20,7 +20,6 @@ use serde::{Deserialize, Serialize};
 use skia_safe::font_style::{Slant, Weight, Width};
 use skia_safe::{Canvas, Color, Font, FontMgr, FontStyle, Paint, Point, Rect};
 use std::str::FromStr;
-use clipboard::{ClipboardContext, ClipboardProvider};
 use measure_time::print_time;
 use skia_safe::wrapper::NativeTransmutableWrapper;
 use winit::keyboard::NamedKey;
@@ -526,7 +525,9 @@ impl Paragraph {
         if event.modifiers == KEY_MOD_CTRL {
             if let Some(text) = &event.key_str {
                 match text.as_str() {
+                    #[cfg(feature = "clipboard")]
                     "c" => {
+                        use clipboard::{ClipboardContext, ClipboardProvider};
                         if let Some(sel) = self.get_selection_text() {
                             let sel=  sel.to_string();
                             if let Ok(mut ctx) = ClipboardContext::new() {

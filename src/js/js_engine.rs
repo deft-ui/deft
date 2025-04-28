@@ -21,13 +21,10 @@ use crate::event_loop::run_with_event_loop;
 use crate::ext::ext_animation::animation_create;
 use crate::ext::ext_appfs::appfs;
 use crate::ext::ext_base64::Base64;
-use crate::ext::ext_clipboard::{clipboard_read_text, clipboard_write_text};
 use crate::ext::ext_console::Console as ExtConsole;
 use crate::ext::ext_env::env;
-use crate::ext::ext_fetch::fetch;
 use crate::ext::ext_window::{handle_window_event, WINDOWS};
 use crate::ext::ext_fs::{fs_create_dir, fs_create_dir_all, fs_delete_file, fs_exists, fs_read_dir, fs_remove_dir, fs_remove_dir_all, fs_rename, fs_stat};
-use crate::ext::ext_http::http;
 use crate::ext::ext_localstorage::localstorage;
 use crate::ext::ext_path::path;
 use crate::ext::ext_process::process;
@@ -136,13 +133,15 @@ impl JsEngine {
         engine.add_global_functions(crate::ext::ext_audio::Audio::create_js_apis());
         engine.add_global_functions(path::create_js_apis());
         engine.add_global_functions(env::create_js_apis());
-        engine.add_global_functions(http::create_js_apis());
+        #[cfg(feature = "http")]
+        engine.add_global_functions(crate::ext::ext_http::http::create_js_apis());
         engine.add_global_functions(appfs::create_js_apis());
         engine.add_global_functions(localstorage::create_js_apis());
         // websocket
         #[cfg(feature = "websocket")]
         engine.add_global_functions(crate::ext::ext_websocket::WsConnection::create_js_apis());
-        engine.add_global_functions(fetch::create_js_apis());
+        #[cfg(feature = "http")]
+        engine.add_global_functions(crate::ext::ext_fetch::fetch::create_js_apis());
 
         engine.add_global_functions(Window::create_js_apis());
         engine.add_global_func(timer_set_timeout::new());
@@ -163,8 +162,11 @@ impl JsEngine {
         engine.add_global_func(animation_create::new());
         engine.add_global_func(typeface_create::new());
 
-        engine.add_global_func(clipboard_write_text::new());
-        engine.add_global_func(clipboard_read_text::new());
+        #[cfg(feature = "clipboard")]
+        {
+            engine.add_global_func(crate::ext::ext_clipboard::clipboard_write_text::new());
+            engine.add_global_func(crate::ext::ext_clipboard::clipboard_read_text::new());
+        }
         engine.add_global_func(stylesheet_add::new());
         engine.add_global_func(stylesheet_remove::new());
         engine.add_global_func(stylesheet_update::new());

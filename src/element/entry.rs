@@ -4,7 +4,6 @@ use std::cell::Cell;
 use std::rc::Rc;
 use std::string::ToString;
 use anyhow::Error;
-use clipboard::{ClipboardContext, ClipboardProvider};
 use ordered_float::OrderedFloat;
 use quick_js::{JsValue, ValueError};
 use skia_safe::{Canvas, Color, Font, Paint};
@@ -465,7 +464,9 @@ impl Entry {
         } else if event.modifiers == KEY_MOD_CTRL {
             if let Some(text) = &event.key_str {
                 match text.as_str() {
+                    #[cfg(feature = "clipboard")]
                     "c" | "x" => {
+                        use clipboard::{ClipboardContext, ClipboardProvider};
                         if let Some(sel) = self.paragraph.get_selection_text() {
                             let sel=  sel.to_string();
                             if text == "x" {
@@ -475,7 +476,9 @@ impl Entry {
                             ctx.set_contents(sel).unwrap();
                         }
                     },
+                    #[cfg(feature = "clipboard")]
                     "v" => {
+                        use clipboard::{ClipboardContext, ClipboardProvider};
                         let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
                         if let Ok(text) = ctx.get_contents() {
                             self.handle_input(&text);

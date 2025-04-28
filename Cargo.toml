@@ -24,7 +24,7 @@ anyhow = { version = "1.0.75" }
 tokio = { version = "1.38.0", features = ["rt-multi-thread", "fs", "macros", "io-std", "io-util", "sync"] }
 tokio-tungstenite = { version = "0.23.1", features = ["native-tls"], optional = true }
 futures-util = "0.3.30"
-clipboard = "0.5.0"
+clipboard = { version = "0.5.0", optional = true }
 image = { version = "0.25.2", default-features = false, features = ["bmp", "jpeg", "png", "gif"] }
 libc = "0.2.155"
 sled = "0.34.7"
@@ -50,18 +50,20 @@ memmap2 = "0.9.5"
 simplecss = { version = "0.3.0", package = "deft-simplecss" }
 
 [features]
-default = ["gl", "websocket", "audio"]
+default = ["gl", "websocket", "audio", "http", "clipboard"]
 tray = ["ksni"]
 x11 = ["skia-safe/x11", "skia-window/x11"]
 wayland = ["skia-safe/wayland", "skia-window/wayland"]
 sqlite = ["rusqlite"]
+http = ["reqwest"]
 websocket = ["tokio-tungstenite"]
 audio = ["rodio"]
 gl = ["skia-window/gpu"]
+clipboard = ["dep:clipboard"]
 
 [target.'cfg(not(target_os = "android"))'.dependencies]
 native-dialog = "0.7.0"
-reqwest = { version = "0.11.27",default-features = false, features = ["blocking", "multipart", "stream"] }
+reqwest = { version = "0.11.27",default-features = false, features = ["blocking", "multipart", "stream"], optional = true }
 
 [target.'cfg(target_os = "android")'.dependencies]
 android_logger = "0.11.0"

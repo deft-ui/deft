@@ -5,6 +5,7 @@ pub mod ext_tray;
 pub mod ext_fs;
 pub mod ext_env;
 pub mod ext_path;
+#[cfg(feature = "http")]
 pub mod ext_http;
 #[cfg(feature = "websocket")]
 pub mod ext_websocket;
@@ -13,6 +14,7 @@ pub mod ext_timer;
 pub mod ext_window;
 #[cfg(feature = "audio")]
 pub mod ext_audio;
+#[cfg(feature = "http")]
 pub mod ext_fetch;
 #[cfg(feature = "audio")]
 mod audio_player;
@@ -24,6 +26,7 @@ pub mod promise;
 pub mod ext_process;
 pub mod ext_console;
 pub mod ext_animation;
+#[cfg(feature = "clipboard")]
 pub mod ext_clipboard;
 pub mod ext_worker;
 pub mod service;
