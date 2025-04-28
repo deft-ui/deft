@@ -50,7 +50,7 @@ memmap2 = "0.9.5"
 simplecss = { version = "0.3.0", package = "deft-simplecss" }
 
 [features]
-default = []
+default = ["gl", "websocket", "audio"]
 tray = ["ksni"]
 x11 = ["skia-safe/x11", "skia-window/x11"]
 wayland = ["skia-safe/wayland", "skia-window/wayland"]

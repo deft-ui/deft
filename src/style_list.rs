@@ -334,6 +334,9 @@ impl StyleList {
     fn parse_variables(mut value: &str) -> Option<Box<dyn Fn(&HashMap<String, String>) -> String>> {
         let mut keys = Vec::new();
         let chars = value.chars().collect::<Vec<_>>();
+        if chars.len() < 2 {
+            return None;
+        }
         let mut i = 0;
         while i < chars.len() - 1 {
             if chars[i] == '$' && Self::is_variable_name_start(chars[i + 1]) {
