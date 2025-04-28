@@ -5,8 +5,6 @@ use winit::event::{ElementState, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 #[cfg(target_os = "android")]
 use winit::platform::android::activity::AndroidApp;
-#[cfg(glx_backend)]
-use winit::platform::x11;
 
 use skia_safe::{Color, Paint};
 use winit::application::ApplicationHandler;

@@ -1,5 +1,3 @@
-use crate::context::RenderContext;
-use skia_safe::{Canvas, Data};
 use winit::window::Window;
 use crate::renderer::Renderer;
 

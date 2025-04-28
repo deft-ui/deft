@@ -1,6 +1,3 @@
-use std::num::NonZeroU32;
-use std::rc::Rc;
-use winit::window::Window;
 use crate::context::{IRenderContext, UserContext};
 use crate::layer::ILayer;
 use crate::soft::layer::SoftLayer;

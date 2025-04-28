@@ -1,4 +1,5 @@
-use skia_safe::{Canvas, Surface, surfaces};
+use skia_safe::{Surface, surfaces};
+use crate::paint::Canvas;
 
 pub struct SoftRenderer {
     skia_surface: Surface,

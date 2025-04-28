@@ -1,8 +1,7 @@
 use crate::gl::SurfaceState;
-use crate::renderer::Renderer;
 use crate::soft::surface_presenter::SurfacePresenter;
 use crate::surface::RenderBackend;
-use skia_safe::{Canvas, Paint, Surface};
+use skia_safe::{Canvas};
 use winit::event_loop::ActiveEventLoop;
 use winit::window::Window;
 
@@ -37,7 +36,7 @@ impl SurfacePresenter for GlPresenter {
         self.surface_state.resize(width, height);
     }
 
-    fn render(&mut self, renderer: Box<dyn FnOnce(&Canvas)>) {
+    fn render(&mut self, _renderer: Box<dyn FnOnce(&Canvas)>) {
         // let renderer = Renderer::new(move |canvas, ctx| {
         //     renderer(canvas);
         // });

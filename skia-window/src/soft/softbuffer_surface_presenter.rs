@@ -1,10 +1,11 @@
 use crate::soft::surface_presenter::SurfacePresenter;
-use skia_safe::{AlphaType, Canvas, ColorSpace, ColorType, ImageInfo};
+use skia_safe::{AlphaType, ColorSpace, ColorType, ImageInfo};
 use softbuffer::{Context, Surface};
 use std::num::NonZeroU32;
 use std::rc::Rc;
 use std::slice;
 use winit::window::Window;
+use crate::paint::Canvas;
 
 pub struct SoftBufferSurfacePresenter {
     width: u32,
@@ -18,7 +19,7 @@ impl SoftBufferSurfacePresenter {
         let context = Context::new(window.clone()).unwrap();
         let mut win_surface = Surface::new(&context, window.clone()).unwrap();
         let size = window.inner_size();
-        win_surface.resize(
+        let _ = win_surface.resize(
             NonZeroU32::new(size.width).unwrap(),
             NonZeroU32::new(size.height).unwrap(),
         );
@@ -37,7 +38,7 @@ impl SurfacePresenter for SoftBufferSurfacePresenter {
     fn resize(&mut self, width: u32, height: u32) {
         self.width = width;
         self.height = height;
-        self.win_surface.resize(NonZeroU32::new(width).unwrap(), NonZeroU32::new(height).unwrap());
+        let _ = self.win_surface.resize(NonZeroU32::new(width).unwrap(), NonZeroU32::new(height).unwrap());
     }
 
     fn render(&mut self, renderer: Box<dyn FnOnce(&Canvas)>) {

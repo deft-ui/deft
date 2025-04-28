@@ -1,6 +1,6 @@
 use crate::layer::ILayer;
 use crate::soft::soft_renderer::SoftRenderer;
-use skia_safe::{Canvas, Image};
+use crate::paint::{Canvas, Image};
 
 pub struct SoftLayer {
     renderer: SoftRenderer,
@@ -8,7 +8,7 @@ pub struct SoftLayer {
 
 impl SoftLayer {
     pub fn new(width: u32, height: u32) -> SoftLayer {
-        let mut renderer = SoftRenderer::new(width as i32, height as i32);
+        let renderer = SoftRenderer::new(width as i32, height as i32);
         Self { renderer }
     }
 }

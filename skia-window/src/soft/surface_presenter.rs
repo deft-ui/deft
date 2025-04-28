@@ -1,4 +1,4 @@
-use skia_safe::Canvas;
+use crate::paint::Canvas;
 use winit::window::Window;
 
 pub trait SurfacePresenter {

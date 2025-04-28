@@ -1,15 +1,11 @@
-use std::num::{NonZeroU32};
 use std::ops::DerefMut;
-use std::rc::Rc;
-use std::slice;
-use skia_safe::{Canvas, ColorType, ImageInfo};
 use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window};
-use crate::context::{RenderContext, UserContext};
+use crate::context::{RenderContext};
 use crate::mrc::Mrc;
+use crate::paint::Canvas;
 use crate::renderer::Renderer;
 use crate::soft::context::SoftRenderContext;
-use crate::soft::soft_renderer::SoftRenderer;
 use crate::soft::surface_presenter::SurfacePresenter;
 use crate::surface::RenderBackend;
 
@@ -39,7 +35,7 @@ impl RenderBackend for SoftSurface {
     fn render(&mut self, draw: Renderer, callback: Box<dyn FnOnce(bool) + Send + 'static>) {
         let mut user_context = self.context.user_context.take().unwrap();
         let mut p_ctx = self.context.clone();
-        let mut renderer: Box<dyn FnOnce(&Canvas)> = Box::new(move |canvas| {
+        let renderer: Box<dyn FnOnce(&Canvas)> = Box::new(move |canvas| {
             let mut ctx = RenderContext::new(p_ctx.deref_mut(), &mut user_context);
             draw.render(canvas, &mut ctx);
             p_ctx.user_context = Some(user_context);

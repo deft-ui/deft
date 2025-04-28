@@ -1,8 +1,6 @@
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use crate::layer::{ILayer, Layer};
-use std::num::NonZeroUsize;
-use std::ops::{Deref, DerefMut};
 
 pub trait IRenderContext {
     fn create_layer(&mut self, width: usize, height: usize) -> Option<Box<dyn ILayer>>;

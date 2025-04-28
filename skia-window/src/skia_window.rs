@@ -1,6 +1,5 @@
 use std::ops::Deref;
 
-use skia_safe::Canvas;
 use winit::event_loop::ActiveEventLoop;
 #[cfg(target_os = "android")]
 use winit::platform::android::activity::AndroidApp;

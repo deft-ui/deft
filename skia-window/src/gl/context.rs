@@ -4,7 +4,6 @@ use crate::layer::ILayer;
 use skia_safe::gpu::surfaces::wrap_backend_texture;
 use skia_safe::gpu::{Mipmapped, Protected, Renderable, SurfaceOrigin};
 use skia_safe::{gpu, AlphaType, ColorType, Image};
-use std::num::NonZeroUsize;
 
 #[derive(Clone)]
 pub struct GlRenderContext {

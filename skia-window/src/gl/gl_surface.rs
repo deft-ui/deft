@@ -10,10 +10,8 @@ use winit::platform::x11;
 use winit::window::{Window};
 
 use glutin::prelude::*;
-use skia_safe::Canvas;
 #[cfg(target_os = "android")]
 use winit::platform::android::activity::AndroidApp;
-use crate::context::RenderContext;
 use crate::gl::gl_renderer::GlRenderer;
 use crate::renderer::Renderer;
 use crate::surface::RenderBackend;

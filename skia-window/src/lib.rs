@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-#![allow(unused)]
 #![allow(unexpected_cfgs)]
 pub mod skia_window;
 mod surface;
@@ -10,3 +9,4 @@ mod gl;
 pub mod renderer;
 mod soft;
 mod mrc;
+mod paint;

@@ -1,4 +1,4 @@
-use skia_safe::{Canvas, Image};
+use crate::paint::{Canvas, Image};
 
 pub trait ILayer {
     fn canvas(&mut self) -> &Canvas;

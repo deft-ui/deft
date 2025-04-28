@@ -1,29 +1,20 @@
-use std::cell::RefCell;
-use std::ffi::{c_void, CString};
+use std::ffi::{CString};
 use std::num::NonZeroU32;
-use std::ptr::{null, null_mut};
-use std::rc::Rc;
 use std::sync::{mpsc, Arc, Mutex};
 use std::sync::mpsc::channel;
-use std::{fs, mem, thread};
-use std::io::Write;
-use std::path::Path;
-use std::time::{Instant, SystemTime};
+use std::{thread};
 use ::gl::GetIntegerv;
-use gl::types::{GLchar, GLenum, GLint, GLsizei, GLsizeiptr, GLuint, GLvoid};
+use gl::types::{GLint};
 use glutin::config::ConfigTemplateBuilder;
 use glutin::context::PossiblyCurrentContext;
-use glutin::display::{Display, GetGlDisplay};
+use glutin::display::{Display};
 use glutin::prelude::*;
-use glutin::surface::{SurfaceAttributesBuilder, SwapInterval, WindowSurface};
+use glutin::surface::{WindowSurface};
 use log::info;
 use measure_time::print_time;
-use raw_window_handle::HasRawWindowHandle;
-use skia_safe::{Canvas, ColorType, gpu, Surface, EncodedImageFormat, Image, AlphaType};
-use skia_safe::gpu::{backend_render_targets, BackendTexture, Mipmapped, Protected, Renderable, SurfaceOrigin};
+use skia_safe::{ColorType, gpu, Surface};
+use skia_safe::gpu::{backend_render_targets, SurfaceOrigin};
 use skia_safe::gpu::gl::FramebufferInfo;
-use skia_safe::gpu::surfaces::wrap_backend_texture;
-use skia_safe::wrapper::PointerWrapper;
 #[cfg(glx_backend)]
 use winit::platform::x11;
 use winit::window::Window;
@@ -99,7 +90,7 @@ impl GlRenderer {
 
             let fb_info = {
                 let mut fboid: GLint = 0;
-                unsafe { GetIntegerv(gl::FRAMEBUFFER_BINDING, &mut fboid) };
+                GetIntegerv(gl::FRAMEBUFFER_BINDING, &mut fboid);
 
 
                 FramebufferInfo {
@@ -138,7 +129,7 @@ impl GlRenderer {
                 context,
                 user_context: Some(UserContext::new()),
             };
-            let mut context = Arc::new(Mutex::new(context));
+            let context = Arc::new(Mutex::new(context));
             let drawer = Arc::new(Mutex::new(None));
 
             let render_context_wrapper = RenderContextWrapper {
@@ -178,7 +169,7 @@ impl GlRenderer {
         self.sender.send(RenderMsg::Updated).unwrap();
     }
 
-    pub fn resize(&self, window: &Window, width: u32, height: u32) {
+    pub fn resize(&self, _window: &Window, width: u32, height: u32) {
         self.sender.send(RenderMsg::Resize(width, height)).unwrap();
     }
 
@@ -223,7 +214,7 @@ pub struct RenderContextWrapper {
 impl RenderContextWrapper {
 
     pub fn make_current(&self) {
-        let mut context = self.context.lock().unwrap();
+        let context = self.context.lock().unwrap();
         context.context.make_current(&context.gl_surface).unwrap();
     }
 
@@ -271,7 +262,7 @@ impl RenderContextWrapper {
                 let mut drawer_arc = self.drawer.lock().unwrap();
                 drawer_arc.take()
             };
-            if let Some(mut drawer) = drawer {
+            if let Some(drawer) = drawer {
                 let mut user_context = context.user_context.take().unwrap();
                 let canvas = context.surface.canvas();
                 let mut rc = RenderContext::new(&mut rc, &mut user_context);

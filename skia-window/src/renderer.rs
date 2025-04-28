@@ -1,5 +1,5 @@
 use crate::context::RenderContext;
-use skia_safe::Canvas;
+use crate::paint::Canvas;
 
 pub struct Renderer {
     renderer: Box<dyn FnOnce(&Canvas, &mut RenderContext) + Send + 'static>,
