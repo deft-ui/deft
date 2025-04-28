@@ -122,16 +122,6 @@ impl Element {
             }
         }));
         let ele_weak = ele.inner.as_weak();
-        ele.inner.style.animation_renderer = Some(Mrc::new(Box::new(move |styles| {
-            if let Ok(inner) = ele_weak.upgrade() {
-                let mut el = Element::from_inner(inner);
-                el.animation_style_props.clear();
-                for st in styles {
-                    el.animation_style_props.insert(st.key().clone(), st);
-                }
-                el.mark_style_dirty();
-            }
-        })));
         // let bk = backend(ele_cp);
         ele.backend = Box::new(backend(&mut ele));
         //ele.backend.bind(ele_cp);
@@ -766,7 +756,7 @@ impl Element {
         changed_style_props.values().cloned().into_iter().collect()
     }
 
-    fn mark_style_dirty(&mut self) {
+    pub(crate) fn mark_style_dirty(&mut self) {
         self.dirty_flags |= StyleDirtyFlags::SelfDirty;
         self.mark_dirty(false);
         if let Some(mut p) = self.get_parent() {
@@ -1178,7 +1168,7 @@ pub struct Element {
     window: Option<WindowWeak>,
     event_registration: EventRegistration<ElementWeak>,
     pub style: StyleNode,
-    animation_style_props: HashMap<StylePropKey, StyleProp>,
+    pub(crate) animation_style_props: HashMap<StylePropKey, StyleProp>,
     pub(crate) hover: bool,
     auto_focus: bool,
     dirty_flags: StyleDirtyFlags,

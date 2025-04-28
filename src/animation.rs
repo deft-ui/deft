@@ -1,3 +1,6 @@
+pub mod actor;
+pub mod css_actor;
+
 use crate as deft;
 use crate::mrc::Mrc;
 use crate::style::{ResolvedStyleProp, ScaleParams, StyleProp, StylePropKey, StylePropVal, StyleTransform, StyleTransformOp, TranslateLength, TranslateParams};
@@ -13,6 +16,7 @@ use std::time::SystemTime;
 use log::debug;
 use tokio::time::Instant;
 use yoga::StyleUnit;
+use crate::animation::actor::{AnimationAction, AnimationActor};
 use crate::base::Callback;
 use crate::element::Element;
 use crate::window::WindowWeak;
@@ -193,7 +197,7 @@ pub trait FrameController {
 }
 
 pub struct AnimationState {
-    animation: Animation,
+    actor: Box<dyn AnimationActor>,
     start_time: Instant,
     duration: f32,
     iteration_count: f32,
@@ -280,9 +284,9 @@ impl Animation {
 }
 
 impl AnimationInstance {
-    pub fn new(animation: Animation, duration: f32, iteration_count: f32, frame_controller: Box<dyn FrameController>) -> Self {
+    pub fn new<A: AnimationActor + 'static>(actor: A, duration: f32, iteration_count: f32, frame_controller: Box<dyn FrameController>) -> Self {
         let state = AnimationState {
-            animation,
+            actor: Box::new(actor),
             start_time: Instant::now(),
             duration,
             iteration_count,
@@ -294,12 +298,12 @@ impl AnimationInstance {
         }
     }
 
-    pub fn run(&mut self, renderer: Box<dyn FnMut(Vec<StyleProp>)>) {
+    pub fn run(&mut self) {
         let mut state = self.state.clone();
         self.state.frame_controller.request_next_frame(Box::new(move || {
             // debug!("animation started:{}", t);
             state.start_time = Instant::now();
-            Self::render_frame(state, renderer);
+            Self::render_frame(state);
         }));
     }
 
@@ -308,20 +312,20 @@ impl AnimationInstance {
         self.state.stopped = true;
     }
 
-    fn render_frame(mut state: Mrc<AnimationState>, mut renderer: Box<dyn FnMut(Vec<StyleProp>)>) {
+    fn render_frame(mut state: Mrc<AnimationState>) {
         let elapsed = state.start_time.elapsed().as_nanos() as f32;
         let position = elapsed / state.duration;
-        let frame = if position >= state.iteration_count || state.stopped {
-            Vec::new()
+        let mut is_ended = false;
+        if position >= state.iteration_count || state.stopped {
+            state.actor.stop();
+            is_ended = true;
         } else {
-            state.animation.get_frame(position - position as usize as f32)
+            state.actor.apply_animation(position - position as usize as f32, &mut is_ended);
         };
-        let is_ended = frame.is_empty();
-        renderer(frame);
         if !is_ended {
             let s = state.clone();
             state.frame_controller.request_next_frame(Box::new(|| {
-                Self::render_frame(s, renderer);
+                Self::render_frame(s);
             }))
         } else {
             //TODO notify ended?

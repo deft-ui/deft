@@ -22,6 +22,7 @@ use crate::animation::{AnimationInstance, SimpleFrameController, WindowAnimation
 use crate::border::build_border_paths;
 use crate::cache::CacheValue;
 use crate::animation::ANIMATIONS;
+use crate::animation::css_actor::CssAnimationActor;
 use crate::element::{Element, ElementWeak};
 use crate::event_loop::create_event_loop_callback;
 use crate::mrc::{Mrc, MrcWeak};
@@ -864,7 +865,6 @@ pub struct StyleNode {
     animation_params: AnimationParams,
     animation_instance: Option<AnimationInstance>,
     pub on_changed: Option<Box<dyn FnMut(StylePropKey)>>,
-    pub animation_renderer: Option<Mrc<Box<dyn FnMut(Vec<StyleProp>)>>>,
     pub resolved_style_props: HashMap<StylePropKey, ResolvedStyleProp>,
     pub font_size: f32,
     pub color: Color,
@@ -889,7 +889,6 @@ impl StyleNode {
             animation_instance: None,
             animation_params: AnimationParams::new(),
             on_changed: None,
-            animation_renderer: None,
             resolved_style_props: HashMap::new(),
             font_size: 12.0,
             color: Color::new(0),
@@ -1385,19 +1384,12 @@ impl StyleNode {
                     let frame_controller = WindowAnimationController::new(window);
                     let duration = p.duration * 1000000.0;
                     let iteration_count = p.iteration_count;
-                    let ani_instance = AnimationInstance::new(ani, duration, iteration_count, Box::new(frame_controller));
+                    let actor = CssAnimationActor::new(ani, element.as_weak());
+                    let mut ani_instance = AnimationInstance::new(actor, duration, iteration_count, Box::new(frame_controller));
+                    ani_instance.run();
                     Some(ani_instance)
                 })
             };
-            let mut ar = me.animation_renderer.clone();
-            if let Some(ai) = &mut me.animation_instance {
-                if let Some(ar) = &mut ar {
-                    let mut ar = ar.clone();
-                    ai.run(Box::new(move |styles| {
-                        ar(styles);
-                    }));
-                }
-            }
         });
         task.call();
     }

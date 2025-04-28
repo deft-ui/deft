@@ -14,6 +14,7 @@ use yoga::Direction::LTR;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size, StyleUnit};
 use crate::{backend_as_api, is_mobile_platform, js_deserialize, js_serialize, ok_or_return, some_or_return};
 use crate::animation::{AnimationDef, AnimationInstance, SimpleFrameController, WindowAnimationController};
+use crate::animation::actor::{AnimationAction, AnimationActor};
 use crate::base::{CaretDetail, EventContext, Rect};
 use crate::color::parse_hex_color;
 use crate::element::{ElementBackend, Element, ViewEvent, ElementWeak};
@@ -578,49 +579,19 @@ impl ElementBackend for Scroll {
                     let old_top = element.get_scroll_top();
                     let left_dist = horizontal_speed / 0.003;
                     let top_dist = vertical_speed / 0.003;
-
-                    //TODO Don't use RowGap/ColumnGap
-                    let animation = AnimationDef::new()
-                        .key_frame(0.0, vec![StyleProp::RowGap(StylePropVal::Custom(Length::PX(0.0))), StyleProp::ColumnGap(StylePropVal::Custom(Length::PX(0.0)))])
-                        .key_frame(1.0, vec![StyleProp::RowGap(StylePropVal::Custom(Length::PX(1.0))), StyleProp::ColumnGap(StylePropVal::Custom(Length::PX(1.0)))])
-                        .build();
+                    let actor = ScrollAnimationActor::new(
+                        element.as_weak(), old_left, old_top, left_dist, top_dist
+                    );
                     let window = some_or_return!(element.get_window(), false);
-                    let frame_controller = WindowAnimationController::new(window);
-                    let mut animation_instance = AnimationInstance::new(animation, 1000.0 * 1000000.0, 1.0, Box::new(frame_controller));
-                    let mut ele = self.element.clone();
-                    let timing_func = Bezier::from_cubic_coordinates(0.0, 0.0, 0.17, 0.89, 0.45, 1.0, 1.0, 1.0);
-                    let mut me = self.clone();
-                    let element = self.element.clone();
-                    animation_instance.run(Box::new(move |styles| {
-                        let mut left_stopped = left_dist == 0.0;
-                        let mut top_stooped = top_dist == 0.0;
-                        let mut ele = ok_or_return!(element.upgrade_mut());
-                        let length_ctx = LengthContext {
-                            root: 0.0,
-                            font_size: 0.0,
-                            viewport_width: 0.0,
-                            viewport_height: 0.0,
-                        };
-                        for style in styles {
-                            match style {
-                                StyleProp::RowGap(value) => {
-                                    let new_left = old_left + left_dist * timing_func.evaluate(TValue::Parametric(value.resolve(&Length::PX(0.0)).to_px(&length_ctx) as f64)).y as f32;
-                                    ele.set_scroll_left(new_left);
-                                    left_stopped = new_left < 0.0 || new_left > ele.get_max_scroll_left();
-                                },
-                                StyleProp::ColumnGap(value) => {
-                                    let new_top = old_top + top_dist * timing_func.evaluate(TValue::Parametric(value.resolve(&Length::PX(0.0)).to_px(&length_ctx) as f64)).y as f32;
-                                    ele.set_scroll_top(new_top);
-                                    top_stooped = new_top < 0.0 || new_top > ele.get_max_scroll_top();
-                                },
-                                _ => {}
-                            }
-                        }
-                        if left_stopped && top_stooped {
-                            me.momentum_animation_instance = None;
-                        }
-                    }));
-                    self.momentum_animation_instance = Some(animation_instance);
+                    let fc = WindowAnimationController::new(window);
+                    let mut ai = AnimationInstance::new(
+                        actor,
+                        1000.0 * 1000000.0,
+                        1.0,
+                        Box::new(fc)
+                    );
+                    ai.run();
+                    self.momentum_animation_instance = Some(ai);
                 }
             }
             self.momentum_info = None;
@@ -756,5 +727,50 @@ fn calculate_speed(distance: f32, duration: f32) -> f32 {
         speed
     } else {
         speed * -1.0
+    }
+}
+
+struct ScrollAnimationActor {
+    old_left: f32,
+    left_dist: f32,
+    old_top: f32,
+    top_dist: f32,
+    element: ElementWeak,
+    timing_func: Bezier,
+}
+
+impl ScrollAnimationActor {
+    fn new(element: ElementWeak, old_left: f32, old_top: f32, left_dist: f32, top_dist: f32) -> Self {
+        let timing_func = Bezier::from_cubic_coordinates(0.0, 0.0, 0.17, 0.89, 0.45, 1.0, 1.0, 1.0);
+        Self {
+            old_left,
+            left_dist,
+            old_top,
+            top_dist,
+            element,
+            timing_func,
+        }
+    }
+}
+
+impl AnimationActor for ScrollAnimationActor {
+    fn apply_animation(&mut self, position: f32, stop: &mut bool) {
+        let mut left_stopped = self.left_dist == 0.0;
+        let mut top_stooped = self.top_dist == 0.0;
+        let mut ele = ok_or_return!(self.element.upgrade_mut());
+
+        if !left_stopped {
+            let new_left = self.old_left + self.left_dist * self.timing_func.evaluate(TValue::Parametric(position as f64)).y as f32;
+            ele.set_scroll_left(new_left);
+            left_stopped = new_left < 0.0 || new_left > ele.get_max_scroll_left();
+        }
+        if !top_stooped {
+            let new_top = self.old_top + self.top_dist * self.timing_func.evaluate(TValue::Parametric(position as f64)).y as f32;
+            ele.set_scroll_top(new_top);
+            top_stooped = new_top < 0.0 || new_top > ele.get_max_scroll_top();
+        }
+        if left_stopped && top_stooped {
+            *stop = true;
+        }
     }
 }
