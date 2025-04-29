@@ -5,13 +5,15 @@ use font_kit::hinting::HintingOptions;
 use font_kit::loader::Loader;
 use libc::memcpy;
 use log::warn;
-use skia_safe::{scalar, AlphaType, Bitmap, Canvas, ColorType, FilterMode, Image, ImageInfo, Paint, Point, Rect, SamplingOptions};
+use skia_safe::{scalar, AlphaType, Bitmap, Canvas, Color, ColorType, FilterMode, Image, ImageInfo, Paint, Point, Rect, SamplingOptions};
 use skia_safe::canvas::GlyphPositions;
 use swash::GlyphId;
 use swash::scale::image::Content;
+use swash::zeno::Placement;
 use crate::base;
 use crate::canvas_util::CanvasHelper;
 use crate::element::paragraph::TextUnit;
+use crate::element::text::rasterize_cache::RasterizeCache;
 use crate::element::text::text_paragraph::TextParams;
 use crate::font::Font;
 use crate::number::DeNan;
@@ -20,6 +22,9 @@ use crate::string::StringUtils;
 use crate::style::ColorHelper;
 use crate::text::{calculate_line_char_count, TextStyle};
 
+thread_local! {
+    static RASTERIZE_CACHE: RasterizeCache = RasterizeCache::new();
+}
 
 #[derive(Clone)]
 struct LineUnit {
@@ -107,62 +112,72 @@ impl LineUnit {
         let color = paint.color();
         for idx in range_start..range_end {
             let lb = layout_bounds[idx];
-            if let Some(img) = font.rasterize_glyph(glyphs[idx], font_size * scale) {
-                let width = img.placement.width;
-                let height = img.placement.height;
-                let x = img.placement.left;
-                let y = img.placement.top;
-                // println!("placement {} {:?}", font.name(), img.placement);
-                if width == 0 || height == 0 {
-                    continue;
+            let glyph = glyphs[idx];
+            let rasterized_img = RASTERIZE_CACHE.with(
+                move |cache| cache.get_image(&font, glyph, font_size * scale)
+            );
+            if let Some(img) = rasterized_img {
+                if let Some(bmp) = Self::swash_to_bitmap(&img, color) {
+                    let x = img.placement.left;
+                    let y = img.placement.top;
+                    let mut options = SamplingOptions::default();
+                    options.filter = FilterMode::Linear;
+                    canvas.draw_image_with_sampling_options(
+                        bmp.as_image(),
+                        ((origin.x + lb.x) * scale + x as f32, origin.y * scale - y as f32),
+                        options,
+                        None,
+                    );
                 }
-                let size = (width as i32, height as i32);
-                let pixels_count = (width * height * 4) as usize;
-                let mut bmp = Bitmap::new();
-                let image_info = ImageInfo::new(size, ColorType::RGBA8888, AlphaType::Unpremul, None);
-                bmp.set_info(&image_info, None);
-                bmp.alloc_pixels();
-                match img.content {
-                    Content::Mask => {
-                        let mut bytes = unsafe {
-                            slice_from_raw_parts_mut(bmp.pixels() as *mut u8, pixels_count)
-                        };
-                        let mut i = 0;
-                        for y in 0..height {
-                            let row_offset = y * width * 4;
-                            for x in 0..width {
-                                let pixel_offset = (row_offset + x * 4) as usize;
-                                unsafe {
-                                    (*bytes)[pixel_offset] = color.r();
-                                    (*bytes)[pixel_offset + 1] = color.g();
-                                    (*bytes)[pixel_offset + 2] = color.b();
-                                    (*bytes)[pixel_offset + 3] = img.data[i];
-                                }
-                                i += 1;
-                            }
-                        }
-                    }
-                    Content::SubpixelMask => {
-                        warn!("SubpixelMast is unsupported yet");
-                    }
-                    Content::Color => {
-                        unsafe {
-                            memcpy(bmp.pixels(),  img.data.as_ptr() as *const c_void, img.data.len());
-                        }
-                    }
-                };
-                let mut options = SamplingOptions::default();
-                options.filter = FilterMode::Linear;
-                canvas.draw_image_with_sampling_options(
-                    bmp.as_image(),
-                    ((origin.x + lb.x) * scale + x as f32, origin.y * scale - y as f32),
-                    options,
-                    None
-                );
             }
         }
         canvas.restore();
 
+    }
+
+    fn swash_to_bitmap(img: &swash::scale::image::Image, color: Color) -> Option<Bitmap> {
+        let width = img.placement.width;
+        let height = img.placement.height;
+        // println!("placement {} {:?}", font.name(), img.placement);
+        if width == 0 || height == 0 {
+            return None;
+        }
+        let size = (width as i32, height as i32);
+        let pixels_count = (width * height * 4) as usize;
+        let mut bmp = Bitmap::new();
+        let image_info = ImageInfo::new(size, ColorType::RGBA8888, AlphaType::Unpremul, None);
+        bmp.set_info(&image_info, None);
+        bmp.alloc_pixels();
+        match img.content {
+            Content::Mask => {
+                let mut bytes = unsafe {
+                    slice_from_raw_parts_mut(bmp.pixels() as *mut u8, pixels_count)
+                };
+                let mut i = 0;
+                for y in 0..height {
+                    let row_offset = y * width * 4;
+                    for x in 0..width {
+                        let pixel_offset = (row_offset + x * 4) as usize;
+                        unsafe {
+                            (*bytes)[pixel_offset] = color.r();
+                            (*bytes)[pixel_offset + 1] = color.g();
+                            (*bytes)[pixel_offset + 2] = color.b();
+                            (*bytes)[pixel_offset + 3] = img.data[i];
+                        }
+                        i += 1;
+                    }
+                }
+            }
+            Content::SubpixelMask => {
+                warn!("SubpixelMast is unsupported yet");
+            }
+            Content::Color => {
+                unsafe {
+                    memcpy(bmp.pixels(),  img.data.as_ptr() as *const c_void, img.data.len());
+                }
+            }
+        };
+        Some(bmp)
     }
 
 }

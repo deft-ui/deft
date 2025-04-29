@@ -1,6 +1,7 @@
 // pub mod skia_text_paragraph;
 pub mod text_paragraph;
 pub mod simple_text_paragraph;
+mod rasterize_cache;
 
 use std::any::Any;
 use crate as deft;
