@@ -68,7 +68,7 @@ reqwest = { version = "0.11.27",default-features = false, features = ["blocking"
 [target.'cfg(target_os = "android")'.dependencies]
 android_logger = "0.11.0"
 jni = "0.21.1"
-reqwest = { version = "0.11.27",default-features = false, features = ["blocking", "native-tls-vendored", "multipart", "stream"] }
+reqwest = { version = "0.11.27",default-features = false, features = ["blocking", "native-tls-vendored", "multipart", "stream"], optional = true }
 
 [build-dependencies]
 cfg_aliases = "0.2.1"
