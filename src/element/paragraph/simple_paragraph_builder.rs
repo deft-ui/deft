@@ -194,12 +194,13 @@ fn test_get_char_bounds() {
     pb.add_text(format!("{}{}", "12", ZERO_WIDTH_WHITESPACE));
     let mut paragraph = pb.build();
     paragraph.layout(100.0);
+    let layout = paragraph.layout.as_ref().unwrap();
     for offset in 0..3 {
-        let bounds = paragraph.get_char_bounds(offset);
+        let bounds = layout.get_char_bounds(offset);
         assert!(bounds.is_some());
     }
-    let bounds0 = paragraph.get_char_bounds(0).unwrap();
-    let bounds1 = paragraph.get_char_bounds(1).unwrap();
+    let bounds0 = layout.get_char_bounds(0).unwrap();
+    let bounds1 = layout.get_char_bounds(1).unwrap();
     assert!(bounds1.left >= bounds0.right);
     assert!(paragraph.max_intrinsic_width() > 0.0);
 }
