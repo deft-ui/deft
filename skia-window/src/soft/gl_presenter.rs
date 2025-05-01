@@ -36,7 +36,7 @@ impl SurfacePresenter for GlPresenter {
         self.surface_state.resize(width, height);
     }
 
-    fn render(&mut self, _renderer: Box<dyn FnOnce(&Canvas)>) {
+    fn render(&mut self, _renderer: Box<dyn FnOnce(&Canvas) + Send>, _callback: Box<dyn FnOnce(bool) + Send + 'static>) {
         // let renderer = Renderer::new(move |canvas, ctx| {
         //     renderer(canvas);
         // });
