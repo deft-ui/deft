@@ -22,7 +22,9 @@ use crate::element::paragraph::simple_paragraph_builder::SimpleParagraphBuilder;
 use crate::element::text::simple_text_paragraph::{SimpleTextParagraph, TextBlock};
 use crate::event::{FocusShiftEvent, TextUpdateEvent};
 use crate::number::DeNan;
+use crate::paint::Painter;
 use crate::render::RenderFn;
+use crate::some_or_continue;
 use crate::string::StringUtils;
 use crate::style::StylePropKey;
 use crate::text::{TextAlign, TextStyle};
@@ -359,27 +361,6 @@ impl Text {
         })
     }
 
-    pub fn get_caret_offset_coordinate(&self, char_offset: usize) -> ((f32, f32), (f32, f32)) {
-        let (caret_row, caret_col) = self.get_location_by_atom_offset(char_offset);
-        let (padding_top, _, _, padding_left) = self.element.get_padding();
-        let caret_height = self.get_font_size();
-        self.with_lines_mut(|p_list| {
-            let mut y_offset = 0f32;
-            let mut current_row = 0;
-            for p in p_list {
-                if current_row == caret_row {
-                    let gc = p.paragraph.get_char_bounds(caret_col).unwrap();
-                    let right = gc.left + padding_left;
-                    let middle = (gc.top + gc.bottom) / 2.0 + padding_top + y_offset;
-                    return ((right, middle - caret_height / 2.0), (right, middle + caret_height / 2.0));
-                }
-                y_offset += p.paragraph.height();
-                current_row += 1;
-            }
-            unreachable!()
-        })
-    }
-
     pub fn get_location_by_atom_offset(&self, atom_offset: AtomOffset) -> (RowOffset, ColOffset) {
         self.with_lines_mut(|ps| {
             let mut line_atom_offset = 0;
@@ -616,20 +597,11 @@ impl ElementBackend for Text {
         let selection = self.selection;
         let selection_paint = self.selection_paint.clone();
 
-        let mut p_list = self.with_lines_mut(|ln| ln.clone());
-        RenderFn::new(move |painter| {
-            let canvas = painter.canvas;
-            let clip_rect = canvas.local_clip_bounds();
-            // if let Some(clip_r) = canvas.local_clip_bounds() {
-            //     debug!("clip_r:{:?}", clip_r);
-            //     let mut paint = Paint::default();
-            //     paint.set_color(parse_hex_color("ccc").unwrap());
-            //     canvas.draw_rect(clip_r, &paint);
-            // }
-            canvas.translate((padding.3, padding.0));
+        let mut line_renderers = self.with_lines_mut(|p_list| {
+            let mut line_renders = Vec::with_capacity(p_list.len());
             let mut top = 0.0;
             let mut line_atom_offset = 0;
-            for p in &mut p_list {
+            for p in p_list {
                 let p_height = p.paragraph.height();
                 let p_top = top;
                 let p_bottom = top + p_height;
@@ -639,30 +611,59 @@ impl ElementBackend for Text {
 
                 top += p_height;
                 line_atom_offset += p_atom_count;
-                if let Some(cp) = clip_rect {
-                    // Simply use p_height as descent/ascent
-                    let descent = p_height;
-                    let ascent = p_height;
-                    if p_bottom + descent < cp.top {
-                        continue;
-                    } else if p_top - ascent > cp.bottom {
-                        break;
-                    }
-                }
+                let layout = some_or_continue!(p.paragraph.layout.clone());
+
+                let mut selection_bounds = Vec::new();
                 if let Some(si_range) = selection {
                     let p_range = (p_atom_begin, p_atom_end);
                     if let Some((begin, end)) = intersect_range(si_range, p_range) {
                         let begin = begin - p_atom_begin;
                         let end = end - p_atom_begin;
                         for offset in begin..end {
-                            if let Some(g) = p.paragraph.get_char_bounds(offset) {
+                            if let Some(g) = layout.get_char_bounds(offset) {
                                 let bounds = g.with_offset((0.0, p_top));
-                                canvas.draw_rect(&bounds, &selection_paint);
+                                selection_bounds.push(bounds);
                             }
                         }
                     }
                 }
-                p.paragraph.paint(painter, (0.0, p_top));
+
+
+                let selection_paint = selection_paint.clone();
+                let ln_render = move |painter: &Painter| {
+                    let canvas = painter.canvas;
+                    let clip_rect = canvas.local_clip_bounds();
+
+                    if let Some(cp) = clip_rect {
+                        // Simply use p_height as descent/ascent
+                        let descent = p_height;
+                        let ascent = p_height;
+                        if p_bottom + descent < cp.top {
+                            return true;
+                        } else if p_top - ascent > cp.bottom {
+                            return false;
+                        }
+                    }
+                    for sb in selection_bounds {
+                        canvas.draw_rect(&sb, &selection_paint);
+                    }
+                    layout.paint(painter, (0.0, p_top).into());
+                    true
+                };
+                line_renders.push(ln_render);
+            }
+            line_renders
+        });
+        RenderFn::new(move |painter| {
+            // if let Some(clip_r) = canvas.local_clip_bounds() {
+            //     debug!("clip_r:{:?}", clip_r);
+            //     let mut paint = Paint::default();
+            //     paint.set_color(parse_hex_color("ccc").unwrap());
+            //     canvas.draw_rect(clip_r, &paint);
+            // }
+            painter.canvas.translate((padding.3, padding.0));
+            for ln in line_renderers {
+                ln(painter);
             }
         })
     }

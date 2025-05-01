@@ -19,7 +19,6 @@ pub struct ParagraphData {
     pub measure_mode: Option<(MeasureMode, MeasureMode)>,
 }
 
-#[derive(Clone)]
 pub struct Line {
     /// Atom count; \r\n is treated as one atom
     pub atom_count: AtomOffset,
@@ -88,7 +87,4 @@ impl Line {
         self.paragraph.get_text()
     }
 
-    pub fn get_soft_line_height(&self, char_offset: usize) -> f32 {
-        self.paragraph.get_soft_line_height(char_offset)
-    }
 }

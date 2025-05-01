@@ -14,7 +14,7 @@ use crate::js::JsError;
 use crate::number::DeNan;
 use crate::string::StringUtils;
 use crate::style::{parse_color_str, parse_optional_color_str, StylePropKey};
-use crate::{js_deserialize, js_serialize};
+use crate::{js_deserialize, js_serialize, some_or_continue};
 use deft_macros::{element_backend, js_methods, mrc_object};
 use serde::{Deserialize, Serialize};
 use skia_safe::font_style::{Slant, Weight, Width};
@@ -129,7 +129,6 @@ pub struct Paragraph {
     selection_fg: Paint,
 }
 
-#[derive(Clone)]
 pub struct Line {
     units: Vec<ParagraphUnit>,
     sk_paragraph: SimpleTextParagraph,
@@ -195,39 +194,12 @@ impl Line {
         }
     }
 
-    pub fn get_char_bounds(&mut self, char_offset: usize) -> Option<Rect> {
-        self.sk_paragraph.get_char_bounds(char_offset)
-    }
-
     pub fn get_utf8_offset(&self, char_offset: usize) -> usize {
         if char_offset == 0 {
             0
         } else {
             self.get_text().substring(0, char_offset).len()
         }
-    }
-
-    fn paint_selection(
-        &mut self,
-        painter: &Painter,
-        line_offset: (f32,f32),
-        selection: (usize, usize),
-        bg_paint: &Paint,
-        fg_paint: &Paint,
-    ) {
-        let canvas = painter.canvas;
-        let (start_offset, end_offset) = selection;
-        let line_offset = Point { x: line_offset.0, y: line_offset.1 };
-        canvas.save();
-        canvas.translate(line_offset);
-        for i in start_offset..end_offset {
-            if let Some(char_rect) = self.get_char_bounds(i) {
-                canvas.draw_rect(&char_rect, &bg_paint);
-            }
-        }
-
-        self.sk_paragraph.paint_chars(painter, start_offset, end_offset, Some(fg_paint));
-        canvas.restore();
     }
 
     fn rebuild_paragraph(&mut self, paragraph_params: &ParagraphParams) {
@@ -509,7 +481,8 @@ impl Paragraph {
     pub fn get_char_rect(&mut self, coord: TextCoord) -> Option<crate::base::Rect> {
         let (row, col) = (coord.0, coord.1);
         let line = self.lines.get_mut(row)?;
-        let bounds = line.sk_paragraph.get_char_bounds(col)?;
+        let layout = line.sk_paragraph.layout.as_ref()?;
+        let bounds = layout.get_char_bounds(col)?;
         let mut y_offset = 0.0;
         if row > 0 {
             for i in 0..row {
@@ -733,47 +706,61 @@ impl ElementBackend for Paragraph {
         let mut consumed_top = 0.0;
         let mut consumed_rows = 0usize;
         let mut consumed_columns = 0usize;
-        let mut lines = me.lines.clone();
+
         let selection = self.selection;
         let selection_bg = self.selection_bg.clone();
         let selection_fg = self.selection_fg.clone();
 
-        RenderFn::new(move |painter| {
-            let canvas = painter.canvas;
-            canvas.translate((padding.3, padding.0));
-            let clip_rect = canvas.local_clip_bounds();
-            for ln in &mut lines {
-                let ln_row = consumed_rows; consumed_rows += 1;
-                let ln_column = consumed_columns; consumed_columns += 1;
+        let mut line_painters = Vec::with_capacity(self.lines.len());
+        for ln in &mut self.lines {
+            let ln_row = consumed_rows; consumed_rows += 1;
+            let ln_column = consumed_columns; consumed_columns += 1;
 
-                let ln_height = ln.sk_paragraph.height();
-                let ln_top = consumed_top; consumed_top += ln_height;
-                let ln_bottom = consumed_top;
+            let ln_height = ln.sk_paragraph.height();
+            let ln_top = consumed_top; consumed_top += ln_height;
+            let ln_bottom = consumed_top;
+            let atom_count = ln.atom_count();
+            let ln_layout = some_or_continue!(ln.sk_paragraph.layout.clone());
 
-
+            let selection_bg = selection_bg.clone();
+            let selection_fg = selection_fg.clone();
+            let ln_renderer = move |painter: &Painter| {
+                let clip_rect = painter.canvas.local_clip_bounds();
                 if let Some(cp) = clip_rect {
                     if ln_bottom < cp.top {
-                        continue;
+                        return true;
                     } else if ln_top > cp.bottom {
-                        break;
+                        return false;
                     }
                 }
-                ln.sk_paragraph.paint(painter, (0.0, ln_top));
+                ln_layout.paint(painter, (0.0, ln_top).into());
 
-                let atom_count = ln.atom_count();
                 if atom_count > 0 {
                     if let Some(selection_range) = selection {
                         let ln_range = (TextCoord(ln_row, 0), TextCoord(ln_row, atom_count));
                         if let Some((begin, end)) = intersect_range(selection_range, ln_range) {
-                            ln.paint_selection(
+                            ln_layout.paint_selection(
                                 painter,
                                 (0.0, ln_top),
                                 (begin.1, end.1),
                                 &selection_bg,
-                                &selection_fg
+                                &selection_fg,
                             );
                         }
                     }
+                }
+                true
+            };
+            line_painters.push(ln_renderer);
+        }
+
+
+        RenderFn::new(move |painter| {
+            let canvas = painter.canvas;
+            canvas.translate((padding.3, padding.0));
+            for lp in line_painters {
+                if !lp(painter) {
+                    break;
                 }
             }
         })

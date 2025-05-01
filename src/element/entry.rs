@@ -13,6 +13,7 @@ use winit::keyboard::NamedKey;
 use winit::window::CursorIcon;
 use yoga::{PositionType, StyleUnit};
 use deft_macros::{element_backend, js_methods};
+use measure_time::print_time;
 use serde::{Deserialize, Serialize};
 use crate::base::{Callback, CaretDetail, EventContext, MouseDetail, MouseEventType, Rect, TextChangeDetail, TextUpdateDetail};
 use crate::element::{ElementBackend, Element, ElementWeak};
@@ -792,6 +793,22 @@ impl ElementBackend for Entry {
     }
 
 }
+
+#[test]
+fn test_performance() {
+    let mut entry_el = Element::create(Entry::create);
+    let mut entry_el2 = entry_el.clone();
+    let entry = entry_el.get_backend_mut_as::<Entry>();
+    entry.set_text(include_str!("../../Cargo.lock").to_string().repeat(10));
+    {
+        print_time!("layout time");
+        entry_el2.calculate_layout(1000.0, 100.0);
+    }
+
+    print_time!("render paragraph");
+    entry.paragraph.render();
+}
+
 
 #[test]
 fn test_caret() {

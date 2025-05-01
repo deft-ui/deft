@@ -1,5 +1,6 @@
 use std::ffi::c_void;
 use std::ptr::{slice_from_raw_parts, slice_from_raw_parts_mut};
+use std::sync::Arc;
 use font_kit::canvas::{Format, RasterizationOptions};
 use font_kit::hinting::HintingOptions;
 use font_kit::loader::Loader;
@@ -10,7 +11,7 @@ use skia_safe::canvas::GlyphPositions;
 use swash::GlyphId;
 use swash::scale::image::Content;
 use swash::zeno::Placement;
-use crate::base;
+use crate::{base, some_or_return};
 use crate::canvas_util::CanvasHelper;
 use crate::element::paragraph::TextUnit;
 use crate::element::text::rasterize_cache::RasterizeCache;
@@ -26,7 +27,6 @@ thread_local! {
     static RASTERIZE_CACHE: RasterizeCache = RasterizeCache::new();
 }
 
-#[derive(Clone)]
 struct LineUnit {
     block: TextBlock,
     x: f32,
@@ -182,7 +182,6 @@ impl LineUnit {
 
 }
 
-#[derive(Clone)]
 struct TextLine {
     units: Vec<LineUnit>,
     line_number: usize,
@@ -205,18 +204,101 @@ impl TextLine {
     }
 }
 
-#[derive(Clone)]
 pub struct SimpleTextParagraph {
     text: String,
     line_height: Option<f32>,
-    height: f32,
-    max_intrinsic_width: f32,
     text_blocks: Vec<TextBlock>,
+    pub(crate) layout: Option<Arc<TextLayout>>,
+}
+
+pub struct TextLayout {
+    max_intrinsic_width: f32,
     lines: Vec<TextLine>,
+    height: f32,
+}
+
+impl TextLayout {
+    pub fn paint(&self, painter: &Painter, p: Point) {
+        let canvas = painter.canvas;
+        canvas.save();
+        canvas.translate(p);
+        for ln in &self.lines {
+            let y = ln.y + ln.baseline;
+            for unit in &ln.units {
+                let tb = &unit.block;
+                if tb.style.foreground().color().is_transparent() {
+                    continue;
+                }
+                let x = unit.x;
+                unit.paint(painter, Point::new(x, y), None, None);
+            }
+        }
+        canvas.restore();
+    }
+
+    fn get_unit_at_char_offset(&self, char_offset: usize) -> Option<(&TextLine, &LineUnit)> {
+        for ln in self.lines.iter().rev() {
+            if ln.char_offset > char_offset {
+                continue;
+            }
+            for unit in ln.units.iter().rev() {
+                if unit.char_offset > char_offset {
+                    continue;
+                }
+                return Some((ln, unit));
+            }
+            return None;
+        }
+        None
+    }
+
+    pub fn get_char_bounds(&self, char_offset: usize) -> Option<Rect> {
+        let (ln, unit) = self.get_unit_at_char_offset(char_offset)?;
+        let char_offset = char_offset - unit.char_offset;
+        let unit_origin = (unit.x, ln.y + ln.baseline);
+        let bounds = unit.get_inner_layout_bounds(false);
+        Some(bounds[char_offset].bounds_with_offset().with_offset(unit_origin))
+    }
+
+    pub fn paint_chars(&self, painter: &Painter, mut start: usize, end: usize, paint: Option<&Paint>) {
+        while start < end {
+            if let Some((ln, unit)) = self.get_unit_at_char_offset(start) {
+                let unit_start = start - unit.char_offset;
+                let paint_char_count = usize::min(unit.block.text.chars_count() - unit_start, end - start);
+                unit.paint(painter, Point::new(unit.x, ln.y + ln.baseline), Some((unit_start, unit_start + paint_char_count)), paint);
+                start += paint_char_count;
+            } else {
+                return;
+            }
+        }
+    }
+
+    pub fn paint_selection(
+        &self,
+        painter: &Painter,
+        line_offset: (f32,f32),
+        selection: (usize, usize),
+        bg_paint: &Paint,
+        fg_paint: &Paint,
+    ) {
+        let canvas = painter.canvas;
+        let (start_offset, end_offset) = selection;
+        let line_offset = Point { x: line_offset.0, y: line_offset.1 };
+        canvas.save();
+        canvas.translate(line_offset);
+        for i in start_offset..end_offset {
+            if let Some(char_rect) = self.get_char_bounds(i) {
+                canvas.draw_rect(&char_rect, &bg_paint);
+            }
+        }
+
+        self.paint_chars(painter, start_offset, end_offset, Some(fg_paint));
+        canvas.restore();
+    }
+
 }
 
 
-#[derive(Clone)]
 pub struct TextBlock {
     pub text: String,
     pub style: TextStyle,
@@ -233,11 +315,9 @@ impl SimpleTextParagraph {
 
         Self {
             text,
-            max_intrinsic_width: 0.0,
-            height: 0.0,
             line_height: None,
             text_blocks,
-            lines: Vec::new(),
+            layout: None,
         }
     }
 
@@ -319,42 +399,27 @@ impl SimpleTextParagraph {
                 max_intrinsic_width = f32::max(max_intrinsic_width, left);
             }
         }
-        self.max_intrinsic_width = max_intrinsic_width;
-        self.height = current_line.y + current_line.height;
+        let height = current_line.y + current_line.height;
         lines.push(current_line);
-        self.lines = lines;
+        self.layout = Some(Arc::new(TextLayout {
+            max_intrinsic_width,
+            height,
+            lines,
+        }));
     }
 
     pub fn height(&self) -> f32 {
-        self.height
+        match &self.layout {
+            Some(layout) => layout.height,
+            None => 0.0,
+        }
     }
 
     pub fn max_intrinsic_width(&self) -> f32 {
-        self.max_intrinsic_width
-    }
-
-    pub fn get_char_bounds(&mut self, char_offset: usize) -> Option<Rect> {
-        let (ln, unit) = self.get_unit_at_char_offset(char_offset)?;
-        let char_offset = char_offset - unit.char_offset;
-        let unit_origin = (unit.x, ln.y + ln.baseline);
-        let bounds = unit.get_inner_layout_bounds(false);
-        return Some(bounds[char_offset].bounds_with_offset().with_offset(unit_origin));
-    }
-
-    fn get_unit_at_char_offset(&self, char_offset: usize) -> Option<(&TextLine, &LineUnit)> {
-        for ln in self.lines.iter().rev() {
-            if ln.char_offset > char_offset {
-                continue;
-            }
-            for unit in ln.units.iter().rev() {
-                if unit.char_offset > char_offset {
-                    continue;
-                }
-                return Some((ln, unit));
-            }
-            return None;
+        match &self.layout {
+            Some(layout) => layout.max_intrinsic_width,
+            None => 0.0,
         }
-        None
     }
 
     pub fn get_char_offset_at_coordinate(&self, coord: (f32, f32)) -> usize {
@@ -362,7 +427,8 @@ impl SimpleTextParagraph {
         if y < 0.0 {
             return 0;
         }
-        for ln in self.lines.iter().rev() {
+        let layout = some_or_return!(self.layout.as_ref(), 0);
+        for ln in layout.lines.iter().rev() {
             if ln.y > coord.1 {
                 continue;
             }
@@ -388,59 +454,23 @@ impl SimpleTextParagraph {
         return 0;
     }
 
-    pub fn get_soft_line_height(&self, char_offset: usize) -> f32 {
-        if let Some((ln, unit)) = self.get_unit_at_char_offset(char_offset) {
-            ln.height
-        } else {
-            0.0
-        }
-    }
-
-    pub fn paint(&self, painter: &Painter, p: impl Into<Point>) {
-        let canvas = painter.canvas;
-        canvas.save();
-        let p = p.into();
-        canvas.translate(p);
-        for ln in &self.lines {
-            let y = ln.y + ln.baseline;
-            for unit in &ln.units {
-                let tb = &unit.block;
-                if tb.style.foreground().color().is_transparent() {
-                    continue;
-                }
-                let x = unit.x;
-                unit.paint(painter, Point::new(x, y), None, None);
-            }
-        }
-        canvas.restore();
-    }
-
     pub fn get_text(&self) -> &str {
         &self.text
     }
 
     pub fn get_line_number_at_utf16_offset(&self, offset: usize) -> Option<usize> {
-        let (ln, unit) = self.get_unit_at_char_offset(offset)?;
+        let layout = self.layout.as_ref()?;
+        let (ln, unit) = layout.get_unit_at_char_offset(offset)?;
         Some(ln.line_number)
     }
 
     pub fn get_line_height_at(&self, line_number: usize) -> Option<f32> {
-        let ln = self.lines.get(line_number)?;
+        let layout = self.layout.as_ref()?;
+        let ln = layout.lines.get(line_number)?;
         Some(ln.height)
     }
 
-    pub fn paint_chars(&self, painter: &Painter, mut start: usize, end: usize, paint: Option<&Paint>) {
-        while start < end {
-            if let Some((ln, unit)) = self.get_unit_at_char_offset(start) {
-                let unit_start = start - unit.char_offset;
-                let paint_char_count = usize::min(unit.block.text.chars_count() - unit_start, end - start);
-                unit.paint(painter, Point::new(unit.x, ln.y + ln.baseline), Some((unit_start, unit_start + paint_char_count)), paint);
-                start += paint_char_count;
-            } else {
-                return;
-            }
-        }
-    }
+
 
 }
 
