@@ -15,7 +15,7 @@ egl = ["gpu", "glutin/egl"]
 glx = ["gpu", "glutin/glx", "glutin/x11", "winit/x11", "x11"]
 wgl = ["gpu", "glutin/wgl"]
 x11 = ["winit/x11", "skia-safe/x11"]
-wayland = ["winit/wayland", "winit/wayland-dlopen", "winit/wayland-csd-adwaita-notitle"]
+wayland = ["winit/wayland", "winit/wayland-dlopen", "winit/wayland-csd-adwaita-notitle", "skia-safe/wayland"]
 gpu = ["gl", "glutin", "skia-safe/gl", "egl", "wgl"]
 
 
