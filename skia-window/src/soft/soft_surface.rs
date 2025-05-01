@@ -39,7 +39,7 @@ impl RenderBackend for SoftSurface {
     }
 
     fn render(&mut self, draw: Renderer, callback: Box<dyn FnOnce(bool) + Send + 'static>) {
-        let mut unsafe_context = UnsafeContext {
+        let unsafe_context = UnsafeContext {
             context: self.context.clone(),
         };
 
