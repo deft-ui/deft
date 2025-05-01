@@ -8,8 +8,14 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::{slice, thread};
 use winit::window::Window;
 
+struct WinSurface {
+    surface: Surface<Arc<Window>, Arc<Window>>,
+    width: u32,
+    height: u32,
+}
+
 struct RenderTask {
-    surface: Arc<Mutex<Surface<Arc<Window>, Arc<Window>>>>,
+    surface: Arc<Mutex<WinSurface>>,
     renderer: Box<dyn FnOnce(&Canvas) + Send>,
     callback: Box<dyn FnOnce(bool) + Send + 'static>,
 }
@@ -19,12 +25,12 @@ unsafe impl Send for RenderTask {}
 impl RenderTask {
     pub fn run(self) {
         let mut win_surface = self.surface.lock().unwrap();
-        let size = win_surface.window().inner_size();
+        let width = win_surface.width;
+        let height = win_surface.height;
         let mut buffer = win_surface
+            .surface
             .buffer_mut()
             .expect("Failed to get the softbuffer buffer");
-        let width = size.width;
-        let height = size.height;
         let img_info = ImageInfo::new(
             (width as i32, height as i32),
             ColorType::BGRA8888,
@@ -47,10 +53,8 @@ impl RenderTask {
 }
 
 pub struct SoftBufferSurfacePresenter {
-    width: u32,
-    height: u32,
     window: Arc<Window>,
-    win_surface: Arc<Mutex<Surface<Arc<Window>, Arc<Window>>>>,
+    win_surface: Arc<Mutex<WinSurface>>,
     sender: Sender<RenderTask>,
 }
 
@@ -58,9 +62,9 @@ impl SoftBufferSurfacePresenter {
     pub fn new(window: Window) -> SoftBufferSurfacePresenter {
         let window = Arc::new(window);
         let context = Context::new(window.clone()).unwrap();
-        let mut win_surface = Surface::new(&context, window.clone()).unwrap();
+        let mut surface = Surface::new(&context, window.clone()).unwrap();
         let size = window.inner_size();
-        let _ = win_surface.resize(
+        let _ = surface.resize(
             NonZeroU32::new(size.width).unwrap(),
             NonZeroU32::new(size.height).unwrap(),
         );
@@ -74,9 +78,11 @@ impl SoftBufferSurfacePresenter {
         });
         Self {
             window,
-            win_surface: Arc::new(Mutex::new(win_surface)),
-            width: size.width,
-            height: size.height,
+            win_surface: Arc::new(Mutex::new(WinSurface {
+                width: size.width,
+                height: size.height,
+                surface,
+            })),
             sender,
         }
     }
@@ -88,9 +94,9 @@ impl SurfacePresenter for SoftBufferSurfacePresenter {
     }
     fn resize(&mut self, width: u32, height: u32) {
         let mut win_surface = self.win_surface.lock().unwrap();
-        self.width = width;
-        self.height = height;
-        let _ = win_surface.resize(
+        win_surface.width = width;
+        win_surface.height = height;
+        let _ = win_surface.surface.resize(
             NonZeroU32::new(width).unwrap(),
             NonZeroU32::new(height).unwrap(),
         );
@@ -110,6 +116,7 @@ impl SurfacePresenter for SoftBufferSurfacePresenter {
     }
 
     fn size(&self) -> (u32, u32) {
-        (self.width, self.height)
+        let surface = self.win_surface.lock().unwrap();
+        (surface.width, surface.height)
     }
 }
