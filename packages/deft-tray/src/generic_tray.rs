@@ -110,10 +110,9 @@ impl GenericTray {
         self.tray_icon.set_title(Some(title));
     }
 
-    pub fn set_icon(&mut self, icon: &str) {
-        if let Ok(icon) = Icon::from_path(icon, None) {
-            let _ = self.tray_icon.set_icon(Some(icon));
-        }
+    pub fn set_icon_from_rgba(&mut self, data: Vec<u8>, width: u32, height: u32) {
+        let icon = Icon::from_rgba(data, width, height).ok();
+        let _ = self.tray_icon.set_icon(icon);
     }
 
     pub fn set_menus(&mut self, menus: Vec<TrayMenu>) {

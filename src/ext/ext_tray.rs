@@ -9,10 +9,13 @@ use deft_macros::{js_func, js_methods, mrc_object};
 use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
 use std::cell::Cell;
+use std::fs::File;
+use std::io::Cursor;
+use image::{GenericImageView, ImageReader};
 use log::{debug, error};
 use winit::event_loop::EventLoopProxy;
 use deft_tray::{Tray, TrayMenu};
-use crate::{js_deserialize, js_value};
+use crate::{js_deserialize, js_value, some_or_return};
 
 
 thread_local! {
@@ -103,12 +106,25 @@ impl SystemTray {
 
     #[js_func]
     pub fn set_icon(&mut self, icon: String) {
+        #[cfg(target_os = "linux")]
         self.tray_impl.set_icon(&icon);
+        #[cfg(not(target_os = "linux"))]
+        if let Some((img, width, height)) = Self::load_image(&icon) {
+            self.tray_impl.set_icon_from_rgba(img, width, height);
+        }
     }
 
     #[js_func]
     pub fn set_menus(&mut self, menus: Vec<TrayMenu>) {
         self.tray_impl.set_menus(menus);
+    }
+
+    fn load_image(path: &str) -> Option<(Vec<u8>, u32, u32)> {
+        let img = ImageReader::open(path).ok()?.decode().ok()?;
+        let rgba_img = img.to_rgba8();
+        let width = img.width();
+        let height = img.height();
+        Some((rgba_img.into_raw(), width, height))
     }
 
 }
