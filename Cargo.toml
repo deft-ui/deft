@@ -52,8 +52,6 @@ simplecss = { version = "0.3.0", package = "deft-simplecss" }
 [features]
 default = ["gl", "websocket", "audio", "http", "clipboard"]
 tray = ["ksni"]
-x11 = ["skia-safe/x11", "skia-window/x11"]
-wayland = ["skia-safe/wayland", "skia-window/wayland"]
 sqlite = ["rusqlite"]
 http = ["reqwest"]
 websocket = ["tokio-tungstenite"]
@@ -69,6 +67,10 @@ reqwest = { version = "0.11.27",default-features = false, features = ["blocking"
 android_logger = "0.11.0"
 jni = "0.21.1"
 reqwest = { version = "0.11.27",default-features = false, features = ["blocking", "native-tls-vendored", "multipart", "stream"], optional = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+skia-safe = { package = "deft-skia-safe", version = "0.81.0", features = ["binary-cache", "x11", "wayland"], default-features = false }
+skia-window = { path = "skia-window", version = "0.3.1", features = ["x11", "wayland"] }
 
 [build-dependencies]
 cfg_aliases = "0.2.1"
