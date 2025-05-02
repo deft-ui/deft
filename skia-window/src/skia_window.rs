@@ -15,9 +15,9 @@ pub struct SkiaWindow {
 #[derive(Debug, Copy, Clone)]
 pub enum RenderBackendType {
     SoftBuffer,
-    #[cfg(feature = "gpu")]
+    #[cfg(feature = "gl")]
     GL,
-    #[cfg(feature = "gpu")]
+    #[cfg(feature = "gl")]
     SoftGL,
 }
 
@@ -34,11 +34,11 @@ impl SkiaWindow {
                     Box::new(SoftSurface::new(event_loop, SoftBufferSurfacePresenter::new(window)))
                 }
             }
-            #[cfg(feature = "gpu")]
+            #[cfg(feature = "gl")]
             RenderBackendType::SoftGL => {
                 Box::new(SoftSurface::new(event_loop, crate::soft::gl_presenter::GlPresenter::new(event_loop, window)?))
             }
-            #[cfg(feature = "gpu")]
+            #[cfg(feature = "gl")]
             RenderBackendType::GL => {
                 Box::new(crate::gl::SurfaceState::new(event_loop, window)?)
             }

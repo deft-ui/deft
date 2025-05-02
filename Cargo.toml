@@ -58,7 +58,7 @@ sqlite = ["rusqlite"]
 http = ["reqwest"]
 websocket = ["tokio-tungstenite"]
 audio = ["rodio"]
-gl = ["skia-window/gpu"]
+gl = ["skia-window/gl"]
 clipboard = ["dep:clipboard"]
 
 [target.'cfg(not(target_os = "android"))'.dependencies]
