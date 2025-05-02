@@ -31,9 +31,9 @@ jobs:
           sudo apt-get install build-essential libssl-dev libclang-dev libc++-dev xorg-dev libxcb-xfixes0-dev libxcb-shape0-dev libasound2-dev;
       # TODO support build with only wayland feature?
       - name: Build
-        run: cargo build --features x11,wayland
+        run: cargo build
       - name: Tests
-        run: cargo test --features x11
+        run: cargo test
 #      - name: Format
 #        run: cargo fmt --all -- --check
 
