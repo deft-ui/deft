@@ -1,0 +1,13 @@
+[package]
+name = "deft-tray"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
+tray-icon = "0.20.1"
+
+[target.'cfg(any(target_os = "linux"))'.dependencies]
+ksni = "0.2.2"

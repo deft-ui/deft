@@ -28,15 +28,28 @@ function createSystemTray() {
     if (!globalThis.SystemTray) {
         return;
     }
+    console.log("Setting up tray");
     const tray = new SystemTray();
+    tray.icon = "local/deft.ico";
     tray.title="DeftTest";
-    tray.setMenus([{
-        id: "test",
-        label: "test",
-        handler() {
-            console.log("clicked test menu");
+    tray.bindActivate(() => {
+        console.log("tray clicked");
+    });
+    tray.setMenus([
+        {
+            id: "Test",
+            label: "test",
+            handler() {
+                console.log("clicked test menu");
+            }
+        },{
+            id: "quit",
+            label: "Quit",
+            handler() {
+                process.exit(0);
+            }
         }
-    }]);
+    ]);
 }
 
 function createEntry() {
