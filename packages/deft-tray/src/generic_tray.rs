@@ -126,6 +126,7 @@ impl GenericTray {
                 None => continue,
                 Some(k) => k,
             };
+            let enabled = m.enabled.unwrap_or(true);
             let label = m.label.unwrap_or("".to_string());
             //TODO auto generate id?
             let menu_id = match m.id {
@@ -145,15 +146,18 @@ impl GenericTray {
             match kind {
                 MenuKind::Standard => {
                     let std_menu = MenuItem::with_id(menu_id, label, true, None);
+                    std_menu.set_enabled(enabled);
                     let _ = menu.append(&std_menu);
                 }
                 MenuKind::Checkmark => {
                     let checked = m.checked.unwrap_or(false);
                     let check_menu = CheckMenuItem::with_id(menu_id, label, true, checked, None);
+                    check_menu.set_enabled(enabled);
                     let _ = menu.append(&check_menu);
                 }
                 MenuKind::Separator => {
                     let std_menu = MenuItem::new("-".to_string(), true, None);
+                    std_menu.set_enabled(enabled);
                     let _ = menu.append(&std_menu);
                 }
             }
