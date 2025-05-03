@@ -23,6 +23,10 @@ impl NoTray {
 
     }
 
+    pub fn set_icon_from_rgba(&mut self, _data: Vec<u8>, _width: u32, _height: u32) {
+
+    }
+
     pub fn set_menus(&mut self, _menus: Vec<TrayMenu>) {
 
     }
