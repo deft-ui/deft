@@ -277,6 +277,7 @@ impl TextLayout {
         &self,
         painter: &Painter,
         line_offset: (f32,f32),
+        line_height: f32,
         selection: (usize, usize),
         bg_paint: &Paint,
         fg_paint: &Paint,
@@ -288,7 +289,8 @@ impl TextLayout {
         canvas.translate(line_offset);
         for i in start_offset..end_offset {
             if let Some(char_rect) = self.get_char_bounds(i) {
-                canvas.draw_rect(&char_rect, &bg_paint);
+                let select_rect = Rect::new(char_rect.left, 0.0, char_rect.right, line_height);
+                canvas.draw_rect(&select_rect, &bg_paint);
             }
         }
 
@@ -306,7 +308,7 @@ pub struct TextBlock {
 }
 
 impl SimpleTextParagraph {
-    pub fn new(text_blocks: Vec<TextBlock>) -> Self {
+    pub fn new(text_blocks: Vec<TextBlock>, line_height: Option<f32>) -> Self {
         let mut font_line_height = 0.0;
         let mut text = String::new();
         for text_block in &text_blocks {
@@ -315,7 +317,7 @@ impl SimpleTextParagraph {
 
         Self {
             text,
-            line_height: None,
+            line_height,
             text_blocks,
             layout: None,
         }
@@ -392,10 +394,13 @@ impl SimpleTextParagraph {
                 char_offset += cc;
                 left += x_pos[consumed_char_count + cc - 1] - x_pos[consumed_char_count] + widths[consumed_char_count + cc - 1];
                 consumed_char_count += cc;
+                let text_height = (font_metrics.ascent + font_metrics.descent  + font_metrics.leading) * metrics_scale;
                 //TODO fix leading?
-                current_line.baseline = f32::max(current_line.baseline, font_metrics.ascent * metrics_scale /* + font_metrics.leading */);
-                //TODO check line height
-                current_line.height =  f32::max(current_line.height, (font_metrics.ascent + font_metrics.descent  + font_metrics.leading) * metrics_scale);
+                let text_base_line = font_metrics.ascent * metrics_scale /* + font_metrics.leading */;
+                let line_height = self.line_height.unwrap_or(text_height);
+                let line_space = line_height - text_height;
+                current_line.baseline = f32::max(current_line.baseline, text_base_line + line_space / 2.0);
+                current_line.height =  f32::max(current_line.height, line_height);
                 max_intrinsic_width = f32::max(max_intrinsic_width, left);
             }
         }

@@ -31,7 +31,7 @@ use crate::element::text::Text;
 use crate::element::textedit::TextEdit;
 use crate::event::{DragOverEventListener, BlurEventListener, BoundsChangeEventListener, CaretChangeEventListener, ClickEventListener, DragStartEventListener, DropEventListener, FocusEventListener, FocusShiftEventListener, KeyDownEventListener, KeyUpEventListener, MouseDownEventListener, MouseEnterEvent, MouseEnterEventListener, MouseLeaveEvent, MouseLeaveEventListener, MouseMoveEventListener, MouseUpEventListener, MouseWheelEventListener, ScrollEvent, ScrollEventListener, TextChangeEventListener, TextUpdateEventListener, TouchCancelEventListener, TouchEndEventListener, TouchMoveEventListener, TouchStartEventListener, BoundsChangeEvent, ContextMenuEventListener, MouseDownEvent, TouchStartEvent, DroppedFileEventListener, HoveredFileEventListener};
 use crate::event_loop::{create_event_loop_callback};
-use crate::ext::ext_window::{ELEMENT_TYPE_BUTTON, ELEMENT_TYPE_CONTAINER, ELEMENT_TYPE_ENTRY, ELEMENT_TYPE_IMAGE, ELEMENT_TYPE_LABEL, ELEMENT_TYPE_SCROLL, ELEMENT_TYPE_TEXT_EDIT, ELEMENT_TYPE_BODY};
+use crate::ext::ext_window::{ELEMENT_TYPE_BUTTON, ELEMENT_TYPE_CONTAINER, ELEMENT_TYPE_ENTRY, ELEMENT_TYPE_IMAGE, ELEMENT_TYPE_LABEL, ELEMENT_TYPE_SCROLL, ELEMENT_TYPE_TEXT_EDIT, ELEMENT_TYPE_BODY, ELEMENT_TYPE_PARAGRAPH};
 use crate::window::{Window, WindowWeak};
 use crate::img_manager::IMG_MANAGER;
 use crate::js::js_serde::JsValueSerializer;
@@ -58,6 +58,7 @@ use crate as deft;
 use crate::app::AppEvent;
 use crate::computed::ComputedValue;
 use crate::element::body::Body;
+use crate::element::paragraph::Paragraph;
 use crate::js::JsError;
 use crate::layout::LayoutRoot;
 use crate::paint::{MatrixCalculator, RenderTree, UniqueRect};
@@ -215,6 +216,7 @@ impl Element {
             ELEMENT_TYPE_TEXT_EDIT => Element::create(TextEdit::create),
             ELEMENT_TYPE_IMAGE => Element::create(Image::create),
             ELEMENT_TYPE_BODY => Element::create(Body::create),
+            ELEMENT_TYPE_PARAGRAPH => Element::create(Paragraph::create),
             _ => return Err(anyhow!("invalid view_type")),
         };
         view.resource_table.put(ElementJsContext { context });

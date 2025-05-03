@@ -8,6 +8,7 @@ const VT_SCROLL = 7
 const VT_TEXT_EDIT = 8
 const VT_IMAGE = 9;
 const VT_BODY = 10;
+const VT_PARAGRAPH = 11;
 
 class Clipboard {
     /**
@@ -1177,11 +1178,8 @@ export class LabelElement extends Element {
  * }} ParagraphUnit
  */
 export class ParagraphElement extends Element {
-    #paragraph;
     constructor() {
-        const p = Paragraph_new_element();
-        super(p, {});
-        this.#paragraph = p;
+        super(VT_PARAGRAPH);
     }
 
     /**
@@ -1189,7 +1187,7 @@ export class ParagraphElement extends Element {
      * @param units {ParagraphUnit[]}
      */
     addLine(units) {
-        Paragraph_add_line(this.#paragraph, units);
+        Paragraph_add_line(this.handle, units);
     }
 
     /**
@@ -1198,7 +1196,7 @@ export class ParagraphElement extends Element {
      * @param units {ParagraphUnit[]}
      */
     insertLine(index, units) {
-        Paragraph_insert_line(this.#paragraph, index, units);
+        Paragraph_insert_line(this.handle, index, units);
     }
 
 
@@ -1207,7 +1205,7 @@ export class ParagraphElement extends Element {
      * @param index {number}
      */
     deleteLine(index) {
-        Paragraph_delete_line(this.#paragraph, index);
+        Paragraph_delete_line(this.handle, index);
     }
 
     /**
@@ -1216,11 +1214,11 @@ export class ParagraphElement extends Element {
      * @param units {ParagraphUnit[]}
      */
     updateLine(index, units) {
-        Paragraph_update_line(this.#paragraph, index, units);
+        Paragraph_update_line(this.handle, index, units);
     }
 
     clear() {
-        Paragraph_clear(this.#paragraph);
+        Paragraph_clear(this.handle);
     }
 
     /**
@@ -1229,7 +1227,7 @@ export class ParagraphElement extends Element {
      * @return {[number, number]}
      */
     measureLine(units) {
-        return Paragraph_measure_line(this.#paragraph, units);
+        return Paragraph_measure_line(this.handle, units);
     }
 
     /**
@@ -1237,7 +1235,7 @@ export class ParagraphElement extends Element {
      * @returns {string | undefined}
      */
     get selectionText() {
-        return Paragraph_get_selection_text(this.#paragraph);
+        return Paragraph_get_selection_text(this.handle);
     }
 
 }

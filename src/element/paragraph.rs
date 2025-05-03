@@ -248,10 +248,6 @@ extern "C" fn measure_paragraph(
 
 #[js_methods]
 impl Paragraph {
-    #[js_func]
-    pub fn new_element() -> Element {
-        Element::create(Paragraph::create)
-    }
 
     #[js_func]
     pub fn add_line(&mut self, units: Vec<ParagraphUnit>) {
@@ -680,13 +676,14 @@ impl ElementBackend for Paragraph {
         let mut rebuild = true;
         match key {
             StylePropKey::Color => {
+                //TODO no rebuild?
                 self.params.color = self.element.style.color;
             }
             StylePropKey::FontSize => {
                 self.params.font_size = self.element.style.font_size;
             }
             StylePropKey::LineHeight => {
-                self.params.line_height = Some(self.element.style.line_height);
+                self.params.line_height = self.element.style.line_height;
             }
             _ => {
                 rebuild = false;
@@ -742,6 +739,7 @@ impl ElementBackend for Paragraph {
                             ln_layout.paint_selection(
                                 painter,
                                 (0.0, ln_top),
+                                ln_height,
                                 (begin.1, end.1),
                                 &selection_bg,
                                 &selection_fg,

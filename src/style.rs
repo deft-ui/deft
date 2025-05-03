@@ -56,6 +56,32 @@ impl PropValueParse for Length {
     }
 }
 
+impl PropValueParse for LineHeightVal {
+    fn parse_prop_value(value: &str) -> Option<Self> {
+        let value = value.trim();
+        if value.eq_ignore_ascii_case("normal") {
+            Some(LineHeightVal::Normal)
+        } else if let Ok(v) = f32::from_str(value) {
+            Some(LineHeightVal::Number(v))
+        } else if let Some(len) = Length::from_str(value) {
+            Some(LineHeightVal::Length(len))
+        } else if let Some(v) = parse_percent(value) {
+            Some(LineHeightVal::Percent(v))
+        } else {
+            None
+        }
+    }
+
+    fn to_style_string(&self) -> String {
+        match self {
+            LineHeightVal::Length(l) => l.to_style_string(),
+            LineHeightVal::Percent(p) => format!("{}%", p),
+            LineHeightVal::Number(n) => format!("{}", n),
+            LineHeightVal::Normal => "normal".to_string(),
+        }
+    }
+}
+
 impl PropValueParse for LengthOrPercent {
 
     fn parse_prop_value(value: &str) -> Option<Self> {
@@ -66,9 +92,8 @@ impl PropValueParse for LengthOrPercent {
             return Some(Self::Length(v))
         } else {
             let value = value.trim();
-            if let Some(v) = value.strip_suffix("%") {
-                let value = f32::from_str(v).ok()?;
-                return Some(Self::Percent(value));
+            if let Some(v) = parse_percent(value) {
+                return Some(Self::Percent(v));
             }
         }
         Some(LengthOrPercent::Undefined)
@@ -527,7 +552,7 @@ define_style_props!(
     Color => Color, Color;
     BackgroundColor => Color, Color;
     FontSize        => Length, f32;
-    LineHeight      => f32, f32;
+    LineHeight      => LineHeightVal, f32;
 
     BorderTopWidth => LengthOrPercent, f32;
     BorderRightWidth => LengthOrPercent, f32;
@@ -687,6 +712,28 @@ pub enum LengthOrPercent {
     Percent(f32),
     Undefined,
     Auto,
+}
+
+#[derive(Clone, Debug, PartialEq, Copy)]
+pub enum LineHeightVal {
+    Length(Length),
+    Percent(f32),
+    Number(f32),
+    Normal,
+}
+
+impl LineHeightVal {
+    pub fn to_px(&self, length_context: &LengthContext) -> Option<f32> {
+        let v = match self {
+            LineHeightVal::Length(l) => l.to_px(length_context),
+            LineHeightVal::Percent(p) => length_context.font_size * p / 100.0,
+            LineHeightVal::Number(n) => length_context.font_size * n,
+            LineHeightVal::Normal => {
+                return None
+            },
+        };
+        Some(v)
+    }
 }
 
 impl LengthOrPercent {
@@ -869,7 +916,7 @@ pub struct StyleNode {
     pub font_size: f32,
     pub color: Color,
     pub background_color: Color,
-    pub line_height: f32,
+    pub line_height: Option<f32>,
 }
 
 
@@ -893,7 +940,7 @@ impl StyleNode {
             font_size: 12.0,
             color: Color::new(0),
             background_color: Color::new(0),
-            line_height: 12.0,
+            line_height: None,
         };
         inner.yoga_node.set_position_type(PositionType::Static);
         let mut inst = inner.to_ref();
@@ -964,8 +1011,7 @@ impl StyleNode {
                 ResolvedStyleProp::FontSize(Length::PX(12.0))
             }
             StylePropKey::LineHeight => {
-                //TODO use font-size
-                ResolvedStyleProp::LineHeight(12.0)
+                ResolvedStyleProp::LineHeight(LineHeightVal::Normal)
             }
             StylePropKey::BorderTopWidth  =>   {
                 ResolvedStyleProp::BorderTopWidth(default_border_width)
@@ -1169,7 +1215,7 @@ impl StyleNode {
                 // self.computed_style.font_size = value.0;
             }
             ResolvedStyleProp::LineHeight(value) => {
-                self.line_height = value;
+                self.line_height = value.to_px(length_ctx);
             }
             ResolvedStyleProp::BorderTopWidth (value) =>   {
                 self.set_border_width(&value, &vec![0], length_ctx);
@@ -1562,6 +1608,15 @@ pub fn parse_float(value: &str) -> f32 {
     f32::from_str(value).unwrap_or(0.0)
 }
 
+pub fn parse_percent(value: &str) -> Option<f32> {
+    if let Some(v) = value.strip_suffix("%") {
+        let v = f32::from_str(v.trim()).ok()?;
+        Some(v)
+    } else {
+        None
+    }
+}
+
 pub fn parse_color_str(value: &str) -> Option<Color> {
     //TODO support white,black and so on
     if let Some(hex) = value.strip_prefix("#") {
@@ -1643,8 +1698,7 @@ fn parse_translate_op(value: &str) -> Option<StyleTransformOp> {
 }
 
 fn parse_translate_length(value: &str) -> Option<TranslateLength> {
-    if let Some(v) = value.strip_suffix("%") {
-        let v = f32::from_str(v.trim()).ok()?;
+    if let Some(v) = parse_percent(value) {
         Some(TranslateLength::Percent(v))
     } else {
         let v = f32::from_str(value).ok()?;

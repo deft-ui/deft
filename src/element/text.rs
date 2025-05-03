@@ -587,6 +587,11 @@ impl ElementBackend for Text {
                 self.text_params.font_size = font_size;
                 self.refresh_lines();
                 self.mark_dirty(true);
+            },
+            StylePropKey::LineHeight => {
+                self.text_params.line_height = self.element.style.line_height;
+                self.refresh_lines();
+                self.mark_dirty(true);
             }
             _ => {}
         }

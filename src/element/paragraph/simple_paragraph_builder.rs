@@ -22,6 +22,7 @@ pub struct SimpleParagraphBuilder {
     text_blocks: Vec<TextBlock>,
     font_manager: FontManager,
     fallback_cache: HashMap<char, Option<Font>>,
+    line_height: Option<f32>,
 }
 
 impl SimpleParagraphBuilder {
@@ -38,6 +39,7 @@ impl SimpleParagraphBuilder {
         text_style.set_font_size(style.font_size);
         text_style.set_font_families(&font_families);
         Self {
+            line_height: style.line_height,
             styles: vec![text_style],
             text_blocks: Vec::new(),
             font_manager: FONT_MANAGER.with(|fm| fm.clone()),
@@ -133,7 +135,7 @@ impl SimpleParagraphBuilder {
 
     pub fn build(self) -> SimpleTextParagraph {
         let mut text = String::new();
-        SimpleTextParagraph::new(self.text_blocks)
+        SimpleTextParagraph::new(self.text_blocks, self.line_height)
     }
 
     fn do_resolve_font(chars: &Vec<char>, fonts: &Vec<Font>) -> (Vec<i32>, usize) {
