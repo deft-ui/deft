@@ -103,6 +103,7 @@ impl StyleList {
             StyleProp::Color(StylePropVal::Inherit),
             StyleProp::FontSize(StylePropVal::Inherit),
             StyleProp::LineHeight(StylePropVal::Inherit),
+            StyleProp::FontFamily(StylePropVal::Inherit),
         ];
         for d in default_styles {
             default_style_props.insert(d.key(), ParsedStyleProp::Fixed(d));

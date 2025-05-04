@@ -59,6 +59,7 @@ use crate::app::AppEvent;
 use crate::computed::ComputedValue;
 use crate::element::body::Body;
 use crate::element::paragraph::Paragraph;
+use crate::font::family::FontFamilies;
 use crate::js::JsError;
 use crate::layout::LayoutRoot;
 use crate::paint::{MatrixCalculator, RenderTree, UniqueRect};
@@ -795,6 +796,7 @@ impl Element {
         }
         let mut ctx = ctx.clone();
         ctx.font_size = px;
+
         for mut c in self.get_children() {
             c.compute_font_size_recurse(&ctx);
         }

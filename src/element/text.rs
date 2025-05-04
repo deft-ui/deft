@@ -21,6 +21,7 @@ use crate::element::paragraph::ParagraphParams;
 use crate::element::paragraph::simple_paragraph_builder::SimpleParagraphBuilder;
 use crate::element::text::simple_text_paragraph::{SimpleTextParagraph, TextBlock};
 use crate::event::{FocusShiftEvent, TextUpdateEvent};
+use crate::font::family::FontFamilies;
 use crate::number::DeNan;
 use crate::paint::Painter;
 use crate::render::RenderFn;
@@ -40,6 +41,7 @@ pub type ColOffset = usize;
 #[repr(C)]
 #[mrc_object]
 pub struct Text {
+    text: String,
     text_params: TextParams,
     selection_paint: Paint,
     paragraph_ref: ParagraphRef,
@@ -88,7 +90,7 @@ impl crate::js::FromJsValue for Text {
 impl Text {
     fn new(element: Element) -> Self {
         let text_params = TextParams {
-            font_families: vec![],
+            font_families: FontFamilies::default(),
             align: TextAlign::Left,
             paint: Paint::default(),
             line_height: None,
@@ -107,6 +109,7 @@ impl Text {
         let mut selection_paint = Paint::default();
         selection_paint.set_color(parse_hex_color("214283").unwrap());
         TextData {
+            text: "".to_string(),
             paragraph_ref: paragraph_props,
             selection_paint,
             selection: None,
@@ -121,8 +124,9 @@ impl Text {
     pub fn set_text(&mut self, text: String) {
         let old_text = self.get_text();
         if old_text != text {
+            self.text = text.clone();
             self.selection = None;
-            self.rebuild_lines(&text);
+            self.rebuild_lines();
             self.mark_dirty(true);
             // self.mark_layout_dirty_if_needed();
 
@@ -294,7 +298,7 @@ impl Text {
 
     pub fn set_font_size(&mut self, size: f32) {
         self.text_params.font_size = size;
-        self.refresh_lines();
+        self.rebuild_lines();
         self.mark_dirty(true);
     }
 
@@ -304,7 +308,7 @@ impl Text {
 
     pub fn set_align(&mut self, align: TextAlign) {
         self.text_params.align = align;
-        self.refresh_lines();
+        self.rebuild_lines();
         self.mark_dirty(false);
     }
 
@@ -316,15 +320,10 @@ impl Text {
         self.text_params.paint.color()
     }
 
-    pub fn rebuild_lines(&mut self, text: &str) {
-        let paragraphs = Self::build_lines(text, &self.text_params, true);
+    pub fn rebuild_lines(&mut self) {
+        let paragraphs = Self::build_lines(&self.text, &self.text_params, true);
         let mut pi = self.paragraph_ref.data.borrow_mut();
         pi.update_line(paragraphs);
-    }
-
-    pub fn refresh_lines(&mut self) {
-        let text = self.get_text();
-        self.rebuild_lines(&text);
     }
 
     pub fn get_paint(&self) -> &Paint {
@@ -579,18 +578,23 @@ impl ElementBackend for Text {
             StylePropKey::Color => {
                 let color = self.element.style.color;
                 self.text_params.paint.set_color(color);
-                self.refresh_lines();
+                self.rebuild_lines();
                 self.mark_dirty(false);
             },
             StylePropKey::FontSize => {
                 let font_size = self.element.style.font_size;
                 self.text_params.font_size = font_size;
-                self.refresh_lines();
+                self.rebuild_lines();
                 self.mark_dirty(true);
             },
+            StylePropKey::FontFamily => {
+                self.text_params.font_families = self.element.style.font_family.clone();
+                self.rebuild_lines();
+                self.mark_dirty(true);
+            }
             StylePropKey::LineHeight => {
                 self.text_params.line_height = self.element.style.line_height;
-                self.refresh_lines();
+                self.rebuild_lines();
                 self.mark_dirty(true);
             }
             _ => {}

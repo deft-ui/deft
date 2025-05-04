@@ -5,10 +5,12 @@ use measure_time::print_time;
 use skia_safe::{FontStyle, Paint, Typeface, Unichar};
 use skia_safe::wrapper::ValueWrapper;
 use crate::element::font_manager::FontManager;
-use crate::element::paragraph::{ParagraphParams, DEFAULT_FONT_NAME, ZERO_WIDTH_WHITESPACE};
+use crate::element::paragraph::{ParagraphParams, ZERO_WIDTH_WHITESPACE};
 use crate::element::text::simple_text_paragraph::{chars_to_glyphs_vec, str_to_glyphs_vec, SimpleTextParagraph, TextBlock};
 use crate::element::text::text_paragraph::TextParams;
+use crate::font::family::{FontFamilies, FontFamily};
 use crate::font::Font;
+use crate::mrc::Mrc;
 use crate::some_or_continue;
 use crate::string::StringUtils;
 use crate::text::TextStyle;
@@ -18,32 +20,24 @@ thread_local! {
 }
 
 pub struct SimpleParagraphBuilder {
+    paragraph_params: ParagraphParams,
     styles: Vec<TextStyle>,
     text_blocks: Vec<TextBlock>,
     font_manager: FontManager,
-    fallback_cache: HashMap<char, Option<Font>>,
-    line_height: Option<f32>,
+    fallback_cache: Mrc<HashMap<char, Option<Font>>>,
 }
 
 impl SimpleParagraphBuilder {
     pub fn new(style: &ParagraphParams) -> Self {
-        let mut font_families = style.font_families.clone();
-        if font_families.is_empty() {
-            for f in DEFAULT_FONT_NAME.split(",") {
-                font_families.push(f.to_string());
-            }
-        }
-
         let mut text_style = TextStyle::new();
         text_style.set_color(style.color);
         text_style.set_font_size(style.font_size);
-        text_style.set_font_families(&font_families);
         Self {
-            line_height: style.line_height,
+            paragraph_params: style.clone(),
             styles: vec![text_style],
             text_blocks: Vec::new(),
             font_manager: FONT_MANAGER.with(|fm| fm.clone()),
-            fallback_cache: HashMap::new(),
+            fallback_cache: Mrc::new(HashMap::new()),
         }
     }
 
@@ -54,19 +48,15 @@ impl SimpleParagraphBuilder {
     pub fn add_text(&mut self, text: impl Into<String>) {
         let text = text.into();
         let style = self.styles.last().unwrap().clone();
-        let font_families_names: Vec<&str> = style.font_families();
+        let font_families = style.font_families().as_ref().unwrap_or(&self.paragraph_params.font_families);
+        let font_families_names = font_families.as_slice().iter().map(|it| it.name()).collect::<Vec<_>>();
         let mut text_blocks = self.resolve_font(&font_families_names, &style, &text);
         // debug!("text_blocks: {:?} {:?}", &text, &text_blocks);
         self.text_blocks.append(&mut text_blocks);
     }
 
-    fn resolve_font(&mut self, font_families_names: &Vec<&str>, style: &TextStyle, text: &str) -> Vec<TextBlock> {
+    fn resolve_font(&self, font_families_names: &Vec<&str>, style: &TextStyle, text: &str) -> Vec<TextBlock> {
         let mut font_families_names = font_families_names.clone();
-        if font_families_names.is_empty() {
-            for f in DEFAULT_FONT_NAME.split(",") {
-                font_families_names.push(f);
-            }
-        }
         let mut fonts = self.font_manager.match_best(&font_families_names, style.font_style());
         if fonts.is_empty() {
             warn!("No matching font found for {:?}", &font_families_names);
@@ -88,7 +78,7 @@ impl SimpleParagraphBuilder {
                     //TODO fix locale
                     // let tf = self.font_collection.default_fallback_char(chars[i] as Unichar, style.font_style(), "en");
                     let tf = None;
-                    self.fallback_cache.insert(ch, tf);
+                    self.fallback_cache.clone().insert(ch, tf);
                     self.fallback_cache.get(&ch).unwrap()
                 }
             };
@@ -135,7 +125,7 @@ impl SimpleParagraphBuilder {
 
     pub fn build(self) -> SimpleTextParagraph {
         let mut text = String::new();
-        SimpleTextParagraph::new(self.text_blocks, self.line_height)
+        SimpleTextParagraph::new(self.text_blocks, self.paragraph_params.line_height)
     }
 
     fn do_resolve_font(chars: &Vec<char>, fonts: &Vec<Font>) -> (Vec<i32>, usize) {
@@ -168,7 +158,7 @@ fn test_performance() {
             align: Default::default(),
             color: Default::default(),
             font_size: 14.0,
-            font_families: vec!["monospace".to_string()],
+            font_families: FontFamilies::new(vec![FontFamily::new("monospace")]),
             mask_char: None,
         };
         let mut pb = SimpleParagraphBuilder::new(&params);
@@ -189,7 +179,7 @@ fn test_get_char_bounds() {
         align: Default::default(),
         color: Default::default(),
         font_size: 14.0,
-        font_families: vec!["monospace".to_string()],
+        font_families: FontFamilies::new(vec![FontFamily::new("monospace")]),
         mask_char: None,
     };
     let mut pb = SimpleParagraphBuilder::new(&params);

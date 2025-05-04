@@ -20,6 +20,7 @@ use serde::{Deserialize, Serialize};
 use skia_safe::font_style::{Slant, Weight, Width};
 use skia_safe::{Canvas, Color, Font, FontMgr, FontStyle, Paint, Point, Rect};
 use std::str::FromStr;
+use std::sync::LazyLock;
 use measure_time::print_time;
 use skia_safe::wrapper::NativeTransmutableWrapper;
 use winit::keyboard::NamedKey;
@@ -28,20 +29,21 @@ use crate::base::{EventContext, MouseDetail, MouseEventType};
 use crate::element::paragraph::simple_paragraph_builder::SimpleParagraphBuilder;
 use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
 use crate::event::{FocusShiftEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent, SelectEndEvent, SelectMoveEvent, SelectStartEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
+use crate::font::family::{FontFamilies, FontFamily};
 use crate::paint::Painter;
 use crate::render::RenderFn;
 use crate::text::{TextAlign, TextDecoration, TextStyle};
 
 #[cfg(target_os = "windows")]
-const DEFAULT_FONT_NAME: &str = "sans-serif,Microsoft YaHei,Segoe UI Emoji";
+pub const DEFAULT_FALLBACK_FONTS: &str = "sans-serif,Microsoft YaHei,Segoe UI Emoji";
 #[cfg(target_os = "linux")]
-const DEFAULT_FONT_NAME: &str = "sans-serif,Noto Sans CJK SC,Noto Sans CJK TC,Noto Sans CJK HK,Noto Sans CJK KR,Noto Sans CJK JP,Noto Color Emoji";
+pub const DEFAULT_FALLBACK_FONTS: &str = "sans-serif,Noto Sans CJK SC,Noto Sans CJK TC,Noto Sans CJK HK,Noto Sans CJK KR,Noto Sans CJK JP,Noto Color Emoji";
 #[cfg(target_os = "macos")]
-const DEFAULT_FONT_NAME: &str = "sans-serif,PingFang SC,Apple Color Emoji";
+pub const DEFAULT_FALLBACK_FONTS: &str = "sans-serif,PingFang SC,Apple Color Emoji";
 #[cfg(target_os = "android")]
-const DEFAULT_FONT_NAME: &str = "Roboto,Noto Sans CJK SC,Noto Sans CJK TC,Noto Sans CJK HK,Noto Sans CJK KR,Noto Sans CJK JP,Noto Color Emoji";
+pub const DEFAULT_FALLBACK_FONTS: &str = "Roboto,Noto Sans CJK SC,Noto Sans CJK TC,Noto Sans CJK HK,Noto Sans CJK KR,Noto Sans CJK JP,Noto Color Emoji";
 #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos", target_os = "android")))]
-const DEFAULT_FONT_NAME: &str = "sans-serif";
+pub const DEFAULT_FALLBACK_FONTS: &str = "sans-serif";
 
 const ZERO_WIDTH_WHITESPACE: &str = "\u{200B}";
 
@@ -53,7 +55,7 @@ pub struct ParagraphParams {
     pub align: TextAlign,
     pub color: Color,
     pub font_size: f32,
-    pub font_families: Vec<String>,
+    pub font_families: FontFamilies,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -568,8 +570,6 @@ impl Paragraph {
         // let mut text = text.trim_line_endings().to_string();
         // text.push_str(ZERO_WIDTH_WHITESPACE);
 
-        let default_font_families:Vec<&str> = DEFAULT_FONT_NAME.split(",").collect();
-
         let mut pb = SimpleParagraphBuilder::new(&paragraph_params);
         let p_color = paragraph_params.color;
         let mask_char = paragraph_params.mask_char;
@@ -577,19 +577,15 @@ impl Paragraph {
             match u {
                 ParagraphUnit::Text(unit) => {
                     let mut text_style = TextStyle::new();
-                    let font_families = unit
-                        .font_families
-                        .as_ref()
-                        .unwrap_or(&paragraph_params.font_families);
-                    let font_families = if font_families.is_empty() {
-                        &paragraph_params.font_families
-                    } else {
-                        &font_families
+                    let unit_font_families = match &unit.font_families {
+                        Some(list) => {
+                            let list = list.iter().map(|it| FontFamily::new(it.as_str())).collect();
+                            FontFamilies::new(list)
+                        },
+                        None => FontFamilies::default()
                     };
+                    let font_families = unit_font_families.append(&paragraph_params.font_families);
                     let font_size = unit.font_size.unwrap_or(paragraph_params.font_size);
-                    if !font_families.is_empty() {
-                        text_style.set_font_families(&font_families);
-                    }
                     text_style.set_font_size(font_size);
 
                     let weight =
@@ -633,7 +629,7 @@ impl ElementBackend for Paragraph {
     where
         Self: Sized,
     {
-        let font_families:Vec<String> = DEFAULT_FONT_NAME.split(",").map(|i| i.to_string()).collect();
+        let font_families: FontFamilies = FontFamilies::default();
 
         let params = ParagraphParams {
             text_wrap: Some(true),
@@ -681,6 +677,9 @@ impl ElementBackend for Paragraph {
             }
             StylePropKey::FontSize => {
                 self.params.font_size = self.element.style.font_size;
+            }
+            StylePropKey::FontFamily => {
+                self.params.font_families = self.element.style.font_family.clone();
             }
             StylePropKey::LineHeight => {
                 self.params.line_height = self.element.style.line_height;
@@ -857,7 +856,7 @@ fn test_layout_performance() {
         align: TextAlign::Left,
         color: Default::default(),
         font_size: 16.0,
-        font_families: vec!["monospace".to_string()],
+        font_families: FontFamilies::new(vec![FontFamily::new("monospace")]),
         text_wrap: Some(false),
         mask_char: None,
     };

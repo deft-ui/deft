@@ -8,6 +8,7 @@ use font_kit::source::{Source, SystemSource};
 use skia_safe::FontStyle;
 use skia_safe::wrapper::NativeTransmutableWrapper;
 use swash::Weight;
+use crate::element::paragraph::{DEFAULT_FALLBACK_FONTS};
 use crate::text::TextStyle;
 
 #[mrc_object]
@@ -35,6 +36,10 @@ impl FontManager {
     pub fn match_best(&self, family_names: &[impl AsRef<str>], style: &FontStyle) -> Vec<Font> {
         let mut result = Vec::new();
         let mut me = self.clone();
+        let mut family_names = family_names.iter().map(|s| s.as_ref()).collect::<Vec<_>>();
+        for name in DEFAULT_FALLBACK_FONTS.split(",") {
+            family_names.push(name);
+        }
         for name in family_names {
             if let Some(font) = self.get_by_family_name(name.as_ref(), &style) {
                 result.push(font.clone());

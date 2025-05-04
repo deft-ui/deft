@@ -1,5 +1,6 @@
 use bitflags::bitflags;
 use skia_safe::{Color, Font, FontMetrics, FontStyle, Paint};
+use crate::font::family::{FontFamilies, FontFamily};
 use crate::string::StringUtils;
 
 #[repr(i32)]
@@ -22,7 +23,7 @@ impl Default for TextAlign {
 #[derive(Debug, Clone, Default)]
 pub struct TextStyle {
     font_size: f32,
-    font_families: Vec<String>,
+    font_families: Option<FontFamilies>,
     foreground_paint: Paint,
     background_paint: Paint,
     font_style: FontStyle,
@@ -42,12 +43,12 @@ impl TextStyle {
     pub fn font_size(&self) -> f32 {
         self.font_size
     }
-    pub fn set_font_families(&mut self, families: &Vec<String>) {
-        self.font_families = families.clone();
+    pub fn set_font_families(&mut self, families: Option<FontFamilies>) {
+        self.font_families = families;
     }
 
-    pub fn font_families(&self) -> Vec<&str> {
-        self.font_families.iter().map(|it| it.as_str()).collect()
+    pub fn font_families(&self) -> &Option<FontFamilies> {
+        &self.font_families
     }
 
     pub fn set_foreground_paint(&mut self, paint: &Paint) {

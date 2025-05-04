@@ -1,3 +1,5 @@
+pub mod family;
+
 use crate as deft;
 use crate::element::text::simple_text_paragraph::TextBlock;
 use deft_macros::mrc_object;

@@ -4,6 +4,7 @@ use skia_safe::{Font, Paint};
 use yoga::MeasureMode;
 use crate::element::text::{AtomOffset, ColOffset};
 use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
+use crate::font::family::{FontFamilies, FontFamily};
 use crate::string::StringUtils;
 use crate::text::TextAlign;
 
@@ -28,7 +29,7 @@ pub struct Line {
 
 #[derive(Clone)]
 pub struct TextParams {
-    pub font_families: Vec<String>,
+    pub font_families: FontFamilies,
     pub font_size: f32,
     pub paint: Paint,
     pub line_height: Option<f32>,

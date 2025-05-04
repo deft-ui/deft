@@ -25,6 +25,7 @@ use crate::animation::ANIMATIONS;
 use crate::animation::css_actor::CssAnimationActor;
 use crate::element::{Element, ElementWeak};
 use crate::event_loop::create_event_loop_callback;
+use crate::font::family::{FontFamilies, FontFamily};
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::paint::MatrixCalculator;
@@ -552,6 +553,7 @@ define_style_props!(
     Color => Color, Color;
     BackgroundColor => Color, Color;
     FontSize        => Length, f32;
+    FontFamily      => FontFamilies, FontFamilies;
     LineHeight      => LineHeightVal, f32;
 
     BorderTopWidth => LengthOrPercent, f32;
@@ -736,6 +738,28 @@ impl LineHeightVal {
     }
 }
 
+impl PropValueParse for FontFamilies {
+    fn parse_prop_value(value: &str) -> Option<Self> {
+        let mut list = Vec::new();
+        for p in value.trim().split(",") {
+            if p.starts_with("\"") && p.ends_with("\"") {
+                list.push(FontFamily::new(&p[1..p.len() - 1]));
+            } else if p.starts_with("'") && p.ends_with("'") {
+                list.push(FontFamily::new(&p[1..p.len() - 1]));
+            } else {
+                list.push(FontFamily::new(p));
+            }
+        }
+        Some(Self::new(list))
+    }
+
+    fn to_style_string(&self) -> String {
+        let list: Vec<String> = self.as_slice().iter().map(|it| format!("'{}'", it.name())).collect();
+        list.join(",")
+    }
+}
+
+
 impl LengthOrPercent {
     pub fn to_style_unit(&self, ctx: &LengthContext) -> StyleUnit {
         match self {
@@ -917,6 +941,7 @@ pub struct StyleNode {
     pub color: Color,
     pub background_color: Color,
     pub line_height: Option<f32>,
+    pub font_family: FontFamilies,
 }
 
 
@@ -941,6 +966,7 @@ impl StyleNode {
             color: Color::new(0),
             background_color: Color::new(0),
             line_height: None,
+            font_family: FontFamilies::default(),
         };
         inner.yoga_node.set_position_type(PositionType::Static);
         let mut inst = inner.to_ref();
@@ -1009,6 +1035,9 @@ impl StyleNode {
             }
             StylePropKey::FontSize => {
                 ResolvedStyleProp::FontSize(Length::PX(12.0))
+            }
+            StylePropKey::FontFamily => {
+                ResolvedStyleProp::FontFamily(FontFamilies::default())
             }
             StylePropKey::LineHeight => {
                 ResolvedStyleProp::LineHeight(LineHeightVal::Normal)
@@ -1210,9 +1239,13 @@ impl StyleNode {
                 self.background_color = value;
                 need_layout = false;
             }
-            ResolvedStyleProp::FontSize(value) => {
-                //TODO remove
-                // self.computed_style.font_size = value.0;
+            ResolvedStyleProp::FontSize(_) => {
+                //Do nothing
+                change_notified = true;
+                //TODO need_layout = false?
+            }
+            ResolvedStyleProp::FontFamily(value) => {
+                self.font_family = value;
             }
             ResolvedStyleProp::LineHeight(value) => {
                 self.line_height = value.to_px(length_ctx);
