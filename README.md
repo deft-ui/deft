@@ -35,22 +35,28 @@ npm create deft@latest
 
 # Building
 
-**On Debian**
+### Prerequisites
+
+Make sure Rust, Node.js and Clang14+ installed.
+
+Some extra packages need to be installed on Linux.
 
 ```
-apt install build-essential libssl-dev libclang-dev libc++-dev xorg-dev libxcb-xfixes0-dev libxcb-shape0-dev libdbus-1-dev libasound2-dev libegl-dev libgles-dev librust-wayland-egl-dev
+apt install build-essential libssl-dev libclang-dev libc++-dev \
+    xorg-dev libxcb-xfixes0-dev libxcb-shape0-dev libdbus-1-dev \
+    libasound2-dev libegl-dev libgles-dev librust-wayland-egl-dev
 ```
 
-```
-cargo build --features x11,wayland
-```
-
-**On Windows/MacOS**
-
-Make sure Clang14+ installed.
+### Build
 
 ```
 cargo build
+```
+
+### Run demo
+
+```
+cargo run --example demo
 ```
 
 # License
