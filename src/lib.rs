@@ -89,6 +89,7 @@ use skia_safe::font_style::Slant::Upright;
 use skia_safe::wrapper::ValueWrapper;
 use yoga::Direction::LTR;
 use crate::base::ResultWaiter;
+use crate::console::init_console;
 use crate::event_loop::{AppEventProxy};
 use crate::string::StringUtils;
 use crate::text::break_lines;
@@ -110,6 +111,7 @@ fn run_event_loop(event_loop: EventLoop<AppEventPayload>, deft_app: App) {
 
 /// Boostrap for desktop apps
 pub fn bootstrap(deft_app: App) {
+    init_console();
     let event_loop: EventLoop<AppEventPayload> = EventLoop::with_user_event().build().unwrap();
     run_event_loop(event_loop, deft_app);
 }

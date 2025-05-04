@@ -1,8 +1,8 @@
+#![windows_subsystem = "windows"]
 use deft::app::{App, IApp};
-use deft::bootstrap;
+use deft::{bootstrap};
 use quick_js::loader::{FsJsModuleLoader, JsModuleLoader};
 use deft::js::js_engine::JsEngine;
-use deft::loader::StaticModuleLoader;
 
 struct AppImpl {}
 

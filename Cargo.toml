@@ -73,6 +73,10 @@ skia-safe = { package = "deft-skia-safe", version = "0.81.0", features = ["binar
 skia-safe = { package = "deft-skia-safe", version = "0.81.0", features = ["binary-cache", "x11", "wayland"], default-features = false }
 skia-window = { path = "skia-window", version = "0.4.0", features = ["x11", "wayland"] }
 
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.61.1", features = ["Win32_System_Console"] }
+
 [build-dependencies]
 cfg_aliases = "0.2.1"
 

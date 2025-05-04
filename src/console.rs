@@ -1,5 +1,13 @@
+#[cfg(windows)]
+mod windows;
+
 use quick_js::console::{ConsoleBackend, Level};
 use quick_js::JsValue;
+
+pub fn init_console() {
+    #[cfg(windows)]
+    windows::attach_console();
+}
 
 pub struct Console {
 
