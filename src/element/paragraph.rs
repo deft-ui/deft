@@ -13,16 +13,17 @@ use crate::element::{text, Element, ElementBackend, ElementWeak};
 use crate::js::JsError;
 use crate::number::DeNan;
 use crate::string::StringUtils;
-use crate::style::{parse_color_str, parse_optional_color_str, StylePropKey};
+use crate::style::{parse_color_str, parse_optional_color_str, FontStyle, StylePropKey};
 use crate::{js_deserialize, js_serialize, some_or_continue};
 use deft_macros::{element_backend, js_methods, mrc_object};
 use serde::{Deserialize, Serialize};
 use skia_safe::font_style::{Slant, Weight, Width};
-use skia_safe::{Canvas, Color, Font, FontMgr, FontStyle, Paint, Point, Rect};
+use skia_safe::{Canvas, Color, Font, FontMgr, Paint, Point, Rect};
 use std::str::FromStr;
 use std::sync::LazyLock;
 use measure_time::print_time;
 use skia_safe::wrapper::NativeTransmutableWrapper;
+use swash::Style;
 use winit::keyboard::NamedKey;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 use crate::base::{EventContext, MouseDetail, MouseEventType};
@@ -56,6 +57,8 @@ pub struct ParagraphParams {
     pub color: Color,
     pub font_size: f32,
     pub font_families: FontFamilies,
+    pub font_weight: Weight,
+    pub font_style: FontStyle,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -589,8 +592,8 @@ impl Paragraph {
                     text_style.set_font_size(font_size);
 
                     let weight =
-                        parse_optional_weight(unit.weight.as_ref()).unwrap_or(Weight::NORMAL);
-                    let font_style = FontStyle::new(weight, Width::NORMAL, Slant::Upright);
+                        parse_optional_weight(unit.weight.as_ref()).unwrap_or(paragraph_params.font_weight);
+                    let font_style = skia_safe::FontStyle::new(weight, Width::NORMAL, paragraph_params.font_style.to_slant());
                     text_style.set_font_style(font_style);
 
                     let decoration =
@@ -638,6 +641,8 @@ impl ElementBackend for Paragraph {
             color: Color::default(),
             font_size: 12.0,
             font_families,
+            font_weight: Weight::NORMAL,
+            font_style: FontStyle::Normal,
             mask_char: None,
         };
         let units = Vec::new();
@@ -680,6 +685,12 @@ impl ElementBackend for Paragraph {
             }
             StylePropKey::FontFamily => {
                 self.params.font_families = self.element.style.font_family.clone();
+            }
+            StylePropKey::FontWeight => {
+                self.params.font_weight = self.element.style.font_weight.clone();
+            }
+            StylePropKey::FontStyle => {
+                self.params.font_style = self.element.style.font_style.clone();
             }
             StylePropKey::LineHeight => {
                 self.params.line_height = self.element.style.line_height;
@@ -857,6 +868,8 @@ fn test_layout_performance() {
         color: Default::default(),
         font_size: 16.0,
         font_families: FontFamilies::new(vec![FontFamily::new("monospace")]),
+        font_weight: Weight::NORMAL,
+        font_style: FontStyle::Normal,
         text_wrap: Some(false),
         mask_char: None,
     };

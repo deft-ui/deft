@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use font_kit::loader::Loader;
 use log::warn;
 use measure_time::print_time;
-use skia_safe::{FontStyle, Paint, Typeface, Unichar};
+use skia_safe::{Paint, Typeface, Unichar};
+use skia_safe::font_style::Weight;
 use skia_safe::wrapper::ValueWrapper;
 use crate::element::font_manager::FontManager;
 use crate::element::paragraph::{ParagraphParams, ZERO_WIDTH_WHITESPACE};
@@ -13,6 +14,7 @@ use crate::font::Font;
 use crate::mrc::Mrc;
 use crate::some_or_continue;
 use crate::string::StringUtils;
+use crate::style::FontStyle;
 use crate::text::TextStyle;
 
 thread_local! {
@@ -159,6 +161,8 @@ fn test_performance() {
             color: Default::default(),
             font_size: 14.0,
             font_families: FontFamilies::new(vec![FontFamily::new("monospace")]),
+            font_weight: Weight::NORMAL,
+            font_style: FontStyle::Normal,
             mask_char: None,
         };
         let mut pb = SimpleParagraphBuilder::new(&params);
@@ -180,6 +184,8 @@ fn test_get_char_bounds() {
         color: Default::default(),
         font_size: 14.0,
         font_families: FontFamilies::new(vec![FontFamily::new("monospace")]),
+        font_weight: Weight::NORMAL,
+        font_style: FontStyle::Normal,
         mask_char: None,
     };
     let mut pb = SimpleParagraphBuilder::new(&params);

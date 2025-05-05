@@ -10,8 +10,10 @@ use std::ops::Deref;
 use std::path::Path;
 use swash::scale::image::Image;
 use swash::scale::{Render, ScaleContext, Source, StrikeWith};
-use swash::zeno::Format;
-use swash::{Attributes, CacheKey, Charmap, FontRef, GlyphId, Metrics};
+use swash::zeno::{Angle, Format, Transform};
+use swash::{Attributes, CacheKey, Charmap, FontRef, GlyphId, Metrics, Style, Weight};
+use crate::mrc::Mrc;
+use crate::style::FontStyle;
 
 enum FontContent {
     Mmap(Mmap),
@@ -30,13 +32,17 @@ impl FontContent {
 #[mrc_object]
 pub struct Font {
     // Full content of the font file
-    data: FontContent,
+    data: Mrc<FontContent>,
     // Offset to the table directory
     offset: u32,
     // Cache key
     key: CacheKey,
 
     family_name: String,
+
+    weight: Weight,
+
+    style: Style,
 }
 
 unsafe impl Send for Font {}
@@ -55,16 +61,32 @@ impl Font {
 
     fn new(data: FontContent, index: usize, family_name: String) -> Option<Self> {
         let font = FontRef::from_index(data.as_ref(), index)?;
+        let weight = font.attributes().weight();
+        let style = font.attributes().style();
         let (offset, key) = (font.offset, font.key);
         Some(
             FontData {
-                data,
+                data: Mrc::new(data),
                 offset,
                 key,
                 family_name,
+                weight,
+                style,
             }
             .to_ref(),
         )
+    }
+
+    pub fn synthesize(self, weight: Weight, style: Style) -> Self {
+        let data = self.data.clone();
+        FontData {
+            data,
+            offset: self.offset,
+            key: self.key,
+            family_name: self.family_name.clone(),
+            weight,
+            style,
+        }.to_ref()
     }
 
     // As a convenience, you may want to forward some methods.
@@ -101,7 +123,7 @@ impl Font {
             .size(font_size)
             .hint(true)
             .build();
-        Render::new(&[
+        let mut render = Render::new(&[
             // Color outline with the first palette
             Source::ColorOutline(0),
             Source::Bitmap(StrikeWith::BestFit),
@@ -109,11 +131,28 @@ impl Font {
             Source::ColorBitmap(StrikeWith::BestFit),
             // Standard scalable outline
             Source::Outline,
-        ])
+        ]);
         // Select a subpixel format
-        .format(Format::Alpha)
+        let font_attrs = self.as_ref().attributes();
+        if font_attrs.weight() != self.weight {
+            render.embolden((self.weight.0 as f32 - font_attrs.weight().0 as f32) / 1000.0 * 2.0);
+        }
+        if font_attrs.style() == Style::Normal {
+            if self.style == Style::Italic {
+                render.transform(Some(Transform::skew(
+                    Angle::from_degrees(14.0),
+                    Angle::from_degrees(0.0),
+                )));
+            } else if let Style::Oblique(ang) = &self.style {
+                render.transform(Some(Transform::skew(
+                    Angle::from_degrees(ang.to_degrees()),
+                    Angle::from_degrees(0.0),
+                )));
+            }
+        }
+
         // Render the image
-        .render(&mut scaler, glyph_id)
+        render.format(Format::Alpha).render(&mut scaler, glyph_id)
     }
 
     /// Just for debug

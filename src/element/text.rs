@@ -10,9 +10,11 @@ use std::rc::Rc;
 
 use anyhow::Error;
 use quick_js::{JsValue, ValueError};
-use skia_safe::{Canvas, Color, Font, FontMgr, FontStyle, Paint, Typeface};
+use skia_safe::{Canvas, Color, Font, FontMgr, Paint, Typeface};
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 use deft_macros::{js_methods, mrc_object};
+use skia_safe::font_style::{Slant, Weight, Width};
+use swash::Style;
 use crate::base::{EventContext, MouseDetail, MouseEventType, Rect, TextUpdateDetail};
 use crate::color::parse_hex_color;
 use crate::element::{ElementBackend, Element, ElementWeak};
@@ -27,7 +29,7 @@ use crate::paint::Painter;
 use crate::render::RenderFn;
 use crate::some_or_continue;
 use crate::string::StringUtils;
-use crate::style::StylePropKey;
+use crate::style::{FontStyle, StylePropKey};
 use crate::text::{TextAlign, TextStyle};
 
 // zero-width space for caret
@@ -95,6 +97,8 @@ impl Text {
             paint: Paint::default(),
             line_height: None,
             font_size: 14.0,
+            font_weight: Weight::NORMAL,
+            font_style: FontStyle::Normal,
         };
         let text = "".to_string();
 
@@ -494,6 +498,8 @@ impl Text {
                 color: params.paint.color(),
                 font_size: params.font_size,
                 font_families: params.font_families.clone(),
+                font_weight: Weight::NORMAL,
+                font_style: params.font_style,
                 mask_char: None,
             };
             let mut pb = SimpleParagraphBuilder::new(&paragraph_params);
@@ -502,6 +508,15 @@ impl Text {
             let mut style = TextStyle::default();
             style.set_font_size(paragraph_params.font_size);
             style.set_foreground_paint(&params.paint);
+            let weight = params.font_weight;
+            let slant = match paragraph_params.font_style {
+                FontStyle::Normal => Slant::Upright,
+                FontStyle::Italic => Slant::Italic,
+                //TODO support degree?
+                FontStyle::Oblique => Slant::Oblique,
+            };
+            let font_style = skia_safe::FontStyle::new(weight, Width::NORMAL, slant);
+            style.set_font_style(font_style);
             pb.push_style(&style);
             pb.add_text(ln.to_string());
 
@@ -589,6 +604,16 @@ impl ElementBackend for Text {
             },
             StylePropKey::FontFamily => {
                 self.text_params.font_families = self.element.style.font_family.clone();
+                self.rebuild_lines();
+                self.mark_dirty(true);
+            }
+            StylePropKey::FontWeight => {
+                self.text_params.font_weight = self.element.style.font_weight;
+                self.rebuild_lines();
+                self.mark_dirty(true);
+            }
+            StylePropKey::FontStyle => {
+                self.text_params.font_style = self.element.style.font_style.clone();
                 self.rebuild_lines();
                 self.mark_dirty(true);
             }

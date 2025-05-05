@@ -14,6 +14,8 @@ use deft_macros::mrc_object;
 use ordered_float::{Float, OrderedFloat};
 use quick_js::JsValue;
 use skia_safe::{Color, Image, Matrix, Path};
+use skia_safe::font_style::{Slant, Weight};
+use swash::Style;
 use yoga::{Align, Direction, Display, Edge, FlexDirection, Justify, Node, Overflow, PositionType, StyleUnit, Wrap};
 use crate::base::Rect;
 use crate::color::parse_hex_color;
@@ -24,6 +26,7 @@ use crate::cache::CacheValue;
 use crate::animation::ANIMATIONS;
 use crate::animation::css_actor::CssAnimationActor;
 use crate::element::{Element, ElementWeak};
+use crate::element::paragraph::parse_weight;
 use crate::event_loop::create_event_loop_callback;
 use crate::font::family::{FontFamilies, FontFamily};
 use crate::mrc::{Mrc, MrcWeak};
@@ -554,6 +557,8 @@ define_style_props!(
     BackgroundColor => Color, Color;
     FontSize        => Length, f32;
     FontFamily      => FontFamilies, FontFamilies;
+    FontWeight      => Weight, Weight;
+    FontStyle       => FontStyle, Style;
     LineHeight      => LineHeightVal, f32;
 
     BorderTopWidth => LengthOrPercent, f32;
@@ -716,6 +721,23 @@ pub enum LengthOrPercent {
     Auto,
 }
 
+#[derive(Clone, Debug, PartialEq, Copy, Hash, Eq)]
+pub enum FontStyle {
+    Normal,
+    Italic,
+    Oblique,
+}
+
+impl FontStyle {
+    pub fn to_slant(&self) -> Slant {
+        match self {
+            FontStyle::Normal => Slant::Upright,
+            FontStyle::Italic => Slant::Italic,
+            FontStyle::Oblique => Slant::Oblique,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Copy)]
 pub enum LineHeightVal {
     Length(Length),
@@ -756,6 +778,26 @@ impl PropValueParse for FontFamilies {
     fn to_style_string(&self) -> String {
         let list: Vec<String> = self.as_slice().iter().map(|it| format!("'{}'", it.name())).collect();
         list.join(",")
+    }
+}
+
+impl PropValueParse for FontStyle {
+    fn parse_prop_value(value: &str) -> Option<Self> {
+        let value = value.trim();
+        match value {
+            "normal" => Some(Self::Normal),
+            "italic" => Some(Self::Italic),
+            "oblique" => Some(Self::Oblique),
+            _ => None,
+        }
+    }
+
+    fn to_style_string(&self) -> String {
+        match self {
+            Self::Normal => String::from("normal"),
+            Self::Italic => String::from("italic"),
+            Self::Oblique => String::from("oblique"),
+        }
     }
 }
 
@@ -857,6 +899,16 @@ impl Length {
 
 }
 
+impl PropValueParse for Weight {
+    fn parse_prop_value(value: &str) -> Option<Self> {
+        parse_weight(value)
+    }
+
+    fn to_style_string(&self) -> String {
+        format!("{}", self.deref())
+    }
+}
+
 pub trait ColorHelper {
     fn is_transparent(&self) -> bool;
 }
@@ -942,6 +994,8 @@ pub struct StyleNode {
     pub background_color: Color,
     pub line_height: Option<f32>,
     pub font_family: FontFamilies,
+    pub font_weight: Weight,
+    pub font_style: FontStyle,
 }
 
 
@@ -967,6 +1021,8 @@ impl StyleNode {
             background_color: Color::new(0),
             line_height: None,
             font_family: FontFamilies::default(),
+            font_weight: Weight::NORMAL,
+            font_style: FontStyle::Normal,
         };
         inner.yoga_node.set_position_type(PositionType::Static);
         let mut inst = inner.to_ref();
@@ -1038,6 +1094,12 @@ impl StyleNode {
             }
             StylePropKey::FontFamily => {
                 ResolvedStyleProp::FontFamily(FontFamilies::default())
+            }
+            StylePropKey::FontWeight => {
+                ResolvedStyleProp::FontWeight(Weight::NORMAL)
+            }
+            StylePropKey::FontStyle => {
+                ResolvedStyleProp::FontStyle(FontStyle::Normal)
             }
             StylePropKey::LineHeight => {
                 ResolvedStyleProp::LineHeight(LineHeightVal::Normal)
@@ -1246,6 +1308,12 @@ impl StyleNode {
             }
             ResolvedStyleProp::FontFamily(value) => {
                 self.font_family = value;
+            }
+            ResolvedStyleProp::FontWeight(value) => {
+                self.font_weight = value;
+            }
+            ResolvedStyleProp::FontStyle(value) => {
+                self.font_style = value;
             }
             ResolvedStyleProp::LineHeight(value) => {
                 self.line_height = value.to_px(length_ctx);
