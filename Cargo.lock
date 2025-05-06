@@ -1000,7 +1000,7 @@ dependencies = [
 
 [[package]]
 name = "deft"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "android_logger",
  "anyhow",
@@ -1133,7 +1133,7 @@ dependencies = [
 
 [[package]]
 name = "deft-tray"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "ksni",
  "serde",
