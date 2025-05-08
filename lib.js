@@ -147,7 +147,9 @@ export class Window {
      * @param attrs {WindowAttrs}
      */
     constructor(attrs = null) {
-        this.#windowHandle = Window_create(attrs || {});
+        attrs = attrs || {};
+        attrs.preferredRenderers = [].concat(attrs.preferredRenderers || [])
+        this.#windowHandle = Window_create(attrs);
         this.#eventBinder = new EventBinder(this.#windowHandle, Window_bind_js_event_listener, Window_unbind_js_event_listener, this);
         Window_set_js_context(this.#windowHandle, this);
         this.#body = new BodyElement();

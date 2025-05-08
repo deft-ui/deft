@@ -9,6 +9,7 @@ declare interface WindowAttrs {
     position ?: [number, number],
     visible ?: boolean,
     windowType ?: WindowType,
+    preferredRenderers ?: string | string[],
 }
 
 declare interface ResizeDetail {

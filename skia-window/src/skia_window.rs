@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::ops::Deref;
 
 use winit::event_loop::ActiveEventLoop;
@@ -12,13 +13,65 @@ pub struct SkiaWindow {
     surface_state: Box<dyn RenderBackend>,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum RenderBackendType {
     SoftBuffer,
     #[cfg(feature = "gl")]
     GL,
     #[cfg(feature = "gl")]
     SoftGL,
+}
+
+impl RenderBackendType {
+
+    pub fn all() -> Vec<Self> {
+        let mut list = Vec::new();
+        list.push(Self::SoftBuffer);
+        #[cfg(feature = "gl")]
+        list.push(Self::GL);
+        #[cfg(feature = "gl")]
+        list.push(Self::SoftGL);
+        list
+    }
+
+    pub fn from_str(backend_type_str: &str) -> Option<Self> {
+        match backend_type_str.to_lowercase().as_str() {
+            "softbuffer" => Some(RenderBackendType::SoftBuffer),
+            #[cfg(feature = "gl")]
+            "softgl" => Some(RenderBackendType::SoftGL),
+            #[cfg(feature = "gl")]
+            "gl" => Some(RenderBackendType::GL),
+            _ => None,
+        }
+    }
+    pub fn from_split_str(backend_type_str: &str) -> Vec<RenderBackendType> {
+        let list = backend_type_str.split(",").collect::<Vec<&str>>();
+        Self::from_str_list(&list)
+    }
+
+    pub fn from_str_list(backend_type_list: &Vec<&str>) -> Vec<RenderBackendType> {
+        let mut backend_types = Vec::new();
+        for bt_str in backend_type_list {
+            if let Some(bt) = Self::from_str(bt_str) {
+                backend_types.push(bt);
+            }
+        }
+        backend_types
+    }
+
+    pub fn merge(list1: &Vec<RenderBackendType>, list2: &Vec<RenderBackendType>) -> Vec<RenderBackendType> {
+        let mut result = Vec::new();
+        let mut added = HashSet::new();
+        for list in [list1, list2] {
+            for it in list {
+                if added.insert(it) {
+                    result.push(it.clone());
+                }
+            }
+        }
+        result
+    }
+
 }
 
 impl SkiaWindow {

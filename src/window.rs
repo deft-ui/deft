@@ -116,6 +116,7 @@ pub struct Window {
     frame_rate_controller: FrameRateController,
     next_frame_timer_handle: Option<TimerHandle>,
     resource_table: ResourceTable,
+    render_backend_types: Vec<RenderBackendType>,
 }
 
 pub type WindowEventHandler = EventHandler<WindowWeak>;
@@ -208,7 +209,18 @@ impl Window {
             _ => WindowType::Normal,
         };
 
-        let mut window = Self::create_window(attributes.clone());
+        let user_pf_backends = match attrs.preferred_renderers {
+            None => Vec::new(),
+            Some(str) => RenderBackendType::from_str_list(
+                &str.iter().map(|it| it.as_str()).collect()
+            ),
+        };
+        let env_pf_backends = RenderBackendType::from_split_str(
+            &env::var("DEFT_RENDERERS").unwrap_or("".to_string())
+        );
+        let render_backend_types = RenderBackendType::merge(&user_pf_backends, &env_pf_backends);
+        let render_backend_types = RenderBackendType::merge(&render_backend_types, &RenderBackendType::all());
+        let mut window = Self::create_window(attributes.clone(), &render_backend_types);
         window.set_ime_allowed(true);
         let state = WindowData {
             id,
@@ -254,6 +266,7 @@ impl Window {
             next_frame_timer_handle: None,
             resource_table: ResourceTable::new(),
             drag_window_called: false,
+            render_backend_types,
         };
         let mut handle = Window {
             inner: Mrc::new(state),
@@ -284,7 +297,7 @@ impl Window {
     }
 
     pub fn resume(&mut self) {
-        self.window = Self::create_window(self.attributes.clone());
+        self.window = Self::create_window(self.attributes.clone(), &self.render_backend_types);
     }
 
     pub fn notify_update(&mut self) {
@@ -1217,32 +1230,10 @@ impl Window {
         }
     }
 
-    fn create_window(attributes: WindowAttributes) -> SkiaWindow {
+    fn create_window(attributes: WindowAttributes, backend_types: &Vec<RenderBackendType>) -> SkiaWindow {
         run_with_event_loop(|el| {
-            //TODO support RenderBackedType parameter
-            let mut backend_types = vec![
-                RenderBackendType::SoftBuffer,
-                #[cfg(feature = "gl")]
-                RenderBackendType::GL,
-            ];
-            if let Ok(backend_type_str) = env::var("DEFT_RENDERERS") {
-                backend_types.clear();
-                for bt_str in backend_type_str.split(",") {
-                    let bt = match bt_str.to_lowercase().as_str() {
-                        #[cfg(feature = "gl")]
-                        "softgl" => Some(RenderBackendType::SoftGL),
-                        "softbuffer" => Some(RenderBackendType::SoftBuffer),
-                        #[cfg(feature = "gl")]
-                        "gl" => Some(RenderBackendType::GL),
-                        _ => None,
-                    };
-                    if let Some(bt) = bt {
-                        backend_types.push(bt);
-                    }
-                }
-            }
             debug!("render backends: {:?}", backend_types);
-            for bt in &backend_types {
+            for bt in backend_types {
                 let mut init_attributes = attributes.clone().with_visible(false);
                 if let Some(mut sw) = SkiaWindow::new(el, init_attributes, *bt) {
                     if attributes.visible {

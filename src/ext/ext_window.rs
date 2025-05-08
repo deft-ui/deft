@@ -52,6 +52,7 @@ pub struct WindowAttrs {
     pub position: Option<(f32, f32)>,
     pub visible: Option<bool>,
     pub window_type: Option<String>,
+    pub preferred_renderers: Option<Vec<String>>,
 }
 
 js_deserialize!(WindowAttrs);
