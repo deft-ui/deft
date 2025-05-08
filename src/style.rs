@@ -1832,6 +1832,31 @@ fn parse_color(value: &str) -> Option<Color> {
                 Some(Color::from_argb(rgba.alpha, rgba.red, rgba.green, rgba.blue))
             }
         }
+    } else if let Some(rgb) = value.strip_prefix("rgb(") {
+        let mut params = rgb.strip_suffix(")")?
+            .split(',')
+            .map(|p| p.trim());
+        let r = u8::from_str(params.next()?).ok()?;
+        let g = u8::from_str(params.next()?).ok()?;
+        let b = u8::from_str(params.next()?).ok()?;
+        if params.next().is_none() {
+            Some(Color::from_rgb(r, g, b))
+        } else {
+            None
+        }
+    } else if let Some(rgba) = value.strip_prefix("rgba(") {
+        let mut params = rgba.strip_suffix(")")?
+            .split(',')
+            .map(|p| p.trim());
+        let r = u8::from_str(params.next()?).ok()?;
+        let g = u8::from_str(params.next()?).ok()?;
+        let b = u8::from_str(params.next()?).ok()?;
+        let a = u8::from_str(params.next()?).ok()?;
+        if params.next().is_none() {
+            Some(Color::from_argb(a, r, g, b))
+        } else {
+            None
+        }
     } else {
         None
     }
