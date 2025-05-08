@@ -1649,56 +1649,8 @@ pub fn parse_style_obj(style: JsValue) -> Vec<ParsedStyleProp> {
                 JsValue::Float(f) => f.to_string(),
                 _ => return,
             };
-            let mut parse = |key: &str, value: &str| -> bool {
-                let mut list = ParsedStyleProp::parse(key, value);
-                if !list.is_empty() {
-                    result.append(&mut list);
-                    true
-                } else {
-                    false
-                }
-            };
-            if !parse(&k, &v_str) {
-                let key = k.to_lowercase();
-                let k = key.as_str();
-                match k {
-                    "background" => {
-                        parse("BackgroundColor", &v_str);
-                    },
-                    "gap" => {
-                        parse("RowGap", &v_str);
-                        parse("ColumnGap", &v_str);
-                    },
-                    "border" => {
-                        parse("BorderTop", &v_str);
-                        parse("BorderRight", &v_str);
-                        parse("BorderBottom", &v_str);
-                        parse("BorderLeft", &v_str);
-                    },
-                    "margin" => {
-                        let (t, r, b, l) = parse_box_prop(StylePropertyValue::String(v_str.to_string()));
-                        parse("MarginTop", &t.to_str("none"));
-                        parse("MarginRight", &r.to_str("none"));
-                        parse("MarginBottom", &b.to_str("none"));
-                        parse("MarginLeft", &l.to_str("none"));
-                    }
-                    "padding" => {
-                        let (t, r, b, l) = parse_box_prop(StylePropertyValue::String(v_str.to_string()));
-                        parse("PaddingTop", &t.to_str("none"));
-                        parse("PaddingRight", &r.to_str("none"));
-                        parse("PaddingBottom", &b.to_str("none"));
-                        parse("PaddingLeft", &l.to_str("none"));
-                    }
-                    "borderradius" => {
-                        let (t, r, b, l) = parse_box_prop(StylePropertyValue::String(v_str.to_string()));
-                        parse("BorderTopLeftRadius", &t.to_str("none"));
-                        parse("BorderTopRightRadius", &r.to_str("none"));
-                        parse("BorderBottomRightRadius", &b.to_str("none"));
-                        parse("BorderBottomLeftRadius", &l.to_str("none"));
-                    }
-                    _ => {}
-                }
-            }
+            let mut list = ParsedStyleProp::parse(&k, &v_str);
+            result.append(&mut list);
         });
     }
     result

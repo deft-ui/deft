@@ -1,4 +1,5 @@
 declare type WindowType = "normal" | "menu"
+declare type RenderBackend = "SoftBuffer" | "GL" | "SoftGL"
 declare interface WindowAttrs {
     width ?: number
     height ?: number
@@ -9,7 +10,7 @@ declare interface WindowAttrs {
     position ?: [number, number],
     visible ?: boolean,
     windowType ?: WindowType,
-    preferredRenderers ?: string | string[],
+    preferredRenderers ?: RenderBackend | RenderBackend[],
 }
 
 declare interface ResizeDetail {

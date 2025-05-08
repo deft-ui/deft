@@ -4,7 +4,7 @@ readme = "README.md"
 license = "MIT"
 description = "Cross platform ui framework"
 
-version = "0.6.1"
+version = "0.6.2"
 authors = ["KasonYang <me@kason.fun>"]
 edition = "2021"
 
@@ -15,7 +15,7 @@ deft-macros = { path = "packages/deft-macros", version = "0.2.1" }
 quick-js = { package = "deft-quick-js", version = "0.5.0"}
 yoga = { package = "deft-yoga", version = "0.6.0" }
 winit = { package = "deft-winit", version = "0.30.8", features = ["android-native-activity", "rwh_06"] }
-skia-window = { path = "skia-window", version = "0.4.0" }
+skia-window = { path = "skia-window", version = "0.4.1" }
 deft-tray = { path = "packages/deft-tray", version = "0.1.0", optional = true }
 
 base64 = { version = "0.22.0" }
@@ -71,7 +71,7 @@ skia-safe = { package = "deft-skia-safe", version = "0.81.0", features = ["binar
 
 [target.'cfg(target_os = "linux")'.dependencies]
 skia-safe = { package = "deft-skia-safe", version = "0.81.0", features = ["binary-cache", "x11", "wayland"], default-features = false }
-skia-window = { path = "skia-window", version = "0.4.0", features = ["x11", "wayland"] }
+skia-window = { path = "skia-window", version = "0.4.1", features = ["x11", "wayland"] }
 
 
 [target.'cfg(target_os = "windows")'.dependencies]

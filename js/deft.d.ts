@@ -1,4 +1,5 @@
 declare type WindowType = "normal" | "menu"
+declare type RenderBackend = "SoftBuffer" | "GL" | "SoftGL"
 declare interface WindowAttrs {
     width ?: number
     height ?: number
@@ -9,6 +10,7 @@ declare interface WindowAttrs {
     position ?: [number, number],
     visible ?: boolean,
     windowType ?: WindowType,
+    preferredRenderers ?: RenderBackend | RenderBackend[],
 }
 
 declare interface ResizeDetail {
@@ -823,7 +825,6 @@ declare class ParagraphElement extends Element {
      * @returns {string | undefined}
      */
     get selectionText(): string | undefined;
-    
 }
 declare class ImageElement extends Element {
     constructor();
