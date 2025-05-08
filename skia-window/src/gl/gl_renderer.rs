@@ -5,7 +5,7 @@ use std::sync::mpsc::channel;
 use std::{thread};
 use ::gl::GetIntegerv;
 use gl::types::{GLint};
-use glutin::config::ConfigTemplateBuilder;
+use glutin::config::{AsRawConfig, Config, ConfigTemplateBuilder};
 use glutin::context::PossiblyCurrentContext;
 use glutin::display::{Display};
 use glutin::prelude::*;
@@ -52,31 +52,18 @@ struct GlContext {
 unsafe impl Send for GlContext {}
 
 impl GlRenderer {
-    pub fn new(gl_display: &Display, window: &Window, gl_surface: glutin::surface::Surface<WindowSurface>, context: PossiblyCurrentContext) -> Option<Self> {
+    pub fn new(
+        gl_display: &Display,
+        window: &Window,
+        gl_surface: glutin::surface::Surface<WindowSurface>,
+        context: PossiblyCurrentContext,
+        gl_config: &Config,
+    ) -> Option<Self> {
         unsafe {
             gl::load_with(|s| {
                 gl_display
                     .get_proc_address(CString::new(s).unwrap().as_c_str())
             });
-
-            let template = ConfigTemplateBuilder::new()
-                .with_alpha_size(8)
-                .with_transparency(false).build();
-
-            let configs = gl_display
-                .find_configs(template)
-                .ok()?;
-            let gl_config = configs.reduce(|accum, config| {
-                let transparency_check = config.supports_transparency().unwrap_or(false)
-                    & !accum.supports_transparency().unwrap_or(false);
-
-                if transparency_check || config.num_samples() < accum.num_samples() {
-                    config
-                } else {
-                    accum
-                }
-            })?;
-
 
             let interface = gpu::gl::Interface::new_load_with(|name| {
                 if name == "eglGetCurrentDisplay" {

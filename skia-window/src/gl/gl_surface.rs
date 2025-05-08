@@ -83,7 +83,9 @@ impl SurfaceState {
     /// Create template to find OpenGL config.
     fn config_template(raw_window_handle: RawWindowHandle) -> ConfigTemplate {
         let builder = ConfigTemplateBuilder::new()
-            .with_alpha_size(8)
+            .prefer_hardware_accelerated(None)
+            .with_depth_size(0)
+            .with_stencil_size(0)
             .compatible_with_native_window(raw_window_handle)
             .with_surface_type(ConfigSurfaceTypes::WINDOW);
 
@@ -107,7 +109,7 @@ impl SurfaceState {
                 .find_configs(template)
                 .ok()?
                 .reduce(|accum, config| {
-                    // Find the config with the maximum number of samples.
+                    // Find the config with the minimum number of samples.
                     //
                     // In general if you're not sure what you want in template you can request or
                     // don't want to require multisampling for example, you can search for a
@@ -115,7 +117,11 @@ impl SurfaceState {
                     //
                     // XXX however on macOS you can request only one config, so you should do
                     // a search with the help of `find_configs` and adjusting your template.
-                    if config.num_samples() > accum.num_samples() {
+                    if config.num_samples() < accum.num_samples() {
+                        config
+                    } else if config.stencil_size() < accum.stencil_size() {
+                        config
+                    } else if config.depth_size() < accum.depth_size() {
                         config
                     } else {
                         accum
@@ -144,7 +150,7 @@ impl SurfaceState {
         let context = not_current_context
             .make_current(&surface)
             .expect("Failed to make GL context current");
-        let render = GlRenderer::new(&glutin_display, &window, surface, context)?;
+        let render = GlRenderer::new(&glutin_display, &window, surface, context, &config)?;
 
         Some(SurfaceState { window, glutin_display, render })
     }
