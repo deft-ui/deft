@@ -53,7 +53,8 @@ impl SurfaceState {
     }
 
     fn ensure_glutin_display(display_handle: RawDisplayHandle, window: &winit::window::Window) -> Display {
-        let raw_window_handle = window.raw_window_handle();
+        //TODO no unwrap
+        let raw_window_handle = window.raw_window_handle().unwrap();
         Self::create_display(display_handle, raw_window_handle)
     }
 
@@ -97,8 +98,8 @@ impl SurfaceState {
 
 
     pub fn new(event_loop: &ActiveEventLoop, window: Window) -> Option<SurfaceState> {
-        let raw_display_handle = event_loop.raw_display_handle();
-        let raw_window_handle = window.raw_window_handle();
+        let raw_display_handle = event_loop.raw_display_handle().ok()?;
+        let raw_window_handle = window.raw_window_handle().ok()?;
 
         let glutin_display = Self::ensure_glutin_display(raw_display_handle, &window);
         // Lazily initialize, egl, wgl, glx etc
@@ -133,7 +134,7 @@ impl SurfaceState {
         // XXX: Winit is missing a window.surface_size() API and the inner_size may be the wrong
         // size to use on some platforms!
         let (width, height): (u32, u32) = window.inner_size().into();
-        let raw_window_handle = window.raw_window_handle();
+        let raw_window_handle = window.raw_window_handle().ok()?;
         let attrs = SurfaceAttributesBuilder::<WindowSurface>::new().build(
             raw_window_handle,
             NonZeroU32::new(width)?,

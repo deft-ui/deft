@@ -1,7 +1,6 @@
 use crate as deft;
 use std::cell::RefCell;
 use std::collections::HashMap;
-
 use anyhow::{anyhow, Error};
 use log::{debug, info, warn};
 use quick_js::{JsValue, ResourceValue, ValueError};

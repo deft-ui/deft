@@ -27,7 +27,7 @@ use crate::js::js_engine::JsEngine;
 use crate::js::js_event_loop::{js_init_event_loop, JsEvent, JsEventLoopClosedError};
 use crate::js::js_runtime::JsContext;
 use crate::mrc::Mrc;
-use crate::timer;
+use crate::{platform, timer};
 
 #[derive(Debug)]
 pub struct AppEventPayload {
@@ -60,6 +60,7 @@ pub enum AppEvent {
     ShowSoftInput(i32),
     HideSoftInput(i32),
     CommitInput(i32, String),
+    /// window_id,key,pressed
     NamedKeyInput(i32, String, bool),
     SetInset(i32, InsetType, Rect),
     Update(i32),
@@ -167,11 +168,15 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
                     debug!("show soft input");
                     #[cfg(target_os = "android")]
                     show_hide_keyboard(event_loop.android_app().clone(), window_id, true);
+                    #[cfg(ohos)]
+                    platform::show_soft_keyboard(window_id);
                 },
                 AppEvent::HideSoftInput(window_id) => {
                     debug!("hide soft input");
                     #[cfg(target_os = "android")]
                     show_hide_keyboard(event_loop.android_app().clone(), window_id, false);
+                    #[cfg(ohos)]
+                    platform::hide_soft_keyboard(window_id);
                 },
                 AppEvent::CommitInput(window_id, content) => {
                     window_input(window_id, content);

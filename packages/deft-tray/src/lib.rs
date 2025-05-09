@@ -1,17 +1,17 @@
-#[cfg(target_os = "linux")]
+#[cfg(linux_pc)]
 mod linux_tray;
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 mod generic_tray;
 
-#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+#[cfg(not(any(linux_pc, target_os = "windows", target_os = "macos")))]
 mod no_tray;
 
 use serde::{Deserialize, Serialize};
-#[cfg(target_os = "linux")]
+#[cfg(linux_pc)]
 pub use crate::linux_tray::LinuxTray as Tray;
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 pub use crate::generic_tray::GenericTray as Tray;
-#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+#[cfg(not(any(linux_pc, target_os = "windows", target_os = "macos")))]
 pub use crate::no_tray::NoTray as Tray;
 
 

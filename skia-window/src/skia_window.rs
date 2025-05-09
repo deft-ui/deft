@@ -75,24 +75,28 @@ impl RenderBackendType {
 }
 
 impl SkiaWindow {
+
+    #[allow(unreachable_code)]
     pub fn new(event_loop: &ActiveEventLoop, attributes: WindowAttributes, backend: RenderBackendType) -> Option<Self> {
         let window = event_loop.create_window(attributes).unwrap();
         let surface_state: Box<dyn RenderBackend> = match backend {
             RenderBackendType::SoftBuffer => {
-                #[cfg(target_os = "android")]
+                #[cfg(target_env = "ohos")]
                 return None;
-                #[cfg(not(target_os = "android"))]
-                {
-                    use crate::soft::softbuffer_surface_presenter::SoftBufferSurfacePresenter;
-                    Box::new(SoftSurface::new(event_loop, SoftBufferSurfacePresenter::new(window)))
-                }
+                use crate::soft::softbuffer_surface_presenter::SoftBufferSurfacePresenter;
+                let presenter = SoftBufferSurfacePresenter::new(window);
+                let soft_surface = SoftSurface::new(event_loop, presenter);
+                Box::new(soft_surface)
             }
             #[cfg(feature = "gl")]
             RenderBackendType::SoftGL => {
-                Box::new(SoftSurface::new(event_loop, crate::soft::gl_presenter::GlPresenter::new(event_loop, window)?))
+                let soft_surface = SoftSurface::new(event_loop, crate::soft::gl_presenter::GlPresenter::new(event_loop, window)?);
+                Box::new(soft_surface)
             }
             #[cfg(feature = "gl")]
             RenderBackendType::GL => {
+                #[cfg(target_env = "ohos")]
+                return None;
                 Box::new(crate::gl::SurfaceState::new(event_loop, window)?)
             }
         };

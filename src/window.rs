@@ -1241,6 +1241,8 @@ impl Window {
                     }
                     debug!("created window with backend {:?}", bt);
                     return sw;
+                } else {
+                    debug!("failed to create window with backend: {:?}", bt);
                 }
             }
             panic!("Failed to create window with backends: {:?}", backend_types);

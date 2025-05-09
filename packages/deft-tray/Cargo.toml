@@ -11,5 +11,8 @@ serde = { version = "1", features = ["derive"] }
 [target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
 tray-icon = "0.20.1"
 
-[target.'cfg(any(target_os = "linux"))'.dependencies]
+[target.'cfg(all(target_os = "linux", not(target_env = "ohos")))'.dependencies]
 ksni = "0.2.2"
+
+[build-dependencies]
+cfg_aliases = "0.2.1"

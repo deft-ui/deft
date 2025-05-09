@@ -1,6 +1,7 @@
 #![allow(unused)]
 #![allow(dead_code)]
 #![allow(unused_variables)]
+#![allow(deprecated)]
 
 use crate::app::{WinitApp, AppEvent, AppEventPayload, IApp, App};
 use crate::data_dir::get_data_path;
@@ -81,6 +82,7 @@ pub mod winit;
 mod task_executor;
 mod stylesheet;
 mod font;
+mod platform;
 
 pub use deft_macros::*;
 use log::debug;
@@ -106,6 +108,9 @@ fn run_event_loop(event_loop: EventLoop<AppEventPayload>, deft_app: App) {
         debug_time!("init engine time");
         WinitApp::new(deft_app, el_proxy)
     };
+    #[cfg(ohos)]
+    platform::run_app(event_loop, app);
+    #[cfg(not(ohos))]
     event_loop.run_app(&mut app).unwrap();
 }
 
@@ -165,5 +170,15 @@ pub fn android_bootstrap(app: AndroidApp, deft_app: App) {
     }
     debug!("data path: {:?}", data_dir::get_data_path(""));
     let event_loop = EventLoop::with_user_event().with_android_app(app).build().unwrap();
+    run_event_loop(event_loop, deft_app);
+}
+
+
+#[cfg(ohos)]
+pub fn ohos_bootstrap(openharmony_app: openharmony_ability::OpenHarmonyApp, deft_app: App) {
+    use winit::platform::ohos::EventLoopBuilderExtOpenHarmony;
+    let a = openharmony_app.clone();
+
+    let event_loop = EventLoop::with_user_event().with_openharmony_app(a).build().unwrap();
     run_event_loop(event_loop, deft_app);
 }

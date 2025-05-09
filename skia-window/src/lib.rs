@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 #![allow(unexpected_cfgs)]
+#![allow(deprecated)]
 pub mod skia_window;
 mod surface;
 pub mod layer;
