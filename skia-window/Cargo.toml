@@ -21,11 +21,11 @@ gl = ["dep:gl", "glutin", "skia-safe/gl", "egl", "wgl"]
 
 [dependencies]
 log = "0.4"
-winit = { package = "deft-winit", version = "0.30.5", features = ["android-native-activity", "rwh_05"] }
-glutin = { version = "0.31", optional = true }
+winit = { package = "deft-winit", version = "0.31.0", features = ["android-native-activity", "rwh_06"] }
+glutin = { version = "0.32.3", optional = true }
 measure_time = "0.8.3"
-raw-window-handle = "0.5.0"
-skia-safe = { package = "deft-skia-safe", features = ["binary-cache", "svg", "gl"], default-features = false, version = "0.81.2" }
+raw-window-handle = "0.6.0"
+skia-safe = { package = "deft-skia-safe", features = ["binary-cache", "svg", "gl"], default-features = false, version = "0.82.0" }
 gl = { version = "0.14.0", optional = true }
 # sparkle = { version = "0.1.25" }
 

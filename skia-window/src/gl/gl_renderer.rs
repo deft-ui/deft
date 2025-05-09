@@ -5,7 +5,7 @@ use std::sync::mpsc::channel;
 use std::{thread};
 use ::gl::GetIntegerv;
 use gl::types::{GLint};
-use glutin::config::{AsRawConfig, Config, ConfigTemplateBuilder};
+use glutin::config::{Config};
 use glutin::context::PossiblyCurrentContext;
 use glutin::display::{Display};
 use glutin::prelude::*;

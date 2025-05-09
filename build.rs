@@ -13,6 +13,7 @@ fn main() {
         apple: { any(target_os = "ios", target_os = "macos") },
         free_unix: { all(unix, not(apple), not(android_platform), not(target_os = "emscripten")) },
         redox: { target_os = "redox" },
+        ohos: { target_env = "ohos" },
 
         // Native displays.
         x11_platform: { all(feature = "x11", free_unix, not(redox)) },
@@ -21,4 +22,7 @@ fn main() {
         // Systems
         mobile_platform: { any(target_os = "ios", target_os = "android") },
     }
+
+    #[cfg(target_env = "ohos")]
+    napi_build_ohos::setup();
 }

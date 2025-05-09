@@ -4,3 +4,4 @@ target
 *.so
 *.log
 local*
+dist/

@@ -17,7 +17,7 @@ impl GlPresenter {
         let size = window.inner_size();
         let width = size.width;
         let height = size.height;
-        let surface_state = SurfaceState::new(event_loop, window).unwrap();
+        let surface_state = SurfaceState::new(event_loop, window)?;
         Some(Self {
             surface_state,
             width,

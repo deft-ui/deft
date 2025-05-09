@@ -9,5 +9,7 @@ impl Console {
     #[js_func]
     pub fn print(text: String) {
         print!("{}", text);
+        #[cfg(target_env = "ohos")]
+        ohos_hilog_binding::hilog_info!("{}", text);
     }
 }

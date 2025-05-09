@@ -125,7 +125,7 @@ impl JsEngine {
             engine.add_global_functions(SystemTray::create_js_apis());
         }
         engine.add_global_functions(process::create_js_apis());
-        #[cfg(any(target_os = "windows", target_os = "linux"))]
+        #[cfg(feature = "dialog")]
         engine.add_global_functions(crate::ext::ext_dialog::dialog::create_js_apis());
         engine.add_global_functions(Base64::create_js_apis());
         engine.add_global_functions(shell::create_js_apis());
