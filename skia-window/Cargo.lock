@@ -495,9 +495,9 @@ dependencies = [
 
 [[package]]
 name = "deft-winit"
-version = "0.31.0"
+version = "0.31.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d7ac010e2f9aacca62bb8ebbc64df924318d5ef54ad5bfe0534b23af4e817bb"
+checksum = "3c78be58c286d0a595bbfacb63c2cabcc0acac53b5f3b0887a81e76ed2598969"
 dependencies = [
  "ahash",
  "android-activity",
@@ -1823,7 +1823,7 @@ dependencies = [
 
 [[package]]
 name = "skia-window"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "android_logger",
  "cfg_aliases 0.1.1",
