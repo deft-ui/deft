@@ -1023,6 +1023,7 @@ dependencies = [
  "cssparser",
  "deft-font-kit",
  "deft-macros",
+ "deft-ohos-logger",
  "deft-quick-js",
  "deft-simplecss",
  "deft-skia-safe",
@@ -1094,6 +1095,15 @@ version = "0.2.1"
 dependencies = [
  "quote",
  "syn 2.0.101",
+]
+
+[[package]]
+name = "deft-ohos-logger"
+version = "0.1.0"
+dependencies = [
+ "env_logger 0.11.8",
+ "log",
+ "ohos-hilog-binding",
 ]
 
 [[package]]

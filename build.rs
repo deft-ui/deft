@@ -16,8 +16,8 @@ fn main() {
         ohos: { target_env = "ohos" },
 
         // Native displays.
-        x11_platform: { all(feature = "x11", free_unix, not(redox)) },
-        wayland_platform: { all(feature = "wayland", free_unix, not(redox)) },
+        x11_platform: { all(feature = "x11", free_unix, not(redox), not(ohos)) },
+        wayland_platform: { all(feature = "wayland", free_unix, not(redox), not(ohos)) },
         orbital_platform: { redox },
         // Systems
         mobile_platform: { any(target_os = "ios", target_os = "android") },

@@ -26,6 +26,7 @@ impl IApp for AppImpl {
 #[cfg(target_env = "ohos")]
 #[openharmony_ability_derive::ability]
 pub fn openharmony(openharmony_app: winit::platform::ohos::ability::OpenHarmonyApp) {
+    let _ = deft_ohos_logger::init();
     let app = App::new(AppImpl {});
     deft::ohos_bootstrap(openharmony_app, app);
 }

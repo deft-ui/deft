@@ -83,6 +83,7 @@ ohos-hilog-binding = "0.1.0"
 openharmony-ability = { version = "0.0.4" }
 openharmony-ability-derive = { version = "0.0.3" }
 ohos-ime-binding = "0.1.0"
+deft-ohos-logger = {version = "0.1.0", path = "packages/deft-ohos-logger" }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.61.1", features = ["Win32_System_Console"] }

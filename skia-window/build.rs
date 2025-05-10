@@ -12,10 +12,11 @@ fn main() {
         ios: { target_os = "ios" },
         apple: { any(target_os = "ios", target_os = "macos") },
         free_unix: { all(unix, not(apple), not(android)) },
+        ohos: { target_env = "ohos" },
 
         // Native displays.
-        x11_platform: { all(feature = "x11", free_unix, not(wasm)) },
-        wayland_platform: { all(feature = "wayland", free_unix, not(wasm)) },
+        x11_platform: { all(feature = "x11", free_unix, not(wasm), not(ohos)) },
+        wayland_platform: { all(feature = "wayland", free_unix, not(wasm), not(ohos)) },
 
         // Backends.
         egl_backend: { all(feature = "egl", any(windows, unix), not(apple), not(wasm)) },
