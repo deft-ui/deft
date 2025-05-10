@@ -68,7 +68,7 @@ reqwest = { version = "0.11.27",default-features = false, features = ["blocking"
 android_logger = "0.11.0"
 jni = "0.21.1"
 reqwest = { version = "0.11.27",default-features = false, features = ["blocking", "native-tls-vendored", "multipart", "stream"], optional = true }
-skia-safe = { package = "deft-skia-safe", version = "0.82.0", features = ["binary-cache"], default-features = false }
+skia-safe = { package = "deft-skia-safe", version = "0.82.0", features = ["binary-cache", "x11"], default-features = false }
 
 [target.'cfg(all(target_os = "linux", not(target_env = "ohos")))'.dependencies]
 skia-safe = { package = "deft-skia-safe", version = "0.82.0", features = ["binary-cache", "x11", "wayland"], default-features = false }

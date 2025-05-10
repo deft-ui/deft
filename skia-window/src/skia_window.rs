@@ -81,12 +81,15 @@ impl SkiaWindow {
         let window = event_loop.create_window(attributes).unwrap();
         let surface_state: Box<dyn RenderBackend> = match backend {
             RenderBackendType::SoftBuffer => {
-                #[cfg(target_env = "ohos")]
+                #[cfg(any(target_os = "android", target_env = "ohos"))]
                 return None;
-                use crate::soft::softbuffer_surface_presenter::SoftBufferSurfacePresenter;
-                let presenter = SoftBufferSurfacePresenter::new(window);
-                let soft_surface = SoftSurface::new(event_loop, presenter);
-                Box::new(soft_surface)
+                #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+                {
+                    use crate::soft::softbuffer_surface_presenter::SoftBufferSurfacePresenter;
+                    let presenter = SoftBufferSurfacePresenter::new(window);
+                    let soft_surface = SoftSurface::new(event_loop, presenter);
+                    Box::new(soft_surface)
+                }
             }
             #[cfg(feature = "gl")]
             RenderBackendType::SoftGL => {
