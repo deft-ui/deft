@@ -44,7 +44,7 @@ use winit::keyboard::{Key, KeyCode, NamedKey, PhysicalKey};
 #[cfg(x11_platform)]
 use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorGrabMode, CursorIcon, Fullscreen, ResizeDirection, WindowAttributes, WindowId};
-use crate::{bind_js_event_listener, ok_or_return, send_app_event, show_focus_hint, show_repaint_area, some_or_continue, some_or_return, warn_time};
+use crate::{bind_js_event_listener, ok_or_return, platform, send_app_event, show_focus_hint, show_repaint_area, some_or_continue, some_or_return, warn_time};
 use crate::computed::ComputedValue;
 use crate::element::button::Button;
 use crate::frame_rate::{FrameRateController};
@@ -298,6 +298,8 @@ impl Window {
 
     pub fn resume(&mut self) {
         self.window = Self::create_window(self.attributes.clone(), &self.render_backend_types);
+        #[cfg(ohos)]
+        platform::resume_ime();
     }
 
     pub fn notify_update(&mut self) {

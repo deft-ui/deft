@@ -24,14 +24,15 @@ npm create deft@latest
 
 # Platforms
 
-| Platform | Versions      | Supported |
-|----------|---------------|-----------|
-| Windows  | 10+           | ✅         |
-| Linux    | X11 & Wayland | ✅         |
-| MacOS    | -             | ✅         |
-| Android  | -             | ✅         |
-| iOS      | -             | ❔         |
-| Web      | -             | ❌         |
+| Platform   | Versions      | Supported     |
+|------------|---------------|---------------|
+| Windows    | 10+           | ✅             |
+| Linux      | X11 & Wayland | ✅             |
+| MacOS      | -             | ✅             |
+| HarmonyOS  | -             | ✅experimental |
+| Android    | -             | ✅experimental |
+| iOS        | -             | ❔             |
+| Web        | -             | ❌             |
 
 # Building
 

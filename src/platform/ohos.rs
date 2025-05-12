@@ -20,7 +20,7 @@ fn get_last_focused_window_id() -> Option<i32> {
     locked.clone()
 }
 
-static IME_INST: LazyLock<Arc<Mutex<IME>>> = LazyLock::new(|| {
+fn create_ime_instance() -> IME {
     let mut ime = IME::new(AttachOptions::default());
     ime.insert_text(|input| {
         let window_id = some_or_return!(get_last_focused_window_id());
@@ -38,18 +38,30 @@ static IME_INST: LazyLock<Arc<Mutex<IME>>> = LazyLock::new(|| {
             }
         }
     });
-    Arc::new(Mutex::new(ime))
-});
+    ime
+}
+
+static IME_INST: LazyLock<Arc<Mutex<Option<IME>>>> = LazyLock::new(|| Arc::new(Mutex::new(None)));
+
+pub fn resume_ime() {
+    let mut ime = IME_INST.lock().unwrap();
+    *ime = Some(create_ime_instance());
+}
 
 pub fn show_soft_keyboard(window_id: i32) {
     set_last_focused_window_id(window_id);
     let ime = IME_INST.lock().unwrap();
-    ime.show_keyboard();
+    if let Some(ime) = &*ime {
+        ime.show_keyboard();
+    }
+
 }
 
 pub fn hide_soft_keyboard(_window_id: i32) {
     let ime = IME_INST.lock().unwrap();
-    ime.hide_keyboard();
+    if let Some(ime) = &*ime {
+        ime.hide_keyboard();
+    }
 }
 
 pub fn run_app(event_loop: EventLoop<AppEventPayload>, app: WinitApp) {
