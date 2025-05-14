@@ -39,7 +39,7 @@ rusqlite = { version = "0.32.0", features = ["bundled"], optional = true }
 bezier-rs = "0.4.0"
 raw-window-handle = "0.6.2"
 log = "0.4.25"
-skia-safe = {package = "deft-skia-safe", version = "0.82.0", features = ["binary-cache"], default-features = false}
+skia-safe = {package = "deft-skia-safe", version = "0.83.0", features = ["binary-cache"], default-features = false}
 env_logger = "0.11.6"
 bitflags = "2.6.0"
 cssparser = "0.27"
@@ -68,14 +68,14 @@ reqwest = { version = "0.11.27",default-features = false, features = ["blocking"
 android_logger = "0.11.0"
 jni = "0.21.1"
 reqwest = { version = "0.11.27",default-features = false, features = ["blocking", "native-tls-vendored", "multipart", "stream"], optional = true }
-skia-safe = { package = "deft-skia-safe", version = "0.82.0", features = ["binary-cache", "x11"], default-features = false }
+skia-safe = { package = "deft-skia-safe", version = "0.83.0", features = ["binary-cache", "x11"], default-features = false }
 
 [target.'cfg(all(target_os = "linux", not(target_env = "ohos")))'.dependencies]
-skia-safe = { package = "deft-skia-safe", version = "0.82.0", features = ["binary-cache", "x11", "wayland"], default-features = false }
+skia-safe = { package = "deft-skia-safe", version = "0.83.0", features = ["binary-cache", "x11", "wayland"], default-features = false }
 skia-window = { path = "skia-window", version = "0.5.0", features = ["x11", "wayland"] }
 
 [target.'cfg(target_env = "ohos")'.dependencies]
-skia-safe = { package = "deft-skia-safe", version = "0.82.0", features = ["binary-cache", "egl"], default-features = false }
+skia-safe = { package = "deft-skia-safe", version = "0.83.0", features = ["binary-cache", "egl"], default-features = false }
 skia-window = { path = "skia-window", version = "0.5.0" }
 napi-ohos = "1.0.4"
 napi-derive-ohos = "1.0.4"

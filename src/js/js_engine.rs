@@ -13,9 +13,12 @@ use winit::window::{CursorGrabMode, WindowId};
 use crate::app::{exit_app, IApp, App};
 use crate::console::Console;
 use crate::element::{Element, CSS_MANAGER};
+use crate::element::button::Button;
+use crate::element::checkbox::Checkbox;
 use crate::element::entry::Entry;
 use crate::element::image::Image;
 use crate::element::paragraph::Paragraph;
+use crate::element::radio::Radio;
 use crate::element::text::Text;
 use crate::event_loop::run_with_event_loop;
 use crate::ext::ext_animation::animation_create;
@@ -114,6 +117,9 @@ impl JsEngine {
 
         engine.add_global_functions(ExtConsole::create_js_apis());
         engine.add_global_functions(Element::create_js_apis());
+        engine.add_global_functions(Button::create_js_apis());
+        engine.add_global_functions(Checkbox::create_js_apis());
+        engine.add_global_functions(Radio::create_js_apis());
         engine.add_global_functions(Entry::create_js_apis());
         engine.add_global_functions(Paragraph::create_js_apis());
         engine.add_global_functions(Text::create_js_apis());

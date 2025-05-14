@@ -13,6 +13,14 @@ button {
 button:hover {
     border: 1px #3DAEE9;
 }
+button[disabled] {
+    color: #A8A9AA;
+    background: #f0f0f0;
+    border: 1px #DADBDB;
+}
+button[disabled]:hover {
+    border: 1px #DADBDB;
+}
 
 entry {
     background: #FFFFFF;
@@ -26,6 +34,64 @@ entry:hover {
 }
 entry:focus {
     border: 1px #3DAEE9;
+}
+checkbox {
+    color: #232629;
+}
+checkbox::box {
+    width: 1.2em;
+    height: 1.2em;
+    margin-right: 2px;
+    border: 1px #b0b1b2;
+    border-radius: 2px;
+}
+
+checkbox:hover::box {
+    border: 1px #3DAEE9;
+}
+checkbox[checked]::box {
+    background: #b8ddf1;
+    border: 1px #3DAEE9;
+}
+
+checkbox[disabled], checkbox[disabled]:hover {
+    color: #A8A9AA;
+}
+
+checkbox[disabled]::box, checkbox[disabled]:hover::box {
+    border: 1px #DADBDB;
+}
+
+
+radio {
+    color: #232629;
+}
+radio::box {
+    width: 1.2em;
+    height: 1.2em;
+    margin-right: 2px;
+    border: 1px #b0b1b2;
+    border-radius: 0.6em;
+}
+
+radio:hover::box {
+    border: 1px #3DAEE9;
+}
+radio[checked]::box {
+    background: #b8ddf1;
+    border: 1px #3DAEE9;
+}
+radio[disabled], radio[disabled]:hover {
+    color: #A8A9AA;
+}
+
+radio[disabled]::box, radio[disabled]:hover::box {
+    border: 1px #DADBDB;
+}
+
+entry[disabled], entry[disabled]: hover {
+    background: #F3F3F3;
+    border: 1px #E1E1E1;
 }
 
 scroll::scrollbar {

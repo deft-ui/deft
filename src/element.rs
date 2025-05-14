@@ -28,10 +28,9 @@ use crate::element::entry::Entry;
 use crate::element::image::Image;
 use crate::element::scroll::Scroll;
 use crate::element::text::Text;
-use crate::element::textedit::TextEdit;
 use crate::event::{DragOverEventListener, BlurEventListener, BoundsChangeEventListener, CaretChangeEventListener, ClickEventListener, DragStartEventListener, DropEventListener, FocusEventListener, FocusShiftEventListener, KeyDownEventListener, KeyUpEventListener, MouseDownEventListener, MouseEnterEvent, MouseEnterEventListener, MouseLeaveEvent, MouseLeaveEventListener, MouseMoveEventListener, MouseUpEventListener, MouseWheelEventListener, ScrollEvent, ScrollEventListener, TextChangeEventListener, TextUpdateEventListener, TouchCancelEventListener, TouchEndEventListener, TouchMoveEventListener, TouchStartEventListener, BoundsChangeEvent, ContextMenuEventListener, MouseDownEvent, TouchStartEvent, DroppedFileEventListener, HoveredFileEventListener};
 use crate::event_loop::{create_event_loop_callback};
-use crate::ext::ext_window::{ELEMENT_TYPE_BUTTON, ELEMENT_TYPE_CONTAINER, ELEMENT_TYPE_ENTRY, ELEMENT_TYPE_IMAGE, ELEMENT_TYPE_LABEL, ELEMENT_TYPE_SCROLL, ELEMENT_TYPE_TEXT_EDIT, ELEMENT_TYPE_BODY, ELEMENT_TYPE_PARAGRAPH};
+use crate::ext::ext_window::{ELEMENT_TYPE_BUTTON, ELEMENT_TYPE_CONTAINER, ELEMENT_TYPE_ENTRY, ELEMENT_TYPE_IMAGE, ELEMENT_TYPE_LABEL, ELEMENT_TYPE_SCROLL, ELEMENT_TYPE_TEXT_EDIT, ELEMENT_TYPE_BODY, ELEMENT_TYPE_PARAGRAPH, ELEMENT_TYPE_CHECKBOX, ELEMENT_TYPE_RADIO, ELEMENT_TYPE_RADIO_GROUP};
 use crate::window::{Window, WindowWeak};
 use crate::img_manager::IMG_MANAGER;
 use crate::js::js_serde::JsValueSerializer;
@@ -45,7 +44,6 @@ pub mod container;
 pub mod entry;
 pub mod button;
 pub mod scroll;
-pub mod textedit;
 pub mod image;
 pub mod label;
 mod edit_history;
@@ -53,12 +51,17 @@ pub mod text;
 pub mod paragraph;
 pub mod body;
 mod font_manager;
+mod util;
+pub mod checkbox;
+pub mod radio;
 
 use crate as deft;
 use crate::app::AppEvent;
 use crate::computed::ComputedValue;
 use crate::element::body::Body;
+use crate::element::checkbox::Checkbox;
 use crate::element::paragraph::Paragraph;
+use crate::element::radio::{Radio, RadioGroup};
 use crate::font::family::FontFamilies;
 use crate::js::JsError;
 use crate::layout::LayoutRoot;
@@ -125,7 +128,7 @@ impl Element {
         }));
         let ele_weak = ele.inner.as_weak();
         // let bk = backend(ele_cp);
-        ele.backend = Box::new(backend(&mut ele));
+        ele.backend = Mrc::new(Box::new(backend(&mut ele)));
         //ele.backend.bind(ele_cp);
         ele
     }
@@ -177,7 +180,29 @@ impl Element {
         let need_update_style = CSS_MANAGER.with_borrow(|cm| {
             cm.contains_attr(&key)
         });
-        self.attributes.insert(key, value);
+        let mut backend = self.backend.clone();
+        let mut is_new = false;
+        let v = self.attributes.entry(key.clone()).or_insert_with(|| {
+            is_new = true;
+            String::new()
+        });
+        if is_new || v != &value {
+            *v = value;
+            backend.on_attribute_changed(&key, Some(&v));
+            if need_update_style {
+                self.select_style_recurse();
+            }
+        }
+    }
+
+    #[js_func]
+    pub fn remove_attribute(&mut self, key: String) {
+        let need_update_style = CSS_MANAGER.with_borrow(|cm| {
+            cm.contains_attr(&key)
+        });
+        self.attributes.remove(&key);
+        let mut backend = self.backend.clone();
+        self.backend.on_attribute_changed(&key, None);
         if need_update_style {
             self.select_style_recurse();
         }
@@ -214,10 +239,12 @@ impl Element {
             ELEMENT_TYPE_LABEL => Element::create(Text::create),
             ELEMENT_TYPE_ENTRY => Element::create(Entry::create),
             ELEMENT_TYPE_BUTTON => Element::create(Button::create),
-            ELEMENT_TYPE_TEXT_EDIT => Element::create(TextEdit::create),
             ELEMENT_TYPE_IMAGE => Element::create(Image::create),
             ELEMENT_TYPE_BODY => Element::create(Body::create),
             ELEMENT_TYPE_PARAGRAPH => Element::create(Paragraph::create),
+            ELEMENT_TYPE_CHECKBOX => Element::create(Checkbox::create),
+            ELEMENT_TYPE_RADIO => Element::create(Radio::create),
+            ELEMENT_TYPE_RADIO_GROUP => Element::create(RadioGroup::create),
             _ => return Err(anyhow!("invalid view_type")),
         };
         view.resource_table.put(ElementJsContext { context });
@@ -261,8 +288,8 @@ impl Element {
 
     #[js_func]
     pub fn add_js_event_listener(&mut self, event_type: String, listener: JsValue) -> Result<u32, JsError> {
-        let id = bind_js_event_listener!(
-            self, event_type.as_str(), listener;
+        let mut id = bind_js_event_listener!(
+            self, event_type.as_str(), listener.clone();
             "click" => ClickEventListener,
             "contextmenu" => ContextMenuEventListener,
             "caretchange" => CaretChangeEventListener,
@@ -291,6 +318,10 @@ impl Element {
             "droppedfile" => DroppedFileEventListener,
             "hoveredfile" => HoveredFileEventListener,
         );
+        if id.is_none() {
+            id = self.backend.bind_js_listener(&event_type, listener);
+        }
+        let id = id.ok_or_else(|| JsError::new(format!("unknown event_type:{}", event_type)))?;
         Ok(id)
     }
 
@@ -405,14 +436,14 @@ impl Element {
     pub fn get_backend_as<T>(&self) -> &T {
         unsafe {
             // &*(self as *const dyn Any as *const T)
-            &*(self.backend.deref() as *const dyn ElementBackend as *const T)
+            &*(self.backend.deref().deref() as *const dyn ElementBackend as *const T)
         }
     }
 
     pub fn get_backend_mut_as<T>(&mut self) -> &mut T {
         unsafe {
             // &*(self as *const dyn Any as *const T)
-            &mut *(self.backend.deref_mut() as *mut dyn ElementBackend as *mut T)
+            &mut *(self.backend.deref_mut().deref_mut() as *mut dyn ElementBackend as *mut T)
         }
     }
 
@@ -422,6 +453,10 @@ impl Element {
 
     pub fn get_backend(&self) -> &Box<dyn ElementBackend> {
         &self.backend
+    }
+
+    pub fn is_backend<T: 'static>(&self) -> bool {
+        self.backend.backend_type_id() == TypeId::of::<T>()
     }
 
     fn set_parent_internal(&mut self, parent: Option<Element>) {
@@ -906,10 +941,12 @@ impl Element {
         let backend = self.get_backend_mut();
         let mut e: Box<&mut dyn Any> = Box::new(event);
         backend.on_event(e, ctx);
-        self.event_registration.emit(event, ctx);
-        if event.allow_bubbles() && !ctx.propagation_cancelled {
-            if let Some(mut p) = self.get_parent() {
-                p.handle_event(event, ctx);
+        if !ctx.propagation_cancelled {
+            self.event_registration.emit(event, ctx);
+            if event.allow_bubbles() && !ctx.propagation_cancelled {
+                if let Some(mut p) = self.get_parent() {
+                    p.handle_event(event, ctx);
+                }
             }
         }
     }
@@ -1091,7 +1128,7 @@ impl Element {
 
     #[js_func]
     pub fn is_focusable(&self) -> bool {
-        self.focusable
+        self.focusable && self.backend.clone().can_focus()
     }
 
     pub(crate) fn select_style(&mut self) {
@@ -1166,7 +1203,7 @@ pub enum ElementType {
 #[mrc_object]
 pub struct Element {
     id: u32,
-    backend: Box<dyn ElementBackend>,
+    backend: Mrc<Box<dyn ElementBackend>>,
     pub(crate) parent: Option<ElementWeak>,
     children: Vec<Element>,
     window: Option<WindowWeak>,
@@ -1218,7 +1255,7 @@ impl ElementData {
         NEXT_ELEMENT_ID.set(id + 1);
         Self {
             id,
-            backend: Box::new(backend),
+            backend: Mrc::new(Box::new(backend)),
             parent: None,
             window: None,
             event_registration: EventRegistration::new(),
@@ -1264,41 +1301,97 @@ impl ElementBackend for EmptyElementBackend {
         "Empty"
     }
 
+    fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend> {
+        None
+    }
 }
 
-pub trait ElementBackend {
+pub trait ElementBackend : 'static {
 
     fn create(element: &mut Element) -> Self where Self: Sized;
 
     fn get_name(&self) -> &str;
 
+    fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend>;
+
     fn handle_style_changed(&mut self, key: StylePropKey) {
-        let _ = key;
+        if let Some(base) = self.get_base_mut() {
+            base.handle_style_changed(key);
+        }
     }
 
     fn render(&mut self) -> RenderFn {
-        RenderFn::new(|_c| {})
+        if let Some(base) = self.get_base_mut() {
+            base.render()
+        } else {
+            RenderFn::new(|_c| {})
+        }
     }
 
     fn on_event(&mut self, mut event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
-        let _ = (event, ctx);
+        if let Some(base) = self.get_base_mut() {
+            base.on_event(event, ctx);
+        }
     }
 
     fn execute_default_behavior(&mut self, mut event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) -> bool {
-        let _ = (event, ctx);
-        false
+        if let Some(base) = self.get_base_mut() {
+            base.execute_default_behavior(event, ctx)
+        } else {
+            false
+        }
     }
 
-    fn handle_origin_bounds_change(&mut self, _bounds: &base::Rect) {}
+    fn handle_origin_bounds_change(&mut self, bounds: &base::Rect) {
+        if let Some(base) = self.get_base_mut() {
+            base.handle_origin_bounds_change(bounds);
+        }
+    }
 
     fn apply_style_prop(&mut self, prop: &StyleProp, length_ctx: &LengthContext) -> Option<(bool, bool, ResolvedStyleProp)> {
-        let _ = prop;
-        None
+        if let Some(base) = self.get_base_mut() {
+            base.apply_style_prop(prop, length_ctx)
+        } else {
+            None
+        }
     }
 
     fn accept_pseudo_styles(&mut self, styles: HashMap<String, Vec<ParsedStyleProp>>) {
-        let _ = styles;
+        if let Some(base) = self.get_base_mut() {
+            base.accept_pseudo_styles(styles);
+        }
+    }
+
+    fn on_attribute_changed(&mut self, key: &str, value: Option<&str>) {
+        if let Some(base) = self.get_base_mut() {
+            base.on_attribute_changed(key, value);
+        }
+    }
+
+    fn can_focus(&mut self) -> bool {
+        if let Some(base) = self.get_base_mut() {
+            base.can_focus()
+        } else {
+            true
+        }
+    }
+
+    fn bind_js_listener(&mut self, event_type: &str, listener: JsValue) -> Option<u32> {
+        if let Some(base) = self.get_base_mut() {
+            base.bind_js_listener(event_type, listener)
+        } else {
+            None
+        }
+    }
+
+    fn backend_type_id(&self) -> TypeId {
+        self.type_id()
     }
 
 }
 
+#[test]
+fn test_backend_type_id() {
+    let mut el = Element::create(Container::create);
+    assert_eq!(true, el.is_backend::<Container>());
+}

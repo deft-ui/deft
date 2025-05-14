@@ -1140,9 +1140,9 @@ dependencies = [
 
 [[package]]
 name = "deft-skia-bindings"
-version = "0.82.0"
+version = "0.83.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6cc98befece2677a9b6b486216be06fe9626ca96632630f4ad56771e2bb20b59"
+checksum = "2de0dd33dbdb392365206c52e3d24dc69ec22485f30bf284ebb980d3ad94bccb"
 dependencies = [
  "bindgen 0.71.1",
  "cc",
@@ -1156,9 +1156,9 @@ dependencies = [
 
 [[package]]
 name = "deft-skia-safe"
-version = "0.82.0"
+version = "0.83.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a91ec66646244d02cf0102161480fcbd4c77fccebac711cea9109b109eb7d17c"
+checksum = "45d862e75cd5be9e0091cc2da86db7f2313c9ac0d3aecc3265b9aa73ad9eb9ee"
 dependencies = [
  "base64 0.22.1",
  "bitflags 2.9.0",

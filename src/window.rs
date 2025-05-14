@@ -608,6 +608,7 @@ impl Window {
             "focus"  => WindowFocusEventListener,
             "blur"   => WindowBlurEventListener,
         );
+        let id = id.ok_or_else(|| JsError::new(format!("unknown event_type:{}", event_type)))?;
         Ok(id)
     }
 

@@ -673,6 +673,10 @@ impl ElementBackend for Paragraph {
         "Paragraph"
     }
 
+    fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend> {
+        None
+    }
+
     fn handle_style_changed(&mut self, key: StylePropKey) {
         let mut rebuild = true;
         match key {

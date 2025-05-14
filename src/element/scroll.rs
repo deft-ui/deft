@@ -669,6 +669,10 @@ impl ElementBackend for Scroll {
             }
         }
     }
+
+    fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend> {
+        Some(&mut self.base)
+    }
 }
 
 struct Indicator {

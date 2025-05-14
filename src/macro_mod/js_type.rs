@@ -106,11 +106,11 @@ macro_rules! bind_js_event_listener {
             $(
                 $event_type => {
                     use deft::js::FromJsValue;
-                    $target.register_event_listener(<$listener_type>::from_js_value($listener)?)
+                    Some($target.register_event_listener(<$listener_type>::from_js_value($listener)?))
                 }
             )*
             _ => {
-                return Err(JsError::new(format!("unknown event_type:{}", $actual_type)))
+                None
             }
         }
     };

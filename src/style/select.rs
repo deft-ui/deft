@@ -322,20 +322,20 @@ impl Selector {
 
     pub fn new(selector: GenericSelector<DeftSelectors>) -> Self {
         let mut list = Vec::new();
-        let mut attributes = Vec::new();
+        let mut attribute_names = Vec::new();
         for e in selector.iter_raw_match_order() {
             match e {
                 Component::Class(c) => {
                     list.push(c.clone());
                 }
                 Component::AttributeInNoNamespaceExists { local_name, .. } => {
-                    attributes.push(local_name.clone());
+                    attribute_names.push(local_name.clone());
                 }
                 Component::AttributeInNoNamespace { local_name, .. } => {
-                    attributes.push(local_name.clone());
+                    attribute_names.push(local_name.clone());
                 }
                 Component::AttributeOther(a) => {
-                    attributes.push(a.local_name.clone());
+                    attribute_names.push(a.local_name.clone());
                 }
                 Component::Combinator(_) => {}
                 Component::ExplicitAnyNamespace => {}
@@ -369,7 +369,7 @@ impl Selector {
         Self {
             selector,
             class_names: list,
-            attribute_names: Vec::new(),
+            attribute_names,
         }
     }
 

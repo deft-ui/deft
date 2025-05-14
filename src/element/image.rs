@@ -104,6 +104,10 @@ impl Image {
         self.element.mark_dirty(true);
     }
 
+    pub fn set_src_svg_raw(&mut self, data: &[u8]) {
+        self.load_svg_from_data(&data.to_vec());
+    }
+
     fn load_svg_from_data(&mut self, data: &Vec<u8>) {
         let fm = FONT_MGR.with(|fm| fm.clone());
         self.img = match Dom::read(Cursor::new(data), fm) {
@@ -154,6 +158,10 @@ impl ElementBackend for Image {
 
     fn get_name(&self) -> &str {
         "Image"
+    }
+
+    fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend> {
+        None
     }
 
     fn handle_style_changed(&mut self, key: StylePropKey) {

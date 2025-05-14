@@ -10,4 +10,8 @@ impl ElementBackend for Body {
     fn get_name(&self) -> &str {
         "Body"
     }
+
+    fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend> {
+        None
+    }
 }

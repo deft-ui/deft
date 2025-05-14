@@ -9,6 +9,10 @@ const VT_TEXT_EDIT = 8
 const VT_IMAGE = 9;
 const VT_BODY = 10;
 const VT_PARAGRAPH = 11;
+const VT_CHECKBOX = 12;
+const VT_RADIO = 13;
+const VT_RADIO_GROUP = 14;
+
 
 class Clipboard {
     /**
@@ -844,6 +848,10 @@ export class Element {
         return Element_get_attribute(this.handle, key);
     }
 
+    removeAttribute(key) {
+        Element_remove_attribute(this.handle, key);
+    }
+
     /**
      *
      * @param callback {(event: IBoundsChangeEvent) => void}
@@ -1167,6 +1175,76 @@ export class LabelElement extends Element {
 
 }
 
+export class CheckboxElement extends Element {
+    constructor() {
+        super(VT_CHECKBOX);
+    }
+
+    set label(text) {
+        Checkbox_set_label(this.handle, text);
+    }
+
+    get label() {
+        return Checkbox_get_label(this.handle);
+    }
+
+    set checked(value) {
+        Checkbox_set_checked(this.handle, value);
+    }
+
+    get checked() {
+        return Checkbox_is_checked(this.handle);
+    }
+
+    get disabled() {
+        return Checkbox_is_disabled(this.handle);
+    }
+
+    set disabled(value) {
+        Checkbox_set_disabled(this.handle, value);
+    }
+
+    bindChange(callback) {
+        this.bindEvent("change", callback);
+    }
+
+}
+
+export class RadioElement extends Element {
+    constructor() {
+        super(VT_RADIO);
+    }
+
+    set label(text) {
+        Radio_set_label(this.handle, text);
+    }
+
+    get label() {
+        return Radio_get_label(this.handle);
+    }
+
+    set checked(value) {
+        Radio_set_checked(this.handle, value);
+    }
+
+    get checked() {
+        return Radio_is_checked(this.handle);
+    }
+
+    get disabled() {
+        return Radio_is_disabled(this.handle);
+    }
+
+    set disabled(value) {
+        Radio_set_disabled(this.handle, value);
+    }
+
+    bindChange(callback) {
+        this.bindEvent("change", callback);
+    }
+
+}
+
 /**
  * @typedef {{
  *   type: "text",
@@ -1371,6 +1449,15 @@ export class EntryElement extends Element {
         Entry_set_rows(this.handle, rows);
     }
 
+    get disabled() {
+        return Entry_is_disabled(this.handle);
+    }
+
+    set disabled(value) {
+        Entry_set_disabled(this.handle, value);
+    }
+
+
     bindTextChange(callback) {
         this.bindEvent("textchange", callback);
     }
@@ -1525,6 +1612,15 @@ export class ButtonElement extends ContainerBasedElement {
     constructor() {
         super(VT_BUTTON);
     }
+
+    get disabled() {
+        return Button_is_disabled(this.handle);
+    }
+
+    set disabled(value) {
+        Button_set_disabled(this.handle, value);
+    }
+
 }
 
 export class ContainerElement extends ContainerBasedElement {
@@ -1566,6 +1662,12 @@ export class ScrollElement extends ContainerBasedElement {
         Element_scroll_by(this.handle, value);
     }
 
+}
+
+class RadioGroupElement extends ContainerBasedElement {
+    constructor() {
+        super(VT_RADIO_GROUP);
+    }
 }
 
 export class WebSocket {
@@ -1970,6 +2072,9 @@ globalThis.TextEditElement = TextEditElement;
 globalThis.ButtonElement = ButtonElement;
 globalThis.ImageElement  = ImageElement;
 globalThis.ParagraphElement = ParagraphElement;
+globalThis.CheckboxElement = CheckboxElement;
+globalThis.RadioElement = RadioElement;
+globalThis.RadioGroupElement = RadioGroupElement;
 globalThis.Audio = Audio;
 globalThis.WebSocket = WebSocket;
 globalThis.Sqlite = Sqlite;

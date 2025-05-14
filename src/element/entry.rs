@@ -25,6 +25,7 @@ use crate::element::edit_history::{EditHistory, EditOpType};
 use crate::element::paragraph::{Paragraph, ParagraphUnit, TextCoord, TextUnit};
 use crate::element::scroll::{Scroll, ScrollBarStrategy};
 use crate::element::text::text_paragraph::Line;
+use crate::element::util::is_form_event;
 use crate::event::{BlurEvent, BoundsChangeEvent, CaretChangeEvent, ClickEvent, FocusEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ScrollEvent, SelectEndEvent, SelectMoveEvent, SelectStartEvent, TextChangeEvent, TextInputEvent, TextUpdateEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
 use crate::event_loop::{create_event_loop_callback, create_event_loop_proxy};
 use crate::js::{FromJsValue, ToJsValue};
@@ -99,6 +100,7 @@ pub struct Entry {
     vertical_caret_moving_coord_x: f32,
     edit_history: EditHistory,
     rows: u32,
+    disabled: bool,
 }
 
 pub type TextChangeHandler = dyn FnMut(&str);
@@ -207,6 +209,21 @@ impl Entry {
     #[js_func]
     pub fn get_type(&self) -> InputType {
         self.input_type.clone()
+    }
+
+    #[js_func]
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
+    #[js_func]
+    pub fn set_disabled(&mut self, disabled: bool) {
+        let mut ele = ok_or_return!(self.element.upgrade());
+        if disabled {
+            ele.set_attribute("disabled".to_string(), "".to_string());
+        } else {
+            ele.remove_attribute("disabled".to_string());
+        }
     }
 
     fn get_caret_pixels_position(&self) -> Option<Rect> {
@@ -697,6 +714,7 @@ impl ElementBackend for Entry {
             vertical_caret_moving_coord_x: 0.0,
             edit_history: EditHistory::new(),
             rows: 5,
+            disabled: false,
         }.to_ref();
         inst.set_multiple_line(false);
         inst.update_placeholder_style(true);
@@ -705,6 +723,10 @@ impl ElementBackend for Entry {
 
     fn get_name(&self) -> &str {
         "Entry"
+    }
+
+    fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend> {
+        Some(&mut self.base)
     }
 
     fn handle_style_changed(&mut self, key: StylePropKey) {
@@ -737,6 +759,10 @@ impl ElementBackend for Entry {
     }
 
     fn on_event(&mut self, event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
+        if self.disabled && is_form_event(&event) {
+            ctx.propagation_cancelled = true;
+            return;
+        }
         if let Some(e) = event.downcast_ref::<FocusEvent>() {
             self.handle_focus();
         } else if let Some(e) = event.downcast_ref::<BlurEvent>() {
@@ -791,7 +817,16 @@ impl ElementBackend for Entry {
             }
         }
     }
+    fn on_attribute_changed(&mut self, key: &str, value: Option<&str>) {
+        match key {
+            "disabled" => self.disabled = value.is_some(),
+            _ => self.base.on_attribute_changed(key, value),
+        }
+    }
 
+    fn can_focus(&mut self) -> bool {
+        !self.disabled
+    }
 }
 
 #[test]

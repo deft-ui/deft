@@ -16,5 +16,8 @@ impl ElementBackend for Container {
         "Container"
     }
 
+    fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend> {
+        None
+    }
 }
 

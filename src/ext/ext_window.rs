@@ -34,6 +34,9 @@ pub const ELEMENT_TYPE_TEXT_EDIT: i32 = 8;
 pub const ELEMENT_TYPE_IMAGE: i32 = 9;
 pub const ELEMENT_TYPE_BODY: i32 = 10;
 pub const ELEMENT_TYPE_PARAGRAPH: i32 = 11;
+pub const ELEMENT_TYPE_CHECKBOX: i32 = 12;
+pub const ELEMENT_TYPE_RADIO: i32 = 13;
+pub const ELEMENT_TYPE_RADIO_GROUP: i32 = 14;
 
 pub type ElementId = i32;
 

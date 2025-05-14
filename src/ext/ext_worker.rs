@@ -159,6 +159,7 @@ impl Worker {
             self, event_type.as_str(), listener;
             "message" => MessageEventListener,
         );
+        let id = id.ok_or_else(|| JsError::new(format!("unknown event_type:{}", event_type)))?;
         Ok(id)
     }
 
@@ -226,6 +227,7 @@ impl WorkerContext {
             self, event_type.as_str(), listener;
             "message" => WorkerContextMessageEventListener,
         );
+        let id = id.ok_or_else(|| JsError::new(format!("unknown event_type:{}", event_type)))?;
         Ok(id)
     }
 
