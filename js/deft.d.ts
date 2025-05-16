@@ -1035,6 +1035,7 @@ declare type ParagraphUnit = {
     fontSize?: number;
     color?: string;
     backgroundColor?: string;
+    style ?: 'normal' | 'italic';
 };
 /**
  * <T>

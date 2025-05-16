@@ -637,6 +637,7 @@ impl Entry {
             text_decoration_line: None,
             weight: None,
             background_color: None,
+            style: None,
         });
         vec![unit]
     }

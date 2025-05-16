@@ -114,24 +114,31 @@ function createImage() {
 
 function createParagraph() {
     const paragraph = new ParagraphElement();
+    paragraph.style = {
+        fontSize: 20,
+    }
     paragraph.addLine([
         {
             type: "text",
             text: "R",
             color: "#F00",
+            weight: 'bold',
         },
         {
             type: "text",
             text: "ich",
+            weight: 'bold',
         },
         {
             type: "text",
             text: "T",
             color: "#F00",
+            style: 'italic',
         },
         {
             type: "text",
             text: "ext",
+            style: 'italic',
         }
     ]);
     return paragraph;

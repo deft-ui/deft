@@ -13,7 +13,7 @@ use crate::element::{text, Element, ElementBackend, ElementWeak};
 use crate::js::JsError;
 use crate::number::DeNan;
 use crate::string::StringUtils;
-use crate::style::{parse_color_str, parse_optional_color_str, FontStyle, StylePropKey};
+use crate::style::{parse_color_str, parse_optional_color_str, FontStyle, PropValueParse, StylePropKey};
 use crate::{js_deserialize, js_serialize, some_or_continue};
 use deft_macros::{element_backend, js_methods, mrc_object};
 use serde::{Deserialize, Serialize};
@@ -106,6 +106,7 @@ pub struct TextUnit {
     pub text_decoration_line: Option<String>,
     pub weight: Option<String>,
     pub background_color: Option<String>,
+    pub style: Option<String>,
 }
 
 js_serialize!(TextUnit);
@@ -566,6 +567,14 @@ impl Paragraph {
         self.element.mark_dirty(true);
     }
 
+    fn parse_font_style(value: &Option<String>, default: FontStyle) -> FontStyle {
+        let mut result = None;
+        if let Some(value) = value {
+            result = FontStyle::parse_prop_value(value);
+        }
+        result.unwrap_or(default)
+    }
+
     pub fn build_paragraph(
         paragraph_params: &ParagraphParams,
         units: &Vec<ParagraphUnit>,
@@ -593,7 +602,9 @@ impl Paragraph {
 
                     let weight =
                         parse_optional_weight(unit.weight.as_ref()).unwrap_or(paragraph_params.font_weight);
-                    let font_style = skia_safe::FontStyle::new(weight, Width::NORMAL, paragraph_params.font_style.to_slant());
+
+                    let unit_style = Self::parse_font_style(&unit.style, paragraph_params.font_style);
+                    let font_style = skia_safe::FontStyle::new(weight, Width::NORMAL, unit_style.to_slant());
                     text_style.set_font_style(font_style);
 
                     let decoration =
@@ -893,6 +904,7 @@ fn test_layout_performance() {
         text_decoration_line: None,
         weight: None,
         background_color: None,
+        style: None,
     });
     let mut p = Paragraph::build_paragraph(&params, &vec![unit]);
     p.layout(600.0);
