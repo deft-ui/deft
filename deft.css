@@ -35,6 +35,12 @@ entry:hover {
 entry:focus {
     border: 1px #3DAEE9;
 }
+entry[disabled], entry[disabled]: hover {
+    background: #F3F3F3;
+    border: 1px #E1E1E1;
+    color: #A8A9AA;
+}
+
 checkbox {
     color: #232629;
 }
@@ -89,10 +95,6 @@ radio[disabled]::box, radio[disabled]:hover::box {
     border: 1px #DADBDB;
 }
 
-entry[disabled], entry[disabled]: hover {
-    background: #F3F3F3;
-    border: 1px #E1E1E1;
-}
 
 scroll::scrollbar {
     background: #E1E1E1;

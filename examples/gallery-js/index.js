@@ -1,7 +1,9 @@
 const stylesheet = `
-body {
+.main {
     gap: 10px;
     padding: 10px;
+    width: 100%;
+    height: 100%;
 }
 .element-row {
     flex-direction: row;
@@ -62,22 +64,6 @@ function createButton() {
     btn.bindClick((e) => {
         console.log("clicked", e)
     })
-    return btn;
-}
-
-function createDisabledButton() {
-    const btn = new ButtonElement();
-    const label = new LabelElement();
-    label.text = "Disabled";
-    btn.addChild(label);
-    btn.style = {
-        width: "8em",
-        alignItems: 'center',
-    }
-    btn.bindClick(() => {
-        console.error("unexpected");
-        process.exit(-1);
-    });
     return btn;
 }
 
@@ -152,6 +138,9 @@ function main() {
         height: 400,
     });
     window.title = "Deft Gallery";
+    const scroll = new ScrollElement();
+    scroll.className = "main";
+    window.body.addChild(scroll);
 
     function createElementRow(label, element) {
         const container = new ContainerElement();
@@ -170,7 +159,7 @@ function main() {
         }
         elementWrapper.className = "element-wrapper";
         container.addChild(elementWrapper);
-        window.body.addChild(container);
+        scroll.addChild(container);
     }
 
     const entry = createEntry();
