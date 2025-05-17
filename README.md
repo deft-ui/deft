@@ -12,6 +12,11 @@ Deft is a framework for building desktop and mobile applications with Rust and J
 * Unified JavaScript engine and rendering engine
 * Support React/Vue/Solid or any framework that supports custom render
 
+# Component Gallery
+
+![](https://github.com/deft-ui/deft/blob/main/snapshots/gallery.png?raw=true)
+
+
 # Quick Start
 
 ```
