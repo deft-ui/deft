@@ -14,7 +14,7 @@ Deft is a framework for building desktop and mobile applications with Rust and J
 
 # Component Gallery
 
-![](https://github.com/deft-ui/deft/blob/main/snapshots/gallery.png?raw=true)
+<img width="400" src="https://github.com/deft-ui/deft/blob/main/snapshots/gallery.png?raw=true" />
 
 
 # Quick Start
