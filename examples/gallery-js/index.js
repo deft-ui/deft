@@ -14,7 +14,6 @@ const stylesheet = `
 }
 .element-wrapper {
     flex: 1;
-    flex-direction: row;
     gap: 10px;
 } 
 radiogroup {

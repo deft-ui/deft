@@ -1,6 +1,7 @@
 body {
     color: #010101;
     background: #EFF0F1;
+    font-size: 14px;
 }
 
 button {
@@ -26,7 +27,8 @@ entry {
     background: #FFFFFF;
     border: 1px #BCBEBF;
     border-radius: 3px;
-    padding: 5px;
+    min-height: 2em;
+    padding: 4px;
 }
 
 entry:hover {
@@ -35,7 +37,10 @@ entry:hover {
 entry:focus {
     border: 1px #3DAEE9;
 }
-entry[disabled], entry[disabled]: hover {
+entry::placeholder {
+    color: #666;
+}
+entry[disabled], entry[disabled]:hover {
     background: #F3F3F3;
     border: 1px #E1E1E1;
     color: #A8A9AA;
@@ -96,10 +101,10 @@ radio[disabled]::box, radio[disabled]:hover::box {
 }
 
 
-scroll::scrollbar {
+entry::scrollbar, scroll::scrollbar {
     background: #E1E1E1;
 }
 
-scroll::scrollbar-thumb {
+entry::scrollbar-thumb, scroll::scrollbar-thumb {
     background: #C1C1C1;
 }

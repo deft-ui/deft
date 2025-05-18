@@ -17,6 +17,7 @@ use crate::mrc::Mrc;
 use crate::render::RenderFn;
 use crate::renderer::CpuRenderer;
 use crate::{some_or_break, some_or_continue, some_or_return};
+use crate::element::entry::Entry;
 use crate::render::layout_tree::LayoutTree;
 use crate::render::paint_object::{ElementPO, LayerPO};
 use crate::style::border_path::BorderPath;
@@ -166,7 +167,7 @@ impl RenderTree {
         let layer_object = self.layout_tree.layer_objects.get(element_object.layer_object_idx?)?;
         let mut mc = MatrixCalculator::new();
         mc.concat(&layer_object.total_matrix);
-        mc.translate(element_object.coord);
+        mc.translate(element_object.layer_coord);
         Some(mc.get_total_matrix())
     }
 

@@ -4,7 +4,6 @@ use winit::keyboard::{ModifiersState, NamedKey};
 use deft_macros::event;
 use crate::base::{CaretDetail, MouseDetail, Rect, ScrollEventDetail, TextChangeDetail, TextUpdateDetail, TouchDetail};
 use crate::{base};
-use crate::element::paragraph::TextCoord;
 
 pub const KEY_MOD_CTRL: u32 = 0x1;
 pub const KEY_MOD_ALT: u32 = 0x1 << 1;

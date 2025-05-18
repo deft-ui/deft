@@ -17,6 +17,7 @@ use crate::element::button::Button;
 use crate::element::checkbox::Checkbox;
 use crate::element::entry::Entry;
 use crate::element::image::Image;
+use crate::element::label::Label;
 use crate::element::paragraph::Paragraph;
 use crate::element::radio::Radio;
 use crate::element::text::Text;
@@ -123,6 +124,7 @@ impl JsEngine {
         engine.add_global_functions(Entry::create_js_apis());
         engine.add_global_functions(Paragraph::create_js_apis());
         engine.add_global_functions(Text::create_js_apis());
+        engine.add_global_functions(Label::create_js_apis());
         engine.add_global_functions(Image::create_js_apis());
         #[cfg(feature = "sqlite")]
         engine.add_global_functions(crate::ext::ext_sqlite::SqliteConn::create_js_apis());

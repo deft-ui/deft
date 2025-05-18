@@ -111,6 +111,28 @@ impl<T> Id<T> {
     }
 }
 
+pub struct StateMarker {
+    state: bool,
+}
+
+impl StateMarker {
+    pub fn new() -> Self {
+        Self { state: false }
+    }
+    pub fn mark(&mut self) {
+        self.state = true
+    }
+
+    pub fn unmark(&mut self) -> bool {
+        if self.state {
+            self.state = false;
+            true
+        } else {
+            false
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct ResultWaiter<T> {
     lock: Arc<(Mutex<Option<T>>, Condvar)>,

@@ -13,7 +13,6 @@ use swash::scale::image::Content;
 use swash::zeno::Placement;
 use crate::{base, some_or_return};
 use crate::canvas_util::CanvasHelper;
-use crate::element::paragraph::TextUnit;
 use crate::element::text::rasterize_cache::RasterizeCache;
 use crate::element::text::text_paragraph::TextParams;
 use crate::font::Font;

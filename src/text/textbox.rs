@@ -1,5 +1,5 @@
-pub mod typeface_mgr;
-pub mod simple_paragraph_builder;
+mod line;
+mod util;
 
 use std::any::Any;
 use std::cmp::Ordering;
@@ -14,7 +14,7 @@ use crate::js::JsError;
 use crate::number::DeNan;
 use crate::string::StringUtils;
 use crate::style::{parse_color_str, parse_optional_color_str, FontStyle, PropValueParse, StylePropKey};
-use crate::{js_deserialize, js_serialize, some_or_continue};
+use crate::{base, js_deserialize, js_serialize, ok_or_return, some_or_continue};
 use deft_macros::{element_backend, js_methods, mrc_object};
 use serde::{Deserialize, Serialize};
 use skia_safe::font_style::{Slant, Weight, Width};
@@ -26,7 +26,8 @@ use skia_safe::wrapper::NativeTransmutableWrapper;
 use swash::Style;
 use winit::keyboard::NamedKey;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
-use crate::base::{EventContext, MouseDetail, MouseEventType};
+use crate::base::{Callback, EventContext, MouseDetail, MouseEventType};
+use crate::element::paragraph::ParagraphParams;
 use crate::element::paragraph::simple_paragraph_builder::SimpleParagraphBuilder;
 use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
 use crate::event::{FocusShiftEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent, SelectEndEvent, SelectMoveEvent, SelectStartEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
@@ -34,7 +35,8 @@ use crate::font::family::{FontFamilies, FontFamily};
 use crate::paint::Painter;
 use crate::render::RenderFn;
 use crate::text::{TextAlign, TextDecoration, TextStyle};
-use crate::text::textbox::{TextCoord, TextUnit};
+use crate::text::textbox::line::Line;
+use crate::text::textbox::util::{parse_optional_text_decoration, parse_optional_weight};
 
 #[cfg(target_os = "windows")]
 pub const DEFAULT_FALLBACK_FONTS: &str = "sans-serif,Microsoft YaHei,Segoe UI Emoji";
@@ -49,39 +51,26 @@ pub const DEFAULT_FALLBACK_FONTS: &str = "sans-serif";
 
 const ZERO_WIDTH_WHITESPACE: &str = "\u{200B}";
 
-#[derive(Clone)]
-pub struct ParagraphParams {
-    pub mask_char: Option<char>,
-    pub text_wrap: Option<bool>,
-    pub line_height: Option<f32>,
-    pub align: TextAlign,
-    pub color: Color,
-    pub font_size: f32,
-    pub font_families: FontFamilies,
-    pub font_weight: Weight,
-    pub font_style: FontStyle,
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "type", rename_all = "camelCase")]
-pub enum ParagraphUnit {
+pub enum TextElement {
     Text(TextUnit),
 }
 
-js_serialize!(ParagraphUnit);
-js_deserialize!(ParagraphUnit);
+js_serialize!(TextElement);
+js_deserialize!(TextElement);
 
-impl ParagraphUnit {
+impl TextElement {
     fn atom_count(&self) -> usize {
         match self {
-            ParagraphUnit::Text(text) => {
+            TextElement::Text(text) => {
                 text.text.chars_count()
             }
         }
     }
     fn text(&self) -> &str {
         match self {
-            ParagraphUnit::Text(t) => {
+            TextElement::Text(t) => {
                 t.text.as_str()
             }
         }
@@ -89,7 +78,7 @@ impl ParagraphUnit {
 
     fn get_text(&self, begin: usize, end: usize) -> &str {
         match self {
-            ParagraphUnit::Text(t) => {
+            TextElement::Text(t) => {
                 t.text.substring(begin, end - begin)
             }
         }
@@ -97,9 +86,34 @@ impl ParagraphUnit {
 
 }
 
-#[element_backend]
-pub struct Paragraph {
-    element: Element,
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TextUnit {
+    pub text: String,
+    pub font_families: Option<Vec<String>>,
+    pub font_size: Option<f32>,
+    pub color: Option<String>,
+    pub text_decoration_line: Option<String>,
+    pub weight: Option<String>,
+    pub background_color: Option<String>,
+    pub style: Option<String>,
+}
+
+js_serialize!(TextUnit);
+js_deserialize!(TextUnit);
+
+#[derive(Ord, PartialOrd, Eq, PartialEq, Debug, Copy, Clone, Serialize, Deserialize)]
+pub struct TextCoord(pub usize, pub usize);
+
+impl TextCoord {
+    pub fn new(v: (usize, usize)) -> TextCoord {
+        TextCoord(v.0, v.1)
+    }
+}
+
+js_serialize!(TextCoord);
+
+pub struct TextBox {
     params: ParagraphParams,
     lines: Vec<Line>,
     /// Option<(start coord, end coord)>
@@ -107,181 +121,129 @@ pub struct Paragraph {
     selecting_begin: Option<TextCoord>,
     selection_bg: Paint,
     selection_fg: Paint,
-}
-
-pub struct Line {
-    units: Vec<ParagraphUnit>,
-    sk_paragraph: SimpleTextParagraph,
-    layout_calculated: bool,
-}
-
-impl Line {
-    pub fn new(units: Vec<ParagraphUnit>, paragraph_params: &ParagraphParams) -> Self {
-        let sk_paragraph = Paragraph::build_paragraph(paragraph_params, &units);
-        Self {
-            layout_calculated: false,
-            units,
-            sk_paragraph,
-        }
-    }
-
-    pub fn atom_count(&self) -> usize {
-        let mut count = 0;
-        for u in &self.units {
-            count += u.atom_count();
-        }
-        count
-    }
-
-    pub fn get_text(&self) -> String {
-        let mut result = String::new();
-        for u in &self.units {
-            result.push_str(u.text());
-        }
-        result
-    }
-
-    pub fn subtext(&self, mut start: ColOffset, mut end: ColOffset) -> String {
-        let mut result = String::new();
-        let mut iter = self.units.iter();
-        let mut processed_atom_count = 0;
-        loop {
-            let u = match iter.next() {
-                Some(u) => u,
-                None => break,
-            };
-            let unit_atom_count = u.atom_count();
-            if let Some(intersect) = intersect_range((start, end), (processed_atom_count, unit_atom_count + processed_atom_count)) {
-                result.push_str(u.get_text(intersect.0 - processed_atom_count, intersect.1 - processed_atom_count));
-            }
-            processed_atom_count += unit_atom_count;
-            if processed_atom_count >= end {
-                break;
-            }
-        }
-        result.to_string()
-    }
-
-    pub fn get_column_by_pixel_coord(&self, coord: (f32, f32)) -> usize {
-        let (x, y) = coord;
-        let atom_count = self.atom_count();
-        if atom_count == 0 {
-            0
-        } else if x > self.sk_paragraph.max_intrinsic_width() {
-            atom_count
-        } else {
-            self.sk_paragraph.get_char_offset_at_coordinate(coord)
-        }
-    }
-
-    pub fn get_utf8_offset(&self, char_offset: usize) -> usize {
-        if char_offset == 0 {
-            0
-        } else {
-            self.get_text().substring(0, char_offset).len()
-        }
-    }
-
-    fn rebuild_paragraph(&mut self, paragraph_params: &ParagraphParams) {
-        self.sk_paragraph = Paragraph::build_paragraph(paragraph_params, &self.units);
-        self.layout_calculated = false;
-    }
-
-    fn force_layout(&mut self, available_width: f32) {
-        self.layout_calculated = true;
-        self.sk_paragraph.layout(available_width);
-    }
-
-    fn layout(&mut self, available_width: Option<f32>, element_width: f32) {
-        if let Some(w) = available_width {
-            self.force_layout(w);
-        } else if (!self.layout_calculated) {
-            self.force_layout(element_width);
-        }
-    }
-
-}
-
-extern "C" fn measure_paragraph(
-    node_ref: NodeRef,
     width: f32,
-    width_mode: MeasureMode,
-    _height: f32,
-    height_mode: MeasureMode,
-) -> Size {
-    if let Some(ctx) = Node::get_context(&node_ref) {
-        if let Some(paragraph) = ctx.downcast_ref::<ParagraphWeak>() {
-            if let Ok(mut p) = paragraph.upgrade() {
-                p.layout(Some(width));
-                return Size {
-                    width: p.max_intrinsic_width(),
-                    height: p.height(),
-                };
-            }
-        }
-    }
-    Size {
-        width: 0.0,
-        height: 0.0,
-    }
+    padding: (f32, f32, f32, f32),
+    /// (row_offset, column_offset)
+    caret: TextCoord,
+    vertical_caret_moving_coord_x: f32,
+    repaint_callback: Box<dyn FnMut()>,
+    layout_callback: Box<dyn FnMut()>,
+    caret_change_callback: Box<dyn FnMut()>,
 }
 
-#[js_methods]
-impl Paragraph {
+impl TextBox {
 
-    #[js_func]
-    pub fn add_line(&mut self, units: Vec<ParagraphUnit>) {
+    pub fn add_line(&mut self, units: Vec<TextElement>) {
         let line = Line::new(units, &self.params);
         self.lines.push(line);
-        self.mark_dirty();
+        self.request_layout();
     }
 
-    #[js_func]
-    pub fn insert_line(&mut self, index: usize, units: Vec<ParagraphUnit>) {
+    pub fn insert_line(&mut self, index: usize, units: Vec<TextElement>) {
         let line = Line::new(units, &self.params);
         self.lines.insert(index, line);
-        self.mark_dirty();
+        self.request_layout();
     }
 
-    #[js_func]
     pub fn delete_line(&mut self, line: usize) {
         self.lines.remove(line);
-        self.mark_dirty();
+        self.request_layout();
     }
 
-    #[js_func]
-    pub fn update_line(&mut self, index: usize, units: Vec<ParagraphUnit>) {
+    pub fn update_line(&mut self, index: usize, units: Vec<TextElement>) {
         self.lines[index] = Line::new(units, &self.params);
-        self.mark_dirty();
+        self.request_layout();
     }
 
-    #[js_func]
     pub fn clear(&mut self) {
         self.lines.clear();
-        self.mark_dirty();
+        self.request_layout();
     }
 
-    #[js_func]
-    pub fn measure_line(&self, units: Vec<ParagraphUnit>) -> (f32, f32) {
+    pub fn measure_line(&self, units: Vec<TextElement>) -> (f32, f32) {
         let mut sk_paragraph = Self::build_paragraph(&self.params, &units);
         sk_paragraph.layout(f32::NAN);
         (sk_paragraph.max_intrinsic_width(), sk_paragraph.height())
     }
 
     pub fn set_text_wrap(&mut self, wrap: bool) {
-        self.params.text_wrap = Some(wrap);
-        self.element.mark_dirty(true);
+        if self.params.text_wrap != Some(wrap) {
+            self.params.text_wrap = Some(wrap);
+            self.rebuild_paragraph();
+        }
     }
 
-    fn layout(&mut self, mut available_width: Option<f32>) {
-        let mut layout_width = f32::NAN;
-        if self.params.text_wrap.unwrap_or(false) {
-            layout_width = self.element.style.get_content_bounds().width;
-        } else {
-            available_width = available_width.map(|_| f32::NAN);
+    pub fn set_font_size(&mut self, size: f32) {
+        if self.params.font_size != size {
+            self.params.font_size = size;
+            self.rebuild_paragraph();
         }
+    }
+
+    pub fn set_color(&mut self, color: Color) {
+        if self.params.color != color {
+            self.params.color = color;
+            self.rebuild_paragraph();
+        }
+    }
+
+    pub fn set_font_families(&mut self, font_families: FontFamilies) {
+        if self.params.font_families != font_families {
+            self.params.font_families = font_families;
+            self.rebuild_paragraph();
+        }
+    }
+
+    pub fn set_font_weight(&mut self, weight: Weight) {
+        if self.params.font_weight != weight {
+            self.params.font_weight = weight;
+            self.rebuild_paragraph();
+        }
+    }
+
+    pub fn set_font_style(&mut self, style: FontStyle) {
+        if self.params.font_style != style {
+            self.params.font_style = style;
+            self.rebuild_paragraph();
+        }
+    }
+
+    pub fn set_line_height(&mut self, line_height: Option<f32>) {
+        if self.params.line_height != line_height {
+            self.params.line_height = line_height;
+            self.rebuild_paragraph();
+        }
+    }
+
+    pub fn get_paragraph_params(&self) -> &ParagraphParams {
+        &self.params
+    }
+
+    pub fn set_padding(&mut self, padding: (f32, f32, f32, f32)) {
+        self.padding = padding;
+    }
+
+    pub fn get_size_without_padding(&self) -> (f32, f32) {
+        let width = self.max_intrinsic_width();
+        let height = self.height();
+        (width - self.padding.1 - self.padding.0, height - self.padding.0 - self.padding.2)
+    }
+
+    pub fn set_layout_width(&mut self, width: f32) {
+        if self.width != width {
+            self.width = width;
+            self.invalid_all_lines();
+            self.request_layout();
+        }
+    }
+
+    pub fn layout(&mut self) {
+        let (_, padding_right, _, padding_left) = self.padding;
         for ln in &mut self.lines {
-            ln.layout(available_width, layout_width);
+            if !ln.layout_calculated {
+                ln.force_layout(self.width - padding_left - padding_right);
+                ln.layout_calculated = true;
+            }
         }
     }
 
@@ -290,15 +252,17 @@ impl Paragraph {
         for ln in &self.lines {
             height += ln.sk_paragraph.height().de_nan(0.0);
         }
-        height
+        let (padding_top, _, padding_bottom, _) = self.padding;
+        height + padding_top + padding_bottom
     }
 
     pub fn max_intrinsic_width(&self) -> f32 {
+        let (_, padding_right, _, padding_left) = self.padding;
         let mut max_width = 0.0;
         for ln in &self.lines {
             max_width = f32::max(max_width, ln.sk_paragraph.max_intrinsic_width());
         }
-        max_width
+        max_width + padding_right + padding_left
     }
 
     pub fn get_atom_count(&self) -> usize {
@@ -339,7 +303,7 @@ impl Paragraph {
     pub fn select(&mut self, start: TextCoord, end: TextCoord) {
         //TODO validate params
         self.selection = Some((start, end));
-        self.element.mark_dirty(false);
+        self.request_repaint();
     }
 
     pub fn is_selecting(&self) -> bool {
@@ -348,32 +312,30 @@ impl Paragraph {
 
     pub fn unselect(&mut self) {
         self.selection = None;
-        self.element.mark_dirty(false);
+        self.request_repaint();
     }
 
     fn begin_select(&mut self, caret: TextCoord) {
-        self.element.emit(FocusShiftEvent);
+        // self.element.emit(FocusShiftEvent);
         self.unselect();
         self.selecting_begin = Some(caret);
-        self.element.emit(SelectStartEvent {
-            row: caret.0,
-            col: caret.1,
-        });
+        // self.element.emit(SelectStartEvent {
+        //     row: caret.0,
+        //     col: caret.1,
+        // });
     }
 
-    fn selection_start(&mut self, point: (f32, f32)) {
-        let begin_coord = self.get_text_coord_by_pixel_coord(point);
+    fn selection_start(&mut self, begin_coord: TextCoord) {
         self.begin_select(begin_coord);
     }
 
-    fn selection_update(&mut self, point: (f32, f32)) -> bool {
+    fn selection_update(&mut self, caret: TextCoord) -> bool {
         if self.selecting_begin.is_some() {
-            let caret = self.get_text_coord_by_pixel_coord(point);
             if let Some(sb) = self.selecting_begin {
-                self.element.emit(SelectMoveEvent{
-                    row: caret.0,
-                    col: caret.1,
-                });
+                // self.element.emit(SelectMoveEvent{
+                //     row: caret.0,
+                //     col: caret.1,
+                // });
                 let start = TextCoord::min(sb, caret);
                 let end = TextCoord::max(sb, caret);
                 self.select(start, end);
@@ -386,7 +348,7 @@ impl Paragraph {
     fn selection_end(&mut self) -> bool {
         if self.selecting_begin.is_some() {
             self.end_select();
-            self.element.emit(SelectEndEvent);
+            // self.element.emit(SelectEndEvent);
             return true;
         }
         false
@@ -396,33 +358,31 @@ impl Paragraph {
         self.selecting_begin = None;
     }
 
-    fn handle_mouse_event(&mut self, event: &MouseDetail) {
-        match event.event_type {
-            MouseEventType::MouseDown => {
-                let begin_coord = self.get_text_coord_by_pixel_coord((event.offset_x, event.offset_y));
-                self.begin_select(begin_coord);
+    fn on_mouse_down(&mut self, point: (f32, f32)) {
+        let begin_coord = self.get_text_coord_by_pixel_coord(point);
+        self.begin_select(begin_coord);
+    }
+
+    fn on_mouse_up(&mut self) {
+        self.end_select();
+    }
+
+    fn on_mouse_move(&mut self, point: (f32, f32)) {
+        if self.selecting_begin.is_some() {
+            let caret = self.get_text_coord_by_pixel_coord(point);
+            if let Some(sb) = self.selecting_begin {
+                let start = TextCoord::min(sb, caret);
+                let end = TextCoord::max(sb, caret);
+                self.select(start, end);
             }
-            MouseEventType::MouseMove => {
-                if self.selecting_begin.is_some() {
-                    let caret = self.get_text_coord_by_pixel_coord((event.offset_x, event.offset_y));
-                    if let Some(sb) = self.selecting_begin {
-                        let start = TextCoord::min(sb, caret);
-                        let end = TextCoord::max(sb, caret);
-                        self.select(start, end);
-                    }
-                }
-            }
-            MouseEventType::MouseUp => {
-                self.end_select();
-            }
-            _ => {},
         }
     }
 
-    pub fn get_text_coord_by_pixel_coord(&self, coord: (f32, f32)) -> TextCoord {
-        let (offset_x, offset_y) = coord;
-        let (padding_top, _, _, padding_left) = self.element.get_padding();
-        let expected_offset = (offset_x - padding_left, offset_y - padding_top);
+    pub fn get_text_coord_by_pixel_coord(&self, mut coord: (f32, f32)) -> TextCoord {
+        let (padding_top, _, _, padding_left) = self.padding;
+        coord.0 -= padding_left;
+        coord.1 - padding_top;
+        let expected_offset = coord;
         let mut row = 0;
         let mut height = 0f32;
 
@@ -440,7 +400,6 @@ impl Paragraph {
         TextCoord(0, 0)
     }
 
-    #[js_func]
     pub fn get_text_coord_by_char_offset(&self, caret: usize) -> Option<TextCoord> {
         let mut col = caret;
         let mut row = 0;
@@ -452,6 +411,10 @@ impl Paragraph {
             col -= ln.atom_count() + 1;
         }
         None
+    }
+
+    pub fn get_caret_rect(&mut self) -> Option<base::Rect> {
+        self.get_char_rect(self.caret)
     }
 
     pub fn get_char_rect(&mut self, coord: TextCoord) -> Option<crate::base::Rect> {
@@ -467,10 +430,41 @@ impl Paragraph {
                 }
             }
         }
-        Some(crate::base::Rect::new(bounds.left, y_offset + bounds.top, bounds.width(), bounds.height()))
+        let (padding_top, _, _, padding_left) = self.padding;
+        Some(crate::base::Rect::new(bounds.left + padding_left, y_offset + bounds.top + padding_top, bounds.width(), bounds.height()))
     }
 
-    fn handle_key_down(&mut self, event: &KeyEventDetail) -> bool {
+    pub fn on_event(&mut self, event: &Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>, scroll_x: f32, scroll_y: f32) -> bool {
+        if let Some(d) = event.downcast_ref::<KeyDownEvent>() {
+            return self.on_key_down(&d.0)
+        } else if let Some(e) = event.downcast_ref::<MouseDownEvent>() {
+            if e.0.button == 1 {
+                let event = e.0;
+                let begin_coord = self.get_text_coord_by_pixel_coord(
+                    (event.offset_x + scroll_x, event.offset_y + scroll_y)
+                );
+                self.update_caret(begin_coord);
+                self.selection_start(begin_coord);
+                return true;
+            }
+        } else if let Some(e) = event.downcast_ref::<MouseMoveEvent>() {
+            if self.selecting_begin.is_some() {
+                let event = e.0;
+                let caret = self.get_text_coord_by_pixel_coord(
+                    (event.offset_x + scroll_x, event.offset_y + scroll_y)
+                );
+                self.update_caret(caret);
+                return self.selection_update(caret);
+            }
+        } else if let Some(e) = event.downcast_ref::<MouseUpEvent>() {
+            if e.0.button == 1 {
+                return self.selection_end();
+            }
+        }
+        false
+    }
+
+    pub fn on_key_down(&mut self, event: &KeyEventDetail) -> bool {
         if event.modifiers == KEY_MOD_CTRL {
             if let Some(text) = &event.key_str {
                 match text.as_str() {
@@ -500,7 +494,6 @@ impl Paragraph {
         self.selection
     }
 
-    #[js_func]
     pub fn get_selection_text(&self) -> Option<String> {
         let selection = self.selection.as_ref()?;
         let start = selection.0;
@@ -526,8 +519,81 @@ impl Paragraph {
     }
 
     pub fn set_mask_char(&mut self, mask_char: Option<char>) {
-        self.params.mask_char = mask_char;
-        self.mark_dirty();
+        if self.params.mask_char != mask_char {
+            self.params.mask_char = mask_char;
+            self.rebuild_paragraph();
+            self.request_layout();
+        }
+    }
+
+    pub fn move_caret(&mut self, mut delta: isize) {
+        let mut row = self.caret.0;
+        let mut col = self.caret.1 as isize;
+        loop {
+            let lines = self.get_lines();
+            let line = match lines.get(row) {
+                None => return,
+                Some(ln) => ln
+            };
+            let atom_count = line.atom_count() as isize;
+            col += delta;
+            if col > atom_count {
+                delta -= col - atom_count;
+                row += 1;
+                col = 0;
+                continue;
+            } else if col < 0 {
+                if row == 0 {
+                    return;
+                }
+                delta += -col;
+                row -= 1;
+                let prev_line = lines.get(row);
+                col = prev_line.unwrap().atom_count() as isize;
+                continue;
+            } else {
+                let new_caret = (row, col as usize);
+                self.update_caret_value(TextCoord::new(new_caret), false);
+                break;
+            }
+
+        }
+    }
+
+    pub fn move_caret_vertical(&mut self, is_up: bool) {
+        let caret = self.caret;
+        let (current_row, current_col) = (self.caret.0, self.caret.1);
+        let line_height = match self.get_soft_line_height(current_row, current_col) {
+            None => return,
+            Some(height) => {height}
+        };
+        let caret_coord = match self.get_char_rect(caret) {
+            None => return,
+            Some(rect) => rect,
+        };
+
+        if self.vertical_caret_moving_coord_x <= 0.0 {
+            self.vertical_caret_moving_coord_x = caret_coord.x;
+        }
+        let new_coord_y = if is_up {
+            caret_coord.y - line_height
+        } else {
+            caret_coord.y + line_height
+        };
+        let new_coord = (self.vertical_caret_moving_coord_x, new_coord_y);
+        self.update_caret_by_offset_coordinate(new_coord.0, new_coord.1, true);
+    }
+
+    pub fn update_caret_value(&mut self, new_caret: TextCoord, is_kb_vertical: bool) {
+        if !is_kb_vertical {
+            self.vertical_caret_moving_coord_x = 0.0;
+        }
+        self.update_caret(new_caret);
+    }
+
+    pub fn update_caret_by_offset_coordinate(&mut self, x: f32, y: f32, is_kb_vertical: bool) {
+        let text_coord = self.get_text_coord_by_pixel_coord((x, y));
+        self.update_caret_value(text_coord, is_kb_vertical);
     }
 
     fn rebuild_paragraph(&mut self) {
@@ -535,10 +601,7 @@ impl Paragraph {
         for ln in &mut self.lines {
             ln.rebuild_paragraph(&params);
         }
-    }
-
-    fn mark_dirty(&mut self) {
-        self.element.mark_dirty(true);
+        self.request_layout();
     }
 
     fn parse_font_style(value: &Option<String>, default: FontStyle) -> FontStyle {
@@ -551,17 +614,17 @@ impl Paragraph {
 
     pub fn build_paragraph(
         paragraph_params: &ParagraphParams,
-        units: &Vec<ParagraphUnit>,
+        units: &Vec<TextElement>,
     ) -> SimpleTextParagraph {
         // let mut text = text.trim_line_endings().to_string();
         // text.push_str(ZERO_WIDTH_WHITESPACE);
 
-        let mut pb = SimpleParagraphBuilder::new(&paragraph_params);
+        let mut pb = SimpleParagraphBuilder::new(paragraph_params);
         let p_color = paragraph_params.color;
         let mask_char = paragraph_params.mask_char;
         for u in units {
             match u {
-                ParagraphUnit::Text(unit) => {
+                TextElement::Text(unit) => {
                     let mut text_style = TextStyle::new();
                     let unit_font_families = match &unit.font_families {
                         Some(list) => {
@@ -610,20 +673,15 @@ impl Paragraph {
 
         pb.build()
     }
-}
 
-impl ElementBackend for Paragraph {
-    fn create(mut element: &mut Element) -> Self
-    where
-        Self: Sized,
-    {
+    pub fn new() -> Self {
         let font_families: FontFamilies = FontFamilies::default();
 
         let params = ParagraphParams {
             text_wrap: Some(true),
             line_height: None,
             align: TextAlign::Left,
-            color: Color::default(),
+            color: Color::from_rgb(0, 0, 0),
             font_size: 12.0,
             font_families,
             font_weight: Weight::NORMAL,
@@ -637,68 +695,33 @@ impl ElementBackend for Paragraph {
         selection_bg.set_color(parse_hex_color("214283").unwrap());
         let mut selection_fg = Paint::default();
         selection_fg.set_color(Color::from_rgb(255, 255, 255));
-        let this = ParagraphData {
+        Self {
             lines: Vec::new(),
-            element: element.clone(),
             params,
             selection: None,
             selecting_begin: None,
             selection_bg,
             selection_fg,
+            width: f32::NAN,
+            padding: (0.0, 0.0, 0.0, 0.0),
+            caret: TextCoord(0, 0),
+            vertical_caret_moving_coord_x: 0.0,
+            repaint_callback: Box::new(|| {}),
+            layout_callback: Box::new(|| {}),
+            caret_change_callback: Box::new(|| {}),
         }
-        .to_ref();
-        element
-            .style
-            .yoga_node.set_context(Some(Context::new(this.as_weak())));
-        element.style.yoga_node.set_measure_func(Some(measure_paragraph));
-        this
-    }
-
-    fn get_name(&self) -> &str {
-        "Paragraph"
     }
 
     fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend> {
         None
     }
 
-    fn handle_style_changed(&mut self, key: StylePropKey) {
-        let mut rebuild = true;
-        match key {
-            StylePropKey::Color => {
-                //TODO no rebuild?
-                self.params.color = self.element.style.color;
-            }
-            StylePropKey::FontSize => {
-                self.params.font_size = self.element.style.font_size;
-            }
-            StylePropKey::FontFamily => {
-                self.params.font_families = self.element.style.font_family.clone();
-            }
-            StylePropKey::FontWeight => {
-                self.params.font_weight = self.element.style.font_weight.clone();
-            }
-            StylePropKey::FontStyle => {
-                self.params.font_style = self.element.style.font_style.clone();
-            }
-            StylePropKey::LineHeight => {
-                self.params.line_height = self.element.style.line_height;
-            }
-            _ => {
-                rebuild = false;
-            }
-        }
-        if rebuild {
-            self.rebuild_paragraph();
-        }
+    pub fn get_caret(&self) -> TextCoord {
+        self.caret
     }
 
-    fn render(&mut self) -> RenderFn {
-        let padding = self.element.get_padding();
-        let mut p = self.clone();
-        p.layout(None);
+    pub fn render(&mut self) -> RenderFn {
 
-        let mut me = self.clone();
         let mut consumed_top = 0.0;
         let mut consumed_rows = 0usize;
         let mut consumed_columns = 0usize;
@@ -751,10 +774,11 @@ impl ElementBackend for Paragraph {
             line_painters.push(ln_renderer);
         }
 
+        let (padding_top, _, _, padding_left) = self.padding;
 
         RenderFn::new(move |painter| {
             let canvas = painter.canvas;
-            canvas.translate((padding.3, padding.0));
+            canvas.translate((padding_left, padding_top));
             for lp in line_painters {
                 if !lp(painter) {
                     break;
@@ -763,76 +787,37 @@ impl ElementBackend for Paragraph {
         })
     }
 
-    fn execute_default_behavior(&mut self, event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) -> bool {
-        if let Some(d) = event.downcast_ref::<KeyDownEvent>() {
-            self.handle_key_down(&d.0);
-        } else {
-            if let Some(e) = event.downcast_ref::<MouseDownEvent>() {
-                if e.0.button == 1 {
-                    let event = e.0;
-                    self.selection_start((event.offset_x, event.offset_y));
-                    return true;
-                }
-            } else if let Some(e) = event.downcast_ref::<MouseMoveEvent>() {
-                let event = e.0;
-                return self.selection_update((event.offset_x, event.offset_y))
-            } else if let Some(e) = event.downcast_ref::<MouseUpEvent>() {
-                if e.0.button == 1 {
-                    return self.selection_end();
-                }
-            }
+    pub fn set_layout_callback<F: FnMut() + 'static>(&mut self, callback: F) {
+        self.layout_callback = Box::new(callback);
+    }
+
+    pub fn set_repaint_callback<F: FnMut() + 'static>(&mut self, callback: F) {
+        self.repaint_callback = Box::new(callback);
+    }
+
+    pub fn set_caret_change_callback<F: FnMut() + 'static>(&mut self, callback: F) {
+        self.caret_change_callback = Box::new(callback);
+    }
+
+    fn invalid_all_lines(&mut self) {
+        for ln in &mut self.lines {
+            ln.layout_calculated = false;
         }
-        return false;
     }
 
-}
-
-pub fn parse_optional_weight(value: Option<&String>) -> Option<Weight> {
-    if let Some(v) = value {
-        parse_weight(v)
-    } else {
-        None
+    fn update_caret(&mut self, caret: TextCoord) {
+        self.caret = caret;
+        (self.caret_change_callback)();
     }
-}
-pub fn parse_weight(value: &str) -> Option<Weight> {
-    let w = match value.to_lowercase().as_str() {
-        "invisible" => Weight::INVISIBLE,
-        "thin" => Weight::THIN,
-        "extra-light" => Weight::EXTRA_LIGHT,
-        "light" => Weight::LIGHT,
-        "normal" => Weight::NORMAL,
-        "medium" => Weight::MEDIUM,
-        "semi-bold" => Weight::SEMI_BOLD,
-        "bold" => Weight::BOLD,
-        "extra-bold" => Weight::EXTRA_BOLD,
-        "black" => Weight::BLACK,
-        "extra-black" => Weight::EXTRA_BLACK,
-        _ => return i32::from_str(value).ok().map(|w| Weight::from(w)),
-    };
-    Some(w)
-}
 
-fn parse_optional_text_decoration(value: Option<&String>) -> TextDecoration {
-    if let Some(v) = value {
-        parse_text_decoration(v)
-    } else {
-        TextDecoration::default()
+    fn request_layout(&mut self) {
+        (self.layout_callback)();
     }
-}
 
-fn parse_text_decoration(value: &str) -> TextDecoration {
-    let mut decoration = TextDecoration::default();
-    for ty in value.split(" ") {
-        let t = match value {
-            "none" => TextDecoration::NO_DECORATION,
-            "underline" => TextDecoration::UNDERLINE,
-            "overline" => TextDecoration::OVERLINE,
-            "line-through" => TextDecoration::LINE_THROUGH,
-            _ => continue,
-        };
-        decoration.set(t, true);
+    fn request_repaint(&mut self) {
+        (self.repaint_callback)();
     }
-    decoration
+
 }
 
 #[test]
@@ -870,7 +855,7 @@ fn test_layout_performance() {
     // file.write_all(text.as_bytes()).unwrap();
 
     print_time!("build paragraph time");
-    let unit = ParagraphUnit::Text(TextUnit {
+    let unit = TextElement::Text(TextUnit {
         text: text.clone(),
         font_families: None,
         font_size: None,
@@ -880,6 +865,6 @@ fn test_layout_performance() {
         background_color: None,
         style: None,
     });
-    let mut p = Paragraph::build_paragraph(&params, &vec![unit]);
+    let mut p = TextBox::build_paragraph(&params, &vec![unit]);
     p.layout(600.0);
 }

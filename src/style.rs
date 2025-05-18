@@ -1062,12 +1062,16 @@ impl StyleNode {
         let r = self.yoga_node.get_layout_padding_right().de_nan(0.0);
         let t = self.yoga_node.get_layout_padding_top().de_nan(0.0);
         let b = self.yoga_node.get_layout_padding_bottom().de_nan(0.0);
+        let bl = self.yoga_node.get_layout_border_left().de_nan(0.0);
+        let br = self.yoga_node.get_layout_border_right().de_nan(0.0);
+        let bt = self.yoga_node.get_layout_border_top().de_nan(0.0);
+        let bb = self.yoga_node.get_layout_border_bottom().de_nan(0.0);
         let width = self.yoga_node.get_layout_width();
         let height = self.yoga_node.get_layout_height();
         // let (width, height) = self.with_container_node(|n| {
         //     (n.get_layout_width().de_nan(0.0), n.get_layout_height().de_nan(0.0))
         // });
-        Rect::new(l, t, width - l - r, height - t - b)
+        Rect::new(l + bl, t + bt, width - l - r - bl - br, height - t - b - bt - bb)
     }
 
     fn get_resolved_value(&self, key: StylePropKey) -> ResolvedStyleProp {

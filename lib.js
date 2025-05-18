@@ -1089,88 +1089,10 @@ export class LabelElement extends Element {
 
     /**
      *
-     * @param wrap {boolean}
-     */
-    set textWrap(wrap) {
-        Text_set_text_wrap(this.handle, wrap);
-    }
-
-    /**
-     *
      * @param text {string}
      */
     set text(text) {
-        Text_set_text(this.handle, text);
-    }
-
-    /**
-     *
-     * @param align {"left" | "right" | "center"}
-     */
-    set align(align) {
-        Element_set_property(this.handle, "align", align);
-    }
-
-    /**
-     *
-     * @param selection {number[]}
-     */
-    set selection(selection) {
-        Text_set_selection(this.handle, selection);
-    }
-
-    /**
-     *
-     * @param startCaretOffset {number}
-     * @param endCaretOffset {number}
-     */
-    selectByCaretOffset(startCaretOffset, endCaretOffset) {
-        this.setSelection([startCaretOffset, endCaretOffset])
-    }
-
-    /**
-     *
-     * @param line {number}
-     * @returns {number}
-     */
-    getLineBeginOffset(line) {
-        return Text_get_line_begin_offset(this.handle, line);
-    }
-
-    /**
-     *
-     * @param line {number}
-     * @param text {string}
-     */
-    insertLine(line, text) {
-        Text_insert_line(this.handle, line, text);
-    }
-
-    /**
-     *
-     * @param line {number}
-     * @param newText {string}
-     */
-    updateLine(line, newText) {
-        Text_update_line(this.handle, line, newText);
-    }
-
-    /**
-     *
-     * @param line {number}
-     */
-    deleteLine(line) {
-        Text_delete_line(this.handle, line);
-    }
-
-    /**
-     *
-     * @param row {number}
-     * @param col {number}
-     * @return {number}
-     */
-    getCaretOffsetByCursor(row, col) {
-        return Text_get_atom_offset_by_location(this.handle, [row, col]);
+        Label_set_text(this.handle, text);
     }
 
 }

@@ -54,12 +54,14 @@ mod font_manager;
 mod util;
 pub mod checkbox;
 pub mod radio;
+mod common;
 
 use crate as deft;
 use crate::app::AppEvent;
 use crate::computed::ComputedValue;
 use crate::element::body::Body;
 use crate::element::checkbox::Checkbox;
+use crate::element::label::Label;
 use crate::element::paragraph::Paragraph;
 use crate::element::radio::{Radio, RadioGroup};
 use crate::font::family::FontFamilies;
@@ -121,14 +123,14 @@ impl Element {
         let ele_weak = ele.inner.as_weak();
         let weak = ele.as_weak();
         ele.style.bind_element(weak);
-        ele.inner.style.on_changed = Some(Box::new(move |key| {
+        let ele_weak = ele.inner.as_weak();
+        // let bk = backend(ele_cp);
+        ele.backend = Mrc::new(Box::new(backend(&mut ele)));
+        ele.style.on_changed = Some(Box::new(move |key| {
             if let Ok(mut inner) = ele_weak.upgrade() {
                 inner.backend.handle_style_changed(key);
             }
         }));
-        let ele_weak = ele.inner.as_weak();
-        // let bk = backend(ele_cp);
-        ele.backend = Mrc::new(Box::new(backend(&mut ele)));
         //ele.backend.bind(ele_cp);
         ele
     }
@@ -236,7 +238,7 @@ impl Element {
         let mut view = match view_type {
             ELEMENT_TYPE_CONTAINER => Element::create(Container::create),
             ELEMENT_TYPE_SCROLL => Element::create(Scroll::create),
-            ELEMENT_TYPE_LABEL => Element::create(Text::create),
+            ELEMENT_TYPE_LABEL => Element::create(Label::create),
             ELEMENT_TYPE_ENTRY => Element::create(Entry::create),
             ELEMENT_TYPE_BUTTON => Element::create(Button::create),
             ELEMENT_TYPE_IMAGE => Element::create(Image::create),
@@ -690,6 +692,7 @@ impl Element {
     pub fn calculate_layout(&mut self, available_width: f32, available_height: f32) {
         // mark all children dirty so that custom measure function could be call
         // self.mark_all_layout_dirty();
+        self.before_layout_recurse();
         self.style.calculate_layout(available_width, available_height, Direction::LTR);
         if let Some(lr) = &mut self.layout_root {
             lr.update_layout();
@@ -875,7 +878,7 @@ impl Element {
                 changed_list.push(v);
             }
         }
-        // debug!("changed list: {:?}", changed_list);
+        // println!("changed list: {} {:?}", self.id, changed_list);
         self.applied_style = style_props;
         changed_list
     }
@@ -1079,6 +1082,13 @@ impl Element {
         Some(Rect::new(x, y, right, bottom))
     }
 
+    pub fn before_layout_recurse(&mut self) {
+        self.backend.before_layout();
+        for c in &mut self.children {
+            c.before_layout_recurse();
+        }
+    }
+
     pub fn on_layout_update(&mut self) {
         self.dirty_flags.remove(StyleDirtyFlags::LayoutDirty);
         let origin_bounds = self.get_origin_bounds();
@@ -1100,7 +1110,7 @@ impl Element {
         //TODO performance: maybe not changed?
         //TODO change is_visible?
         if !origin_bounds.is_empty() {
-            // self.backend.handle_origin_bounds_change(&origin_bounds);
+            self.backend.handle_origin_bounds_change(&origin_bounds);
             for child in &mut self.get_children() {
                 if let Some(p) = &mut child.layout_root {
                     p.update_layout();
@@ -1339,6 +1349,12 @@ pub trait ElementBackend : 'static {
             base.execute_default_behavior(event, ctx)
         } else {
             false
+        }
+    }
+
+    fn before_layout(&mut self) {
+        if let Some(base) = self.get_base_mut() {
+            base.before_layout();
         }
     }
 

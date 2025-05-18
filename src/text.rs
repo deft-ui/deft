@@ -1,3 +1,5 @@
+pub mod textbox;
+
 use bitflags::bitflags;
 use skia_safe::{Color, Font, FontMetrics, FontStyle, Paint};
 use crate::font::family::{FontFamilies, FontFamily};

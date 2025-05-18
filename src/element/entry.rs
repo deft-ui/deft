@@ -1,6 +1,7 @@
 use crate::{self as deft, some_or_return};
 use std::any::Any;
 use std::cell::Cell;
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::string::ToString;
 use anyhow::Error;
@@ -11,22 +12,23 @@ use skia_safe::wrapper::NativeTransmutableWrapper;
 use winit::dpi::{LogicalPosition, LogicalSize, Size};
 use winit::keyboard::NamedKey;
 use winit::window::CursorIcon;
-use yoga::{PositionType, StyleUnit};
+use yoga::{Context, MeasureMode, Node, NodeRef, PositionType, StyleUnit};
 use deft_macros::{element_backend, js_methods};
 use measure_time::print_time;
 use serde::{Deserialize, Serialize};
-use crate::base::{Callback, CaretDetail, EventContext, MouseDetail, MouseEventType, Rect, TextChangeDetail, TextUpdateDetail};
+use crate::base::{Callback, CaretDetail, EventContext, MouseDetail, MouseEventType, Rect, StateMarker, TextChangeDetail, TextUpdateDetail};
 use crate::element::{ElementBackend, Element, ElementWeak};
 use crate::element::text::{AtomOffset, Text as Label};
 use crate::number::DeNan;
 use crate::{js_deserialize, js_serialize, ok_or_return, timer};
 use crate::app::AppEvent;
+use crate::canvas_util::CanvasHelper;
+use crate::element::common::ScrollBar;
 use crate::element::edit_history::{EditHistory, EditOpType};
-use crate::element::paragraph::{Paragraph, ParagraphUnit, TextCoord, TextUnit};
-use crate::element::scroll::{Scroll, ScrollBarStrategy};
+use crate::element::scroll::{Scroll, ScrollBarStrategy, ScrollWeak};
 use crate::element::text::text_paragraph::Line;
 use crate::element::util::is_form_event;
-use crate::event::{BlurEvent, BoundsChangeEvent, CaretChangeEvent, ClickEvent, FocusEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ScrollEvent, SelectEndEvent, SelectMoveEvent, SelectStartEvent, TextChangeEvent, TextInputEvent, TextUpdateEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
+use crate::event::{BlurEvent, BoundsChangeEvent, CaretChangeEvent, ClickEvent, FocusEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, ScrollEvent, SelectEndEvent, SelectMoveEvent, SelectStartEvent, TextChangeEvent, TextInputEvent, TextUpdateEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
 use crate::event_loop::{create_event_loop_callback, create_event_loop_proxy};
 use crate::js::{FromJsValue, ToJsValue};
 use crate::window::Window;
@@ -35,8 +37,10 @@ use crate::string::StringUtils;
 use crate::style::{Length, LengthContext, LengthOrPercent, ResolvedStyleProp, StyleProp, StylePropKey, StylePropVal, YogaNode};
 use crate::style::StyleProp::{BackgroundColor, Display, Left, MinWidth, Position, Top};
 use crate::style::StylePropKey::Height;
+use crate::style_list::ParsedStyleProp;
 use crate::text::TextAlign;
-use crate::timer::TimerHandle;
+use crate::text::textbox::{TextBox, TextCoord, TextElement, TextUnit};
+use crate::timer::{set_timeout, TimerHandle};
 
 const COPY_KEY: &str = "\x03";
 const PASTE_KEY: &str = "\x16";
@@ -75,32 +79,75 @@ impl FromJsValue for InputType {
     }
 }
 
+extern "C" fn measure_entry(
+    node_ref: NodeRef,
+    width: f32,
+    width_mode: MeasureMode,
+    height: f32,
+    height_mode: MeasureMode,
+) -> yoga::Size {
+    let default_size = yoga::Size {
+        width: 0.0,
+        height: 0.0,
+    };
+    if let Some(ctx) = Node::get_context(&node_ref) {
+        if let Some(entry) = ctx.downcast_ref::<EntryWeak>() {
+            if let Ok(mut e) = entry.upgrade() {
+                if e.auto_height {
+                    let bounds = Rect::new(0.0, 0.0, width, height);
+                    e.layout(&bounds);
+                    let (width, height) = e.paragraph.get_size_without_padding();
+                    return yoga::Size {
+                        width,
+                        height,
+                    };
+                } else {
+                    //TODO optimize line_height
+                    let line_height = if let Some(lh) = e.line_height {
+                        lh
+                    } else {
+                        let element = ok_or_return!(e.element.upgrade(), default_size);
+                        element.style.font_size * 1.0
+                    };
+                    let height = line_height * if e.multiple_line {
+                         e.rows as f32
+                    } else {
+                        1.0
+                    };
+                    let bounds = Rect::new(0.0, 0.0, width, height);
+                    e.layout(&bounds);
+                    return yoga::Size {
+                        width: e.paragraph.max_intrinsic_width(),
+                        height,
+                    }
+                }
+            }
+        }
+    }
+    default_size
+}
+
 
 #[element_backend]
 pub struct Entry {
-    base: Scroll,
-    paragraph: Paragraph,
-    paragraph_element: Element,
-
-    placeholder: Label,
-    placeholder_element: Element,
-
+    // base: Scroll,
+    paragraph: TextBox,
+    placeholder: TextBox,
     input_type: InputType,
-
-    /// (row_offset, column_offset)
-    caret: TextCoord,
-    // paint_offset: f32,
-    // text_changed_listener: Vec<Box<TextChangeHandler>>,
     caret_visible: Rc<Cell<bool>>,
     caret_timer_handle: Option<TimerHandle>,
     focusing: bool,
     align: TextAlign,
     multiple_line: bool,
     element: ElementWeak,
-    vertical_caret_moving_coord_x: f32,
     edit_history: EditHistory,
     rows: u32,
     disabled: bool,
+    line_height: Option<f32>,
+    vertical_bar: ScrollBar,
+    horizontal_bar: ScrollBar,
+    caret_change_marker: StateMarker,
+    auto_height: bool,
 }
 
 pub type TextChangeHandler = dyn FnMut(&str);
@@ -115,7 +162,7 @@ impl Entry {
 
     #[js_func]
     pub fn set_text(&mut self, text: String) {
-        let old_text = self.paragraph.get_text();
+        let old_text = self.get_text();
         if text != old_text {
             self.paragraph.clear();
             let lines = text.split('\n').collect::<Vec<&str>>();
@@ -125,12 +172,14 @@ impl Entry {
             }
             self.update_caret_value(TextCoord::new((0, 0)), false);
         }
-        self.update_placeholder_style(text.is_empty());
+        self.element.mark_dirty(true);
     }
 
     #[js_func]
     pub fn set_placeholder(&mut self, placeholder: String) {
-        self.placeholder.set_text(placeholder);
+        self.placeholder.clear();
+        self.placeholder.add_line(Self::build_line(placeholder));
+        self.element.mark_dirty(true);
     }
 
     #[js_func]
@@ -140,7 +189,8 @@ impl Entry {
 
     #[js_func]
     pub fn set_placeholder_style(&mut self, style: JsValue) {
-        self.placeholder_element.update_style(style, false);
+        //TODO impl
+        // self.placeholder_element.update_style(style, false);
     }
 
     pub fn set_align(&mut self, align: TextAlign) {
@@ -156,11 +206,10 @@ impl Entry {
         // self.base.content_auto_width = !multiple_line;
         // self.base.content_auto_height = multiple_line;
         if multiple_line {
-            self.base.set_scroll_y(ScrollBarStrategy::Auto);
+            self.vertical_bar.set_strategy(ScrollBarStrategy::Auto);
         } else {
-            self.base.set_scroll_y(ScrollBarStrategy::Never);
+            self.vertical_bar.set_strategy(ScrollBarStrategy::Never);
         }
-        self.update_default_size();
         //self.base.set_text_wrap(multiple_line);
         //self.update_paint_offset(self.context.layout.get_layout_width(), self.context.layout.get_layout_height());
         self.element.clone().mark_dirty(true);
@@ -169,12 +218,13 @@ impl Entry {
     #[js_func]
     pub fn set_rows(&mut self, rows: u32) {
         self.rows = rows;
-        self.update_default_size();
+        self.element.mark_dirty(true);
     }
 
     #[js_func]
     pub fn set_auto_height(&mut self, value: bool) {
-        self.base.set_auto_height(value);
+        self.auto_height = value;
+        self.element.mark_dirty(true);
     }
 
     #[js_func]
@@ -230,13 +280,12 @@ impl Entry {
         let mut element = self.element.upgrade_mut().ok()?;
         let scroll_left = element.get_scroll_left();
         let scroll_top = element.get_scroll_top();
-        let paragraph_padding = self.paragraph_element.get_padding();
 
         let mut me = self.clone();
-        let caret_rect = me.paragraph.get_char_rect(self.caret)?;
+        let caret_rect = me.paragraph.get_caret_rect()?;
         let caret_visible = self.caret_visible.get();
-        let x = caret_rect.x - scroll_left + paragraph_padding.1;
-        let y = caret_rect.y - scroll_top + paragraph_padding.0;
+        let x = caret_rect.x - scroll_left;
+        let y = caret_rect.y - scroll_top;
         Some(Rect::new(x, y, 1.0, caret_rect.height))
     }
 
@@ -259,101 +308,18 @@ impl Entry {
         Some(())
     }
 
-    // pub fn get_font(&self) -> &Font {
-    //     &self.base.get_font()
-    // }
-
-    // pub fn get_line_height(&self) -> Option<f32> {
-    //     self.base.get_line_height()
-    // }
-
-    // pub fn get_computed_line_height(&self) -> f32 {
-    //     self.base.get_computed_line_height()
-    // }
-
-    // pub fn set_caret(&mut self, atom_offset: usize) {
-    //     self.update_caret_value(atom_offset, false);
-    // }
-
-    fn update_default_size(&mut self) {
-        // if self.multiple_line {
-        //     let (_, line_height) = self.paragraph.measure_line(Self::build_line("a".to_string()));
-        //     let expected_height = (self.rows as f32 * line_height);
-        //     self.base.set_default_height(Some(expected_height));
-        // } else {
-        //     self.base.set_default_height(None);
-        // }
-    }
-
     fn move_caret(&mut self, mut delta: isize) {
-        let mut row = self.caret.0;
-        let mut col = self.caret.1 as isize;
-        loop {
-            let lines = self.paragraph.get_lines();
-            let line = match lines.get(row) {
-                None => return,
-                Some(ln) => ln
-            };
-            let atom_count = line.atom_count() as isize;
-            col += delta;
-            if col > atom_count {
-                delta -= col - atom_count;
-                row += 1;
-                col = 0;
-                continue;
-            } else if col < 0 {
-                if row == 0 {
-                    return;
-                }
-                delta += -col;
-                row -= 1;
-                let prev_line = lines.get(row);
-                col = prev_line.unwrap().atom_count() as isize;
-                continue;
-            } else {
-                let new_caret = (row, col as usize);
-                self.update_caret_value(TextCoord::new(new_caret), false);
-                break;
-            }
-
-        }
+        self.paragraph.move_caret(delta);
     }
 
     fn move_caret_vertical(&mut self, is_up: bool) {
-        let caret = self.caret;
-        let (current_row, current_col) = (self.caret.0, self.caret.1);
-        let line_height = match self.paragraph.get_soft_line_height(current_row, current_col) {
-            None => return,
-            Some(height) => {height}
-        };
-        let caret_coord = match self.paragraph.get_char_rect(caret) {
-            None => return,
-            Some(rect) => rect,
-        };
-
-        if self.vertical_caret_moving_coord_x <= 0.0 {
-            self.vertical_caret_moving_coord_x = caret_coord.x;
-        }
-        let new_coord_y = if is_up {
-            caret_coord.y - line_height
-        } else {
-            caret_coord.y + line_height
-        };
-        let new_coord = (self.vertical_caret_moving_coord_x, new_coord_y);
-        self.update_caret_by_offset_coordinate(new_coord.0, new_coord.1, true);
-    }
-
-    fn update_caret_by_offset_coordinate(&mut self, x: f32, y: f32, is_kb_vertical: bool) {
-        let text_coord = self.paragraph.get_text_coord_by_pixel_coord((x, y));
-        self.update_caret_value(text_coord, is_kb_vertical);
+        self.paragraph.move_caret_vertical(is_up);
     }
 
     fn update_caret_value(&mut self, new_caret: TextCoord, is_kb_vertical: bool) {
-        if !is_kb_vertical {
-            self.vertical_caret_moving_coord_x = 0.0;
-        }
-        if new_caret != self.caret {
-            self.caret = new_caret;
+        let old_caret = self.paragraph.get_caret();
+        self.paragraph.update_caret_value(new_caret, is_kb_vertical);
+        if new_caret != old_caret {
             //TODO remove?
             // if let Some(caret1) = &self.selecting_begin {
             //     let begin = TextCoord::min(*caret1, new_caret);
@@ -386,7 +352,7 @@ impl Entry {
         let scroll_left = element.get_scroll_left();
         let scroll_top = element.get_scroll_top();
 
-        let caret = self.caret;
+        let caret = self.paragraph.get_caret();
         let bounds = match self.paragraph.get_char_rect(caret) {
             None => return,
             Some(rect) => rect.translate(-scroll_left, -scroll_top),
@@ -410,13 +376,6 @@ impl Entry {
         context.mark_dirty(false);
     }
 
-    fn to_label_position(&self, position: (f32, f32)) -> (f32, f32) {
-        let ele = ok_or_return!(self.element.upgrade_mut(), (0.0, 0.0));
-        let padding_left = ele.style.yoga_node.get_layout_padding_left().de_nan(0.0);
-        let padding_top = ele.style.yoga_node.get_layout_padding_top().de_nan(0.0);
-        (position.0 - padding_left, position.1 - padding_top)
-    }
-
     fn handle_blur(&mut self) {
         self.focusing = false;
         self.caret_timer_handle = None;
@@ -436,12 +395,12 @@ impl Entry {
             if let Some(nk) = &event.named_key {
                 match nk {
                     NamedKey::Backspace => {
-                        let caret = self.caret;
+                        let end = self.paragraph.get_caret();
                         if self.paragraph.get_selection().is_none() {
-                            if caret.0 > 0 || caret.1 > 0 {
+                            if end.0 > 0 || end.1 > 0 {
                                 self.move_caret(-1);
-                                let start = self.caret;
-                                self.paragraph.select(start, caret);
+                                let start = self.paragraph.get_caret();
+                                self.paragraph.select(start, end);
                             }
                         }
                         self.handle_input("");
@@ -620,16 +579,16 @@ impl Entry {
             value: text,
         });
 
-        self.update_placeholder_style(self.paragraph.get_text().is_empty());
+        self.element.mark_dirty(true);
     }
 
     fn handle_input(&mut self, input: &str) {
         //debug!("on input:{}", input);
-        self.insert_text(input, self.caret, true);
+        self.insert_text(input, self.paragraph.get_caret(), true);
     }
 
-    fn build_line(text: String) -> Vec<ParagraphUnit> {
-        let unit = ParagraphUnit::Text(TextUnit {
+    fn build_line(text: String) -> Vec<TextElement> {
+        let unit = TextElement::Text(TextUnit {
             text,
             font_families: None,
             font_size: None,
@@ -642,13 +601,60 @@ impl Entry {
         vec![unit]
     }
 
-    fn update_placeholder_style(&mut self, is_text_empty: bool) {
-        let placeholder_color = if is_text_empty {
-            Color::from_rgb(160, 160, 160)
-        } else {
-            Color::TRANSPARENT
-        };
-        self.placeholder_element.set_style_props(vec![StyleProp::Color(StylePropVal::Custom(placeholder_color))]);
+    fn ensure_caret_into_view(&mut self) {
+        if let Some(cp) = self.get_caret_pixels_position() {
+            let scrolled_y = self.vertical_bar.scroll_into_view(cp.y, cp.height);
+            let scrolled_x = self.horizontal_bar.scroll_into_view(cp.x, cp.width);
+            if scrolled_y || scrolled_x {
+                self.element.mark_dirty(false);
+            }
+        }
+    }
+
+    fn do_layout(&mut self, bounds: &Rect) {
+        let element = ok_or_return!(self.element.upgrade());
+        let padding = element.get_padding();
+        let border = element.get_border_width();
+        let mut line_height = self.line_height;
+        let vertical_bar_thickness = self.vertical_bar.visible_thickness();
+        let padding_box_width = bounds.width.de_nan(f32::INFINITY) - border.1 - border.3;
+        let padding_box_height = bounds.height.de_nan(f32::INFINITY) - border.0 - border.2;
+
+        let mut layout_width = padding_box_width - vertical_bar_thickness;
+        if !self.multiple_line {
+            let border = element.get_border_width();
+            let content_height = element.get_bounds().height - padding.0 - border.0 - padding.2 - border.2;
+            line_height = Some(content_height);
+            layout_width = f32::NAN;
+        }
+
+        self.placeholder.set_line_height(line_height);
+        self.paragraph.set_line_height(line_height);
+
+        self.placeholder.set_padding(padding);
+        self.placeholder.set_layout_width(layout_width);
+        self.placeholder.layout();
+
+        self.paragraph.set_padding(padding);
+        self.paragraph.set_layout_width(layout_width);
+        self.paragraph.layout();
+
+        let text_height = self.paragraph.height();
+        let text_width = self.paragraph.max_intrinsic_width();
+
+        self.vertical_bar.set_length(padding_box_height, text_height, padding_box_width);
+        self.horizontal_bar.set_length(padding_box_width, text_width, padding_box_height);
+    }
+
+    fn layout(&mut self, bounds: &Rect) {
+        let old_thickness = self.vertical_bar.visible_thickness();
+        self.do_layout(bounds);
+        if self.multiple_line {
+            let new_thickness = self.vertical_bar.visible_thickness();
+            if old_thickness != new_thickness {
+                self.do_layout(bounds);
+            }
+        }
     }
 
 }
@@ -657,53 +663,58 @@ impl ElementBackend for Entry {
 
     fn create(mut ele: &mut Element) -> Self {
         ele.set_focusable(true);
-        let mut base = Scroll::create(ele);
-        let mut paragraph_element = Element::create(Paragraph::create);
-        paragraph_element.set_style_props(vec![
-            Position(StylePropVal::Custom(PositionType::Absolute)),
-            Left(StylePropVal::Custom(LengthOrPercent::Length(Length::PX(0.0)))),
-            Top(StylePropVal::Custom(LengthOrPercent::Length(Length::PX(0.0)))),
-            MinWidth(StylePropVal::Custom(LengthOrPercent::Percent(100.0))),
-            // BackgroundColor(StylePropVal::Custom(Color::from_argb(80,80, 80, 80))),
-        ]);
-        let mut paragraph = paragraph_element.get_backend_as::<Paragraph>().clone();
+        // let mut base = Scroll::create(ele);
+        let mut paragraph = TextBox::new();
+        let mut placeholder = TextBox::new();
         paragraph.set_text_wrap(false);
+        placeholder.set_text_wrap(false);
+
+        //TODO support custom style
+        placeholder.set_color(Color::from_rgb(80, 80, 80));
+
+        // ele.set_cursor(CursorIcon::Text);
+        // base.set_scroll_x(ScrollBarStrategy::Never);
+        // base.set_scroll_y(ScrollBarStrategy::Never);
+
         paragraph.add_line(Self::build_line("".to_string()));
-
-        let mut placeholder_element = Element::create(Label::create);
-        placeholder_element.set_style_props(
-            vec![
-                Position(StylePropVal::Custom(PositionType::Absolute)),
-                Left(StylePropVal::Custom(LengthOrPercent::Length(Length::PX(0.0)))),
-                Top(StylePropVal::Custom(LengthOrPercent::Length(Length::PX(0.0)))),
-                MinWidth(StylePropVal::Custom(LengthOrPercent::Percent(100.0))),
-            ]
-        );
-        let mut placeholder = placeholder_element.get_backend_as::<Label>().clone();
-
-        ele.add_child_view(placeholder_element.clone(), None);
-        ele.add_child_view(paragraph_element.clone(), None);
-        // base.set_text_wrap(false);
-        ele.set_cursor(CursorIcon::Text);
-        base.set_scroll_x(ScrollBarStrategy::Never);
-        base.set_scroll_y(ScrollBarStrategy::Never);
-        //TODO not working
-        // let border = "1 #F9F9F9";
-        // ele.set_style_prop(StylePropKey::BorderLeft, border);
-        // ele.set_style_prop(StylePropKey::BorderRight, border);
-        // ele.set_style_prop(StylePropKey::BorderTop, border);
-        // ele.set_style_prop(StylePropKey::BorderBottom, border);
+        {
+            let mut element_weak = ele.as_weak();
+            paragraph.set_layout_callback(move || {
+                element_weak.mark_dirty(true);
+            });
+        }
+        {
+            let mut element_weak = ele.as_weak();
+            paragraph.set_repaint_callback(move || {
+                element_weak.mark_dirty(false);
+            });
+        }
 
         // Default style
         let caret_visible = Rc::new(Cell::new(false));
+        let mut vertical_bar = ScrollBar::new_vertical();
+        let mut horizontal_bar = ScrollBar::new_horizontal();
+        horizontal_bar.set_strategy(ScrollBarStrategy::Never);
+
+        {
+            let mut element_weak = ele.as_weak();
+            vertical_bar.set_scroll_callback(move || {
+                element_weak.mark_dirty(false);
+            });
+        }
+        {
+            let mut element_weak = ele.as_weak();
+            horizontal_bar.set_scroll_callback(move || {
+                element_weak.mark_dirty(false);
+            })
+        }
+
+
         let mut inst = EntryData {
-            base,
+            // base,
             paragraph,
-            paragraph_element,
             placeholder,
-            placeholder_element,
             input_type: InputType::Text,
-            caret: TextCoord::new((0, 0)),
             //paint_offset: 0f32,
             // text_changed_listener: Vec::new(),
             caret_visible,
@@ -712,13 +723,26 @@ impl ElementBackend for Entry {
             align: TextAlign::Left,
             multiple_line: false,
             element: ele.as_weak(),
-            vertical_caret_moving_coord_x: 0.0,
             edit_history: EditHistory::new(),
             rows: 5,
             disabled: false,
+            line_height: None,
+            vertical_bar,
+            horizontal_bar,
+            caret_change_marker: StateMarker::new(),
+            auto_height: false,
         }.to_ref();
         inst.set_multiple_line(false);
-        inst.update_placeholder_style(true);
+        {
+            let mut weak = inst.as_weak();
+            inst.paragraph.set_caret_change_callback(move || {
+                let mut entry = ok_or_return!(weak.upgrade());
+                entry.caret_change_marker.mark();
+                entry.element.mark_dirty(false);
+            });
+        }
+        ele.style.yoga_node.set_measure_func(Some(measure_entry));
+        ele.style.yoga_node.set_context(Some(Context::new(inst.as_weak())));
         inst
     }
 
@@ -727,35 +751,73 @@ impl ElementBackend for Entry {
     }
 
     fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend> {
-        Some(&mut self.base)
+        None
     }
 
     fn handle_style_changed(&mut self, key: StylePropKey) {
-        self.base.handle_style_changed(key)
+        let element = ok_or_return!(self.element.upgrade());
+        match key {
+            StylePropKey::FontStyle => {
+                self.paragraph.set_font_style(element.style.font_style);
+            },
+            StylePropKey::FontSize => {
+                self.paragraph.set_font_size(element.style.font_size);
+            }
+            StylePropKey::LineHeight => {
+                self.line_height = element.style.line_height;
+            }
+            StylePropKey::Color => {
+                self.paragraph.set_color(element.style.color);
+            }
+            StylePropKey::FontWeight => {
+                self.paragraph.set_font_weight(element.style.font_weight);
+            }
+            StylePropKey::FontFamily => {
+                self.paragraph.set_font_families(element.style.font_family.clone());
+            }
+            _ => {}
+        }
     }
 
     fn render(&mut self) -> RenderFn {
-        let mut element = ok_or_return!(self.element.upgrade_mut(), RenderFn::empty());
+        if self.caret_change_marker.unmark() {
+            self.ensure_caret_into_view();
+        }
+        let mut element = ok_or_return!(self.element.upgrade(), RenderFn::empty());
         let mut paint = Paint::default();
         paint.set_color(element.style.color);
 
-        let mut base_render_fn = self.base.render();
         let focusing = self.focusing;
         let caret_visible = self.caret_visible.get();
 
         let caret_pos = some_or_return!(self.get_caret_pixels_position(), RenderFn::empty());
+        let text_render = if self.get_text().is_empty() {
+            self.placeholder.render()
+        } else {
+            self.paragraph.render()
+        };
+        let vertical_bar_renderer = self.vertical_bar.render();
+        let offset_y = self.vertical_bar.scroll_offset();
+        let offset_x = self.horizontal_bar.scroll_offset();
 
         RenderFn::new(move |painter| {
             let canvas = painter.canvas;
-            canvas.save();
-            base_render_fn.run(painter);
-            if focusing && caret_visible {
-                paint.set_stroke_width(2.0);
-                let start = (caret_pos.x, caret_pos.y);
-                let end = (caret_pos.x, caret_pos.bottom());
-                canvas.draw_line(start, end, &paint);
-            }
-            canvas.restore();
+            canvas.session(|_| {
+                canvas.translate((-offset_x, -offset_y));
+                text_render.run(painter);
+            });
+            canvas.session(|_| {
+                canvas.translate((-offset_x, -offset_y));
+                if focusing && caret_visible {
+                    paint.set_stroke_width(2.0);
+                    let start = (caret_pos.x, caret_pos.y);
+                    let end = (caret_pos.x, caret_pos.bottom());
+                    canvas.draw_line(start, end, &paint);
+                }
+            });
+            canvas.session(move |_| {
+                vertical_bar_renderer.run(painter);
+            });
         })
     }
 
@@ -764,64 +826,86 @@ impl ElementBackend for Entry {
             ctx.propagation_cancelled = true;
             return;
         }
+        if self.vertical_bar.on_event(&event, ctx) || self.horizontal_bar.on_event(&event, ctx) {
+            return;
+        }
+
+        let offset_y = self.vertical_bar.scroll_offset();
+        let offset_x = self.horizontal_bar.scroll_offset();
+        if self.paragraph.on_event(&event, ctx, offset_x, offset_y) {
+            return;
+        }
         if let Some(e) = event.downcast_ref::<FocusEvent>() {
             self.handle_focus();
         } else if let Some(e) = event.downcast_ref::<BlurEvent>() {
             self.handle_blur();
-        } else if let Some(e) = event.downcast_ref::<SelectStartEvent>() {
-            self.update_caret_value(TextCoord(e.row, e.col), false);
-        } else if let Some(e) = event.downcast_ref::<SelectMoveEvent>() {
-            self.update_caret_value(TextCoord(e.row, e.col), false);
         } else if let Some(e) = event.downcast_ref::<TextInputEvent>() {
-            self.insert_text(e.0.as_str(), self.caret, true);
-        } else if let Some(e) = event.downcast_ref::<ClickEvent>() {
-            if !self.paragraph.is_selecting() {
-                self.update_caret_by_offset_coordinate(e.0.offset_x, e.0.offset_y, false);
-            }
+            self.insert_text(e.0.as_str(), self.paragraph.get_caret(), true);
         } else if let Some(e) = event.downcast_ref::<ScrollEvent>() {
             //TODO update later?
             let _ = self.update_ime();
         } else if let Some(e) = event.downcast_ref::<BoundsChangeEvent>() {
             //TODO update later?
             let _ = self.update_ime();
-        }
-        self.base.on_event(event, ctx)
-    }
-
-    fn execute_default_behavior(&mut self, event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) -> bool {
-        if let Some(e) = event.downcast_ref::<KeyDownEvent>() {
+        } else if let Some(e) = event.downcast_ref::<MouseMoveEvent>() {
+            let d = e.0;
+            let is_over_vb = self.vertical_bar.is_mouse_over(d.offset_x, d.offset_y);
+            let mut el = ok_or_return!(self.element.upgrade());
+            if is_over_vb {
+                el.set_cursor(CursorIcon::Default);
+            } else {
+                el.set_cursor(CursorIcon::Text);
+            }
+        } else if let Some(e) = event.downcast_ref::<MouseLeaveEvent>() {
+            let mut el = ok_or_return!(self.element.upgrade());
+            el.set_cursor(CursorIcon::Default);
+        } else if let Some(e) = event.downcast_ref::<KeyDownEvent>() {
             self.handle_key_down(&e.0);
-            true
-        } else {
-            self.base.execute_default_behavior(event, ctx)
         }
     }
 
     fn handle_origin_bounds_change(&mut self, bounds: &Rect) {
-        self.base.handle_origin_bounds_change(bounds);
-        //self.update_paint_offset(bounds.width, bounds.height);
+        self.layout(bounds);
     }
 
-    fn apply_style_prop(&mut self, prop: &StyleProp, length_ctx: &LengthContext) -> Option<(bool, bool, ResolvedStyleProp)> {
-        let key = prop.key();
-        match key {
-            StylePropKey::PaddingTop
-            | StylePropKey::PaddingRight
-            | StylePropKey::PaddingBottom
-            | StylePropKey::PaddingLeft
-            => {
-                self.placeholder_element.apply_style_prop(prop.clone(), length_ctx);
-                Some(self.paragraph_element.apply_style_prop(prop.clone(), length_ctx))
-            },
-            _ => {
-                self.base.apply_style_prop(prop, length_ctx)
+    fn accept_pseudo_styles(&mut self, styles: HashMap<String, Vec<ParsedStyleProp>>) {
+        if let Some(scrollbar_styles) = styles.get("scrollbar") {
+            for style in scrollbar_styles {
+                if let Some(StyleProp::BackgroundColor(color)) = style.resolved() {
+                    if let StylePropVal::Custom(color) = color {
+                        self.vertical_bar.set_track_background_color(color);
+                        self.horizontal_bar.set_track_background_color(color);
+                        self.element.mark_dirty(false);
+                    }
+                }
+            }
+        }
+        if let Some(thumb_styles) = styles.get("scrollbar-thumb") {
+            for style in thumb_styles {
+                if let Some(StyleProp::BackgroundColor(color)) = style.resolved() {
+                    if let StylePropVal::Custom(color) = color {
+                        self.vertical_bar.set_thumb_background_color(color);
+                        self.horizontal_bar.set_thumb_background_color(color);
+                        self.element.mark_dirty(false);
+                    }
+                }
+            }
+        }
+        if let Some(placeholder_styles) = styles.get("placeholder") {
+            for style in placeholder_styles {
+                if let Some(StyleProp::Color(color)) = style.resolved() {
+                    if let StylePropVal::Custom(color) = color {
+                        self.placeholder.set_color(color);
+                    }
+                }
             }
         }
     }
+
     fn on_attribute_changed(&mut self, key: &str, value: Option<&str>) {
         match key {
             "disabled" => self.disabled = value.is_some(),
-            _ => self.base.on_attribute_changed(key, value),
+            _ => {},
         }
     }
 
@@ -842,7 +926,7 @@ fn test_performance() {
     }
 
     print_time!("render paragraph");
-    entry.paragraph.render();
+    // entry.paragraph.render();
 }
 
 
@@ -851,7 +935,7 @@ fn test_caret() {
     let mut el = Element::create(Entry::create);
     let entry = el.get_backend_mut_as::<Entry>();
     entry.set_text("1\n12\n123\n1234".to_string());
-    entry.caret = TextCoord::new((0, 0));
+    // entry.caret = TextCoord::new((0, 0));
     let expected_carets = vec![
         TextCoord(0, 1),
         TextCoord(1, 0), TextCoord(1, 1), TextCoord(1, 2),
@@ -860,7 +944,7 @@ fn test_caret() {
     ];
     for c in expected_carets {
         entry.move_caret(1);
-        assert_eq!(entry.caret, c);
+        assert_eq!(entry.paragraph.get_caret(), c);
     }
 }
 
@@ -879,14 +963,14 @@ pub fn test_edit_history() {
     entry.handle_input(text2);
     assert_eq!(text_all, entry.get_text());
     // delete text2
-    entry.paragraph.select(TextCoord(0, text1.chars_count()), TextCoord(0, text1.chars_count() + text2.chars_count()));
+    // entry.paragraph.select(TextCoord(0, text1.chars_count()), TextCoord(0, text1.chars_count() + text2.chars_count()));
     entry.handle_input("");
     assert_eq!(text1, entry.get_text());
     // undo
     entry.undo();
     assert_eq!(text_all, entry.get_text());
-    assert_eq!(text_all.chars_count(), entry.caret.1);
+    assert_eq!(text_all.chars_count(), entry.paragraph.get_caret().1);
     entry.undo();
     assert_eq!("", entry.get_text());
-    assert_eq!(0, entry.caret.1);
+    assert_eq!(0, entry.paragraph.get_caret().1);
 }

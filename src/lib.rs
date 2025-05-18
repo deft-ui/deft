@@ -5,7 +5,6 @@
 
 use crate::app::{WinitApp, AppEvent, AppEventPayload, IApp, App};
 use crate::data_dir::get_data_path;
-use crate::element::label::{AttributeText};
 use crate::element::text::text_paragraph::TextParams;
 use crate::element::text::{Text};
 use crate::element::ScrollByOption;

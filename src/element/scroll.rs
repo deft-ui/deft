@@ -187,6 +187,7 @@ impl Scroll {
         let layout_width = if self.content_auto_width { f32::NAN } else { width };
         let layout_height = if self.content_auto_height { f32::NAN } else { height };
         // self.element.style.calculate_shadow_layout(f32::NAN, f32::NAN, LTR);
+        element.before_layout_recurse();
         element.style.calculate_shadow_layout(layout_width, layout_height, LTR);
 
         for child in &mut element.get_children().clone() {
