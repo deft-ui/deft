@@ -20,7 +20,10 @@ Deft is a framework for building desktop and mobile applications with Rust and J
 # Quick Start
 
 ```
-npm create deft@latest
+npm create deft@latest hello-deft
+cd hello-deft
+npm install
+npm run dev
 ```
 
 [Documentation](https://deft-ui.github.io/guides/what-is-deft/)
@@ -39,11 +42,11 @@ npm create deft@latest
 | iOS        | -             | ❔             |
 | Web        | -             | ❌             |
 
-# Building
+# Develop
 
 ### Prerequisites
 
-Make sure Rust, Node.js and Clang14+ installed.
+Make sure `Rust`, `Node.js` and `Clang14+` installed.
 
 Some extra packages need to be installed on Linux.
 
@@ -51,12 +54,6 @@ Some extra packages need to be installed on Linux.
 apt install build-essential libssl-dev libclang-dev libc++-dev \
     xorg-dev libxcb-xfixes0-dev libxcb-shape0-dev libdbus-1-dev \
     libasound2-dev libegl-dev libgles-dev librust-wayland-egl-dev
-```
-
-### Build
-
-```
-cargo build
 ```
 
 ### Run demo
