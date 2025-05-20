@@ -44,7 +44,7 @@ npm run dev
 | Linux      | X11 & Wayland | ✅             |
 | MacOS      | 10.12+        | ✅             |
 | HarmonyOS  | 5+            | ✅experimental |
-| Android    | 11+           | ✅experimental |
+| Android    | 6+            | ✅experimental |
 | iOS        | -             | ❔             |
 | Web        | -             | ❌             |
 
