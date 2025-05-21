@@ -63,7 +63,7 @@ impl ScrollBar {
         (self.scroll_length - self.length).max(0.0)
     }
 
-    pub fn set_scroll_callback<F: FnMut() + 'static>(&mut self, mut cb: F) {
+    pub fn set_scroll_callback<F: FnMut() + 'static>(&mut self, cb: F) {
         self.scroll_callback = Box::new(cb);
     }
 
@@ -155,7 +155,7 @@ impl ScrollBar {
     pub fn on_event(
         &mut self,
         event: & Box<&mut dyn Any>,
-        ctx: &mut EventContext<ElementWeak>,
+        _ctx: &mut EventContext<ElementWeak>,
     ) -> bool {
         if let Some(e) = event.downcast_ref::<MouseDownEvent>() {
             let d = e.0;
@@ -200,7 +200,7 @@ impl ScrollBar {
         }
     }
 
-    pub fn on_mouse_up(&mut self, x: f32, y: f32) -> bool {
+    pub fn on_mouse_up(&mut self, _x: f32, _y: f32) -> bool {
         if self.scroll_begin_info.is_some() {
             self.scroll_begin_info = None;
             true

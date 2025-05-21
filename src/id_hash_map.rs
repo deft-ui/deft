@@ -28,13 +28,13 @@ impl<T> IdHashMap<T> {
         self.hash_map.remove(&id)
     }
 
-    pub fn for_each<F: Fn(u32, &T)>(&self, mut f: F) {
+    pub fn for_each<F: Fn(u32, &T)>(&self, f: F) {
         self.hash_map.iter().for_each(|(id, value)| {
             f(*id, value);
         })
     }
 
-    pub fn for_each_mut<F: Fn(u32, &mut T)>(&mut self, mut f: F) {
+    pub fn for_each_mut<F: Fn(u32, &mut T)>(&mut self, f: F) {
         self.hash_map.iter_mut().for_each(|(id, value)| {
             f(*id, value);
         })

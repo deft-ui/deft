@@ -1,5 +1,5 @@
 use std::time::Instant;
-use log::{debug, error, log, Level, Log};
+use log::{log, Level};
 
 
 pub struct TimeLog {

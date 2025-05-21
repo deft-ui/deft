@@ -1,44 +1,34 @@
-use core::fmt;
 use std::any::{Any, TypeId};
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
-use std::default::Default;
 use std::fmt::{Debug, Formatter};
 use std::mem;
 use std::ops::{Deref, DerefMut};
-use std::rc::{Rc, Weak};
-use std::str::FromStr;
 
 use anyhow::{anyhow, Error};
-use bitflags::{bitflags, Flags};
-use deft_macros::{js_func, js_methods, mrc_object};
-use measure_time::print_time;
-use ordered_float::Float;
+use bitflags::{bitflags};
+use deft_macros::{js_methods, mrc_object};
 use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
-use skia_safe::{Canvas, Color, Matrix, Paint, Path, Rect};
+use skia_safe::Rect;
 use winit::window::CursorIcon;
-use yoga::{Direction, Edge, StyleUnit};
+use yoga::{Direction, StyleUnit};
 
-use crate::base::{EventContext, EventListener, EventRegistration, Id, ScrollEventDetail};
-use crate::border::build_rect_with_radius;
+use crate::base::{EventContext, EventListener, EventRegistration};
 use crate::element::button::Button;
 use crate::element::container::Container;
 use crate::element::entry::Entry;
 use crate::element::image::Image;
 use crate::element::scroll::Scroll;
-use crate::element::text::Text;
 use crate::event::{DragOverEventListener, BlurEventListener, BoundsChangeEventListener, CaretChangeEventListener, ClickEventListener, DragStartEventListener, DropEventListener, FocusEventListener, FocusShiftEventListener, KeyDownEventListener, KeyUpEventListener, MouseDownEventListener, MouseEnterEvent, MouseEnterEventListener, MouseLeaveEvent, MouseLeaveEventListener, MouseMoveEventListener, MouseUpEventListener, MouseWheelEventListener, ScrollEvent, ScrollEventListener, TextChangeEventListener, TextUpdateEventListener, TouchCancelEventListener, TouchEndEventListener, TouchMoveEventListener, TouchStartEventListener, BoundsChangeEvent, ContextMenuEventListener, MouseDownEvent, TouchStartEvent, DroppedFileEventListener, HoveredFileEventListener};
 use crate::event_loop::{create_event_loop_callback};
-use crate::ext::ext_window::{ELEMENT_TYPE_BUTTON, ELEMENT_TYPE_CONTAINER, ELEMENT_TYPE_ENTRY, ELEMENT_TYPE_IMAGE, ELEMENT_TYPE_LABEL, ELEMENT_TYPE_SCROLL, ELEMENT_TYPE_TEXT_EDIT, ELEMENT_TYPE_BODY, ELEMENT_TYPE_PARAGRAPH, ELEMENT_TYPE_CHECKBOX, ELEMENT_TYPE_RADIO, ELEMENT_TYPE_RADIO_GROUP, ELEMENT_TYPE_RICH_TEXT};
+use crate::ext::ext_window::{ELEMENT_TYPE_BUTTON, ELEMENT_TYPE_CONTAINER, ELEMENT_TYPE_ENTRY, ELEMENT_TYPE_IMAGE, ELEMENT_TYPE_LABEL, ELEMENT_TYPE_SCROLL, ELEMENT_TYPE_BODY, ELEMENT_TYPE_PARAGRAPH, ELEMENT_TYPE_CHECKBOX, ELEMENT_TYPE_RADIO, ELEMENT_TYPE_RADIO_GROUP, ELEMENT_TYPE_RICH_TEXT};
 use crate::window::{Window, WindowWeak};
-use crate::img_manager::IMG_MANAGER;
-use crate::js::js_serde::JsValueSerializer;
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::resource_table::ResourceTable;
-use crate::style::{parse_style_obj, ColorHelper, Length, LengthContext, ResolvedStyleProp, StyleNode, StyleProp, StylePropKey, StylePropVal, StyleTransform};
-use crate::{base, bind_js_event_listener, js_auto_upgrade, js_deserialize, js_serialize, js_value, js_weak_value, ok_or_return, send_app_event, some_or_continue, some_or_return};
+use crate::style::{LengthContext, ResolvedStyleProp, StyleNode, StyleProp, StylePropKey, StylePropVal};
+use crate::{base, bind_js_event_listener, js_auto_upgrade, js_deserialize, js_serialize, js_value, ok_or_return};
 
 pub mod container;
 pub mod entry;
@@ -58,7 +48,6 @@ mod common;
 pub mod richtext;
 
 use crate as deft;
-use crate::app::AppEvent;
 use crate::computed::ComputedValue;
 use crate::element::body::Body;
 use crate::element::checkbox::Checkbox;
@@ -66,13 +55,12 @@ use crate::element::label::Label;
 use crate::element::paragraph::Paragraph;
 use crate::element::radio::{Radio, RadioGroup};
 use crate::element::richtext::RichText;
-use crate::font::family::FontFamilies;
 use crate::js::JsError;
 use crate::layout::LayoutRoot;
-use crate::paint::{MatrixCalculator, RenderTree, UniqueRect};
+use crate::paint::MatrixCalculator;
 use crate::render::RenderFn;
 use crate::style::border_path::BorderPath;
-use crate::style::css_manager::{CssManager, CSS};
+use crate::style::css_manager::CssManager;
 use crate::style_list::{ParsedStyleProp, StyleList};
 
 thread_local! {
@@ -122,7 +110,6 @@ impl Element {
         let mut ele = Self {
             inner,
         };
-        let ele_weak = ele.inner.as_weak();
         let weak = ele.as_weak();
         ele.style.bind_element(weak);
         let ele_weak = ele.inner.as_weak();
@@ -205,7 +192,6 @@ impl Element {
             cm.contains_attr(&key)
         });
         self.attributes.remove(&key);
-        let mut backend = self.backend.clone();
         self.backend.on_attribute_changed(&key, None);
         if need_update_style {
             self.select_style_recurse();
@@ -273,7 +259,7 @@ impl Element {
     }
 
     #[js_func]
-    pub fn add_child(&mut self, mut child: Element, position: i32) -> Result<(), Error> {
+    pub fn add_child(&mut self, child: Element, position: i32) -> Result<(), Error> {
         let position = if position < 0 { None } else { Some(position as u32) };
         self.add_child_view(child, position);
         Ok(())
@@ -287,7 +273,7 @@ impl Element {
 
     pub fn remove_all_child(&mut self) {
         while !self.children.is_empty() {
-            self.remove_child(0);
+            let _ = self.remove_child(0);
         }
     }
 
@@ -477,12 +463,11 @@ impl Element {
         };
         self.applied_style.clear();
         if let Some(win) = self.get_window() {
-            if let Ok(mut win) = win.upgrade_mut() {
+            if let Ok(win) = win.upgrade_mut() {
                 self.refresh_style_variables(&win.style_variables.as_weak());
             }
         }
         self.select_style_recurse();
-        let mut el = self.clone();
         self.mark_style_dirty();
     }
 
@@ -655,7 +640,7 @@ impl Element {
     }
 
     fn process_auto_focus(&self) {
-        let mut focus_element = self.find_auto_focus_element();
+        let focus_element = self.find_auto_focus_element();
         if let Some(mut fe) = focus_element {
             fe.focus();
         }
@@ -869,7 +854,7 @@ impl Element {
             style_props.insert(k.clone(), v.clone());
         }
         let old_style = self.applied_style.clone();
-        let mut changed_style_props = Self::calculate_changed_style(&old_style, &style_props, parent_changed);
+        let changed_style_props = Self::calculate_changed_style(&old_style, &style_props, parent_changed);
         // println!("new styles {} => {:?}", self.id, style_props);
 
 
@@ -894,7 +879,7 @@ impl Element {
         }
     }
 
-    pub fn register_event_listener<T: 'static, H: EventListener<T, ElementWeak> + 'static>(&mut self, mut listener: H) -> u32 {
+    pub fn register_event_listener<T: 'static, H: EventListener<T, ElementWeak> + 'static>(&mut self, listener: H) -> u32 {
         self.event_registration.register_event_listener(listener)
     }
 
@@ -945,7 +930,7 @@ impl Element {
             }
         }
         let backend = self.get_backend_mut();
-        let mut e: Box<&mut dyn Any> = Box::new(event);
+        let e: Box<&mut dyn Any> = Box::new(event);
         backend.on_event(e, ctx);
         if !ctx.propagation_cancelled {
             self.event_registration.emit(event, ctx);
@@ -1048,7 +1033,7 @@ impl Element {
 
     fn set_dirty_state_recurse(&mut self, dirty: bool) {
         if self.is_layout_dirty() != dirty {
-            if (dirty) {
+            if dirty {
                 self.dirty_flags.insert(StyleDirtyFlags::LayoutDirty);
             } else {
                 self.dirty_flags.remove(StyleDirtyFlags::LayoutDirty);
@@ -1094,7 +1079,6 @@ impl Element {
 
     pub fn on_layout_update(&mut self) {
         self.dirty_flags.remove(StyleDirtyFlags::LayoutDirty);
-        let origin_bounds = self.get_origin_bounds();
         //TODO emit size change
         let origin_bounds = self.get_origin_bounds();
         if origin_bounds != self.rect {
@@ -1202,7 +1186,7 @@ impl ElementWeak {
 
 impl Debug for Element {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str("#");
+        f.write_str("#")?;
         self.id.fmt(f)
     }
 }
@@ -1341,13 +1325,13 @@ pub trait ElementBackend : 'static {
         }
     }
 
-    fn on_event(&mut self, mut event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
+    fn on_event(&mut self, event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
         if let Some(base) = self.get_base_mut() {
             base.on_event(event, ctx);
         }
     }
 
-    fn execute_default_behavior(&mut self, mut event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) -> bool {
+    fn execute_default_behavior(&mut self, event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) -> bool {
         if let Some(base) = self.get_base_mut() {
             base.execute_default_behavior(event, ctx)
         } else {
@@ -1411,6 +1395,6 @@ pub trait ElementBackend : 'static {
 
 #[test]
 fn test_backend_type_id() {
-    let mut el = Element::create(Container::create);
+    let el = Element::create(Container::create);
     assert_eq!(true, el.is_backend::<Container>());
 }

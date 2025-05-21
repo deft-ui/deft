@@ -3,38 +3,32 @@ pub mod css_manager;
 mod select;
 
 use crate as deft;
-use std::cell::RefCell;
-use std::collections::{HashMap, VecDeque};
-use std::f32::consts::PI;
+use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use anyhow::{anyhow, Error};
 use cssparser::parse_color_keyword;
 use deft_macros::mrc_object;
-use ordered_float::{Float, OrderedFloat};
+use ordered_float::OrderedFloat;
 use quick_js::JsValue;
-use skia_safe::{Color, Image, Matrix, Path};
+use skia_safe::{Color, Image, Matrix};
 use skia_safe::font_style::{Slant, Weight};
 use swash::Style;
 use yoga::{Align, Direction, Display, Edge, FlexDirection, Justify, Node, Overflow, PositionType, StyleUnit, Wrap};
 use crate::base::Rect;
 use crate::color::parse_hex_color;
-use crate::{match_both, ok_or_return, send_app_event, some_or_return};
-use crate::animation::{AnimationInstance, SimpleFrameController, WindowAnimationController};
-use crate::border::build_border_paths;
-use crate::cache::CacheValue;
+use crate::{ok_or_return, some_or_return};
+use crate::animation::{AnimationInstance, WindowAnimationController};
 use crate::animation::ANIMATIONS;
 use crate::animation::css_actor::CssAnimationActor;
-use crate::element::{Element, ElementWeak};
+use crate::element::ElementWeak;
 use crate::element::paragraph::parse_weight;
 use crate::event_loop::create_event_loop_callback;
 use crate::font::family::{FontFamilies, FontFamily};
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::paint::MatrixCalculator;
-use crate::string::StringUtils;
-use crate::style_list::{ParsedStyleProp, StyleList};
-use crate::timer::{set_timeout, TimerHandle};
+use crate::style_list::ParsedStyleProp;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum StylePropertyValue {
@@ -1025,15 +1019,7 @@ impl StyleNode {
             font_style: FontStyle::Normal,
         };
         inner.yoga_node.set_position_type(PositionType::Static);
-        let mut inst = inner.to_ref();
-        //TODO fix length context
-        let length_ctx = LengthContext {
-            root: 0.0,
-            font_size: 0.0,
-            viewport_width: 0.0,
-            viewport_height: 0.0,
-        };
-        inst
+        inner.to_ref()
     }
 
     pub fn new_with_shadow() -> Self {
@@ -1291,10 +1277,9 @@ impl StyleNode {
             return (false, false);
         }
         self.resolved_style_props.insert(prop_key, p.clone());
-        let mut repaint = true;
+        let repaint = true;
         let mut need_layout = true;
         let mut change_notified = false;
-        let standard_node = Node::new();
 
         match p {
             ResolvedStyleProp::Color(v) => {
@@ -1335,19 +1320,19 @@ impl StyleNode {
                 self.set_border_width(&value, &vec![3], length_ctx);
             }
             ResolvedStyleProp::BorderTopColor (value) =>   {
-                self.set_border_color(&value, &vec![0], length_ctx);
+                self.set_border_color(&value, &vec![0]);
                 need_layout = false;
             }
             ResolvedStyleProp::BorderRightColor (value) =>   {
-                self.set_border_color(&value, &vec![1], length_ctx);
+                self.set_border_color(&value, &vec![1]);
                 need_layout = false;
             }
             ResolvedStyleProp::BorderBottomColor (value) =>   {
-                self.set_border_color(&value, &vec![2], length_ctx);
+                self.set_border_color(&value, &vec![2]);
                 need_layout = false;
             }
             ResolvedStyleProp::BorderLeftColor (value) =>   {
-                self.set_border_color(&value, &vec![3], length_ctx);
+                self.set_border_color(&value, &vec![3]);
                 need_layout = false;
             }
             ResolvedStyleProp::Display (value) =>   {
@@ -1570,7 +1555,7 @@ impl StyleNode {
         }
     }
 
-    fn set_border_color(&mut self, color: &Color, edges: &Vec<usize>, length_ctx: &LengthContext) {
+    fn set_border_color(&mut self, color: &Color, edges: &Vec<usize>) {
         for index in edges {
             self.border_color[*index] = *color;
         }
@@ -1765,7 +1750,7 @@ fn parse_translate_length(value: &str) -> Option<TranslateLength> {
 
 pub fn parse_border(value: &str) -> (LengthOrPercent, Color) {
     let parts = value.split(" ");
-    let mut width = LengthOrPercent::Length(Length::PX((0.0)));
+    let mut width = LengthOrPercent::Length(Length::PX(0.0));
     let mut color = Color::from_rgb(0, 0, 0);
     for p in parts {
         let p = p.trim();

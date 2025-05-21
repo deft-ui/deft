@@ -2,20 +2,14 @@ use std::env;
 use std::future::Future;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
-use anyhow::Error;
-use log::error;
 use quick_js::{Context, ExecutionError, JsPromise, JsValue, ValueError};
-use skia_safe::wrapper::NativeTransmutableWrapper;
 use tokio::runtime::Runtime;
-use winit::event_loop::EventLoopProxy;
 use winit::window::CursorIcon;
-use crate::app::{AppEvent};
 use crate::base::UnsafeFnOnce;
 use crate::js::js_value_util::JsValueHelper;
 use crate::element::label::parse_align;
-use crate::js::{JsError, ToJsCallResult};
-use crate::js::js_event_loop::{js_create_event_loop_proxy, JsEvent, JsEventLoopProxy};
-use crate::resource_table::ResourceTable;
+use crate::js::ToJsCallResult;
+use crate::js::js_event_loop::{js_create_event_loop_proxy, JsEventLoopProxy};
 use crate::text::TextAlign;
 
 pub struct JsContext {
@@ -108,7 +102,7 @@ impl PromiseResolver {
         }
     }
 
-    pub fn settle(mut self, result: Result<JsValue, String>) {
+    pub fn settle(self, result: Result<JsValue, String>) {
         match result {
             Ok(v) => {
                 self.resolve(v)
@@ -137,7 +131,7 @@ unsafe impl Sync for PromiseResolver {}
 impl Drop for PromiseResolver {
     fn drop(&mut self) {
         if let Some(p) = self.promise {
-            let mut callback = unsafe {
+            let callback = unsafe {
                 UnsafeFnOnce::new(move || {
                     let _ = Box::from_raw(p);
                 })

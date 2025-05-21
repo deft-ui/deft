@@ -1,30 +1,15 @@
 use crate as deft;
-use std::any::Any;
-use std::cell::RefCell;
-use std::rc::Rc;
-use anyhow::{Error};
-use deft_macros::{element_backend, js_methods, mrc_object};
-use quick_js::{JsValue, ValueError};
+use deft_macros::{element_backend, js_methods};
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
-use skia_safe::{Canvas, Color, Color4f, Font, FontMgr, FontStyle, Paint, Typeface};
-use skia_safe::font_style::{Slant, Weight, Width};
-use crate::base::{EventContext, MouseDetail, MouseEventType, Rect, TextUpdateDetail};
-use crate::color::parse_hex_color;
-use crate::element::{ElementData, ElementBackend, Element, ElementWeak};
-use crate::element::paragraph::ParagraphParams;
-use crate::element::paragraph::simple_paragraph_builder::SimpleParagraphBuilder;
-use crate::element::text::text_paragraph::{Line, ParagraphData, ParagraphRef, TextParams};
-use crate::event::{FocusShiftEvent, TextUpdateEvent};
-use crate::font::family::FontFamilies;
-use crate::js::js_value_util::JsValueHelper;
+use skia_safe::FontMgr;
+use crate::base::Rect;
+use crate::element::{ElementBackend, Element, ElementWeak};
+use crate::event::TextUpdateEvent;
 use crate::mrc::Mrc;
-use crate::number::DeNan;
-use crate::paint::Painter;
 use crate::render::RenderFn;
-use crate::{ok_or_return, some_or_continue};
-use crate::string::StringUtils;
+use crate::ok_or_return;
 use crate::style::StylePropKey;
-use crate::text::{TextAlign, TextStyle};
+use crate::text::TextAlign;
 use crate::text::textbox::{TextBox, TextElement, TextUnit};
 
 thread_local! {
@@ -53,7 +38,7 @@ struct LabelState {
     layout_calculated: bool,
 }
 
-extern "C" fn measure_label_func(node_ref: NodeRef, width: f32, width_mode: MeasureMode, _height: f32, height_mode: MeasureMode) -> Size {
+extern "C" fn measure_label_func(node_ref: NodeRef, width: f32, _width_mode: MeasureMode, _height: f32, _height_mode: MeasureMode) -> Size {
     if let Some(ctx) = Node::get_context_mut(&node_ref) {
         if let Some(state) = ctx.downcast_mut::<Mrc<LabelState>>() {
             state.text_box.set_layout_width(width);
@@ -116,7 +101,7 @@ impl Label {
 }
 
 impl ElementBackend for Label {
-    fn create(mut ele: &mut Element) -> Self {
+    fn create(ele: &mut Element) -> Self {
         let text = "".to_string();
         let state = LabelState {
             text_box: TextBox::new(),

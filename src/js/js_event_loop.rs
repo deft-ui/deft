@@ -1,11 +1,6 @@
 use crate::base::{UnsafeFnMut, UnsafeFnOnce};
-use crate::event_loop::{create_event_loop_proxy, EventLoopCallback, EventLoopFnMutCallback};
-use quick_js::JsValue;
 use std::cell::RefCell;
-use std::sync::mpsc::{Receiver, RecvError, SendError, Sender, TryRecvError};
-use std::sync::{mpsc, Arc, Mutex};
-use winit::event_loop::EventLoopProxy;
-use crate::app::AppEvent;
+use std::sync::{Arc, Mutex};
 
 thread_local! {
     static JS_EVENT_LOOP_PROXY: RefCell<Option<JsEventLoopProxy>> = RefCell::new(None);
@@ -61,7 +56,7 @@ pub struct JsEventLoopCallback {
 
 impl JsEventLoopCallback {
     pub fn call(mut self) {
-        let mut callback = self.callback.take().unwrap();
+        let callback = self.callback.take().unwrap();
         self.event_loop_proxy.schedule_macro_task(callback.into_box()).unwrap();
     }
 }

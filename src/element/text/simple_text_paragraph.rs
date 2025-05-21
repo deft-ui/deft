@@ -1,20 +1,13 @@
 use std::ffi::c_void;
-use std::ptr::{slice_from_raw_parts, slice_from_raw_parts_mut};
+use std::ptr::slice_from_raw_parts_mut;
 use std::sync::Arc;
-use font_kit::canvas::{Format, RasterizationOptions};
-use font_kit::hinting::HintingOptions;
-use font_kit::loader::Loader;
 use libc::memcpy;
 use log::warn;
-use skia_safe::{scalar, AlphaType, Bitmap, Canvas, Color, ColorType, FilterMode, Image, ImageInfo, Paint, Point, Rect, SamplingOptions};
-use skia_safe::canvas::GlyphPositions;
+use skia_safe::{scalar, AlphaType, Bitmap, Color, ColorType, FilterMode, ImageInfo, Paint, Point, Rect, SamplingOptions};
 use swash::GlyphId;
 use swash::scale::image::Content;
-use swash::zeno::Placement;
-use crate::{base, some_or_return};
-use crate::canvas_util::CanvasHelper;
+use crate::some_or_return;
 use crate::element::text::rasterize_cache::RasterizeCache;
-use crate::element::text::text_paragraph::TextParams;
 use crate::font::Font;
 use crate::number::DeNan;
 use crate::paint::Painter;
@@ -145,13 +138,12 @@ impl LineUnit {
         let pixels_count = (width * height * 4) as usize;
         let mut bmp = Bitmap::new();
         let image_info = ImageInfo::new(size, ColorType::RGBA8888, AlphaType::Unpremul, None);
-        bmp.set_info(&image_info, None);
+        let r = bmp.set_info(&image_info, None);
+        assert_eq!(true, r);
         bmp.alloc_pixels();
         match img.content {
             Content::Mask => {
-                let mut bytes = unsafe {
-                    slice_from_raw_parts_mut(bmp.pixels() as *mut u8, pixels_count)
-                };
+                let bytes = slice_from_raw_parts_mut(bmp.pixels() as *mut u8, pixels_count);
                 let mut i = 0;
                 for y in 0..height {
                     let row_offset = y * width * 4;
@@ -308,7 +300,6 @@ pub struct TextBlock {
 
 impl SimpleTextParagraph {
     pub fn new(text_blocks: Vec<TextBlock>, line_height: Option<f32>) -> Self {
-        let mut font_line_height = 0.0;
         let mut text = String::new();
         for text_block in &text_blocks {
             text.push_str(text_block.text.as_str());
@@ -330,7 +321,6 @@ impl SimpleTextParagraph {
         let mut char_offset = 0;
         let mut max_intrinsic_width = 0.0;
 
-        let line_height = self.line_height;
         let mut lines = Vec::new();
         let mut current_line = TextLine::new(0, 0);
 
@@ -464,7 +454,7 @@ impl SimpleTextParagraph {
 
     pub fn get_line_number_at_utf16_offset(&self, offset: usize) -> Option<usize> {
         let layout = self.layout.as_ref()?;
-        let (ln, unit) = layout.get_unit_at_char_offset(offset)?;
+        let (ln, _) = layout.get_unit_at_char_offset(offset)?;
         Some(ln.line_number)
     }
 
@@ -481,9 +471,9 @@ impl SimpleTextParagraph {
 pub fn get_fixed_widths_bounds(
     font: &Font,
     glyphs: &[GlyphId],
-    mut widths: &mut [scalar],
-    mut bounds: &mut [Rect],
-    paint: Option<&Paint>,
+    widths: &mut [scalar],
+    bounds: &mut [Rect],
+    _paint: Option<&Paint>,
     font_size: f32,
 ) {
     get_widths_bounds(font, glyphs, widths, bounds, font_size);
@@ -498,8 +488,8 @@ pub fn get_fixed_widths_bounds(
 pub fn get_widths_bounds(
     font: &Font,
     glyphs: &[GlyphId],
-    mut widths: &mut [scalar],
-    mut bounds: &mut [Rect],
+    widths: &mut [scalar],
+    bounds: &mut [Rect],
     font_size: f32,
 ) {
     for i in 0..glyphs.len() {

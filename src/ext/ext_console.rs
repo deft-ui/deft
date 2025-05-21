@@ -1,5 +1,5 @@
 use crate as deft;
-use deft_macros::{js_func, js_methods};
+use deft_macros::js_methods;
 
 pub struct Console;
 

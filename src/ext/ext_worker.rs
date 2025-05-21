@@ -1,20 +1,16 @@
 use crate as deft;
-use crate::js::js_engine::JsEngine;
 use crate::js::JsError;
 use crate::{js_weak_value};
-use crate::js::js_event_loop::{js_create_event_loop_fn_mut, js_init_event_loop, js_is_in_event_loop, JsEvent, JsEventLoopClosedError};
+use crate::js::js_event_loop::{js_create_event_loop_fn_mut, js_is_in_event_loop, JsEvent};
 use deft_macros::{js_methods, mrc_object, worker_context_event, worker_event};
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::Error;
 use std::sync::{Arc, Mutex};
-use std::sync::mpsc::{Receiver, Sender};
-use std::thread;
 use crate::base::{EventContext, EventListener, EventRegistration};
 use crate::{bind_js_event_listener};
-use crate::js::ToJsValue;
-use quick_js::{Callback, JsValue};
+use quick_js::{JsValue};
 use quick_js::loader::JsModuleLoader;
 use crate::app::{IApp, App};
 use crate::ext::service::Service;
@@ -140,7 +136,7 @@ impl Worker {
         Ok(js_worker)
     }
 
-    pub fn register_event_listener<T: 'static, H: EventListener<T, WorkerWeak> + 'static>(&mut self, mut listener: H) -> u32 {
+    pub fn register_event_listener<T: 'static, H: EventListener<T, WorkerWeak> + 'static>(&mut self, listener: H) -> u32 {
         self.event_registration.register_event_listener(listener)
     }
 
@@ -208,7 +204,7 @@ impl WorkerContext {
         }.to_ref()
     }
 
-    pub fn register_event_listener<T: 'static, H: EventListener<T, WorkerContextWeak> + 'static>(&mut self, mut listener: H) -> u32 {
+    pub fn register_event_listener<T: 'static, H: EventListener<T, WorkerContextWeak> + 'static>(&mut self, listener: H) -> u32 {
         self.event_registration.register_event_listener(listener)
     }
 

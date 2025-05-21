@@ -6,9 +6,7 @@ use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
-use skia_safe::wrapper::NativeTransmutableWrapper;
-use crate::app::AppEvent;
-use crate::js::js_event_loop::{js_create_event_loop_proxy, JsEvent};
+use crate::js::js_event_loop::js_create_event_loop_proxy;
 
 thread_local! {
     pub static TIMER: RefCell<Timer> = RefCell::new(Timer::new());

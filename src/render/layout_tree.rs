@@ -1,6 +1,6 @@
 use crate::base::Rect;
-use crate::paint::{ElementObjectData, LayerNode, LayerObjectData, RenderLayerKey, RenderObject};
-use crate::{some_or_continue, some_or_return};
+use crate::paint::{LayerNode, LayerObjectData, RenderLayerKey, RenderObject};
+use crate::some_or_continue;
 
 pub struct LayoutTree {
     pub layer_objects: Vec<LayerObjectData>,

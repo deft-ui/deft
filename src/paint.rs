@@ -1,27 +1,18 @@
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::mem;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
-use log::debug;
-use measure_time::print_time;
-use skia_safe::{scalar, ClipOp, Color, Contains, IRect, Image, Matrix, Paint, Path, PathOp, Point, Rect, Vector};
+use skia_safe::{scalar, ClipOp, Color, Contains, Image, Matrix, Path, PathOp, Point, Rect, Vector};
 use skia_safe::Canvas;
-use skia_window::context::{RenderContext, UserContext};
 use skia_window::layer::Layer;
 use yoga::PositionType;
 use crate::base::{Id, IdKey};
 use crate::element::Element;
-use crate::mrc::Mrc;
 use crate::render::RenderFn;
 use crate::renderer::CpuRenderer;
-use crate::{some_or_break, some_or_continue, some_or_return};
-use crate::element::entry::Entry;
+use crate::{some_or_continue, some_or_return};
 use crate::render::layout_tree::LayoutTree;
 use crate::render::paint_object::{ElementPO, LayerPO};
-use crate::style::border_path::BorderPath;
-use crate::style::ColorHelper;
 
 thread_local! {
     pub static NEXT_UNIQUE_RECT_ID: Cell<u64> = Cell::new(1);
@@ -969,65 +960,73 @@ impl ClipPath {
 
 }
 
+#[cfg(test)]
+pub mod tests {
+    use log::debug;
+    use measure_time::print_time;
+    use skia_safe::{Matrix, Path, Rect, Vector};
+    use crate::paint::InvalidArea;
+    
 
-#[test]
-pub fn test_visible() {
-    let mut render = CpuRenderer::new(100, 100);
-    let mut area = InvalidArea::None;
-    area.add_rect(Some(&Rect::from_xywh(0.0, 0.0, 100.0, 100.0)));
-    area.add_rect(Some(&Rect::from_xywh(10.0, 70.0, 100.0, 100.0)));
-    area.add_rect(Some(&Rect::from_xywh(20.0, 40.0, 100.0, 100.0)));
-    area.add_rect(Some(&Rect::from_xywh(30.0, 40.0, 100.0, 100.0)));
-    area.add_rect(Some(&Rect::from_xywh(40.0, 40.0, 100.0, 100.0)));
-    area.add_rect(Some(&Rect::from_xywh(50.0, 40.0, 100.0, 100.0)));
+    #[test]
+    pub fn test_visible() {
+        let mut area = InvalidArea::None;
+        area.add_rect(Some(&Rect::from_xywh(0.0, 0.0, 100.0, 100.0)));
+        area.add_rect(Some(&Rect::from_xywh(10.0, 70.0, 100.0, 100.0)));
+        area.add_rect(Some(&Rect::from_xywh(20.0, 40.0, 100.0, 100.0)));
+        area.add_rect(Some(&Rect::from_xywh(30.0, 40.0, 100.0, 100.0)));
+        area.add_rect(Some(&Rect::from_xywh(40.0, 40.0, 100.0, 100.0)));
+        area.add_rect(Some(&Rect::from_xywh(50.0, 40.0, 100.0, 100.0)));
 
-    let rects = area.build(Rect::from_xywh(0.0, 0.0, 1000.0, 1000.0));
-    print_time!("check time");
-    for _ in 0..20000 {
-        rects.has_intersects(&Rect::new(40.0, 20.0, 80.0, 50.0));
-    }
-}
-
-#[test]
-pub fn test_rect_intersect() {
-    let mut rect = Rect::from_xywh(0.0, 0.0, 100.0, 100.0);
-    let rect2 = Rect::from_xywh(50.0, 50.0, 100.0, 100.0);
-    rect.intersect(&rect2);
-    debug!("{:?}", rect);
-}
-
-#[test]
-pub fn test_path() {
-    let empty_path = Path::new();
-    assert!(!empty_path.contains((0.0, 0.0)));
-
-    let rect = Rect::from_xywh(10.0, 70.0, 100.0, 100.0);
-    let mut path = Path::rect(rect, None);
-    assert!(!path.contains((0.0, 10.0)));
-    assert!(path.contains((30.0, 80.0)));
-}
-
-#[test]
-pub fn test_matrix() {
-    let mut matrix = Matrix::translate(Vector::new(100.0, 200.0));
-    matrix.post_scale((3.0, 3.0), None);
-    matrix.post_scale((2.0, -2.0), None);
-    let sx = 4.0;
-    let sy = 9.0;
-    let d = matrix.map_xy(sx, sy);
-    debug!("s={},{}", sx, sy);
-    debug!("d={},{}", d.x, d.y);
-
-    let invert_matrix = matrix.invert().unwrap();
-    let r = invert_matrix.map_xy(d.x, d.y);
-    debug!("r={}, {}", r.x, r.y);
-
-    {
-        print_time!("map rect time");
-        for i in 0..10000 {
-            let rect=  Rect::from_xywh(0.0, 0.0, i as f32, i as f32);
-            let p = matrix.map_rect(&rect);
+        let rects = area.build(Rect::from_xywh(0.0, 0.0, 1000.0, 1000.0));
+        print_time!("check time");
+        for _ in 0..20000 {
+            rects.has_intersects(&Rect::new(40.0, 20.0, 80.0, 50.0));
         }
     }
 
+    #[test]
+    pub fn test_rect_intersect() {
+        let mut rect = Rect::from_xywh(0.0, 0.0, 100.0, 100.0);
+        let rect2 = Rect::from_xywh(50.0, 50.0, 100.0, 100.0);
+        rect.intersect(&rect2);
+        debug!("{:?}", rect);
+    }
+
+    #[test]
+    pub fn test_path() {
+        let empty_path = Path::new();
+        assert!(!empty_path.contains((0.0, 0.0)));
+
+        let rect = Rect::from_xywh(10.0, 70.0, 100.0, 100.0);
+        let path = Path::rect(rect, None);
+        assert!(!path.contains((0.0, 10.0)));
+        assert!(path.contains((30.0, 80.0)));
+    }
+
+    #[test]
+    pub fn test_matrix() {
+        let mut matrix = Matrix::translate(Vector::new(100.0, 200.0));
+        matrix.post_scale((3.0, 3.0), None);
+        matrix.post_scale((2.0, -2.0), None);
+        let sx = 4.0;
+        let sy = 9.0;
+        let d = matrix.map_xy(sx, sy);
+        debug!("s={},{}", sx, sy);
+        debug!("d={},{}", d.x, d.y);
+
+        let invert_matrix = matrix.invert().unwrap();
+        let r = invert_matrix.map_xy(d.x, d.y);
+        debug!("r={}, {}", r.x, r.y);
+
+        {
+            print_time!("map rect time");
+            for i in 0..10000 {
+                let rect=  Rect::from_xywh(0.0, 0.0, i as f32, i as f32);
+                let _p = matrix.map_rect(&rect);
+            }
+        }
+
+    }
 }
+

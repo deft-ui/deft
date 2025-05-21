@@ -1,6 +1,4 @@
-use std::cell::RefCell;
-use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 const NANOS_PER_MILLI: u32 = 1_000_000;
 const NANOS_PER_FRAME: u64 = 16_666_666;

@@ -8,20 +8,17 @@ use crate as deft;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use anyhow::Error;
 use quick_js::{JsValue, ValueError};
-use skia_safe::{Canvas, Color, Font, FontMgr, Paint, Typeface};
+use skia_safe::{Color, Paint};
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 use deft_macros::{js_methods, mrc_object};
 use skia_safe::font_style::{Slant, Weight, Width};
-use swash::Style;
-use crate::base::{EventContext, MouseDetail, MouseEventType, Rect, TextUpdateDetail};
+use crate::base::{EventContext, MouseDetail, MouseEventType, Rect};
 use crate::color::parse_hex_color;
 use crate::element::{ElementBackend, Element, ElementWeak};
 use crate::element::text::text_paragraph::{ParagraphData, Line, ParagraphRef, TextParams};
 use crate::element::paragraph::ParagraphParams;
 use crate::element::paragraph::simple_paragraph_builder::SimpleParagraphBuilder;
-use crate::element::text::simple_text_paragraph::{SimpleTextParagraph, TextBlock};
 use crate::event::{FocusShiftEvent, TextUpdateEvent};
 use crate::font::family::FontFamilies;
 use crate::number::DeNan;
@@ -144,7 +141,7 @@ impl Text {
     pub fn insert_text(&mut self, caret: AtomOffset, text: &str) {
         let (caret_row, caret_col) = self.get_location_by_atom_offset(caret);
         let new_text = {
-            let mut pi = self.paragraph_ref.data.borrow_mut();
+            let pi = self.paragraph_ref.data.borrow_mut();
             let p = pi.lines.get(caret_row).unwrap();
             let mut new_text = p.get_text().to_string();
             let insert_pos = new_text.byte_index(caret_col);
@@ -216,7 +213,7 @@ impl Text {
         {
             let mut pi = self.paragraph_ref.data.borrow_mut();
             let is_ending = pi.lines.len() - 1 == line;
-            let mut ps = Self::build_lines(&new_text, &self.text_params, is_ending);
+            let ps = Self::build_lines(&new_text, &self.text_params, is_ending);
             pi.lines.remove(line);
             let mut idx = line;
             for p in ps {
@@ -261,7 +258,7 @@ impl Text {
         self.selection
     }
 
-    pub fn get_selection_text(&self) -> Option<(String)> {
+    pub fn get_selection_text(&self) -> Option<String> {
         self.get_selection_data().map(|(text, _, _)| text)
     }
 
@@ -577,8 +574,8 @@ pub fn intersect_range<T: Ord>(range1: (T, T), range2: (T, T)) -> Option<(T, T)>
 }
 
 impl ElementBackend for Text {
-    fn create(mut ele: &mut Element) -> Self {
-        let mut label = Self::new(ele.clone());
+    fn create(ele: &mut Element) -> Self {
+        let label = Self::new(ele.clone());
         ele.style.yoga_node.set_context(Some(Context::new(label.paragraph_ref.clone())));
         ele.style.yoga_node.set_measure_func(Some(measure_label));
         label
@@ -635,7 +632,7 @@ impl ElementBackend for Text {
         let selection = self.selection;
         let selection_paint = self.selection_paint.clone();
 
-        let mut line_renderers = self.with_lines_mut(|p_list| {
+        let line_renderers = self.with_lines_mut(|p_list| {
             let mut line_renders = Vec::with_capacity(p_list.len());
             let mut top = 0.0;
             let mut line_atom_offset = 0;
@@ -706,8 +703,8 @@ impl ElementBackend for Text {
         })
     }
 
-    fn execute_default_behavior(&mut self, event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) -> bool {
-        if let Some(d) = event.downcast_ref::<FocusShiftEvent>() {
+    fn execute_default_behavior(&mut self, event: &mut Box<dyn Any>, _ctx: &mut EventContext<ElementWeak>) -> bool {
+        if let Some(_d) = event.downcast_ref::<FocusShiftEvent>() {
             self.unselect();
         }
         false
@@ -753,7 +750,7 @@ pub fn test_get_caret_at_offset_coordinate() {
 #[test]
 pub fn test_get_caret_by_char_offset() {
     let mut el = Element::create(Text::create);
-    let text = el.get_backend_mut_as::<Text>();
+    let _text = el.get_backend_mut_as::<Text>();
     //TODO error because of missing event loop
     // text.set_text("abc".to_string());
     // assert_eq!((0, 2), text.get_location_by_atom_offset(2));

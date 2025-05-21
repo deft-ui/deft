@@ -2,15 +2,10 @@ use crate as deft;
 use std::collections::HashMap;
 use std::mem;
 use deft_macros::mrc_object;
-use log::debug;
 use quick_js::JsValue;
-use skia_safe::stroke_rec::Style;
-use skia_safe::wrapper::NativeTransmutableWrapper;
 use yoga::PositionType;
-use crate::computed::{ComputedValue, ComputedValueHandle};
-use crate::{some_or_break, some_or_continue, some_or_return};
 use crate::mrc::MrcWeak;
-use crate::style::{parse_border, parse_style_obj, PropValueParse, StyleBorder, StyleProp, StylePropKey, StylePropVal, StylePropertyValue};
+use crate::style::{parse_border, parse_style_obj, PropValueParse, StyleProp, StylePropKey, StylePropVal, StylePropertyValue};
 
 type CssValueResolver = Box<dyn Fn(&HashMap<String, String>) -> String>;
 
@@ -44,7 +39,6 @@ impl ParsedStyleProp {
         let list = StyleList::expand_style(key, value);
         for (k, v) in list {
             if let Some(compute_fn) = StyleList::parse_variables(&v) {
-                let key = some_or_continue!(StylePropKey::parse(&k));
                 result.push(ParsedStyleProp::Var(k.to_string(), v, Box::new(compute_fn), None));
             } else {
                 StyleList::str_to_style_prop(k, &v, &mut |p| {
@@ -57,8 +51,8 @@ impl ParsedStyleProp {
 
     pub fn resolve(&mut self, vars: &MrcWeak<HashMap<String, String>>) {
         match self {
-            ParsedStyleProp::Fixed(v) => {},
-            ParsedStyleProp::Var(key, v, resolver, resolved) => {
+            ParsedStyleProp::Fixed(_v) => {},
+            ParsedStyleProp::Var(key, _v, resolver, resolved) => {
                 *resolved = None;
                 if let Ok(vars) = vars.upgrade() {
                     let v = resolver(&vars);
@@ -76,7 +70,7 @@ impl ParsedStyleProp {
     pub fn key(&self) -> StylePropKey {
         match self {
             ParsedStyleProp::Fixed(p) => p.key(),
-            ParsedStyleProp::Var(k, v, _, _) => {
+            ParsedStyleProp::Var(k, _v, _, _) => {
                 //TODO no unwrap
                 StylePropKey::parse(k).unwrap()
             }
@@ -127,7 +121,7 @@ impl StyleList {
     }
 
     fn resolve_variables(table: &mut HashMap<StylePropKey, ParsedStyleProp>, variables: &MrcWeak<HashMap<String, String>>)  {
-        for (k, v) in table {
+        for (_k, v) in table {
             v.resolve(variables);
         }
     }
@@ -334,7 +328,7 @@ impl StyleList {
         char.is_ascii_alphanumeric() || char == '_' || char == '-'
     }
 
-    fn parse_variables(mut value: &str) -> Option<Box<dyn Fn(&HashMap<String, String>) -> String>> {
+    fn parse_variables(value: &str) -> Option<Box<dyn Fn(&HashMap<String, String>) -> String>> {
         let mut keys = Vec::new();
         let chars = value.chars().collect::<Vec<_>>();
         if chars.len() < 2 {
@@ -358,8 +352,7 @@ impl StyleList {
             let value = value.to_string();
             let compute = Box::new(move |variables: &HashMap<String, String>| {
                 let mut result = String::new();
-                let mut str = value.as_str();
-                let mut offset = 0;
+                let str = value.as_str();
                 let mut consumed = 0;
                 let empty = String::from("");
                 for (k, start) in &keys {
@@ -369,7 +362,6 @@ impl StyleList {
                     let var_value = variables.get(&k[1..]).unwrap_or(&empty);
                     result.push_str(&var_value);
                     consumed = start + k.len();
-                    offset += 1;
                 }
                 if str.len() > consumed {
                     result.push_str(&str[consumed..]);
@@ -384,13 +376,20 @@ impl StyleList {
 
 }
 
-#[test]
-fn test_style_manager() {
-    let style_vars = ComputedValue::new();
-    style_vars.update_value("height", "5".to_string());
-    let mut sm = StyleList::new();
-    // sm.bind_style_variables(&style_vars);
-    // sm.parse_style("width", "4");
-    // sm.parse_style("transform", "translate(0, $height)");
-    // style_vars.update_value("height", "6".to_string());
+#[cfg(test)]
+pub mod tests {
+    use crate::computed::ComputedValue;
+    
+
+    #[test]
+    fn test_style_manager() {
+        let style_vars = ComputedValue::new();
+        style_vars.update_value("height", "5".to_string());
+        // let sm = StyleList::new();
+        // sm.bind_style_variables(&style_vars);
+        // sm.parse_style("width", "4");
+        // sm.parse_style("transform", "translate(0, $height)");
+        // style_vars.update_value("height", "6".to_string());
+    }
 }
+

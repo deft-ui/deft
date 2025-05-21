@@ -1,6 +1,5 @@
-use crate::base::Id;
 use crate::{some_or_continue, some_or_return};
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -109,18 +108,27 @@ impl Drop for ComputedValueHandle {
     }
 }
 
-#[test]
-fn test_computed_value() {
-    let mut cv = ComputedValue::new();
-    let counter = Rc::new(Cell::new(0));
-    {
-        let counter2 = counter.clone();
-        let h1 = cv.dep(&vec!["counter".to_string()], move|v| {
-            counter2.set(v[0]);
-        });
-        cv.update_value("counter", 1);
+#[cfg(test)]
+mod tests {
+    use std::cell::Cell;
+    use std::rc::Rc;
+    use crate::computed::ComputedValue;
+
+    #[test]
+    fn test_computed_value() {
+        let cv = ComputedValue::new();
+        let counter = Rc::new(Cell::new(0));
+        {
+            let counter2 = counter.clone();
+            let _h1 = cv.dep(&vec!["counter".to_string()], move|v| {
+                counter2.set(v[0]);
+            });
+            cv.update_value("counter", 1);
+            assert_eq!(counter.get(), 1);
+        }
+        cv.update_value("counter", 2);
         assert_eq!(counter.get(), 1);
     }
-    cv.update_value("counter", 2);
-    assert_eq!(counter.get(), 1);
+
 }
+

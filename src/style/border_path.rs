@@ -1,5 +1,4 @@
 use crate::border::{build_border_paths, build_rect_with_radius};
-use crate::style::BorderParams;
 use skia_safe::Path;
 
 pub struct BorderPath {
@@ -36,7 +35,7 @@ impl BorderPath {
             let p = build_rect_with_radius(self.radius, self.box_width, self.box_height);
             self.box_path = Some(p);
         }
-        unsafe { self.box_path.as_ref().unwrap() }
+        self.box_path.as_ref().unwrap()
     }
 
     pub fn get_paths(&mut self) -> &[Path; 4] {
@@ -45,7 +44,7 @@ impl BorderPath {
                 build_border_paths(self.widths, self.radius, self.box_width, self.box_height);
             self.path = Some(path);
         }
-        unsafe { self.path.as_ref().unwrap() }
+        self.path.as_ref().unwrap()
     }
 
     fn has_border(&self) -> bool {

@@ -1,17 +1,14 @@
 use crate as deft;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use anyhow::{anyhow, Error};
-use log::{debug, info, warn};
-use quick_js::{JsValue, ResourceValue, ValueError};
+use log::{debug, warn};
 use serde::{Deserialize, Serialize};
 use winit::event::WindowEvent;
 #[cfg(x11_platform)]
 use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{WindowId as WinitWindowId};
 
-use crate::app::{exit_app};
-use crate::element::{ElementBackend, Element};
+use crate::element::Element;
 use crate::{js_deserialize, js_weak_value};
 use crate::window::{Window, WindowWeak};
 

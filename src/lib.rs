@@ -1,34 +1,12 @@
-#![allow(unused)]
 #![allow(dead_code)]
-#![allow(unused_variables)]
 #![allow(deprecated)]
 
-use crate::app::{WinitApp, AppEvent, AppEventPayload, IApp, App};
-use crate::data_dir::get_data_path;
-use crate::element::text::text_paragraph::TextParams;
-use crate::element::text::{Text};
-use crate::element::ScrollByOption;
-use crate::js::js_deserialze::JsDeserializer;
-use crate::loader::{StaticModuleLoader};
-use crate::renderer::CpuRenderer;
-use futures_util::StreamExt;
-use measure_time::{debug_time, info, print_time};
-use quick_js::loader::FsJsModuleLoader;
-use serde::{Deserialize, Serialize};
-use skia_safe::{Font, FontMetrics, FontStyle, Paint};
-use skia_window::skia_window::{RenderBackendType, SkiaWindow};
-use std::collections::HashMap;
-use std::env;
-use std::str::FromStr;
-use std::sync::{Arc, Condvar, Mutex, OnceLock};
-use std::time::SystemTime;
+use crate::app::{WinitApp, AppEvent, AppEventPayload, App};
+use measure_time::debug_time;
+use std::sync::OnceLock;
 use anyhow::{anyhow, Error};
-use winit::application::ApplicationHandler;
-use winit::event::WindowEvent;
 #[cfg(target_os = "android")]
 use winit::platform::android::activity::AndroidApp;
-use winit::window::{WindowAttributes, WindowId};
-use yoga::Node;
 
 pub use quick_js::JsValue;
 pub use winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopBuilder, EventLoopProxy};
@@ -84,16 +62,9 @@ mod font;
 mod platform;
 
 pub use deft_macros::*;
-use log::debug;
-use skia_safe::font_style::{Weight, Width};
-use skia_safe::font_style::Slant::Upright;
-use skia_safe::wrapper::ValueWrapper;
-use yoga::Direction::LTR;
 use crate::base::ResultWaiter;
 use crate::console::init_console;
 use crate::event_loop::{AppEventProxy};
-use crate::string::StringUtils;
-use crate::text::break_lines;
 
 pub static APP_EVENT_PROXY: OnceLock<AppEventProxy> = OnceLock::new();
 
@@ -162,12 +133,12 @@ pub fn android_bootstrap(app: AndroidApp, deft_app: App) {
     // info!("starting");
     if let Some(p) = app.internal_data_path() {
         let data_path = p.into_os_string().to_string_lossy().to_string();
-        debug!("internal data_path:{}", data_path);
+        log::debug!("internal data_path:{}", data_path);
         unsafe {
             std::env::set_var(data_dir::ENV_KEY, data_path);
         }
     }
-    debug!("data path: {:?}", data_dir::get_data_path(""));
+    log::debug!("data path: {:?}", data_dir::get_data_path(""));
     let event_loop = EventLoop::with_user_event().with_android_app(app).build().unwrap();
     run_event_loop(event_loop, deft_app);
 }

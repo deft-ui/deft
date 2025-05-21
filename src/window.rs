@@ -1,60 +1,41 @@
 use crate as deft;
-use crate::app::{exit_app, AppEvent, AppEventPayload, InsetType};
+use crate::app::{exit_app, AppEvent, InsetType};
 use crate::base::MouseEventType::{MouseClick, MouseUp};
-use crate::base::{Callback, Event, EventContext, EventHandler, EventListener, EventRegistration, JsValueContext, MouseDetail, MouseEventType, ResultWaiter, Touch, TouchDetail, UnsafeFnOnce};
-use crate::canvas_util::CanvasHelper;
+use crate::base::{Callback, EventContext, EventHandler, EventListener, EventRegistration, JsValueContext, MouseDetail, MouseEventType, ResultWaiter, Touch, TouchDetail};
 use crate::cursor::search_cursor;
-use crate::element::{Element, ElementBackend, ElementWeak, PaintInfo};
-use crate::event::{build_modifier, named_key_to_str, str_to_named_key, BlurEvent, CaretChangeEventListener, ClickEvent, ContextMenuEvent, DragOverEvent, DragStartEvent, DropEvent, DroppedFileEvent, FocusEvent, FocusShiftEvent, HoveredFileEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent, MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, TextInputEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT};
-use crate::event_loop::{create_event_loop_proxy, run_with_event_loop};
-use crate::ext::common::create_event_handler;
+use crate::element::{Element};
+use crate::event::{build_modifier, named_key_to_str, str_to_named_key, BlurEvent, ClickEvent, ContextMenuEvent, DragOverEvent, DragStartEvent, DropEvent, DroppedFileEvent, FocusEvent, FocusShiftEvent, HoveredFileEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent, MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, TextInputEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT};
+use crate::event_loop::run_with_event_loop;
 use crate::ext::ext_window::{WindowAttrs, WINDOWS, WINDOW_TYPE_MENU, WINDOW_TYPE_NORMAL, MODAL_TO_OWNERS, WINIT_TO_WINDOW};
 use crate::js::JsError;
 use crate::mrc::{Mrc, MrcWeak};
-use crate::renderer::CpuRenderer;
-use crate::timer::{set_timeout, set_timeout_nanos, TimerHandle};
-use anyhow::{anyhow, Error};
-use deft_macros::{event, window_event, js_func, js_methods, mrc_object};
-use measure_time::print_time;
-use quick_js::{JsValue, ResourceValue};
-use skia_safe::{Canvas, ClipOp, Color, ColorType, Contains, IRect, Image, ImageInfo, Matrix, Paint, PaintStyle, Path, Point, Rect};
+use crate::timer::{set_timeout_nanos, TimerHandle};
+use anyhow::Error;
+use deft_macros::{window_event, js_methods, mrc_object};
+use quick_js::JsValue;
+use skia_safe::{Color, Point, Rect};
 use skia_window::skia_window::{RenderBackendType, SkiaWindow};
-use std::cell::{Cell, RefCell};
-use std::collections::{HashMap, HashSet};
-use std::num::NonZeroU32;
-use std::ops::{Deref, DerefMut};
-use std::process::exit;
-use std::rc::Rc;
-use std::{env, mem, slice};
+use std::cell::Cell;
+use std::collections::HashMap;
+use std::env;
 use std::string::ToString;
-use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
-use log::debug;
-use skia_safe::canvas::SetMatrix;
-use skia_safe::wrapper::{NativeTransmutableWrapper, PointerWrapper};
-use skia_window::context::RenderContext;
-use skia_window::layer::Layer;
+use log::{debug, error};
 use skia_window::renderer::Renderer;
 use winit::dpi::Position::Logical;
-use winit::dpi::{LogicalPosition, LogicalSize, Position, Size};
-use winit::error::ExternalError;
+use winit::dpi::{LogicalPosition, LogicalSize, Size};
 use winit::event::{ElementState, Ime, Modifiers, MouseButton, MouseScrollDelta, TouchPhase, WindowEvent};
-use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use winit::keyboard::{Key, KeyCode, NamedKey, PhysicalKey};
 #[cfg(x11_platform)]
 use winit::platform::x11::WindowAttributesExtX11;
-use winit::window::{Cursor, CursorGrabMode, CursorIcon, Fullscreen, ResizeDirection, WindowAttributes, WindowId};
-use crate::{bind_js_event_listener, ok_or_return, platform, send_app_event, show_focus_hint, show_repaint_area, some_or_continue, some_or_return, warn_time};
-use crate::computed::ComputedValue;
-use crate::element::button::Button;
+use winit::window::{Cursor, CursorIcon, Fullscreen, ResizeDirection, WindowAttributes, WindowId};
+use crate::{bind_js_event_listener, ok_or_return, send_app_event, show_focus_hint, some_or_return, warn_time};
 use crate::frame_rate::{FrameRateController};
 use crate::layout::LayoutRoot;
-use crate::paint::{InvalidArea, PartialInvalidArea, RenderTree, UniqueRect, InvalidRects, MatrixCalculator, RenderLayerKey, LayerState, PaintContext, Painter};
-use crate::render::paint_object::{ElementPO};
+use crate::paint::{RenderTree, PaintContext, Painter};
 use crate::render::painter::{ElementPainter};
 use crate::resource_table::ResourceTable;
-use crate::style::border_path::BorderPath;
-use crate::style::{ColorHelper, LengthContext};
+use crate::style::LengthContext;
 
 #[derive(Clone)]
 struct MouseDownInfo {
@@ -220,7 +201,7 @@ impl Window {
         );
         let render_backend_types = RenderBackendType::merge(&user_pf_backends, &env_pf_backends);
         let render_backend_types = RenderBackendType::merge(&render_backend_types, &RenderBackendType::all());
-        let mut window = Self::create_window(attributes.clone(), &render_backend_types);
+        let window = Self::create_window(attributes.clone(), &render_backend_types);
         window.set_ime_allowed(true);
         let state = WindowData {
             id,
@@ -305,7 +286,7 @@ impl Window {
     pub fn notify_update(&mut self) {
         if !self.dirty {
             self.dirty = true;
-            send_app_event(AppEvent::Update(self.get_id()));
+            send_app_event(AppEvent::Update(self.get_id())).unwrap();
         }
     }
 
@@ -318,7 +299,7 @@ impl Window {
 
     pub fn mark_dirty_and_update_immediate(&mut self, layout_dirty: bool) -> ResultWaiter<bool> {
         if let Some(body) = &mut self.body {
-            body.mark_dirty(true);
+            body.mark_dirty(layout_dirty);
         }
         self.update()
     }
@@ -486,7 +467,7 @@ impl Window {
                     PhysicalKey::Code(c) => {
                         get_scancode(c)
                     },
-                    PhysicalKey::Unidentified(e) => None,
+                    PhysicalKey::Unidentified(_e) => None,
                 };
                 let key = match &event.logical_key {
                     Key::Named(n) => {Some(named_key_to_str(n).to_string())},
@@ -523,7 +504,9 @@ impl Window {
             WindowEvent::MouseInput { button, state, .. } => {
                 // debug!("mouse:{:?}:{:?}", button, state);
                 if let Some((dir, _)) = self.get_resize_direction() {
-                    self.window.drag_resize_window(dir);
+                    if let Err(e) = self.window.drag_resize_window(dir) {
+                        error!("Failed to drag resize window: {:?}", e);
+                    }
                     return;
                 }
                 if treat_mouse_as_touch() {
@@ -573,7 +556,6 @@ impl Window {
                 self.emit_touch_event(touch.id, touch.phase, loc.x, loc.y);
             }
             WindowEvent::Focused(focus) => {
-                let target = self.as_weak();
                 if focus {
                     self.emit(WindowFocusEvent);
                 } else {
@@ -617,7 +599,7 @@ impl Window {
         self.event_registration.unregister_event_listener(id)
     }
 
-    pub fn register_event_listener<T: 'static, H: EventListener<T, WindowWeak> + 'static>(&mut self, mut listener: H) -> u32 {
+    pub fn register_event_listener<T: 'static, H: EventListener<T, WindowWeak> + 'static>(&mut self, listener: H) -> u32 {
         self.event_registration.register_event_listener(listener)
     }
 
@@ -630,7 +612,7 @@ impl Window {
         self.event_registration.remove_event_listener(&event_type, id)
     }
 
-    pub fn on_element_removed(&mut self, element: &Element) {
+    pub fn on_element_removed(&mut self, _element: &Element) {
         if let Some(f) = &self.focusing {
             if f.get_window().is_none() {
                 self.focusing = self.body.clone();
@@ -760,7 +742,7 @@ impl Window {
         //TODO impl
 
         if let Some((mut node, _, _)) = self.get_node_by_point() {
-            let (e_type, event_type) = match state {
+            let (_e_type, event_type) = match state {
                 ElementState::Pressed =>("mousedown", MouseEventType::MouseDown),
                 ElementState::Released => ("mouseup", MouseEventType::MouseUp),
             };
@@ -806,13 +788,13 @@ impl Window {
     }
 
     pub fn emit_dropped_file_event(&mut self, window_x: f64, window_y: f64, path: String) -> Option<()> {
-        let (mut node, relative_x, relative_y) = self.get_node_by_pos(window_x as f32, window_y as f32)?;
+        let (mut node, _relative_x, _relative_y) = self.get_node_by_pos(window_x as f32, window_y as f32)?;
         node.emit(DroppedFileEvent(path));
         Some(())
     }
 
     pub fn emit_hovered_file_event(&mut self, window_x: f64, window_y: f64, path: String) -> Option<()> {
-        let (mut node, relative_x, relative_y) = self.get_node_by_pos(window_x as f32, window_y as f32)?;
+        let (mut node, _relative_x, _relative_y) = self.get_node_by_pos(window_x as f32, window_y as f32)?;
         node.emit(HoveredFileEvent(path));
         Some(())
     }
@@ -825,7 +807,6 @@ impl Window {
                 TouchPhase::Moved => "touchmove",
                 TouchPhase::Cancelled => "touchcancel",
             };
-            let node_bounds = node.get_origin_bounds();
             let (border_top, _, _, border_left) = node.get_border_width();
 
             let offset_x = relative_x - border_left;
@@ -965,7 +946,7 @@ impl Window {
         } else {
             win_width
         };
-        let mut height = if auto_size {
+        let height = if auto_size {
             self.init_height.unwrap_or(f32::NAN)
         } else {
             win_height
@@ -993,7 +974,6 @@ impl Window {
         }
         let sleep_time = self.frame_rate_controller.next_frame();
         if sleep_time > 0 {
-            let window_id = self.get_id();
             let mut me = self.clone();
             let next_frame_timer_handle = set_timeout_nanos(move || {
                 me.next_frame_timer_handle = None;
@@ -1104,14 +1084,14 @@ impl Window {
     pub fn request_next_frame_callback(&mut self, callback: Callback) {
         self.next_frame_callbacks.push(callback);
         if self.next_frame_callbacks.len() == 1 {
-            send_app_event(AppEvent::Update(self.get_id()));
+            send_app_event(AppEvent::Update(self.get_id())).unwrap();
         }
     }
 
     pub fn request_next_paint_callback(&mut self, callback: Callback) {
         self.next_paint_callbacks.push(callback);
         if self.next_paint_callbacks.len() == 1 {
-            send_app_event(AppEvent::Update(self.get_id()));
+            send_app_event(AppEvent::Update(self.get_id())).unwrap();
         }
     }
 
@@ -1162,7 +1142,7 @@ impl Window {
             canvas.restore();
         }), move|r| {
             waiter_finisher.finish(r);
-            send_app_event(AppEvent::RenderIdle(window_id));
+            send_app_event(AppEvent::RenderIdle(window_id)).unwrap();
         });
         waiter
     }
@@ -1237,8 +1217,8 @@ impl Window {
         run_with_event_loop(|el| {
             debug!("render backends: {:?}", backend_types);
             for bt in backend_types {
-                let mut init_attributes = attributes.clone().with_visible(false);
-                if let Some(mut sw) = SkiaWindow::new(el, init_attributes, *bt) {
+                let init_attributes = attributes.clone().with_visible(false);
+                if let Some(sw) = SkiaWindow::new(el, init_attributes, *bt) {
                     if attributes.visible {
                         sw.set_visible(true);
                     }
@@ -1270,8 +1250,11 @@ fn get_scancode(code: KeyCode) -> Option<u32> {
         use winit::platform::scancode::PhysicalKeyExtScancode;
         return code.to_scancode();
     }
-    #[allow(dead_code)]
-    return None;
+    #[cfg(not(any(windows_platform, macos_platform, x11_platform, wayland_platform)))]
+    {
+        let _ = code;
+        None
+    }
 }
 
 pub fn build_render_nodes(root: &mut Element) -> RenderTree {

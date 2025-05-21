@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 #[macro_export]
 macro_rules! set_style {
     ($element: expr, { $($key: expr => $value: expr,)* }) => {

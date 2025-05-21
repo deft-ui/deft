@@ -1,18 +1,18 @@
 use std::any::Any;
 use std::collections::HashMap;
 use crate as deft;
-use deft_macros::{element_backend, event, js_func, js_methods};
+use deft_macros::{element_backend, event, js_methods};
 use quick_js::JsValue;
 use yoga::{Align, Display, FlexDirection};
 use crate::element::{Element, ElementBackend, ElementWeak};
 use crate::element::container::Container;
 use crate::element::image::Image;
 use crate::element::text::Text;
-use crate::{bind_js_event_listener, ok_or_return, some_or_return};
+use crate::ok_or_return;
 use crate::base::EventContext;
 use crate::element::util::is_form_event;
 use crate::event::{ClickEvent};
-use crate::js::{FromJsValue, JsError};
+use crate::js::FromJsValue;
 use crate::style::{LengthOrPercent, StyleProp, StylePropVal};
 use crate::style_list::ParsedStyleProp;
 
@@ -112,12 +112,12 @@ impl ElementBackend for Checkbox {
             StyleProp::Width(StylePropVal::Custom(LengthOrPercent::Percent(100.0))),
             StyleProp::Height(StylePropVal::Custom(LengthOrPercent::Percent(100.0))),
         ]);
-        box_element.add_child(img_element.clone(), 0);
+        box_element.add_child(img_element.clone(), 0).unwrap();
 
-        wrapper_element.add_child(box_element.clone(), 0);
-        wrapper_element.add_child(label_element.clone(), 1);
+        wrapper_element.add_child(box_element.clone(), 0).unwrap();
+        wrapper_element.add_child(label_element.clone(), 1).unwrap();
 
-        element.add_child(wrapper_element.clone(), 0);
+        element.add_child(wrapper_element.clone(), 0).unwrap();
         wrapper_element.set_style_props(vec![
             StyleProp::AlignItems(StylePropVal::Custom(Align::Center)),
             StyleProp::FlexDirection(StylePropVal::Custom(FlexDirection::Row)),

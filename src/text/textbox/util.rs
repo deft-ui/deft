@@ -38,7 +38,7 @@ pub fn parse_optional_text_decoration(value: Option<&String>) -> TextDecoration 
 pub fn parse_text_decoration(value: &str) -> TextDecoration {
     let mut decoration = TextDecoration::default();
     for ty in value.split(" ") {
-        let t = match value {
+        let t = match ty {
             "none" => TextDecoration::NO_DECORATION,
             "underline" => TextDecoration::UNDERLINE,
             "overline" => TextDecoration::OVERLINE,

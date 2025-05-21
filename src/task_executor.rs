@@ -1,5 +1,5 @@
 use std::sync::mpsc::Sender;
-use std::sync::{mpsc, Arc, Barrier, Mutex};
+use std::sync::mpsc;
 use std::thread;
 
 pub struct TaskExecutor<I> {

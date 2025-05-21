@@ -2,6 +2,7 @@ use deft::app::{App, IApp};
 use deft::js::js_engine::JsEngine;
 use deft::loader::StaticModuleLoader;
 use quick_js::loader::JsModuleLoader;
+use deft::bootstrap;
 
 struct AppImpl {}
 
@@ -21,6 +22,11 @@ impl IApp for AppImpl {
         );
         Box::new(ml)
     }
+}
+
+fn main() {
+    let app = App::new(AppImpl {});
+    bootstrap(app);
 }
 
 #[cfg(target_env = "ohos")]

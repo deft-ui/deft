@@ -2,8 +2,6 @@ use std::collections::HashSet;
 use std::ops::Deref;
 
 use winit::event_loop::ActiveEventLoop;
-#[cfg(target_os = "android")]
-use winit::platform::android::activity::AndroidApp;
 use winit::window::{Window, WindowAttributes};
 use crate::renderer::Renderer;
 use crate::soft::SoftSurface;

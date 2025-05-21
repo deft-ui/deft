@@ -7,7 +7,7 @@ use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
 use tokio::fs::File;
 use tokio_util::codec::{BytesCodec, FramedRead};
-use deft_macros::{js_func, js_methods};
+use deft_macros::js_methods;
 use crate::{js_deserialize, js_serialize};
 
 pub struct HttpOptions {}

@@ -1,15 +1,12 @@
 use crate as deft;
 use std::fs::File;
 use std::io::Cursor;
-use std::rc::Rc;
 use anyhow::Error;
 use base64::Engine;
 use base64::prelude::*;
 use deft_macros::{element_backend, js_methods};
 use image::ImageReader;
-use quick_js::JsValue;
-use skia_safe::{Canvas, Color, Paint};
-use skia_safe::resources::{LocalResourceProvider, NativeResourceProvider};
+use log::error;
 use skia_safe::svg::Dom;
 use skia_safe::wrapper::PointerWrapper;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
@@ -21,7 +18,7 @@ use crate::{ok_or_return};
 use crate::render::RenderFn;
 use crate::style::StylePropKey;
 
-extern "C" fn measure_image(node_ref: NodeRef, width: f32, _mode: MeasureMode, _height: f32, _height_mode: MeasureMode) -> Size {
+extern "C" fn measure_image(node_ref: NodeRef, _width: f32, _mode: MeasureMode, _height: f32, _height_mode: MeasureMode) -> Size {
     if let Some(ctx) = Node::get_context(&node_ref) {
         if let Some(img) = ctx.downcast_ref::<ImageSrc>() {
             let (width, height) = img.get_size();
@@ -123,6 +120,7 @@ impl Image {
                 ImageSrc::Img(sk_img)
             },
             Err(e) => {
+                error!("Failed to load image: {:?}", e);
                 ImageSrc::None
             }
         }
@@ -147,7 +145,7 @@ impl Image {
 }
 
 impl ElementBackend for Image {
-    fn create(mut element: &mut Element) -> Self {
+    fn create(element: &mut Element) -> Self {
         element.style.yoga_node.set_measure_func(Some(measure_image));
         ImageData {
             element: element.as_weak(),
@@ -167,7 +165,7 @@ impl ElementBackend for Image {
     fn handle_style_changed(&mut self, key: StylePropKey) {
         match key {
             StylePropKey::Color => {
-                if let ImageSrc::Svg(dom) = &mut self.img {
+                if let ImageSrc::Svg(_dom) = &mut self.img {
                     self.element.mark_dirty(false);
                 }
             },
@@ -182,7 +180,7 @@ impl ElementBackend for Image {
         let img = self.img.clone();
 
         let element = self.element.clone();
-        let mut element = element.upgrade_mut().unwrap();
+        let element = element.upgrade_mut().unwrap();
         let color = element.style.color;
         
         RenderFn::new(move |painter| {

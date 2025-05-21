@@ -4,43 +4,34 @@ use std::cell::Cell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::string::ToString;
-use anyhow::Error;
-use ordered_float::OrderedFloat;
 use quick_js::{JsValue, ValueError};
-use skia_safe::{Canvas, Color, Font, Paint};
-use skia_safe::wrapper::NativeTransmutableWrapper;
+use skia_safe::{Color, Paint};
 use winit::dpi::{LogicalPosition, LogicalSize, Size};
 use winit::keyboard::NamedKey;
 use winit::window::CursorIcon;
-use yoga::{Context, MeasureMode, Node, NodeRef, PositionType, StyleUnit};
+use yoga::{Context, MeasureMode, Node, NodeRef};
 use deft_macros::{element_backend, js_methods};
-use measure_time::print_time;
 use serde::{Deserialize, Serialize};
-use crate::base::{Callback, CaretDetail, EventContext, MouseDetail, MouseEventType, Rect, StateMarker, TextChangeDetail, TextUpdateDetail};
+use crate::base::{Callback, EventContext, Rect, StateMarker};
 use crate::element::{ElementBackend, Element, ElementWeak};
-use crate::element::text::{AtomOffset, Text as Label};
 use crate::number::DeNan;
-use crate::{js_deserialize, js_serialize, ok_or_return, timer};
+use crate::{ok_or_return, timer};
 use crate::app::AppEvent;
 use crate::canvas_util::CanvasHelper;
 use crate::element::common::ScrollBar;
 use crate::element::edit_history::{EditHistory, EditOpType};
-use crate::element::scroll::{Scroll, ScrollBarStrategy, ScrollWeak};
-use crate::element::text::text_paragraph::Line;
+use crate::element::scroll::ScrollBarStrategy;
 use crate::element::util::is_form_event;
-use crate::event::{BlurEvent, BoundsChangeEvent, CaretChangeEvent, ClickEvent, FocusEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, ScrollEvent, SelectEndEvent, SelectMoveEvent, SelectStartEvent, TextChangeEvent, TextInputEvent, TextUpdateEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
-use crate::event_loop::{create_event_loop_callback, create_event_loop_proxy};
+use crate::event::{BlurEvent, BoundsChangeEvent, CaretChangeEvent, FocusEvent, KeyDownEvent, KeyEventDetail, MouseLeaveEvent, MouseMoveEvent, ScrollEvent, TextChangeEvent, TextInputEvent, TextUpdateEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
+use crate::event_loop::create_event_loop_proxy;
 use crate::js::{FromJsValue, ToJsValue};
-use crate::window::Window;
 use crate::render::RenderFn;
 use crate::string::StringUtils;
-use crate::style::{Length, LengthContext, LengthOrPercent, ResolvedStyleProp, StyleProp, StylePropKey, StylePropVal, YogaNode};
-use crate::style::StyleProp::{BackgroundColor, Display, Left, MinWidth, Position, Top};
-use crate::style::StylePropKey::Height;
+use crate::style::{StyleProp, StylePropKey, StylePropVal};
 use crate::style_list::ParsedStyleProp;
 use crate::text::TextAlign;
 use crate::text::textbox::{TextBox, TextCoord, TextElement, TextUnit};
-use crate::timer::{set_timeout, TimerHandle};
+use crate::timer::TimerHandle;
 
 const COPY_KEY: &str = "\x03";
 const PASTE_KEY: &str = "\x16";
@@ -82,9 +73,9 @@ impl FromJsValue for InputType {
 extern "C" fn measure_entry(
     node_ref: NodeRef,
     width: f32,
-    width_mode: MeasureMode,
+    _width_mode: MeasureMode,
     height: f32,
-    height_mode: MeasureMode,
+    _height_mode: MeasureMode,
 ) -> yoga::Size {
     let default_size = yoga::Size {
         width: 0.0,
@@ -188,7 +179,7 @@ impl Entry {
     }
 
     #[js_func]
-    pub fn set_placeholder_style(&mut self, style: JsValue) {
+    pub fn set_placeholder_style(&mut self, _style: JsValue) {
         //TODO impl
         // self.placeholder_element.update_style(style, false);
     }
@@ -277,13 +268,12 @@ impl Entry {
     }
 
     fn get_caret_pixels_position(&self) -> Option<Rect> {
-        let mut element = self.element.upgrade_mut().ok()?;
+        let element = self.element.upgrade_mut().ok()?;
         let scroll_left = element.get_scroll_left();
         let scroll_top = element.get_scroll_top();
 
         let mut me = self.clone();
         let caret_rect = me.paragraph.get_caret_rect()?;
-        let caret_visible = self.caret_visible.get();
         let x = caret_rect.x - scroll_left;
         let y = caret_rect.y - scroll_top;
         Some(Rect::new(x, y, 1.0, caret_rect.height))
@@ -291,9 +281,9 @@ impl Entry {
 
     fn update_ime(&self) -> Option<()> {
         let pos = self.get_caret_pixels_position()?;
-        let mut el = self.element.upgrade_mut().ok()?;
+        let el = self.element.upgrade_mut().ok()?;
         let win = el.get_window()?;
-        let mut win = win.upgrade_mut().ok()?;
+        let win = win.upgrade_mut().ok()?;
         //TOOD use transformed position
         let el_offset = el.get_origin_bounds();
         let x = (el_offset.x + pos.x) as f64;
@@ -308,7 +298,7 @@ impl Entry {
         Some(())
     }
 
-    fn move_caret(&mut self, mut delta: isize) {
+    fn move_caret(&mut self, delta: isize) {
         self.paragraph.move_caret(delta);
     }
 
@@ -334,7 +324,7 @@ impl Entry {
             //TODO do not use loop callback?
             // Note: here use loop callback because of paragraph has not been layout when receive caret change event
             let mut me = self.clone();
-            let mut element = ok_or_return!(self.element.upgrade_mut());
+            let element = ok_or_return!(self.element.upgrade_mut());
             let callback = Callback::new(move || {
                 me.update_ime();
                 me.emit_caret_change();
@@ -346,7 +336,7 @@ impl Entry {
     }
 
     fn emit_caret_change(&mut self) {
-        let mut element = ok_or_return!(self.element.upgrade_mut());
+        let element = ok_or_return!(self.element.upgrade_mut());
         let origin_bounds = element.get_origin_bounds();
         let (border_top, _, _, border_left) = element.get_padding();
         let scroll_left = element.get_scroll_left();
@@ -513,7 +503,7 @@ impl Entry {
     fn insert_text(&mut self, input: &str, mut caret: TextCoord, record_history: bool) {
         if let Some((start, end)) = self.paragraph.get_selection() {
             if record_history {
-                let text= self.paragraph.get_selection_text().unwrap();
+                // let text= self.paragraph.get_selection_text().unwrap();
                 //TODO self.edit_history.record_delete(begin, &text);
             }
 
@@ -661,7 +651,7 @@ impl Entry {
 
 impl ElementBackend for Entry {
 
-    fn create(mut ele: &mut Element) -> Self {
+    fn create(ele: &mut Element) -> Self {
         ele.set_focusable(true);
         // let mut base = Scroll::create(ele);
         let mut paragraph = TextBox::new();
@@ -734,7 +724,7 @@ impl ElementBackend for Entry {
         }.to_ref();
         inst.set_multiple_line(false);
         {
-            let mut weak = inst.as_weak();
+            let weak = inst.as_weak();
             inst.paragraph.set_caret_change_callback(move || {
                 let mut entry = ok_or_return!(weak.upgrade());
                 entry.caret_change_marker.mark();
@@ -783,7 +773,7 @@ impl ElementBackend for Entry {
         if self.caret_change_marker.unmark() {
             self.ensure_caret_into_view();
         }
-        let mut element = ok_or_return!(self.element.upgrade(), RenderFn::empty());
+        let element = ok_or_return!(self.element.upgrade(), RenderFn::empty());
         let mut paint = Paint::default();
         paint.set_color(element.style.color);
 
@@ -835,16 +825,16 @@ impl ElementBackend for Entry {
         if self.paragraph.on_event(&event, ctx, offset_x, offset_y) {
             return;
         }
-        if let Some(e) = event.downcast_ref::<FocusEvent>() {
+        if let Some(_e) = event.downcast_ref::<FocusEvent>() {
             self.handle_focus();
-        } else if let Some(e) = event.downcast_ref::<BlurEvent>() {
+        } else if let Some(_e) = event.downcast_ref::<BlurEvent>() {
             self.handle_blur();
         } else if let Some(e) = event.downcast_ref::<TextInputEvent>() {
             self.insert_text(e.0.as_str(), self.paragraph.get_caret(), true);
-        } else if let Some(e) = event.downcast_ref::<ScrollEvent>() {
+        } else if let Some(_e) = event.downcast_ref::<ScrollEvent>() {
             //TODO update later?
             let _ = self.update_ime();
-        } else if let Some(e) = event.downcast_ref::<BoundsChangeEvent>() {
+        } else if let Some(_e) = event.downcast_ref::<BoundsChangeEvent>() {
             //TODO update later?
             let _ = self.update_ime();
         } else if let Some(e) = event.downcast_ref::<MouseMoveEvent>() {
@@ -856,7 +846,7 @@ impl ElementBackend for Entry {
             } else {
                 el.set_cursor(CursorIcon::Text);
             }
-        } else if let Some(e) = event.downcast_ref::<MouseLeaveEvent>() {
+        } else if let Some(_e) = event.downcast_ref::<MouseLeaveEvent>() {
             let mut el = ok_or_return!(self.element.upgrade());
             el.set_cursor(CursorIcon::Default);
         } else if let Some(e) = event.downcast_ref::<KeyDownEvent>() {
@@ -914,63 +904,73 @@ impl ElementBackend for Entry {
     }
 }
 
-#[test]
-fn test_performance() {
-    let mut entry_el = Element::create(Entry::create);
-    let mut entry_el2 = entry_el.clone();
-    let entry = entry_el.get_backend_mut_as::<Entry>();
-    entry.set_text(include_str!("../../Cargo.lock").to_string().repeat(10));
-    {
-        print_time!("layout time");
-        entry_el2.calculate_layout(1000.0, 100.0);
+#[cfg(test)]
+mod tests {
+    use measure_time::print_time;
+    use crate::element::{Element, ElementBackend};
+    use crate::element::entry::Entry;
+    use crate::string::StringUtils;
+    use crate::text::textbox::TextCoord;
+
+    #[test]
+    fn test_performance() {
+        let mut entry_el = Element::create(Entry::create);
+        let mut entry_el2 = entry_el.clone();
+        let entry = entry_el.get_backend_mut_as::<Entry>();
+        entry.set_text(include_str!("../../Cargo.lock").to_string().repeat(10));
+        {
+            print_time!("layout time");
+            entry_el2.calculate_layout(1000.0, 100.0);
+        }
+
+        print_time!("render paragraph");
+        // entry.paragraph.render();
     }
 
-    print_time!("render paragraph");
-    // entry.paragraph.render();
-}
 
+    #[test]
+    fn test_caret() {
+        let mut el = Element::create(Entry::create);
+        let entry = el.get_backend_mut_as::<Entry>();
+        entry.set_text("1\n12\n123\n1234".to_string());
+        // entry.caret = TextCoord::new((0, 0));
+        let expected_carets = vec![
+            TextCoord(0, 1),
+            TextCoord(1, 0), TextCoord(1, 1), TextCoord(1, 2),
+            TextCoord(2, 0), TextCoord(2, 1), TextCoord(2, 2), TextCoord(2, 3),
+            TextCoord(3, 0), TextCoord(3, 1), TextCoord(3, 2), TextCoord(3, 3), TextCoord(3, 4),
+        ];
+        for c in expected_carets {
+            entry.move_caret(1);
+            assert_eq!(entry.paragraph.get_caret(), c);
+        }
+    }
 
-#[test]
-fn test_caret() {
-    let mut el = Element::create(Entry::create);
-    let entry = el.get_backend_mut_as::<Entry>();
-    entry.set_text("1\n12\n123\n1234".to_string());
-    // entry.caret = TextCoord::new((0, 0));
-    let expected_carets = vec![
-        TextCoord(0, 1),
-        TextCoord(1, 0), TextCoord(1, 1), TextCoord(1, 2),
-        TextCoord(2, 0), TextCoord(2, 1), TextCoord(2, 2), TextCoord(2, 3),
-        TextCoord(3, 0), TextCoord(3, 1), TextCoord(3, 2), TextCoord(3, 3), TextCoord(3, 4),
-    ];
-    for c in expected_carets {
-        entry.move_caret(1);
-        assert_eq!(entry.paragraph.get_caret(), c);
+    //TODO error because of missing event loop
+    // #[test]
+    pub fn test_edit_history() {
+        let mut el = Element::create(Entry::create);
+        let entry = el.get_backend_mut_as::<Entry>();
+        let text1 = "hello";
+        let text2 = "world";
+        let text_all = "helloworld";
+        // input text1
+        entry.handle_input(text1);
+        assert_eq!(text1, entry.get_text());
+        // input text2
+        entry.handle_input(text2);
+        assert_eq!(text_all, entry.get_text());
+        // delete text2
+        // entry.paragraph.select(TextCoord(0, text1.chars_count()), TextCoord(0, text1.chars_count() + text2.chars_count()));
+        entry.handle_input("");
+        assert_eq!(text1, entry.get_text());
+        // undo
+        entry.undo();
+        assert_eq!(text_all, entry.get_text());
+        assert_eq!(text_all.chars_count(), entry.paragraph.get_caret().1);
+        entry.undo();
+        assert_eq!("", entry.get_text());
+        assert_eq!(0, entry.paragraph.get_caret().1);
     }
 }
 
-//TODO error because of missing event loop
-// #[test]
-pub fn test_edit_history() {
-    let mut el = Element::create(Entry::create);
-    let entry = el.get_backend_mut_as::<Entry>();
-    let text1 = "hello";
-    let text2 = "world";
-    let text_all = "helloworld";
-    // input text1
-    entry.handle_input(text1);
-    assert_eq!(text1, entry.get_text());
-    // input text2
-    entry.handle_input(text2);
-    assert_eq!(text_all, entry.get_text());
-    // delete text2
-    // entry.paragraph.select(TextCoord(0, text1.chars_count()), TextCoord(0, text1.chars_count() + text2.chars_count()));
-    entry.handle_input("");
-    assert_eq!(text1, entry.get_text());
-    // undo
-    entry.undo();
-    assert_eq!(text_all, entry.get_text());
-    assert_eq!(text_all.chars_count(), entry.paragraph.get_caret().1);
-    entry.undo();
-    assert_eq!("", entry.get_text());
-    assert_eq!(0, entry.paragraph.get_caret().1);
-}

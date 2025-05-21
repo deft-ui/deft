@@ -1,6 +1,4 @@
-use crate::element::button::Button;
-use crate::element::container::Container;
-use crate::element::{Element, ElementBackend, ElementData};
+use crate::element::{Element};
 use cssparser::{self, CowRcStr, ParseError, SourceLocation, ToCss};
 use selectors::attr::{AttrSelectorOperation, CaseSensitivity, NamespaceConstraint};
 use selectors::context::{MatchingMode, QuirksMode};
@@ -10,7 +8,6 @@ use selectors::parser::{
 };
 use selectors::{self, matching, OpaqueElement};
 use std::fmt;
-use std::fmt::Write;
 use anyhow::{anyhow, Error};
 use crate::some_or_return;
 
@@ -45,7 +42,7 @@ impl<'i> Parser<'i> for DeftParser {
 
     fn parse_non_ts_pseudo_class(
         &self,
-        location: SourceLocation,
+        _location: SourceLocation,
         name: CowRcStr<'i>,
     ) -> Result<PseudoClass, ParseError<'i, SelectorParseErrorKind<'i>>> {
         use self::PseudoClass::*;
@@ -58,7 +55,7 @@ impl<'i> Parser<'i> for DeftParser {
         }
     }
 
-    fn parse_pseudo_element(&self, location: SourceLocation, name: CowRcStr<'i>) -> Result<<Self::Impl as SelectorImpl>::PseudoElement, ParseError<'i, Self::Error>> {
+    fn parse_pseudo_element(&self, _location: SourceLocation, name: CowRcStr<'i>) -> Result<<Self::Impl as SelectorImpl>::PseudoElement, ParseError<'i, Self::Error>> {
         Ok(PseudoElement {
             name: name.to_string(),
         })
@@ -112,8 +109,7 @@ impl ToCss for PseudoElement {
     where
         W: fmt::Write,
     {
-        dest.write_str(&format!("::{}", self.name));
-        Ok(())
+        dest.write_str(&format!("::{}", self.name))
     }
 }
 
@@ -167,20 +163,20 @@ impl selectors::Element for Element {
     }
 
     #[inline]
-    fn has_namespace(&self, namespace: &Namespace) -> bool {
+    fn has_namespace(&self, _namespace: &Namespace) -> bool {
         //TODO fix
         false
     }
 
     #[inline]
-    fn is_same_type(&self, other: &Self) -> bool {
+    fn is_same_type(&self, _other: &Self) -> bool {
         //TODO fixme
         false
     }
     #[inline]
     fn attr_matches(
         &self,
-        ns: &NamespaceConstraint<&Namespace>,
+        _ns: &NamespaceConstraint<&Namespace>,
         local_name: &LocalName,
         operation: &AttrSelectorOperation<&String>,
     ) -> bool {
@@ -189,7 +185,7 @@ impl selectors::Element for Element {
             AttrSelectorOperation::Exists => {
                 true
             }
-            AttrSelectorOperation::WithValue { expected_value, operator, case_sensitivity } => {
+            AttrSelectorOperation::WithValue { expected_value, case_sensitivity, .. } => {
                 match case_sensitivity {
                     CaseSensitivity::CaseSensitive => {
                         attr == *expected_value
@@ -243,7 +239,7 @@ impl selectors::Element for Element {
     }
 
     #[inline]
-    fn has_id(&self, id: &LocalName, case_sensitivity: CaseSensitivity) -> bool {
+    fn has_id(&self, _id: &LocalName, _case_sensitivity: CaseSensitivity) -> bool {
         //TODO fix
         false
     }
@@ -406,22 +402,32 @@ impl Selector {
 
 }
 
-#[test]
-fn test_select() {
-    let btn_selector = Selectors::compile("button").unwrap();
-    let container_selector = Selectors::compile("container").unwrap();
-    let button = Element::create(Button::create);
-    let container = Element::create(Container::create);
-    assert!(btn_selector.matches(&button));
-    assert!(container_selector.matches(&container));
-    assert!(!btn_selector.matches(&container));
-    assert!(!container_selector.matches(&button));
+#[cfg(test)]
+pub mod tests {
+    use crate::element::button::Button;
+    use crate::element::container::Container;
+    use crate::element::{Element, ElementBackend};
+    use crate::style::select::Selectors;
+
+    #[test]
+    fn test_select() {
+        let btn_selector = Selectors::compile("button").unwrap();
+        let container_selector = Selectors::compile("container").unwrap();
+        let button = Element::create(Button::create);
+        let container = Element::create(Container::create);
+        assert!(btn_selector.matches(&button));
+        assert!(container_selector.matches(&container));
+        assert!(!btn_selector.matches(&container));
+        assert!(!container_selector.matches(&button));
+    }
+
+    #[test]
+    fn test_class() {
+        let selectors = Selectors::compile("p.a .b button").unwrap();
+        let selector = selectors.0.get(0).unwrap();
+        let classes = selector.get_classes();
+        assert_eq!(classes, &vec!["b", "a"]);
+    }
 }
 
-#[test]
-fn test_class() {
-    let selectors = Selectors::compile("p.a .b button").unwrap();
-    let selector = selectors.0.get(0).unwrap();
-    let classes = selector.get_classes();
-    assert_eq!(classes, &vec!["b", "a"]);
-}
+

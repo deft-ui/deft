@@ -1,23 +1,18 @@
 pub mod actor;
 pub mod css_actor;
 
-use crate as deft;
 use crate::mrc::Mrc;
-use crate::style::{ResolvedStyleProp, ScaleParams, StyleProp, StylePropKey, StylePropVal, StyleTransform, StyleTransformOp, TranslateLength, TranslateParams};
+use crate::style::{ScaleParams, StyleProp, StylePropKey, StylePropVal, StyleTransform, StyleTransformOp, TranslateLength, TranslateParams};
 use crate::timer::{set_timeout, set_timeout_nanos, TimerHandle};
-use crate::{js_value};
-use anyhow::{anyhow, Error};
 use ordered_float::OrderedFloat;
-use quick_js::JsValue;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::ops::Bound::{Excluded, Included};
 use std::time::{Instant, SystemTime};
 use log::debug;
 use yoga::StyleUnit;
-use crate::animation::actor::{AnimationAction, AnimationActor};
+use crate::animation::actor::AnimationActor;
 use crate::base::Callback;
-use crate::element::Element;
 use crate::window::WindowWeak;
 
 macro_rules! interpolate_values {
@@ -219,7 +214,7 @@ impl AnimationDef {
         self
     }
 
-    pub fn build(mut self) -> Animation {
+    pub fn build(self) -> Animation {
         let mut styles = HashMap::new();
         for (p, key_styles) in &self.key_frames {
             for s in key_styles {

@@ -1,13 +1,12 @@
 use crate as deft;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
-use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 
 use crate::base::{Event, EventRegistration};
 use crate::ext::audio_player::{AudioNotify, AudioServer, AudioSources};
 use crate::{js_deserialize, js_value};
-use anyhow::{anyhow, Error};
+use anyhow::{Error};
 use deft_macros::{js_methods, mrc_object};
 use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
@@ -53,7 +52,7 @@ pub struct AudioOptions {
 }
 
 fn handle_play_notify(elp: JsEventLoopProxy, id: u32, msg: AudioNotify) {
-    elp.schedule_macro_task(move || {
+    let _ = elp.schedule_macro_task(move || {
         let mut audio = PLAYING_MAP.with_borrow_mut(|m| m.get(&id).cloned());
         if let Some(a) = &mut audio {
             let target = a.clone();

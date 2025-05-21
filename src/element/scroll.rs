@@ -1,34 +1,30 @@
 use crate as deft;
 use std::any::Any;
 use std::collections::HashMap;
-use std::str::FromStr;
 use std::time::Instant;
 use bezier_rs::{Bezier, TValue};
 use deft_macros::{element_backend, js_methods};
 use log::debug;
-use measure_time::print_time;
 use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
-use skia_safe::{Canvas, Color, Paint, Path, Point};
+use skia_safe::{Color, Paint};
 use yoga::Direction::LTR;
-use yoga::{Context, MeasureMode, Node, NodeRef, Size, StyleUnit};
+use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 use crate::{backend_as_api, is_mobile_platform, js_deserialize, js_serialize, ok_or_return, some_or_return};
-use crate::animation::{AnimationDef, AnimationInstance, SimpleFrameController, WindowAnimationController};
-use crate::animation::actor::{AnimationAction, AnimationActor};
-use crate::base::{CaretDetail, EventContext, Rect};
+use crate::animation::{AnimationInstance, WindowAnimationController};
+use crate::animation::actor::AnimationActor;
+use crate::base::{EventContext, Rect};
 use crate::color::parse_hex_color;
-use crate::element::{ElementBackend, Element, ViewEvent, ElementWeak};
+use crate::element::{ElementBackend, Element, ElementWeak};
 use crate::element::container::Container;
-use crate::element::paragraph::ParagraphWeak;
 use crate::element::scroll::ScrollBarStrategy::{Always, Auto, Never};
 use crate::event::{CaretChangeEvent, MouseDownEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent};
 use crate::js::js_runtime::FromJsValue;
 use crate::js::JsError;
 use crate::layout::LayoutRoot;
 use crate::render::RenderFn;
-use crate::style::{Length, LengthContext, StyleProp, StylePropVal};
+use crate::style::{StyleProp, StylePropVal};
 use crate::style_list::ParsedStyleProp;
-use crate::timer::{set_timeout, TimerHandle};
 
 const MOMENTUM_DURATION: f32 = 200.0;
 const MOMENTUM_DISTANCE: f32 = 16.0;
@@ -76,9 +72,9 @@ backend_as_api!(ScrollBackend, Scroll, as_scroll, as_scroll_mut);
 extern "C" fn measure_scroll(
     node_ref: NodeRef,
     width: f32,
-    width_mode: MeasureMode,
+    _width_mode: MeasureMode,
     height: f32,
-    height_mode: MeasureMode,
+    _height_mode: MeasureMode,
 ) -> Size {
     if let Some(ctx) = Node::get_context(&node_ref) {
         if let Some(scroll) = ctx.downcast_ref::<ScrollWeak>() {
@@ -91,8 +87,6 @@ extern "C" fn measure_scroll(
                 }
                 let width = s.default_width.unwrap_or(s.real_content_width);
                 let height = s.default_height.unwrap_or(s.real_content_height);
-                let real_width = s.real_content_width;
-                let real_height = s.real_content_height;
                 return Size { width, height }
             }
         }
@@ -358,7 +352,7 @@ impl Scroll {
     }
 
     fn update_layout(&mut self) {
-        let mut element = ok_or_return!(self.element.upgrade_mut());
+        let element = ok_or_return!(self.element.upgrade_mut());
         if let Some(mut p) = element.get_parent() {
             p.ensure_layout_update();
         }
@@ -380,7 +374,7 @@ impl Scroll {
         let (bounds_width, bounds_height) = self.last_layout_size;
         self.layout_content(bounds_width, bounds_height);
 
-        let (mut body_width, mut body_height) = self.get_body_view_size(bounds_width, bounds_height);
+        let (mut body_width, body_height) = self.get_body_view_size(bounds_width, bounds_height);
         let (mut real_content_width, mut real_content_height) = element.get_real_content_size();
 
         let old_vertical_bar_visible = !self.vertical_bar_rect.is_empty();
@@ -395,7 +389,7 @@ impl Scroll {
             if !is_mobile_platform() {
                 self.layout_content(bounds_width, bounds_height);
             }
-            (body_width, body_height) = self.get_body_view_size(bounds_width, bounds_height);
+            (body_width, _) = self.get_body_view_size(bounds_width, bounds_height);
             (real_content_width, real_content_height) = element.get_real_content_size();
         } else if new_vertical_bar_visible {
             self.update_vertical_bar_rect(true, bounds_width, bounds_height);
@@ -414,7 +408,6 @@ impl Scroll {
             if !is_mobile_platform() {
                 self.layout_content(bounds_width, bounds_height);
             }
-            (body_width, body_height) = self.get_body_view_size(bounds_width, bounds_height);
             (real_content_width, real_content_height) = element.get_real_content_size();
         } else if new_horizontal_bar_visible {
             self.update_horizontal_bar_rect(true, bounds_width, bounds_height);
@@ -435,8 +428,8 @@ impl Scroll {
 
     /// invert transform effect
     fn map_window_xy(&self, window_x: f32, window_y: f32) -> Option<(f32, f32)> {
-        let mut element = ok_or_return!(self.element.upgrade_mut(), None);
-        let mut window = element.get_window()?.upgrade().ok()?;
+        let element = ok_or_return!(self.element.upgrade_mut(), None);
+        let window = element.get_window()?.upgrade().ok()?;
         let node_matrix = window.render_tree.get_element_total_matrix(&element)?;
         let p = node_matrix.invert()?.map_xy(window_x, window_y);
         Some((p.x, p.y))
@@ -445,13 +438,13 @@ impl Scroll {
 }
 
 impl ElementBackend for Scroll {
-    fn create(mut ele: &mut Element) -> Self {
+    fn create(ele: &mut Element) -> Self {
         ele.create_shadow();
         ele.need_snapshot = true;
-        let mut base = Container::create(ele);
+        let base = Container::create(ele);
         let is_mobile_platform = is_mobile_platform();
 
-        let mut inst = ScrollData {
+        let inst = ScrollData {
             scroll_bar_size: if is_mobile_platform { 4.0 } else { 14.0 },
             element: ele.as_weak(),
             base,
@@ -491,7 +484,7 @@ impl ElementBackend for Scroll {
     fn execute_default_behavior(&mut self, event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) -> bool {
         let is_target_self = ctx.target == self.element;
         let element = self.element.clone();
-        let mut element = ok_or_return!(element.upgrade_mut(), false);
+        let element = ok_or_return!(element.upgrade_mut(), false);
         if let Some(e) = event.downcast_mut::<MouseDownEvent>() {
             let d = e.0;
             if !is_target_self {
@@ -517,7 +510,7 @@ impl ElementBackend for Scroll {
                 }
                 return true;
             }
-        } else if let Some(d) = event.downcast_mut::<MouseUpEvent>() {
+        } else if let Some(_d) = event.downcast_mut::<MouseUpEvent>() {
             self.end_scroll();
             return true;
         } else if let Some(e) = event.downcast_mut::<MouseMoveEvent>() {
@@ -598,7 +591,7 @@ impl ElementBackend for Scroll {
             self.momentum_info = None;
             self.end_scroll();
             return true;
-        } else if let Some(e) = event.downcast_mut::<TouchCancelEvent>() {
+        } else if let Some(_e) = event.downcast_mut::<TouchCancelEvent>() {
             self.end_scroll();
             self.momentum_info = None;
             return true;
@@ -614,10 +607,8 @@ impl ElementBackend for Scroll {
 
     fn render(&mut self) -> RenderFn {
         let mut me = self.clone();
-        let mut element = ok_or_return!(me.element.upgrade_mut(), RenderFn::empty());
         //TODO use ensure_layout_update?
         if me.content_layout_dirty {
-            let bounds = element.get_bounds();
             me.do_layout_content();
         }
         let mut paint = Paint::default();
@@ -710,7 +701,7 @@ impl LayoutRoot for ScrollWeak {
     }
 
     fn should_propagate_dirty(&self) -> bool {
-        if let Ok(mut scroll) = self.upgrade() {
+        if let Ok(scroll) = self.upgrade() {
             scroll.auto_height
         } else {
             true

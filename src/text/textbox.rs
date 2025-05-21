@@ -2,39 +2,27 @@ mod line;
 mod util;
 
 use std::any::Any;
-use std::cmp::Ordering;
-use std::fs::File;
-use std::io::Write;
 use crate as deft;
 use crate::color::parse_hex_color;
-use crate::element::text::text_paragraph::ParagraphRef;
-use crate::element::text::{intersect_range, ColOffset, RowOffset};
-use crate::element::{text, Element, ElementBackend, ElementWeak};
-use crate::js::JsError;
+use crate::element::text::intersect_range;
+use crate::element::{ElementBackend, ElementWeak};
 use crate::number::DeNan;
 use crate::string::StringUtils;
-use crate::style::{parse_color_str, parse_optional_color_str, FontStyle, PropValueParse, StylePropKey};
-use crate::{base, js_deserialize, js_serialize, ok_or_return, some_or_continue};
-use deft_macros::{element_backend, js_methods, mrc_object};
+use crate::style::{parse_optional_color_str, FontStyle, PropValueParse};
+use crate::{base, js_deserialize, js_serialize, some_or_continue};
 use serde::{Deserialize, Serialize};
-use skia_safe::font_style::{Slant, Weight, Width};
-use skia_safe::{Canvas, Color, Font, FontMgr, Paint, Point, Rect};
-use std::str::FromStr;
-use std::sync::LazyLock;
+use skia_safe::font_style::{Weight, Width};
+use skia_safe::{Color, Paint};
 use measure_time::print_time;
-use skia_safe::wrapper::NativeTransmutableWrapper;
-use swash::Style;
-use winit::keyboard::NamedKey;
-use yoga::{Context, MeasureMode, Node, NodeRef, Size};
-use crate::base::{Callback, EventContext, MouseDetail, MouseEventType};
+use crate::base::EventContext;
 use crate::element::paragraph::ParagraphParams;
 use crate::element::paragraph::simple_paragraph_builder::SimpleParagraphBuilder;
 use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
-use crate::event::{FocusShiftEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent, SelectEndEvent, SelectMoveEvent, SelectStartEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
+use crate::event::{KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent, KEY_MOD_CTRL};
 use crate::font::family::{FontFamilies, FontFamily};
 use crate::paint::Painter;
 use crate::render::RenderFn;
-use crate::text::{TextAlign, TextDecoration, TextStyle};
+use crate::text::{TextAlign, TextStyle};
 use crate::text::textbox::line::Line;
 use crate::text::textbox::util::{parse_optional_text_decoration, parse_optional_weight};
 
@@ -381,7 +369,7 @@ impl TextBox {
     pub fn get_text_coord_by_pixel_coord(&self, mut coord: (f32, f32)) -> TextCoord {
         let (padding_top, _, _, padding_left) = self.padding;
         coord.0 -= padding_left;
-        coord.1 - padding_top;
+        coord.1 -= padding_top;
         let expected_offset = coord;
         let mut row = 0;
         let mut height = 0f32;
@@ -434,7 +422,7 @@ impl TextBox {
         Some(crate::base::Rect::new(bounds.left + padding_left, y_offset + bounds.top + padding_top, bounds.width(), bounds.height()))
     }
 
-    pub fn on_event(&mut self, event: &Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>, scroll_x: f32, scroll_y: f32) -> bool {
+    pub fn on_event(&mut self, event: &Box<&mut dyn Any>, _ctx: &mut EventContext<ElementWeak>, scroll_x: f32, scroll_y: f32) -> bool {
         if let Some(d) = event.downcast_ref::<KeyDownEvent>() {
             return self.on_key_down(&d.0)
         } else if let Some(e) = event.downcast_ref::<MouseDownEvent>() {
@@ -474,7 +462,9 @@ impl TextBox {
                         if let Some(sel) = self.get_selection_text() {
                             let sel=  sel.to_string();
                             if let Ok(mut ctx) = ClipboardContext::new() {
-                                ctx.set_contents(sel);
+                                if let Err(e) = ctx.set_contents(sel) {
+                                    log::error!("Failed to write clipboard: {:?}", e);
+                                }
                             }
                         }
                         return true
@@ -633,7 +623,7 @@ impl TextBox {
                         },
                         None => FontFamilies::default()
                     };
-                    let font_families = unit_font_families.append(&paragraph_params.font_families);
+                    text_style.set_font_families(Some(unit_font_families));
                     let font_size = unit.font_size.unwrap_or(paragraph_params.font_size);
                     text_style.set_font_size(font_size);
 
@@ -688,8 +678,6 @@ impl TextBox {
             font_style: FontStyle::Normal,
             mask_char: None,
         };
-        let units = Vec::new();
-        let paragraph = Self::build_paragraph(&params, &units);
 
         let mut selection_bg = Paint::default();
         selection_bg.set_color(parse_hex_color("214283").unwrap());
@@ -724,7 +712,6 @@ impl TextBox {
 
         let mut consumed_top = 0.0;
         let mut consumed_rows = 0usize;
-        let mut consumed_columns = 0usize;
 
         let selection = self.selection;
         let selection_bg = self.selection_bg.clone();
@@ -733,7 +720,6 @@ impl TextBox {
         let mut line_painters = Vec::with_capacity(self.lines.len());
         for ln in &mut self.lines {
             let ln_row = consumed_rows; consumed_rows += 1;
-            let ln_column = consumed_columns; consumed_columns += 1;
 
             let ln_height = ln.sk_paragraph.height();
             let ln_top = consumed_top; consumed_top += ln_height;
@@ -824,7 +810,7 @@ impl TextBox {
 fn test_measure() {
     let text_demo = include_str!("../../Cargo.lock");
     let mut text = String::new();
-    for i in 0..200 {
+    for _ in 0..200 {
         text.push_str(text_demo);
     }
     // let font = DEFAULT_TYPE_FACE.with(|tf| Font::from_typeface(tf, 14.0));
@@ -848,7 +834,7 @@ fn test_layout_performance() {
         mask_char: None,
     };
     let mut text = String::new();
-    for i in 0..200 {
+    for _ in 0..200 {
         text.push_str(text_demo);
     }
     //let mut file = File::create("target/test.txt").unwrap();

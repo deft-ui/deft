@@ -58,7 +58,7 @@ impl WebSocketManagerInner {
     pub async fn create_connection(&mut self, url: &str) -> Result<i32, io::Error> {
         let id = self.next_client_id;
         self.next_client_id += 1;
-        let (mut socket, _) = connect_async(url).await
+        let (socket, _) = connect_async(url).await
             .map_err(|e| io::Error::new(ErrorKind::Other, e))?;
         let (writer, reader) = socket.split();
         self.clients.insert(id, (writer, reader));

@@ -2,7 +2,6 @@ pub mod paint_object;
 pub mod layout_tree;
 pub mod painter;
 
-use skia_safe::Canvas;
 use crate::paint::Painter;
 
 pub struct RenderFn {

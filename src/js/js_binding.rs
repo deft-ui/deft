@@ -366,7 +366,8 @@ where
 impl<T> ToJsValue for JsPo<T>
 where T: Serialize {
     fn to_js_value(self) -> Result<JsValue, ValueError> {
-        T::serialize(&self.value, JsValueSerializer {}).map_err(|e| ValueError::UnexpectedType)
+        T::serialize(&self.value, JsValueSerializer {})
+            .map_err(|e| ValueError::Internal(format!("Failed to serialize value: {:?}", e)))
     }
 }
 

@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use crate as deft;
 use std::io;
 use std::io::ErrorKind;
@@ -13,8 +13,7 @@ use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 use tokio_tungstenite::tungstenite::Message;
 use tokio::sync::Mutex;
 use deft_macros::{js_methods, mrc_object};
-use serde::Serialize;
-use crate::{js_value, js_weak_value};
+use crate::js_weak_value;
 use crate::js::{JsError, ToJsValue};
 
 thread_local! {
@@ -47,7 +46,7 @@ impl WsConnection {
             *id += 1;
             *id - 1
         });
-        let (mut socket, _) = connect_async(url).await
+        let (socket, _) = connect_async(url).await
             .map_err(|e| io::Error::new(ErrorKind::Other, e))?;
         let (writer, reader) = socket.split();
         let ws_conn = WsConnectionData {
@@ -55,7 +54,7 @@ impl WsConnection {
             reader: Arc::new(Mutex::new(reader)),
             writer: Arc::new(Mutex::new(writer)),
         }.to_ref();
-        CONNECTIONS.with_borrow_mut(|mut map| {
+        CONNECTIONS.with_borrow_mut(|map| {
             map.insert(id, ws_conn.clone());
         });
         Ok(ws_conn)
@@ -89,7 +88,6 @@ impl WsConnection {
 
     #[js_func]
     pub async fn send_str(&self, data: String) -> Result<JsValue, Error> {
-        let t = data.to_string();
         let mut writer = self.inner.writer.lock().await;
         writer.send(Message::Text(data)).await?;
         Ok(JsValue::Undefined)

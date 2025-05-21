@@ -1,21 +1,17 @@
 use crate as deft;
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::ops::Deref;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::sync::mpsc::{channel, RecvTimeoutError, Sender};
+use std::sync::mpsc::{channel, Sender};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
 use anyhow::{anyhow, Error};
-use deft_macros::{js_func, js_methods};
+use deft_macros::js_methods;
 use log::debug;
-use skia_safe::wrapper::NativeTransmutableWrapper;
-use crate::data_dir::get_data_path;
 use crate::js::JsError;
-use crate::task_executor::TaskExecutor;
-use crate::timer::{set_timeout, TimerHandle};
 
 thread_local! {
     static DB: RefCell<Option<KVStorage>> = RefCell::new(None);
@@ -119,7 +115,7 @@ impl KVStorage {
                     if !list.is_empty() {
                         let db = Self::open_db(&dir).expect("failed to open localstorage");
                         for (k, v) in list.iter() {
-                            db.insert(k, v.as_bytes());
+                            db.insert(k, v.as_bytes()).unwrap();
                         }
                         db.flush().expect("failed to flush localstorage");
                         debug!("localstorage flushed");

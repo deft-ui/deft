@@ -1,11 +1,11 @@
 use std::cell::RefCell;
 use std::rc::Rc;
-use skia_safe::{Font, Paint};
+use skia_safe::Paint;
 use skia_safe::font_style::Weight;
 use yoga::MeasureMode;
 use crate::element::text::{AtomOffset, ColOffset};
 use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
-use crate::font::family::{FontFamilies, FontFamily};
+use crate::font::family::FontFamilies;
 use crate::string::StringUtils;
 use crate::style::FontStyle;
 use crate::text::TextAlign;

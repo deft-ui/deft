@@ -1,13 +1,7 @@
 use crate as deft;
-use crate::element::paragraph::parse_optional_weight;
 use crate::js_deserialize;
 use deft_macros::js_func;
 use serde::{Deserialize, Serialize};
-use skia_safe::font_style::{Weight, Width};
-use skia_safe::{FontMgr, FontStyle, Typeface};
-use std::cell::RefCell;
-use std::collections::HashMap;
-use skia_safe::font_style::Slant::Upright;
 
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -18,7 +12,7 @@ pub struct TypefaceSource {
 js_deserialize!(TypefaceSource);
 
 #[js_func]
-pub fn typeface_create(name: String, source: TypefaceSource) -> bool {
+pub fn typeface_create(_name: String, _source: TypefaceSource) -> bool {
     //TODO fix
     false
     /*

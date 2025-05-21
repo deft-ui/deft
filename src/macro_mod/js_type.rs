@@ -1,4 +1,3 @@
-use std::fmt::format;
 
 #[macro_export]
 macro_rules! js_value {

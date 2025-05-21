@@ -2,7 +2,7 @@ use crate as deft;
 use anyhow::Error;
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
-use deft_macros::{js_func, js_methods};
+use deft_macros::js_methods;
 
 #[allow(nonstandard_style)]
 pub struct Base64;

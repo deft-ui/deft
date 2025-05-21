@@ -1,6 +1,6 @@
-use crate::animation::actor::{AnimationAction, AnimationActor};
+use crate::animation::actor::AnimationActor;
 use crate::animation::Animation;
-use crate::element::{Element, ElementWeak};
+use crate::element::ElementWeak;
 use crate::ok_or_return;
 
 pub struct CssAnimationActor {
@@ -15,7 +15,7 @@ impl CssAnimationActor {
 }
 
 impl AnimationActor for CssAnimationActor {
-    fn apply_animation(&mut self, position: f32, stop: &mut bool) {
+    fn apply_animation(&mut self, position: f32, _stop: &mut bool) {
         let mut el = ok_or_return!(self.element.upgrade());
         el.animation_style_props.clear();
         let styles = self.animation.get_frame(position);

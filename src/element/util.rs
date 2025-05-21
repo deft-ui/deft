@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::event::{ClickEvent, KeyDownEvent, KeyUpEvent, MouseDownEvent, MouseEnterEvent, MouseUpEvent, TextInputEvent};
+use crate::event::{ClickEvent, KeyDownEvent, KeyUpEvent, MouseDownEvent, MouseUpEvent, TextInputEvent};
 
 pub fn is_form_event(event: &Box<&mut dyn Any>) -> bool {
     event.downcast_ref::<ClickEvent>().is_some()

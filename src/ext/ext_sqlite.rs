@@ -1,15 +1,12 @@
 use crate as deft;
-use crate::ext::promise::Promise;
 use crate::js::js_engine::JsEngine;
 use crate::js::{JsError, ToJsValue};
 use crate::task_executor::TaskExecutor;
-use crate::{js_value, js_weak_value};
+use crate::{js_value};
 use deft_macros::{js_methods, mrc_object};
-use futures_util::FutureExt;
 use quick_js::JsValue;
-use rusqlite::types::{ToSqlOutput, Type, Value};
-use rusqlite::{params, Connection, ToSql};
-use std::path::Path;
+use rusqlite::types::{Type, Value};
+use rusqlite::{Connection, ToSql};
 use std::vec;
 
 #[mrc_object]
@@ -94,7 +91,7 @@ fn execute(sess: &mut Session, sql: String, sql_values: Vec<Value>) -> Result<Js
     let conn = sess.ensure_opened_mut()?;
     let mut sql_params = Vec::with_capacity(sql_values.len());
     unsafe { sql_params.set_len(sql_values.len()) };
-    let mut sql_params_slice = sql_params.as_mut_slice();
+    let sql_params_slice = sql_params.as_mut_slice();
     for i in 0..sql_values.len() {
         sql_params_slice[i] = sql_values.get(i).unwrap() as &dyn ToSql;
     }
@@ -107,13 +104,13 @@ fn query(sess: &mut Session, sql: String, sql_values: Vec<Value>) -> Result<JsVa
     let conn = sess.ensure_opened_mut()?;
     let mut sql_params = Vec::with_capacity(sql_values.len());
     unsafe { sql_params.set_len(sql_values.len()) };
-    let mut sql_params_slice = sql_params.as_mut_slice();
+    let sql_params_slice = sql_params.as_mut_slice();
     for i in 0..sql_values.len() {
         sql_params_slice[i] = sql_values.get(i).unwrap() as &dyn ToSql;
     }
     let mut stmt = conn.prepare(&sql)
         .map_err(|e| format!("Failed to prepare sql: {}", e))?;
-    let mut columns_names: Vec<JsValue> = stmt
+    let columns_names: Vec<JsValue> = stmt
         .column_names()
         .iter()
         .map(|s| JsValue::String(s.to_string()))

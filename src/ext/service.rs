@@ -1,15 +1,13 @@
-use std::cell::RefCell;
-use crate::ext::ext_worker::{SharedModuleLoader, WorkerContext, WorkerParams, JS_WORKER_CONTEXTS};
+use crate::ext::ext_worker::{WorkerContext, JS_WORKER_CONTEXTS};
 use crate::js::js_engine::JsEngine;
 use crate::js::js_event_loop::{js_init_event_loop, JsEvent, JsEventLoopClosedError};
 use crate::js::ToJsValue;
-use quick_js::loader::JsModuleLoader;
 use std::collections::HashMap;
 use std::sync::mpsc::{SendError, Sender};
-use std::sync::{Arc, LazyLock, Mutex, OnceLock};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::thread;
 use log::error;
-use crate::app::{IApp, App};
+use crate::app::App;
 use crate::id_generator::IdGenerator;
 use crate::id_hash_map::IdHashMap;
 
@@ -67,12 +65,6 @@ impl Service {
             sender_holder.replace(sender.clone());
         }
         let msg_handlers = self.msg_handlers.clone();
-        let module_loader = {
-            let mut app = app.app_impl.lock().unwrap();
-            app.create_module_loader()
-        };
-        let shared_module_loader = SharedModuleLoader::new(module_loader);
-        let module_loader = shared_module_loader.clone();
         let _ = thread::Builder::new()
             .name("js-worker".to_string())
             .spawn(move || {

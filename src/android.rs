@@ -5,7 +5,6 @@ use jni::sys::{jboolean, jfloat, jint, jlong};
 use skia_safe::Rect;
 use winit::platform::android::activity::AndroidApp;
 use crate::app::{AppEvent, InsetType};
-use crate::event_loop::{create_event_loop_proxy};
 use crate::send_app_event;
 use log::debug;
 
@@ -18,7 +17,7 @@ pub fn init_android_app(app: &AndroidApp) {
 
 #[no_mangle]
 pub extern "system" fn Java_deft_DeftActivity_send<'local>(mut env: JNIEnv<'local>,
-                                                                     class: JClass<'local>,
+                                                                     _class: JClass<'local>,
                                                                      window_id: jlong,
                                                                      input: JString<'local>)
 {
@@ -32,7 +31,7 @@ pub extern "system" fn Java_deft_DeftActivity_send<'local>(mut env: JNIEnv<'loca
 
 #[no_mangle]
 pub extern "system" fn Java_deft_DeftActivity_sendKey0<'local>(mut env: JNIEnv<'local>,
-                                                                      class: JClass<'local>,
+                                                                      _class: JClass<'local>,
                                                                       window_id: jlong,
                                                                       input: JString<'local>,
                                                                       pressed: jboolean)
@@ -46,8 +45,8 @@ pub extern "system" fn Java_deft_DeftActivity_sendKey0<'local>(mut env: JNIEnv<'
 }
 
 #[no_mangle]
-pub extern "system" fn Java_deft_DeftActivity_setInset0<'local>(mut env: JNIEnv<'local>,
-                                                                 class: JClass<'local>,
+pub extern "system" fn Java_deft_DeftActivity_setInset0<'local>(_env: JNIEnv<'local>,
+                                                                 _class: JClass<'local>,
                                                                  window_id: jlong,
                                                                  inset_type: jint,
                                                                  top: jfloat,
@@ -58,7 +57,7 @@ pub extern "system" fn Java_deft_DeftActivity_setInset0<'local>(mut env: JNIEnv<
     if let Some(ty) = InsetType::from_i32(inset_type) {
         let rect = Rect::new(left, top, right, bottom);
         debug!("setInset0,{} {:?}, {:?}", window_id, ty, rect);
-        send_app_event(AppEvent::SetInset(window_id as i32, ty, rect));
+        send_app_event(AppEvent::SetInset(window_id as i32, ty, rect)).unwrap();
     } else {
         debug!("unknown inset type: {:?}", inset_type);
     }

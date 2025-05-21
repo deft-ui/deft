@@ -1,12 +1,11 @@
 use std::collections::HashMap;
 use std::mem;
-use skia_safe::{Canvas, ClipOp, Color, FilterMode, Image, Matrix, Paint, PaintStyle, Rect, SamplingOptions};
-use skia_safe::canvas::SetMatrix;
+use skia_safe::{Canvas, ClipOp, Color, FilterMode, Matrix, Paint, PaintStyle, Rect, SamplingOptions};
 use skia_window::context::RenderContext;
 use crate::canvas_util::CanvasHelper;
 use crate::paint::{InvalidRects, LayerState, Painter, RenderLayerKey};
 use crate::render::paint_object::{ElementPO, LayerPO};
-use crate::{show_focus_hint, show_layer_hint, show_repaint_area, some_or_continue, some_or_return};
+use crate::{show_focus_hint, show_layer_hint, show_repaint_area};
 
 
 pub struct ElementPainter {
@@ -72,7 +71,7 @@ impl ElementPainter {
         canvas.restore();
     }
 
-    fn submit_layer(&mut self, painter: &Painter, context: &mut RenderContext, lpo: &mut LayerPO, layer: &mut LayerState) {
+    fn submit_layer(&mut self, painter: &Painter, _context: &mut RenderContext, lpo: &mut LayerPO, layer: &mut LayerState) {
         let img = layer.layer.as_image();
         let canvas = painter.canvas;
         canvas.save();
@@ -117,7 +116,6 @@ impl ElementPainter {
         layer_state_map: &mut HashMap<RenderLayerKey, LayerState>,
     ) {
         let root_canvas = painter.canvas;
-        let viewport = &self.viewport;
         let scale = self.scale;
         let surface_width = (layer.surface_bounds.width() * scale) as usize;
         let surface_height = (layer.surface_bounds.height() * scale) as usize;
@@ -173,7 +171,7 @@ impl ElementPainter {
             layer_canvas.save();
 
             layer_canvas.translate((-graphic_layer.surface_bounds.left, -graphic_layer.surface_bounds.top));
-            if (!layer.invalid_rects.is_empty()) {
+            if !layer.invalid_rects.is_empty() {
                 layer_canvas.clip_path(&layer.invalid_rects.to_path(), ClipOp::Intersect, false);
                 layer_canvas.clip_rect(&Rect::from_xywh(0.0, 0.0, layer.width, layer.height), ClipOp::Intersect, false);
                 layer_canvas.clear(Color::TRANSPARENT);

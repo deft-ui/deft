@@ -47,7 +47,7 @@ impl<T, E> Promise<T, E> {
 
     fn set_value(&self, result: Result<T, E>) {
         let mut inner = self.inner.lock().unwrap();
-        if let Some(v) = &inner.value {
+        if inner.value.is_some() {
             return;
         }
         inner.value = Some(result);

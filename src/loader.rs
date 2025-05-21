@@ -4,7 +4,7 @@ mod http_loader;
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind};
 use anyhow::anyhow;
-use quick_js::loader::{FsJsModuleLoader, JsModuleLoader};
+use quick_js::loader::JsModuleLoader;
 
 #[cfg(feature = "http")]
 pub use crate::loader::http_loader::DevModuleLoader;

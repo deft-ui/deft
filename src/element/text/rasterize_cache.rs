@@ -1,9 +1,7 @@
 use crate::font::Font;
 use crate::mrc::Mrc;
-use skia_safe::Bitmap;
 use std::collections::HashMap;
 use swash::scale::image::Image;
-use swash::zeno::Placement;
 use swash::{CacheKey, GlyphId};
 
 #[derive(Debug, Hash, PartialEq, Eq)]

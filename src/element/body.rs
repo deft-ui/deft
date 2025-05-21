@@ -1,9 +1,9 @@
-use crate::element::{Element, ElementBackend, ElementWeak};
+use crate::element::{Element, ElementBackend};
 
 pub struct Body {}
 
 impl ElementBackend for Body {
-    fn create(element: &mut Element) -> Self {
+    fn create(_element: &mut Element) -> Self {
         Self {}
     }
 

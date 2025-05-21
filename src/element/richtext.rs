@@ -1,42 +1,12 @@
 use crate as deft;
-use crate::base::{EventContext, MouseDetail, MouseEventType};
-use crate::color::parse_hex_color;
-use crate::element::paragraph::simple_paragraph_builder::SimpleParagraphBuilder;
-use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
-use crate::element::text::text_paragraph::ParagraphRef;
-use crate::element::text::{intersect_range, ColOffset, RowOffset};
-use crate::element::{text, Element, ElementBackend, ElementWeak};
-use crate::event::{
-    FocusShiftEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
-    SelectEndEvent, SelectMoveEvent, SelectStartEvent, TouchEndEvent, TouchMoveEvent,
-    TouchStartEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT,
-};
-use crate::font::family::{FontFamilies, FontFamily};
-use crate::js::JsError;
-use crate::number::DeNan;
-use crate::paint::Painter;
+use crate::base::EventContext;
+use crate::element::{Element, ElementBackend, ElementWeak};
 use crate::render::RenderFn;
-use crate::string::StringUtils;
-use crate::style::{
-    parse_color_str, parse_optional_color_str, FontStyle, PropValueParse, StylePropKey,
-};
-use crate::text::textbox::{TextBox, TextCoord, TextElement, TextUnit};
-use crate::text::{TextAlign, TextDecoration, TextStyle};
-use crate::{js_deserialize, js_serialize, ok_or_return, some_or_continue};
-use deft_macros::{element_backend, js_methods, mrc_object};
-use measure_time::print_time;
-use serde::{Deserialize, Serialize};
-use skia_safe::font_style::{Slant, Weight, Width};
-use skia_safe::wrapper::NativeTransmutableWrapper;
-use skia_safe::{Canvas, Color, Font, FontMgr, Paint, Point, Rect};
+use crate::style::StylePropKey;
+use crate::text::textbox::{TextBox, TextCoord, TextElement};
+use crate::ok_or_return;
+use deft_macros::{element_backend, js_methods};
 use std::any::Any;
-use std::cmp::Ordering;
-use std::fs::File;
-use std::io::Write;
-use std::str::FromStr;
-use std::sync::LazyLock;
-use swash::Style;
-use winit::keyboard::NamedKey;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 #[element_backend]
 pub struct RichText {
@@ -47,13 +17,12 @@ pub struct RichText {
 extern "C" fn measure_richtext(
     node_ref: NodeRef,
     width: f32,
-    width_mode: MeasureMode,
-    height: f32,
-    height_mode: MeasureMode,
+    _width_mode: MeasureMode,
+    _height: f32,
+    _height_mode: MeasureMode,
 ) -> Size {
     if let Some(ctx) = Node::get_context(&node_ref) {
         if let Some(rich_text_weak) = ctx.downcast_ref::<RichTextWeak>() {
-            let bounds = Rect::new(0.0, 0.0, width, height);
             if let Ok(mut rich_text) = rich_text_weak.upgrade() {
                 rich_text.layout(width);
                 return Size {
@@ -119,7 +88,7 @@ impl RichText {
 }
 
 impl ElementBackend for RichText {
-    fn create(mut element: &mut Element) -> Self
+    fn create(element: &mut Element) -> Self
     where
         Self: Sized,
     {

@@ -1,4 +1,3 @@
-use skia_safe::Rect;
 
 pub trait LayoutRoot {
     fn update_layout(&mut self);

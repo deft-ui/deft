@@ -1,20 +1,12 @@
 use std::collections::HashMap;
-use font_kit::loader::Loader;
 use log::warn;
-use measure_time::print_time;
-use skia_safe::{Paint, Typeface, Unichar};
-use skia_safe::font_style::Weight;
-use skia_safe::wrapper::ValueWrapper;
 use crate::element::font_manager::FontManager;
-use crate::element::paragraph::{ParagraphParams, ZERO_WIDTH_WHITESPACE};
-use crate::element::text::simple_text_paragraph::{chars_to_glyphs_vec, str_to_glyphs_vec, SimpleTextParagraph, TextBlock};
-use crate::element::text::text_paragraph::TextParams;
-use crate::font::family::{FontFamilies, FontFamily};
+use crate::element::paragraph::ParagraphParams;
+use crate::element::text::simple_text_paragraph::{chars_to_glyphs_vec, SimpleTextParagraph, TextBlock};
 use crate::font::Font;
 use crate::mrc::Mrc;
 use crate::some_or_continue;
 use crate::string::StringUtils;
-use crate::style::FontStyle;
 use crate::text::TextStyle;
 
 thread_local! {
@@ -58,14 +50,14 @@ impl SimpleParagraphBuilder {
     }
 
     fn resolve_font(&self, font_families_names: &Vec<&str>, style: &TextStyle, text: &str) -> Vec<TextBlock> {
-        let mut font_families_names = font_families_names.clone();
+        let font_families_names = font_families_names.clone();
         let mut fonts = self.font_manager.match_best(&font_families_names, style.font_style());
         if fonts.is_empty() {
             warn!("No matching font found for {:?}", &font_families_names);
             return Vec::new();
         }
-        let mut chars = text.chars().collect::<Vec<_>>();
-        let (mut resolved_typefaces, unresolved_count) = Self::do_resolve_font(&chars, &fonts);
+        let chars = text.chars().collect::<Vec<_>>();
+        let (mut resolved_typefaces, _unresolved_count) = Self::do_resolve_font(&chars, &fonts);
         for i in 0..chars.len() {
             if resolved_typefaces[i] != -1 {
                 continue;
@@ -126,7 +118,6 @@ impl SimpleParagraphBuilder {
     }
 
     pub fn build(self) -> SimpleTextParagraph {
-        let mut text = String::new();
         SimpleTextParagraph::new(self.text_blocks, self.paragraph_params.line_height)
     }
 
@@ -151,9 +142,41 @@ impl SimpleParagraphBuilder {
 
 }
 
-#[test]
-fn test_performance() {
-    for _ in 0..10 {
+#[cfg(test)]
+mod tests {
+    use measure_time::print_time;
+    use skia_safe::font_style::Weight;
+    use crate::element::paragraph::{ParagraphParams, ZERO_WIDTH_WHITESPACE};
+    use crate::element::paragraph::simple_paragraph_builder::SimpleParagraphBuilder;
+    use crate::font::family::{FontFamilies, FontFamily};
+    use crate::style::FontStyle;
+
+    #[test]
+    fn test_performance() {
+        for _ in 0..10 {
+            let params = ParagraphParams {
+                text_wrap: None,
+                line_height: None,
+                align: Default::default(),
+                color: Default::default(),
+                font_size: 14.0,
+                font_families: FontFamilies::new(vec![FontFamily::new("monospace")]),
+                font_weight: Weight::NORMAL,
+                font_style: FontStyle::Normal,
+                mask_char: None,
+            };
+            let mut pb = SimpleParagraphBuilder::new(&params);
+            let str = include_str!("../../../Cargo.lock");
+            {
+                print_time!("render");
+                pb.add_text(str.to_string());
+            }
+            let b = pb.build();
+        }
+    }
+
+    #[test]
+    fn test_get_char_bounds() {
         let params = ParagraphParams {
             text_wrap: None,
             line_height: None,
@@ -166,39 +189,18 @@ fn test_performance() {
             mask_char: None,
         };
         let mut pb = SimpleParagraphBuilder::new(&params);
-        let str = include_str!("../../../Cargo.lock");
-        {
-            print_time!("render");
-            pb.add_text(str.to_string());
+        pb.add_text(format!("{}{}", "12", ZERO_WIDTH_WHITESPACE));
+        let mut paragraph = pb.build();
+        paragraph.layout(100.0);
+        let layout = paragraph.layout.as_ref().unwrap();
+        for offset in 0..3 {
+            let bounds = layout.get_char_bounds(offset);
+            assert!(bounds.is_some());
         }
-        let b = pb.build();
+        let bounds0 = layout.get_char_bounds(0).unwrap();
+        let bounds1 = layout.get_char_bounds(1).unwrap();
+        assert!(bounds1.left >= bounds0.right);
+        assert!(paragraph.max_intrinsic_width() > 0.0);
     }
 }
 
-#[test]
-fn test_get_char_bounds() {
-    let params = ParagraphParams {
-        text_wrap: None,
-        line_height: None,
-        align: Default::default(),
-        color: Default::default(),
-        font_size: 14.0,
-        font_families: FontFamilies::new(vec![FontFamily::new("monospace")]),
-        font_weight: Weight::NORMAL,
-        font_style: FontStyle::Normal,
-        mask_char: None,
-    };
-    let mut pb = SimpleParagraphBuilder::new(&params);
-    pb.add_text(format!("{}{}", "12", ZERO_WIDTH_WHITESPACE));
-    let mut paragraph = pb.build();
-    paragraph.layout(100.0);
-    let layout = paragraph.layout.as_ref().unwrap();
-    for offset in 0..3 {
-        let bounds = layout.get_char_bounds(offset);
-        assert!(bounds.is_some());
-    }
-    let bounds0 = layout.get_char_bounds(0).unwrap();
-    let bounds1 = layout.get_char_bounds(1).unwrap();
-    assert!(bounds1.left >= bounds0.right);
-    assert!(paragraph.max_intrinsic_width() > 0.0);
-}

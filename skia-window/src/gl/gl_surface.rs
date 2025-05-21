@@ -5,13 +5,11 @@ use glutin::display::{Display, DisplayApiPreference};
 use glutin::surface::{SurfaceAttributesBuilder, WindowSurface};
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle, RawDisplayHandle, RawWindowHandle};
 use winit::event_loop::ActiveEventLoop;
-#[cfg(x11_platform)]
+#[cfg(glx_backend)]
 use winit::platform::x11;
 use winit::window::{Window};
 
 use glutin::prelude::*;
-#[cfg(target_os = "android")]
-use winit::platform::android::activity::AndroidApp;
 use crate::gl::gl_renderer::GlRenderer;
 use crate::renderer::Renderer;
 use crate::surface::RenderBackend;

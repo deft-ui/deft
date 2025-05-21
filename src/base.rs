@@ -1,21 +1,20 @@
 use crate as deft;
 use std::any::{Any, TypeId};
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::marker::PhantomData;
-use std::rc::Rc;
 use std::str::FromStr;
-use std::sync::{Arc, Condvar, Mutex, MutexGuard};
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread::LocalKey;
 use anyhow::Error;
-use log::{debug, error};
+use log::error;
 use quick_js::{JsValue, ValueError};
 use serde::{Deserialize, Serialize};
 use skia_safe::Path;
 use yoga::{Layout};
-use crate::element::{Element, ElementWeak};
+use crate::element::Element;
 use crate::ext::common::create_event_handler;
 use crate::js::{FromJsValue, ToJsValue};
 use crate::js::js_serde::JsValueSerializer;
@@ -87,7 +86,7 @@ impl<T> FromJsValue for Id<T> {
             Ok(Self { id: id as usize, _phantom: PhantomData })
         } else if let JsValue::String(id) = value {
             let id = usize::from_str(id.as_str())
-                .map_err(|e| ValueError::UnexpectedType)?;
+                .map_err(|e| ValueError::Internal(format!("Invalid number format: {:?}", e)))?;
             Ok(Self { id, _phantom: PhantomData })
         } else {
             Err(ValueError::UnexpectedType)
@@ -623,30 +622,38 @@ pub struct UnsafeFnMut<P> {
 unsafe impl<P> Send for UnsafeFnMut<P> {}
 unsafe impl<P> Sync for UnsafeFnMut<P> {}
 
-#[test]
-fn test_event_registration() {
-    #[derive(Debug)]
-    struct MyEvent {
-        value: Rc<RefCell<i32>>,
-    };
-    struct MyEventListener {
+#[cfg(test)]
+mod tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use log::debug;
+    use crate::base::{EventContext, EventListener, EventRegistration};
 
-    }
-    impl EventListener<MyEvent, ()> for MyEventListener {
-        fn handle_event(&mut self, event: &mut MyEvent, ctx: &mut EventContext<()>) {
-            debug!("handling {:?}", event);
-            let mut v = event.value.borrow_mut();
-            *v = 1;
+    #[test]
+    fn test_event_registration() {
+        #[derive(Debug)]
+        struct MyEvent {
+            value: Rc<RefCell<i32>>,
         }
-    }
-    let value = Rc::new(RefCell::new(0));
-    let mut er: EventRegistration<()> = EventRegistration::new();
-    er.register_event_listener(MyEventListener {});
-    er.emit(&mut MyEvent { value: Rc::clone(&value) }, &mut EventContext {
-        target: (),
-        propagation_cancelled: false,
-        prevent_default: false,
-    });
+        struct MyEventListener {
 
-    assert_eq!(1, *value.borrow());
+        }
+        impl EventListener<MyEvent, ()> for MyEventListener {
+            fn handle_event(&mut self, event: &mut MyEvent, _ctx: &mut EventContext<()>) {
+                debug!("handling {:?}", event);
+                let mut v = event.value.borrow_mut();
+                *v = 1;
+            }
+        }
+        let value = Rc::new(RefCell::new(0));
+        let mut er: EventRegistration<()> = EventRegistration::new();
+        er.register_event_listener(MyEventListener {});
+        er.emit(&mut MyEvent { value: Rc::clone(&value) }, &mut EventContext {
+            target: (),
+            propagation_cancelled: false,
+            prevent_default: false,
+        });
+
+        assert_eq!(1, *value.borrow());
+    }
 }

@@ -1,16 +1,13 @@
 use std::cell::RefCell;
-use std::fmt::Debug;
 use std::future::Future;
 use std::panic::RefUnwindSafe;
-use std::path::{Path, PathBuf};
-use anyhow::anyhow;
-use quick_js::loader::JsModuleLoader;
-use quick_js::{Callback, Context, ExecutionError, JsPromise, JsValue, ValueError};
+use std::path::PathBuf;
+use quick_js::{Callback, Context, ExecutionError, JsValue, ValueError};
 use tokio::runtime::Builder;
 use winit::event::{DeviceEvent, DeviceId, WindowEvent};
 use winit::window::{CursorGrabMode, WindowId};
 
-use crate::app::{exit_app, IApp, App};
+use crate::app::{App};
 use crate::console::Console;
 use crate::element::{Element, CSS_MANAGER};
 use crate::element::button::Button;
@@ -40,7 +37,6 @@ use crate::ext::ext_tray::SystemTray;
 use crate::ext::ext_worker::{SharedModuleLoader, Worker, WorkerInitParams};
 use crate::window::{Window, WindowType};
 use crate::js::js_binding::{JsCallError, JsFunc};
-use crate::js::js_event_loop::js_create_event_loop_proxy;
 use crate::js::js_runtime::{JsContext, PromiseResolver};
 use crate::js::ToJsCallResult;
 use crate::mrc::Mrc;
@@ -96,7 +92,7 @@ impl JsEngine {
         })
     }
 
-    pub fn init(mut app: App) {
+    pub fn init(app: App) {
         let loader = {
             let mut app = app.app_impl.lock().unwrap();
             SharedModuleLoader::new(app.create_module_loader())
@@ -205,8 +201,10 @@ impl JsEngine {
 
     pub fn init_api(&self) {
         let default_css = include_str!("../../deft.css");
-        CSS_MANAGER.with_borrow_mut(|mut manager| {
-            manager.add(default_css);
+        CSS_MANAGER.with_borrow_mut(|manager| {
+            if let Err(e) = manager.add(default_css) {
+                println!("Error adding CSS: {:?}", e);
+            }
         });
         let libjs = String::from_utf8_lossy(include_bytes!("../../lib.js"));
         self.js_context.eval_module(&libjs, "lib.js").unwrap();

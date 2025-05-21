@@ -2,9 +2,7 @@ use anyhow::{anyhow, Error};
 use std::collections::HashMap;
 use simplecss::StyleSheet;
 use crate::base::{Id, IdKey};
-use crate::element::button::Button;
-use crate::element::container::Container;
-use crate::element::{Element, ElementBackend};
+use crate::element::Element;
 use crate::style::select::{Selector, Selectors};
 
 thread_local! {
@@ -115,7 +113,7 @@ impl CssManager {
         css.declared_classes.clear();
         css.declared_attrs.clear();
         css.rules.clear();
-        let mut stylesheet = StyleSheet::parse(&stylesheet_source);
+        let stylesheet = StyleSheet::parse(&stylesheet_source);
         for rule in &stylesheet.rules {
             let selectors = rule.selector.source().to_string();
             let mut declarations = Vec::new();
@@ -140,15 +138,25 @@ impl CssManager {
 
 }
 
-#[test]
-fn test_css_manager() {
-    let mut manager = CssManager::new();
-    manager.add(include_str!("../../tests/demo.css")).unwrap();
-    assert_eq!(1, manager.stylesheets.len());
-    let button = Element::create(Button::create);
-    let container = Element::create(Container::create);
-    let (containers_styles, _) = manager.match_styles(&container);
-    let (button_styles, _) = manager.match_styles(&button);
-    assert_eq!(1, containers_styles.len());
-    assert_eq!(1, button_styles.len());
+#[cfg(test)]
+mod tests {
+    use crate::element::button::Button;
+    use crate::element::container::Container;
+    use crate::element::{Element, ElementBackend};
+    use crate::style::css_manager::CssManager;
+
+    #[test]
+    fn test_css_manager() {
+        let mut manager = CssManager::new();
+        manager.add(include_str!("../../tests/demo.css")).unwrap();
+        assert_eq!(1, manager.stylesheets.len());
+        let button = Element::create(Button::create);
+        let container = Element::create(Container::create);
+        let (containers_styles, _) = manager.match_styles(&container);
+        let (button_styles, _) = manager.match_styles(&button);
+        assert_eq!(1, containers_styles.len());
+        assert_eq!(1, button_styles.len());
+    }
+
 }
+

@@ -1,6 +1,5 @@
 use crate as deft;
 use std::collections::HashMap;
-use std::ops::Deref;
 use deft_macros::mrc_object;
 use font_kit::family_name::FamilyName;
 use crate::font::Font;
@@ -11,7 +10,6 @@ use skia_safe::wrapper::NativeTransmutableWrapper;
 use swash::{ObliqueAngle, Style, Weight};
 use crate::element::paragraph::{DEFAULT_FALLBACK_FONTS};
 use crate::style::FontStyle;
-use crate::text::TextStyle;
 
 #[mrc_object]
 pub struct FontManager {
@@ -38,7 +36,6 @@ impl FontManager {
 
     pub fn match_best(&self, family_names: &[impl AsRef<str>], style: &skia_safe::FontStyle) -> Vec<Font> {
         let mut result = Vec::new();
-        let mut me = self.clone();
         let mut family_names = family_names.iter().map(|s| s.as_ref()).collect::<Vec<_>>();
         for name in DEFAULT_FALLBACK_FONTS.split(",") {
             family_names.push(name);
@@ -68,7 +65,6 @@ impl FontManager {
         me.cache.entry(cache_key).or_insert_with(move || {
             let family_name = Self::str_to_family_name(name);
             let fh = self.source.select_family_by_generic_name(&family_name).ok()?;
-            let mut best_font: Option<Font> = None;
             let expected_style = match expected_font_style.slant() {
                 Slant::Upright => Style::Normal,
                 Slant::Italic => Style::Italic,

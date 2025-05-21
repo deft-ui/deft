@@ -1,6 +1,5 @@
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
-use anyhow::Error;
 use deft_macros::js_func;
 use log::error;
 use quick_js::{JsValue};

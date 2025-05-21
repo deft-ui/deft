@@ -1,7 +1,6 @@
 pub mod family;
 
 use crate as deft;
-use crate::element::text::simple_text_paragraph::TextBlock;
 use deft_macros::mrc_object;
 use memmap2::{Mmap, MmapOptions};
 use skia_safe::Rect;
@@ -13,7 +12,6 @@ use swash::scale::{Render, ScaleContext, Source, StrikeWith};
 use swash::zeno::{Angle, Format, Transform};
 use swash::{Attributes, CacheKey, Charmap, FontRef, GlyphId, Metrics, Style, Weight};
 use crate::mrc::Mrc;
-use crate::style::FontStyle;
 
 enum FontContent {
     Mmap(Mmap),

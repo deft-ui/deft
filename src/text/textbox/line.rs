@@ -35,7 +35,7 @@ impl Line {
         result
     }
 
-    pub fn subtext(&self, mut start: ColOffset, mut end: ColOffset) -> String {
+    pub fn subtext(&self, start: ColOffset, end: ColOffset) -> String {
         let mut result = String::new();
         let mut iter = self.units.iter();
         let mut processed_atom_count = 0;
@@ -57,7 +57,7 @@ impl Line {
     }
 
     pub fn get_column_by_pixel_coord(&self, coord: (f32, f32)) -> usize {
-        let (x, y) = coord;
+        let (x, _y) = coord;
         let atom_count = self.atom_count();
         if atom_count == 0 {
             0

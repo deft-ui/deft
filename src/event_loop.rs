@@ -1,8 +1,8 @@
 use std::cell::{Cell, RefCell};
 use std::ptr::null_mut;
-use std::sync::{Arc, Condvar, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 use winit::event_loop::{ActiveEventLoop, EventLoopClosed, EventLoopProxy};
-use crate::app::{WinitApp, AppEvent, AppEventPayload};
+use crate::app::{AppEvent, AppEventPayload};
 use crate::base::{ResultWaiter, UnsafeFnMut, UnsafeFnOnce};
 
 thread_local! {
@@ -38,7 +38,7 @@ pub struct EventLoopCallback {
 
 impl EventLoopCallback {
     pub fn call(mut self) {
-        let mut callback = self.callback.take().unwrap();
+        let callback = self.callback.take().unwrap();
         self.event_loop_proxy.send_event(AppEvent::Callback(Box::new(|| {
             callback.call();
         }))).unwrap();
@@ -54,7 +54,7 @@ pub struct EventLoopFnMutCallback<P> {
 impl<P: Send + Sync + 'static> EventLoopFnMutCallback<P> {
     pub fn call(&mut self, param: P) {
         let cb = self.callback.clone();
-        self.event_loop_proxy.send_event(AppEvent::Callback(Box::new(move || {
+        let _ = self.event_loop_proxy.send_event(AppEvent::Callback(Box::new(move || {
             let mut cb = cb.lock().unwrap();
             (cb.callback)(param);
         })));

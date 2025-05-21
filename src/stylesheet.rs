@@ -8,7 +8,7 @@ use crate::style::css_manager::CSS;
 
 #[js_func]
 pub fn stylesheet_add(source: String) -> Result<Id<CSS>, JsError> {
-    let id = CSS_MANAGER.with_borrow_mut(|mut manager| {
+    let id = CSS_MANAGER.with_borrow_mut(|manager| {
         manager.add(&source)
     }).map_err(|e| {
         JsError::new(format!("failed to add stylesheet: {}", e))
@@ -19,7 +19,7 @@ pub fn stylesheet_add(source: String) -> Result<Id<CSS>, JsError> {
 
 #[js_func]
 pub fn stylesheet_remove(id: Id<CSS>) -> Result<(), JsError> {
-    CSS_MANAGER.with_borrow_mut(|mut manager| {
+    CSS_MANAGER.with_borrow_mut(|manager| {
         manager.remove(&id)
     });
     refresh_windows_style();
@@ -28,8 +28,8 @@ pub fn stylesheet_remove(id: Id<CSS>) -> Result<(), JsError> {
 
 #[js_func]
 pub fn stylesheet_update(id: Id<CSS>, source: String) -> Result<(), JsError> {
-    CSS_MANAGER.with_borrow_mut(|mut manager| {
-        manager.update(&id, &source);
+    CSS_MANAGER.with_borrow_mut(|manager| {
+        let _ = manager.update(&id, &source);
     });
     refresh_windows_style();
     Ok(())

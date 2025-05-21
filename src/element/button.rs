@@ -1,16 +1,10 @@
 use crate as deft;
 use std::any::Any;
-use anyhow::Error;
 use deft_macros::{element_backend, js_methods};
-use ordered_float::OrderedFloat;
-use quick_js::JsValue;
-use skia_safe::{Canvas, Color};
-use yoga::{Edge, StyleUnit};
 use crate::base::{EventContext, Rect};
 use crate::element::{ElementBackend, Element, ElementWeak};
 use crate::element::container::Container;
 use crate::element::util::is_form_event;
-use crate::event::{ClickEvent, MouseDownEvent, MouseUpEvent};
 use crate::ok_or_return;
 use crate::render::RenderFn;
 use crate::style::StylePropKey;

@@ -1,6 +1,5 @@
 use std::fmt::{Debug, Formatter};
-use std::sync::{Arc, Condvar, Mutex};
-use std::thread;
+use std::sync::{Arc, Mutex};
 use anyhow::Error;
 #[cfg(target_os = "android")]
 use jni::objects::JValue;
@@ -12,7 +11,7 @@ use skia_safe::Rect;
 use crate::js::loader::JsModuleLoader;
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, WindowEvent};
-use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
+use winit::event_loop::ActiveEventLoop;
 #[cfg(target_os = "android")]
 use winit::platform::android::ActiveEventLoopExtAndroid;
 #[cfg(target_os = "android")]
@@ -25,9 +24,7 @@ use crate::ext::ext_window::WINDOWS;
 use crate::window::{window_check_update, window_input, window_on_render_idle, window_send_key, window_update_inset};
 use crate::js::js_engine::JsEngine;
 use crate::js::js_event_loop::{js_init_event_loop, JsEvent, JsEventLoopClosedError};
-use crate::js::js_runtime::JsContext;
 use crate::mrc::Mrc;
-use crate::{platform, timer};
 
 #[derive(Debug)]
 pub struct AppEventPayload {
@@ -104,13 +101,13 @@ impl App {
 }
 
 impl WinitApp {
-    pub fn new(mut app: App, event_loop_proxy: AppEventProxy) -> Self {
+    pub fn new(app: App, event_loop_proxy: AppEventProxy) -> Self {
         JsEngine::init(app.clone());
         let mut js_engine = JsEngine::get();
         js_engine.init_api();
         init_event_loop_proxy(event_loop_proxy.clone());
-        let js_event_loop = js_init_event_loop(move |js_event| {
-            event_loop_proxy.send_event(AppEvent::JsEvent(js_event)).map_err(|_| JsEventLoopClosedError {});
+        let _ = js_init_event_loop(move |js_event| {
+            let _ = event_loop_proxy.send_event(AppEvent::JsEvent(js_event)).map_err(|_| JsEventLoopClosedError {});
             Ok(())
         });
         {
@@ -170,6 +167,7 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
                     show_hide_keyboard(event_loop.android_app().clone(), window_id, true);
                     #[cfg(ohos)]
                     platform::show_soft_keyboard(window_id);
+                    let _ = window_id;
                 },
                 AppEvent::HideSoftInput(window_id) => {
                     debug!("hide soft input");
@@ -177,6 +175,7 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
                     show_hide_keyboard(event_loop.android_app().clone(), window_id, false);
                     #[cfg(ohos)]
                     platform::hide_soft_keyboard(window_id);
+                    let _ = window_id;
                 },
                 AppEvent::CommitInput(window_id, content) => {
                     window_input(window_id, content);
@@ -217,8 +216,9 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
 
 }
 
-pub fn exit_app(code: i32) -> Result<(), Error> {
-    localstorage::cleanup();
+pub fn exit_app(_code: i32) -> Result<(), Error> {
+    //TODO use code from parameter
+    localstorage::cleanup().unwrap();
     run_with_event_loop(|el| {
         el.exit();
     });
@@ -257,7 +257,7 @@ fn show_hide_keyboard_fallible(app: AndroidApp, window_id: i32, show: bool) -> R
 #[cfg(target_os = "android")]
 fn show_hide_keyboard(app: AndroidApp, window_id: i32, show: bool) {
     if let Err(e) = show_hide_keyboard_fallible(app, window_id, show) {
-       //tracing::error!("Showing or hiding the soft keyboard failed: {e:?}");
+       log::error!("Showing or hiding the soft keyboard failed: {e:?}");
     };
 }
 

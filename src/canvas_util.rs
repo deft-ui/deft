@@ -1,5 +1,4 @@
-use skia_safe::{Canvas, Font, Paint, TextBlob};
-use crate::base::{Rect};
+use skia_safe::Canvas;
 
 pub trait CanvasHelper {
     fn session<F: FnOnce(&Self)>(&self, callback: F);

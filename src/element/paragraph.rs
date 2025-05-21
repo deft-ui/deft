@@ -1,35 +1,28 @@
+#![allow(unused)]
 pub mod typeface_mgr;
 pub mod simple_paragraph_builder;
 
 use std::any::Any;
-use std::cmp::Ordering;
-use std::fs::File;
-use std::io::Write;
 use crate as deft;
 use crate::color::parse_hex_color;
-use crate::element::text::text_paragraph::ParagraphRef;
-use crate::element::text::{intersect_range, ColOffset, RowOffset};
-use crate::element::{text, Element, ElementBackend, ElementWeak};
-use crate::js::JsError;
+use crate::element::text::{intersect_range, ColOffset};
+use crate::element::{Element, ElementBackend, ElementWeak};
 use crate::number::DeNan;
 use crate::string::StringUtils;
-use crate::style::{parse_color_str, parse_optional_color_str, FontStyle, PropValueParse, StylePropKey};
+use crate::style::{parse_optional_color_str, FontStyle, PropValueParse, StylePropKey};
 use crate::{js_deserialize, js_serialize, some_or_continue};
-use deft_macros::{element_backend, js_methods, mrc_object};
+use deft_macros::{element_backend, js_methods};
 use serde::{Deserialize, Serialize};
-use skia_safe::font_style::{Slant, Weight, Width};
-use skia_safe::{Canvas, Color, Font, FontMgr, Paint, Point, Rect};
+use skia_safe::font_style::{Weight, Width};
+use skia_safe::{Color, Paint};
 use std::str::FromStr;
-use std::sync::LazyLock;
 use measure_time::print_time;
 use skia_safe::wrapper::NativeTransmutableWrapper;
-use swash::Style;
-use winit::keyboard::NamedKey;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 use crate::base::{EventContext, MouseDetail, MouseEventType};
 use crate::element::paragraph::simple_paragraph_builder::SimpleParagraphBuilder;
 use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
-use crate::event::{FocusShiftEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent, SelectEndEvent, SelectMoveEvent, SelectStartEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
+use crate::event::{FocusShiftEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent, SelectEndEvent, SelectMoveEvent, SelectStartEvent, KEY_MOD_CTRL};
 use crate::font::family::{FontFamilies, FontFamily};
 use crate::paint::Painter;
 use crate::render::RenderFn;
@@ -141,7 +134,7 @@ impl Line {
         result
     }
 
-    pub fn subtext(&self, mut start: ColOffset, mut end: ColOffset) -> String {
+    pub fn subtext(&self, start: ColOffset, end: ColOffset) -> String {
         let mut result = String::new();
         let mut iter = self.units.iter();
         let mut processed_atom_count = 0;
@@ -195,7 +188,7 @@ impl Line {
     fn layout(&mut self, available_width: Option<f32>, element_width: f32) {
         if let Some(w) = available_width {
             self.force_layout(w);
-        } else if (!self.layout_calculated) {
+        } else if !self.layout_calculated {
             self.force_layout(element_width);
         }
     }
@@ -613,7 +606,7 @@ impl Paragraph {
 }
 
 impl ElementBackend for Paragraph {
-    fn create(mut element: &mut Element) -> Self
+    fn create(element: &mut Element) -> Self
     where
         Self: Sized,
     {
@@ -698,7 +691,7 @@ impl ElementBackend for Paragraph {
         let mut p = self.clone();
         p.layout(None);
 
-        let mut me = self.clone();
+        let me = self.clone();
         let mut consumed_top = 0.0;
         let mut consumed_rows = 0usize;
         let mut consumed_columns = 0usize;

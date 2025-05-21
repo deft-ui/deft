@@ -2,7 +2,7 @@ pub mod textbox;
 
 use bitflags::bitflags;
 use skia_safe::{Color, Font, FontMetrics, FontStyle, Paint};
-use crate::font::family::{FontFamilies, FontFamily};
+use crate::font::family::FontFamilies;
 use crate::string::StringUtils;
 
 #[repr(i32)]
@@ -169,7 +169,6 @@ pub fn calculate_line_char_count(x_pos: &[f32], available_width: f32) -> usize {
 
 pub fn break_lines(font: &Font, mut str: &str, available_width: f32) -> Vec<String> {
     let mut lines = Vec::new();
-    let (_, metrics) = font.metrics();
     let glyphs_ids = font.str_to_glyphs_vec(str);
     let mut x_pos_vec = Vec::with_capacity(glyphs_ids.len());
     unsafe {

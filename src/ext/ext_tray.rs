@@ -1,21 +1,14 @@
 
 use crate as deft;
-use crate::app::AppEvent;
 use crate::base::{Event, EventHandler, EventRegistration};
 use crate::event_loop::{create_event_loop_fn_mut, create_event_loop_proxy, AppEventProxy};
-use crate::mrc::Mrc;
 use anyhow::Error;
-use deft_macros::{js_func, js_methods, mrc_object};
+use deft_macros::{js_methods, mrc_object};
 use quick_js::JsValue;
-use serde::{Deserialize, Serialize};
 use std::cell::Cell;
-use std::fs::File;
-use std::io::Cursor;
-use image::{GenericImageView, ImageReader};
-use log::{debug, error};
-use winit::event_loop::EventLoopProxy;
+use image::{ImageReader};
 use deft_tray::{Tray, TrayMenu};
-use crate::{js_deserialize, js_value, some_or_return};
+use crate::{js_deserialize, js_value};
 
 
 thread_local! {
@@ -49,7 +42,6 @@ impl SystemTray {
         let inner_id = NEXT_TRAY_ID.get();
         NEXT_TRAY_ID.set(inner_id + 1);
 
-        let elp = event_loop_proxy.clone();
         let tray_impl = Tray::new(tray_id);
 
         let mut inst = SystemTrayData {

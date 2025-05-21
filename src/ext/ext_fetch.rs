@@ -4,7 +4,6 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Error};
-use quick_js::{JsValue, ValueError};
 use reqwest::{Method, Response};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
@@ -13,7 +12,6 @@ use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 use deft_macros::{js_methods};
 use crate::{js_serialize, js_value};
-use crate::js::js_serde::JsValueSerializer;
 use crate::js::JsPo;
 
 #[derive(Clone)]
@@ -78,7 +76,7 @@ impl fetch {
             }
             body = options.body.clone();
         }
-        let mut client = client_builder.build()?;
+        let client = client_builder.build()?;
         let mut req_builder = client
             .request(method, url)
             .headers(headers);
@@ -127,7 +125,7 @@ impl fetch {
     #[js_func]
     pub async fn response_save(response: FetchResponse, path: String) -> Result<usize, Error> {
         let mut file = File::create_new(path).await?;
-        let mut response = response.clone();
+        let response = response.clone();
         let mut rsp = response.response.lock().await;
         let mut size = 0;
         while let Some(c) = rsp.chunk().await? {

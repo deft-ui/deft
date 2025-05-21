@@ -2,7 +2,7 @@ use crate as deft;
 use serde::{Deserialize, Serialize};
 use winit::keyboard::{ModifiersState, NamedKey};
 use deft_macros::event;
-use crate::base::{CaretDetail, MouseDetail, Rect, ScrollEventDetail, TextChangeDetail, TextUpdateDetail, TouchDetail};
+use crate::base::{MouseDetail, Rect, TouchDetail};
 use crate::{base};
 
 pub const KEY_MOD_CTRL: u32 = 0x1;
