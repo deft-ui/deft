@@ -1,5 +1,4 @@
-use skia_safe::{Canvas, Surface, surfaces};
-
+use skia_safe::{surfaces, Canvas, Surface};
 
 //TODO remove
 pub struct CpuRenderer {
@@ -9,9 +8,7 @@ pub struct CpuRenderer {
 impl CpuRenderer {
     pub fn new(width: i32, height: i32) -> Self {
         let surface = surfaces::raster_n32_premul((width, height)).unwrap();
-        CpuRenderer {
-            surface,
-        }
+        CpuRenderer { surface }
     }
 
     pub fn surface(&mut self) -> &mut Surface {
@@ -21,7 +18,6 @@ impl CpuRenderer {
     pub fn canvas(&mut self) -> &Canvas {
         self.surface.canvas()
     }
-
 }
 
 /*

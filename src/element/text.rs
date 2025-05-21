@@ -1,24 +1,19 @@
 // pub mod skia_text_paragraph;
-pub mod text_paragraph;
-pub mod simple_text_paragraph;
 mod rasterize_cache;
+pub mod simple_text_paragraph;
+pub mod text_paragraph;
 
-use std::any::Any;
 use crate as deft;
+use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use quick_js::{JsValue, ValueError};
-use skia_safe::{Color, Paint};
-use yoga::{Context, MeasureMode, Node, NodeRef, Size};
-use deft_macros::{js_methods, mrc_object};
-use skia_safe::font_style::{Slant, Weight, Width};
 use crate::base::{EventContext, MouseDetail, MouseEventType, Rect};
 use crate::color::parse_hex_color;
-use crate::element::{ElementBackend, Element, ElementWeak};
-use crate::element::text::text_paragraph::{ParagraphData, Line, ParagraphRef, TextParams};
-use crate::element::paragraph::ParagraphParams;
 use crate::element::paragraph::simple_paragraph_builder::SimpleParagraphBuilder;
+use crate::element::paragraph::ParagraphParams;
+use crate::element::text::text_paragraph::{Line, ParagraphData, ParagraphRef, TextParams};
+use crate::element::{Element, ElementBackend, ElementWeak};
 use crate::event::{FocusShiftEvent, TextUpdateEvent};
 use crate::font::family::FontFamilies;
 use crate::number::DeNan;
@@ -28,6 +23,11 @@ use crate::some_or_continue;
 use crate::string::StringUtils;
 use crate::style::{FontStyle, StylePropKey};
 use crate::text::{TextAlign, TextStyle};
+use deft_macros::{js_methods, mrc_object};
+use quick_js::{JsValue, ValueError};
+use skia_safe::font_style::{Slant, Weight, Width};
+use skia_safe::{Color, Paint};
+use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 
 // zero-width space for caret
 const ZERO_WIDTH_WHITESPACE: &str = "\u{200B}";
@@ -35,7 +35,6 @@ const ZERO_WIDTH_WHITESPACE: &str = "\u{200B}";
 pub type AtomOffset = usize;
 pub type RowOffset = usize;
 pub type ColOffset = usize;
-
 
 #[repr(C)]
 #[mrc_object]
@@ -51,7 +50,13 @@ pub struct Text {
     selecting_begin: Option<AtomOffset>,
 }
 
-extern "C" fn measure_label(node_ref: NodeRef, width: f32, width_mode: MeasureMode, _height: f32, height_mode: MeasureMode) -> Size {
+extern "C" fn measure_label(
+    node_ref: NodeRef,
+    width: f32,
+    width_mode: MeasureMode,
+    _height: f32,
+    height_mode: MeasureMode,
+) -> Size {
     if let Some(ctx) = Node::get_context(&node_ref) {
         if let Some(paragraph_props_ptr) = ctx.downcast_ref::<ParagraphRef>() {
             let paragraph = &mut paragraph_props_ptr.data.borrow_mut();
@@ -83,7 +88,6 @@ impl crate::js::FromJsValue for Text {
         Ok(element.get_backend_as::<Text>().clone())
     }
 }
-
 
 #[js_methods]
 impl Text {
@@ -118,7 +122,8 @@ impl Text {
             last_width: 0.0,
             text_params,
             selecting_begin: None,
-        }.to_ref()
+        }
+        .to_ref()
     }
 
     #[js_func]
@@ -131,12 +136,9 @@ impl Text {
             self.mark_dirty(true);
             // self.mark_layout_dirty_if_needed();
 
-            self.element.emit(TextUpdateEvent {
-                value: text
-            })
+            self.element.emit(TextUpdateEvent { value: text })
         }
     }
-
 
     pub fn insert_text(&mut self, caret: AtomOffset, text: &str) {
         let (caret_row, caret_col) = self.get_location_by_atom_offset(caret);
@@ -183,7 +185,6 @@ impl Text {
         let end = self.get_line_begin_offset(line + 1);
         self.delete_text(start, end);
     }
-
 
     pub fn delete_text(&mut self, begin: AtomOffset, end: AtomOffset) {
         let (begin_row, begin_col) = self.get_location_by_atom_offset(begin);
@@ -268,10 +269,9 @@ impl Text {
             self.with_lines_mut(|lines| {
                 let mut line_offset = 0;
                 for p in lines {
-                    if let Some((s,e)) = intersect_range(
-                        (line_offset, line_offset + p.atom_count),
-                        (start, end)
-                    ) {
+                    if let Some((s, e)) =
+                        intersect_range((line_offset, line_offset + p.atom_count), (start, end))
+                    {
                         result.push_str(p.subtext(s - line_offset, e - line_offset));
                     }
                     line_offset += p.atom_count;
@@ -351,7 +351,10 @@ impl Text {
             for p in p_list {
                 height += p.paragraph.height();
                 if paragraph_offset == max_offset || height > expected_offset.1 {
-                    let line_pos = (expected_offset.0, expected_offset.1 - (height - p.paragraph.height()));
+                    let line_pos = (
+                        expected_offset.0,
+                        expected_offset.1 - (height - p.paragraph.height()),
+                    );
                     let line_col = p.get_caret_by_coord(line_pos);
                     return (paragraph_offset, line_col);
                 }
@@ -375,7 +378,8 @@ impl Text {
                 row += 1;
             }
             None
-        }).unwrap_or(self.get_max_caret())
+        })
+        .unwrap_or(self.get_max_caret())
     }
 
     #[js_func]
@@ -420,7 +424,8 @@ impl Text {
             }
             MouseEventType::MouseMove => {
                 if self.selecting_begin.is_some() {
-                    let caret = self.get_atom_offset_by_coordinate((event.offset_x, event.offset_y));
+                    let caret =
+                        self.get_atom_offset_by_coordinate((event.offset_x, event.offset_y));
                     if let Some(sb) = &self.selecting_begin {
                         let start = AtomOffset::min(*sb, caret);
                         let end = AtomOffset::max(*sb, caret);
@@ -431,7 +436,7 @@ impl Text {
             MouseEventType::MouseUp => {
                 self.end_select();
             }
-            _ => {},
+            _ => {}
         }
     }
 
@@ -501,7 +506,6 @@ impl Text {
             };
             let mut pb = SimpleParagraphBuilder::new(&paragraph_params);
 
-
             let mut style = TextStyle::default();
             style.set_font_size(paragraph_params.font_size);
             style.set_foreground_paint(&params.paint);
@@ -559,9 +563,7 @@ impl Text {
     fn preprocess_text(text: &str) -> String {
         text.replace("\r\n", "\n")
     }
-
 }
-
 
 pub fn intersect_range<T: Ord>(range1: (T, T), range2: (T, T)) -> Option<(T, T)> {
     let start = T::max(range1.0, range2.0);
@@ -576,7 +578,9 @@ pub fn intersect_range<T: Ord>(range1: (T, T), range2: (T, T)) -> Option<(T, T)>
 impl ElementBackend for Text {
     fn create(ele: &mut Element) -> Self {
         let label = Self::new(ele.clone());
-        ele.style.yoga_node.set_context(Some(Context::new(label.paragraph_ref.clone())));
+        ele.style
+            .yoga_node
+            .set_context(Some(Context::new(label.paragraph_ref.clone())));
         ele.style.yoga_node.set_measure_func(Some(measure_label));
         label
     }
@@ -596,13 +600,13 @@ impl ElementBackend for Text {
                 self.text_params.paint.set_color(color);
                 self.rebuild_lines();
                 self.mark_dirty(false);
-            },
+            }
             StylePropKey::FontSize => {
                 let font_size = self.element.style.font_size;
                 self.text_params.font_size = font_size;
                 self.rebuild_lines();
                 self.mark_dirty(true);
-            },
+            }
             StylePropKey::FontFamily => {
                 self.text_params.font_families = self.element.style.font_family.clone();
                 self.rebuild_lines();
@@ -663,7 +667,6 @@ impl ElementBackend for Text {
                     }
                 }
 
-
                 let selection_paint = selection_paint.clone();
                 let ln_render = move |painter: &Painter| {
                     let canvas = painter.canvas;
@@ -703,7 +706,11 @@ impl ElementBackend for Text {
         })
     }
 
-    fn execute_default_behavior(&mut self, event: &mut Box<dyn Any>, _ctx: &mut EventContext<ElementWeak>) -> bool {
+    fn execute_default_behavior(
+        &mut self,
+        event: &mut Box<dyn Any>,
+        _ctx: &mut EventContext<ElementWeak>,
+    ) -> bool {
         if let Some(_d) = event.downcast_ref::<FocusShiftEvent>() {
             self.unselect();
         }
@@ -725,7 +732,6 @@ impl ElementBackend for Text {
             self.last_width = last_width;
         }
     }
-
 }
 
 pub fn parse_align(align: &str) -> TextAlign {

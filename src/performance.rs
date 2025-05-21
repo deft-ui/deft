@@ -1,6 +1,5 @@
-use std::time::Instant;
 use log::{log, Level};
-
+use std::time::Instant;
 
 pub struct TimeLog {
     message: String,
@@ -13,7 +12,7 @@ impl Drop for TimeLog {
     fn drop(&mut self) {
         let elapsed = self.start.elapsed().as_millis() as u64;
         if elapsed > self.time {
-            log!(self.level, "{} took {}ms",self.message, elapsed);
+            log!(self.level, "{} took {}ms", self.message, elapsed);
         }
     }
 }

@@ -1,15 +1,14 @@
+use quick_js::{Callback, Context, ExecutionError, JsValue, ValueError};
 use std::cell::RefCell;
 use std::future::Future;
 use std::panic::RefUnwindSafe;
 use std::path::PathBuf;
-use quick_js::{Callback, Context, ExecutionError, JsValue, ValueError};
 use tokio::runtime::Builder;
 use winit::event::{DeviceEvent, DeviceId, WindowEvent};
 use winit::window::{CursorGrabMode, WindowId};
 
-use crate::app::{App};
+use crate::app::App;
 use crate::console::Console;
-use crate::element::{Element, CSS_MANAGER};
 use crate::element::button::Button;
 use crate::element::checkbox::Checkbox;
 use crate::element::entry::Entry;
@@ -19,29 +18,35 @@ use crate::element::paragraph::Paragraph;
 use crate::element::radio::Radio;
 use crate::element::richtext::RichText;
 use crate::element::text::Text;
+use crate::element::{Element, CSS_MANAGER};
 use crate::event_loop::run_with_event_loop;
 use crate::ext::ext_animation::animation_create;
 use crate::ext::ext_appfs::appfs;
 use crate::ext::ext_base64::Base64;
 use crate::ext::ext_console::Console as ExtConsole;
 use crate::ext::ext_env::env;
-use crate::ext::ext_window::{handle_window_event, WINDOWS};
-use crate::ext::ext_fs::{fs_create_dir, fs_create_dir_all, fs_delete_file, fs_exists, fs_read_dir, fs_remove_dir, fs_remove_dir_all, fs_rename, fs_stat};
+use crate::ext::ext_fs::{
+    fs_create_dir, fs_create_dir_all, fs_delete_file, fs_exists, fs_read_dir, fs_remove_dir,
+    fs_remove_dir_all, fs_rename, fs_stat,
+};
 use crate::ext::ext_localstorage::localstorage;
 use crate::ext::ext_path::path;
 use crate::ext::ext_process::process;
 use crate::ext::ext_shell::shell;
-use crate::ext::ext_timer::{timer_clear_interval, timer_clear_timeout, timer_set_interval, timer_set_timeout};
+use crate::ext::ext_timer::{
+    timer_clear_interval, timer_clear_timeout, timer_set_interval, timer_set_timeout,
+};
 #[cfg(feature = "tray")]
 use crate::ext::ext_tray::SystemTray;
+use crate::ext::ext_window::{handle_window_event, WINDOWS};
 use crate::ext::ext_worker::{SharedModuleLoader, Worker, WorkerInitParams};
-use crate::window::{Window, WindowType};
 use crate::js::js_binding::{JsCallError, JsFunc};
 use crate::js::js_runtime::{JsContext, PromiseResolver};
 use crate::js::ToJsCallResult;
 use crate::mrc::Mrc;
 use crate::stylesheet::{stylesheet_add, stylesheet_remove, stylesheet_update};
 use crate::typeface::typeface_create;
+use crate::window::{Window, WindowType};
 
 thread_local! {
     static JS_ENGINE: RefCell<Option<Mrc<JsEngine>>> = RefCell::new(None);
@@ -65,25 +70,16 @@ impl Callback<()> for JsFuncCallback {
     fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError> {
         let mut js_context = self.js_context.clone();
         match self.js_func.call(&mut js_context, args) {
-            Ok(v) => {
-                Ok(Ok(v))
-            }
-            Err(e) => {
-                match e {
-                    JsCallError::ConversionError(ce) => {
-                        Err(ce)
-                    }
-                    JsCallError::ExecutionError(ee) => {
-                        Ok(Err(ee.to_string()))
-                    }
-                }
-            }
+            Ok(v) => Ok(Ok(v)),
+            Err(e) => match e {
+                JsCallError::ConversionError(ce) => Err(ce),
+                JsCallError::ExecutionError(ee) => Ok(Err(ee.to_string())),
+            },
         }
     }
 }
 
 impl JsEngine {
-
     pub fn get() -> Mrc<JsEngine> {
         JS_ENGINE.with(|e| {
             let e = e.borrow();
@@ -105,7 +101,8 @@ impl JsEngine {
         let js_context = Context::builder()
             .console(Console::new())
             .module_loader(loader.clone())
-            .build().unwrap();
+            .build()
+            .unwrap();
         let js_context = Mrc::new(JsContext::new(js_context, runtime));
 
         let engine = Self {
@@ -188,7 +185,7 @@ impl JsEngine {
 
     pub fn create_async_task<F, O>(&mut self, future: F) -> JsValue
     where
-        F: Future<Output=O> + Send + 'static,
+        F: Future<Output = O> + Send + 'static,
         O: ToJsCallResult,
     {
         self.js_context.create_async_task2(future)
@@ -197,7 +194,6 @@ impl JsEngine {
     pub fn create_promise(&mut self) -> (JsValue, PromiseResolver) {
         self.js_context.create_promise()
     }
-
 
     pub fn init_api(&self) {
         let default_css = include_str!("../../deft.css");
@@ -214,20 +210,30 @@ impl JsEngine {
         for func in functions {
             let name = func.name().to_string();
             let js_context = self.js_context.clone();
-            self.js_context.add_callback(name.as_str(), JsFuncCallback {
-                js_func: func,
-                js_context,
-            }).unwrap();
+            self.js_context
+                .add_callback(
+                    name.as_str(),
+                    JsFuncCallback {
+                        js_func: func,
+                        js_context,
+                    },
+                )
+                .unwrap();
         }
     }
 
     pub fn add_global_func(&self, func: impl JsFunc + RefUnwindSafe + 'static) {
         let name = func.name().to_string();
         let js_context = self.js_context.clone();
-        self.js_context.add_callback(name.as_str(), JsFuncCallback {
-            js_func: Box::new(func),
-            js_context,
-        }).unwrap();
+        self.js_context
+            .add_callback(
+                name.as_str(),
+                JsFuncCallback {
+                    js_func: Box::new(func),
+                    js_context,
+                },
+            )
+            .unwrap();
     }
 
     pub fn execute_main(&mut self) {
@@ -247,10 +253,11 @@ impl JsEngine {
     }
 
     pub fn handle_device_event(&mut self, device_id: DeviceId, event: DeviceEvent) {
-        if let DeviceEvent::Button {..} = event {
+        if let DeviceEvent::Button { .. } = event {
             let close_windows = WINDOWS.with_borrow(|windows| {
                 let mut result = Vec::new();
-                let menu_windows: Vec<&Window> = windows.iter()
+                let menu_windows: Vec<&Window> = windows
+                    .iter()
                     .filter(|(_, f)| f.window_type == WindowType::Menu)
                     .map(|(_, f)| f)
                     .collect();
@@ -264,8 +271,10 @@ impl JsEngine {
                             if let Some(wp) = window.window.outer_position().ok() {
                                 let (wx, wy) = (wp.x as f32, wp.y as f32);
                                 let (ww, wh) = (w_size.width as f32, w_size.height as f32);
-                                let is_in_window = pos.0 >= wx && pos.0 <= wx + ww
-                                                       && pos.1 >= wy && pos.1 <= wy + wh;
+                                let is_in_window = pos.0 >= wx
+                                    && pos.0 <= wx + ww
+                                    && pos.1 >= wy
+                                    && pos.1 <= wy + wh;
                                 if !is_in_window {
                                     let _ = window.window.set_cursor_grab(CursorGrabMode::None);
                                     result.push(window.as_weak());
@@ -301,5 +310,4 @@ impl JsEngine {
             }
         }
     }
-
 }

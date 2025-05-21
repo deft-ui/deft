@@ -1,15 +1,15 @@
+use crate::app::App;
 use crate::ext::ext_worker::{WorkerContext, JS_WORKER_CONTEXTS};
+use crate::id_generator::IdGenerator;
+use crate::id_hash_map::IdHashMap;
 use crate::js::js_engine::JsEngine;
 use crate::js::js_event_loop::{js_init_event_loop, JsEvent, JsEventLoopClosedError};
 use crate::js::ToJsValue;
+use log::error;
 use std::collections::HashMap;
 use std::sync::mpsc::{SendError, Sender};
 use std::sync::{Arc, LazyLock, Mutex};
 use std::thread;
-use log::error;
-use crate::app::App;
-use crate::id_generator::IdGenerator;
-use crate::id_hash_map::IdHashMap;
 
 struct ServiceHolder {
     id_generator: IdGenerator,
@@ -32,7 +32,6 @@ pub struct Service {
 }
 
 impl Service {
-
     pub fn get(id: u32) -> Option<Self> {
         let services = SERVICES.lock().unwrap();
         services.services.get(&id).cloned()
@@ -144,5 +143,4 @@ impl Service {
         let mut handlers = self.msg_handlers.lock().unwrap();
         handlers.remove(id);
     }
-
 }

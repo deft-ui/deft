@@ -2,7 +2,7 @@ use std::cell::Cell;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::ops::{Deref, DerefMut};
-use std::panic::{RefUnwindSafe};
+use std::panic::RefUnwindSafe;
 use std::ptr::null_mut;
 
 #[derive(Debug)]
@@ -72,40 +72,31 @@ impl<T> Mrc<T> {
             weak: Cell::new(1),
             value: Some(value),
         }));
-        Mrc {
-            ptr
-        }
+        Mrc { ptr }
     }
 
     pub fn as_weak(&self) -> MrcWeak<T> {
         let weak = self.inner().weak.get();
         self.inner().weak.set(weak + 1);
-        MrcWeak {
-            ptr: self.ptr
-        }
+        MrcWeak { ptr: self.ptr }
     }
 
     fn inner(&self) -> &mut MrcBox<T> {
         unsafe { &mut (*self.ptr) }
     }
-
 }
 
 impl<T> Deref for Mrc<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        unsafe {
-            (*self.ptr).value.as_ref().unwrap()
-        }
+        unsafe { (*self.ptr).value.as_ref().unwrap() }
     }
 }
 
 impl<T> DerefMut for Mrc<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe {
-            (*self.ptr).value.as_mut().unwrap()
-        }
+        unsafe { (*self.ptr).value.as_mut().unwrap() }
     }
 }
 
@@ -114,9 +105,7 @@ impl<T> Clone for Mrc<T> {
         unsafe {
             let strong = &(*self.ptr).strong;
             strong.set(strong.get() + 1);
-            Self {
-                ptr: self.ptr
-            }
+            Self { ptr: self.ptr }
         }
     }
 }
@@ -137,11 +126,8 @@ impl<T> Drop for MrcWeak<T> {
 }
 
 impl<T> MrcWeak<T> {
-
     pub fn new() -> Self {
-        Self {
-            ptr: null_mut(),
-        }
+        Self { ptr: null_mut() }
     }
 
     pub fn upgrade(&self) -> Result<Mrc<T>, UpgradeError> {
@@ -153,24 +139,19 @@ impl<T> MrcWeak<T> {
             return Err(UpgradeError {});
         }
         self.inner().strong.set(strong + 1);
-        Ok(Mrc {
-            ptr: self.ptr,
-        })
+        Ok(Mrc { ptr: self.ptr })
     }
 
     fn inner(&self) -> &mut MrcBox<T> {
         unsafe { &mut (*self.ptr) }
     }
-
 }
 
 impl<T> Clone for MrcWeak<T> {
     fn clone(&self) -> Self {
         let weak = self.inner().weak.get();
         self.inner().weak.set(weak + 1);
-        Self {
-            ptr: self.ptr,
-        }
+        Self { ptr: self.ptr }
     }
 }
 

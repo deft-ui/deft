@@ -1,6 +1,7 @@
 pub mod family;
 
 use crate as deft;
+use crate::mrc::Mrc;
 use deft_macros::mrc_object;
 use memmap2::{Mmap, MmapOptions};
 use skia_safe::Rect;
@@ -11,7 +12,6 @@ use swash::scale::image::Image;
 use swash::scale::{Render, ScaleContext, Source, StrikeWith};
 use swash::zeno::{Angle, Format, Transform};
 use swash::{Attributes, CacheKey, Charmap, FontRef, GlyphId, Metrics, Style, Weight};
-use crate::mrc::Mrc;
 
 enum FontContent {
     Mmap(Mmap),
@@ -84,7 +84,8 @@ impl Font {
             family_name: self.family_name.clone(),
             weight,
             style,
-        }.to_ref()
+        }
+        .to_ref()
     }
 
     // As a convenience, you may want to forward some methods.

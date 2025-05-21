@@ -1,16 +1,16 @@
 use crate as deft;
-use deft_macros::{element_backend, js_methods};
-use yoga::{Context, MeasureMode, Node, NodeRef, Size};
-use skia_safe::FontMgr;
 use crate::base::Rect;
-use crate::element::{ElementBackend, Element, ElementWeak};
+use crate::element::{Element, ElementBackend, ElementWeak};
 use crate::event::TextUpdateEvent;
 use crate::mrc::Mrc;
-use crate::render::RenderFn;
 use crate::ok_or_return;
+use crate::render::RenderFn;
 use crate::style::StylePropKey;
-use crate::text::TextAlign;
 use crate::text::textbox::{TextBox, TextElement, TextUnit};
+use crate::text::TextAlign;
+use deft_macros::{element_backend, js_methods};
+use skia_safe::FontMgr;
+use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 
 thread_local! {
     //TODO remove
@@ -38,7 +38,13 @@ struct LabelState {
     layout_calculated: bool,
 }
 
-extern "C" fn measure_label_func(node_ref: NodeRef, width: f32, _width_mode: MeasureMode, _height: f32, _height_mode: MeasureMode) -> Size {
+extern "C" fn measure_label_func(
+    node_ref: NodeRef,
+    width: f32,
+    _width_mode: MeasureMode,
+    _height: f32,
+    _height_mode: MeasureMode,
+) -> Size {
     if let Some(ctx) = Node::get_context_mut(&node_ref) {
         if let Some(state) = ctx.downcast_mut::<Mrc<LabelState>>() {
             state.text_box.set_layout_width(width);
@@ -57,7 +63,6 @@ extern "C" fn measure_label_func(node_ref: NodeRef, width: f32, _width_mode: Mea
     }
 }
 
-
 #[js_methods]
 impl Label {
     #[js_func]
@@ -67,12 +72,12 @@ impl Label {
             self.text = text.clone();
             self.state.text_box.clear();
             let text_unit = self.build_text_unit(text.clone());
-            self.state.text_box.add_line(vec![TextElement::Text(text_unit)]);
+            self.state
+                .text_box
+                .add_line(vec![TextElement::Text(text_unit)]);
             self.mark_dirty(true);
 
-            self.element.emit(TextUpdateEvent {
-                value: text
-            })
+            self.element.emit(TextUpdateEvent { value: text })
         }
     }
 
@@ -97,7 +102,6 @@ impl Label {
             style: None,
         }
     }
-
 }
 
 impl ElementBackend for Label {
@@ -111,9 +115,14 @@ impl ElementBackend for Label {
             text,
             state: Mrc::new(state),
             element: ele.as_weak(),
-        }.to_ref();
-        ele.style.yoga_node.set_context(Some(Context::new(label.state.clone())));
-        ele.style.yoga_node.set_measure_func(Some(measure_label_func));
+        }
+        .to_ref();
+        ele.style
+            .yoga_node
+            .set_context(Some(Context::new(label.state.clone())));
+        ele.style
+            .yoga_node
+            .set_measure_func(Some(measure_label_func));
         label
     }
 
@@ -132,12 +141,12 @@ impl ElementBackend for Label {
                 let color = element.style.color;
                 self.state.text_box.set_color(color);
                 self.mark_dirty(false);
-            },
+            }
             StylePropKey::FontSize => {
                 let font_size = element.style.font_size;
                 self.state.text_box.set_font_size(font_size);
                 self.mark_dirty(true);
-            },
+            }
             StylePropKey::FontFamily => {
                 let font_families = element.style.font_family.clone();
                 self.state.text_box.set_font_families(font_families);
@@ -160,7 +169,6 @@ impl ElementBackend for Label {
             }
             _ => {}
         }
-
     }
 
     fn render(&mut self) -> RenderFn {
@@ -178,5 +186,4 @@ impl ElementBackend for Label {
             self.state.layout_calculated = true;
         }
     }
-
 }

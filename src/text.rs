@@ -1,9 +1,9 @@
 pub mod textbox;
 
-use bitflags::bitflags;
-use skia_safe::{Color, Font, FontMetrics, FontStyle, Paint};
 use crate::font::family::FontFamilies;
 use crate::string::StringUtils;
+use bitflags::bitflags;
+use skia_safe::{Color, Font, FontMetrics, FontStyle, Paint};
 
 #[repr(i32)]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
@@ -79,7 +79,6 @@ impl TextStyle {
     pub fn set_decoration_type(&mut self, decoration_type: TextDecoration) {
         self.decoration_type = decoration_type;
     }
-
 }
 
 bitflags! {
@@ -110,7 +109,14 @@ fn predicate_len(width: f32, fm: &FontMetrics) -> usize {
     (width / fm.avg_char_width).floor() as usize
 }
 
-fn calculate_len(str: &str, width: f32, char_count: usize, available_width: f32, fm: &FontMetrics, font: &Font) -> usize {
+fn calculate_len(
+    str: &str,
+    width: f32,
+    char_count: usize,
+    available_width: f32,
+    fm: &FontMetrics,
+    font: &Font,
+) -> usize {
     let str_chars = str.chars().count();
     if str_chars <= 1 {
         return str_chars;
@@ -120,7 +126,10 @@ fn calculate_len(str: &str, width: f32, char_count: usize, available_width: f32,
     }
     if width < available_width {
         let remaining_char_count = str.chars().count() - char_count;
-        let add_char_count = usize::min(predicate_len(available_width - width, fm), remaining_char_count);
+        let add_char_count = usize::min(
+            predicate_len(available_width - width, fm),
+            remaining_char_count,
+        );
         if add_char_count == 0 {
             return char_count;
         }
@@ -129,19 +138,36 @@ fn calculate_len(str: &str, width: f32, char_count: usize, available_width: f32,
         if new_width > width && add_char_count == 1 {
             char_count
         } else {
-            calculate_len(str, new_width, char_count + add_char_count, available_width, fm, font)
+            calculate_len(
+                str,
+                new_width,
+                char_count + add_char_count,
+                available_width,
+                fm,
+                font,
+            )
         }
     } else {
         let minus_char_count = usize::min(char_count, predicate_len(width - available_width, fm));
         if minus_char_count == 0 {
-            return char_count
+            return char_count;
         }
-        let (minus_width, _) = font.measure_str(str.substring(char_count - minus_char_count, minus_char_count), None);
+        let (minus_width, _) = font.measure_str(
+            str.substring(char_count - minus_char_count, minus_char_count),
+            None,
+        );
         let new_width = width - minus_width;
         if new_width < width && minus_char_count == 1 {
             char_count - minus_char_count
         } else {
-            calculate_len(str, new_width, char_count - minus_char_count, available_width, fm, font)
+            calculate_len(
+                str,
+                new_width,
+                char_count - minus_char_count,
+                available_width,
+                fm,
+                font,
+            )
         }
     }
 }

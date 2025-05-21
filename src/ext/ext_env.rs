@@ -8,7 +8,6 @@ pub struct env;
 
 #[js_methods]
 impl env {
-
     #[js_func]
     pub fn exe_dir() -> Result<String, Error> {
         let exe = std_env::current_exe()?;

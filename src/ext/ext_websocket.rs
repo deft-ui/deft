@@ -1,26 +1,25 @@
+use crate as deft;
+use crate::js::{JsError, ToJsValue};
+use crate::js_weak_value;
+use anyhow::Error;
+use deft_macros::{js_methods, mrc_object};
+use futures_util::stream::{SplitSink, SplitStream};
+use futures_util::{SinkExt, StreamExt};
+use quick_js::JsValue;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use crate as deft;
 use std::io;
 use std::io::ErrorKind;
 use std::sync::Arc;
-use anyhow::{Error};
-use futures_util::stream::{SplitSink, SplitStream};
-use futures_util::{SinkExt, StreamExt};
-use quick_js::{JsValue};
 use tokio::net::TcpStream;
-use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
-use tokio_tungstenite::tungstenite::Message;
 use tokio::sync::Mutex;
-use deft_macros::{js_methods, mrc_object};
-use crate::js_weak_value;
-use crate::js::{JsError, ToJsValue};
+use tokio_tungstenite::tungstenite::Message;
+use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 
 thread_local! {
     pub static NEXT_ID: RefCell<u64> = RefCell::new(0);
     pub static CONNECTIONS: RefCell<HashMap<u64, WsConnection>> = RefCell::new(HashMap::new());
 }
-
 
 type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
@@ -31,7 +30,6 @@ pub struct WsConnection {
     reader: Arc<Mutex<SplitStream<WsStream>>>,
 }
 
-
 unsafe impl Send for WsConnection {}
 unsafe impl Sync for WsConnection {}
 
@@ -39,21 +37,22 @@ js_weak_value!(WsConnection, WsConnectionWeak);
 
 #[js_methods]
 impl WsConnection {
-
     #[js_func]
     pub async fn connect(url: String) -> Result<WsConnection, JsError> {
         let id = NEXT_ID.with_borrow_mut(|id| {
             *id += 1;
             *id - 1
         });
-        let (socket, _) = connect_async(url).await
+        let (socket, _) = connect_async(url)
+            .await
             .map_err(|e| io::Error::new(ErrorKind::Other, e))?;
         let (writer, reader) = socket.split();
         let ws_conn = WsConnectionData {
             id,
             reader: Arc::new(Mutex::new(reader)),
             writer: Arc::new(Mutex::new(writer)),
-        }.to_ref();
+        }
+        .to_ref();
         CONNECTIONS.with_borrow_mut(|map| {
             map.insert(id, ws_conn.clone());
         });
@@ -92,6 +91,4 @@ impl WsConnection {
         writer.send(Message::Text(data)).await?;
         Ok(JsValue::Undefined)
     }
-
 }
-

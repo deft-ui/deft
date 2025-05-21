@@ -1,6 +1,7 @@
 use crate::data_dir::get_data_path;
 use crate::ext::audio_player::AudioNotify::{End, Finish, Load, TimeUpdate};
 use anyhow::Error;
+use log::{debug, error};
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink, Source};
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
@@ -12,7 +13,6 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::Duration;
 use std::{fs, thread};
-use log::{debug, error};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AudioCurrentChangeInfo {
@@ -61,15 +61,13 @@ impl AudioSources {
                 return SourceResult::Pending;
             }
             return match dh.join() {
-                Ok((id, path)) => {
-                    match Self::create_source(path.as_str()) {
-                        Ok(src) => SourceResult::Some((id, src)),
-                        Err(err) => {
-                            error!("load source failed:{}", err);
-                            self.next_source()
-                        }
+                Ok((id, path)) => match Self::create_source(path.as_str()) {
+                    Ok(src) => SourceResult::Some((id, src)),
+                    Err(err) => {
+                        error!("load source failed:{}", err);
+                        self.next_source()
                     }
-                }
+                },
                 Err(e) => {
                     error!("error: {:?}", e);
                     self.next_source()
@@ -175,7 +173,11 @@ impl AudioServer {
         let (sender, receiver) = mpsc::channel();
         thread::spawn(move || {
             let mut playing_list: HashMap<u32, AudioPlayContext> = HashMap::new();
-            fn play_next_source<F: FnMut(u32, AudioNotify) + Send + 'static>(id: u32, audio_context: &mut AudioPlayContext, notify_handler: &mut F) -> bool {
+            fn play_next_source<F: FnMut(u32, AudioNotify) + Send + 'static>(
+                id: u32,
+                audio_context: &mut AudioPlayContext,
+                notify_handler: &mut F,
+            ) -> bool {
                 let mut sources = audio_context.source.lock().unwrap();
                 let source = sources.next_source();
                 match source {
@@ -193,10 +195,7 @@ impl AudioServer {
                             sink,
                         });
                         audio_context.playing = true;
-                        let meta = AudioMeta {
-                            index,
-                            duration,
-                        };
+                        let meta = AudioMeta { index, duration };
                         notify_handler(id, Load(meta));
                         true
                     }
@@ -248,7 +247,9 @@ impl AudioServer {
                 } else {
                     playing_list.retain(|k, v| {
                         let id = *k;
-                        let is_end_pending = v.audio_stream.as_ref()
+                        let is_end_pending = v
+                            .audio_stream
+                            .as_ref()
                             .map(|it| it.sink.empty())
                             .unwrap_or(false);
                         if is_end_pending {
@@ -268,9 +269,12 @@ impl AudioServer {
                             if !next {
                                 notify_handler(id, Finish);
                             } else if is_end_pending {
-                                notify_handler(id, AudioNotify::CurrentChange(AudioCurrentChangeInfo {
-                                    index: v.current_index()
-                                }));
+                                notify_handler(
+                                    id,
+                                    AudioNotify::CurrentChange(AudioCurrentChangeInfo {
+                                        index: v.current_index(),
+                                    }),
+                                );
                             }
                             next
                         };
@@ -278,9 +282,7 @@ impl AudioServer {
                 }
             }
         });
-        Self {
-            sender,
-        }
+        Self { sender }
     }
 
     pub fn play(&self, id: u32, source: Arc<Mutex<AudioSources>>) {

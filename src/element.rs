@@ -6,7 +6,7 @@ use std::mem;
 use std::ops::{Deref, DerefMut};
 
 use anyhow::{anyhow, Error};
-use bitflags::{bitflags};
+use bitflags::bitflags;
 use deft_macros::{js_methods, mrc_object};
 use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
@@ -20,32 +20,51 @@ use crate::element::container::Container;
 use crate::element::entry::Entry;
 use crate::element::image::Image;
 use crate::element::scroll::Scroll;
-use crate::event::{DragOverEventListener, BlurEventListener, BoundsChangeEventListener, CaretChangeEventListener, ClickEventListener, DragStartEventListener, DropEventListener, FocusEventListener, FocusShiftEventListener, KeyDownEventListener, KeyUpEventListener, MouseDownEventListener, MouseEnterEvent, MouseEnterEventListener, MouseLeaveEvent, MouseLeaveEventListener, MouseMoveEventListener, MouseUpEventListener, MouseWheelEventListener, ScrollEvent, ScrollEventListener, TextChangeEventListener, TextUpdateEventListener, TouchCancelEventListener, TouchEndEventListener, TouchMoveEventListener, TouchStartEventListener, BoundsChangeEvent, ContextMenuEventListener, MouseDownEvent, TouchStartEvent, DroppedFileEventListener, HoveredFileEventListener};
-use crate::event_loop::{create_event_loop_callback};
-use crate::ext::ext_window::{ELEMENT_TYPE_BUTTON, ELEMENT_TYPE_CONTAINER, ELEMENT_TYPE_ENTRY, ELEMENT_TYPE_IMAGE, ELEMENT_TYPE_LABEL, ELEMENT_TYPE_SCROLL, ELEMENT_TYPE_BODY, ELEMENT_TYPE_PARAGRAPH, ELEMENT_TYPE_CHECKBOX, ELEMENT_TYPE_RADIO, ELEMENT_TYPE_RADIO_GROUP, ELEMENT_TYPE_RICH_TEXT};
-use crate::window::{Window, WindowWeak};
+use crate::event::{
+    BlurEventListener, BoundsChangeEvent, BoundsChangeEventListener, CaretChangeEventListener,
+    ClickEventListener, ContextMenuEventListener, DragOverEventListener, DragStartEventListener,
+    DropEventListener, DroppedFileEventListener, FocusEventListener, FocusShiftEventListener,
+    HoveredFileEventListener, KeyDownEventListener, KeyUpEventListener, MouseDownEvent,
+    MouseDownEventListener, MouseEnterEvent, MouseEnterEventListener, MouseLeaveEvent,
+    MouseLeaveEventListener, MouseMoveEventListener, MouseUpEventListener, MouseWheelEventListener,
+    ScrollEvent, ScrollEventListener, TextChangeEventListener, TextUpdateEventListener,
+    TouchCancelEventListener, TouchEndEventListener, TouchMoveEventListener, TouchStartEvent,
+    TouchStartEventListener,
+};
+use crate::event_loop::create_event_loop_callback;
+use crate::ext::ext_window::{
+    ELEMENT_TYPE_BODY, ELEMENT_TYPE_BUTTON, ELEMENT_TYPE_CHECKBOX, ELEMENT_TYPE_CONTAINER,
+    ELEMENT_TYPE_ENTRY, ELEMENT_TYPE_IMAGE, ELEMENT_TYPE_LABEL, ELEMENT_TYPE_PARAGRAPH,
+    ELEMENT_TYPE_RADIO, ELEMENT_TYPE_RADIO_GROUP, ELEMENT_TYPE_RICH_TEXT, ELEMENT_TYPE_SCROLL,
+};
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::resource_table::ResourceTable;
-use crate::style::{LengthContext, ResolvedStyleProp, StyleNode, StyleProp, StylePropKey, StylePropVal};
-use crate::{base, bind_js_event_listener, js_auto_upgrade, js_deserialize, js_serialize, js_value, ok_or_return};
+use crate::style::{
+    LengthContext, ResolvedStyleProp, StyleNode, StyleProp, StylePropKey, StylePropVal,
+};
+use crate::window::{Window, WindowWeak};
+use crate::{
+    base, bind_js_event_listener, js_auto_upgrade, js_deserialize, js_serialize, js_value,
+    ok_or_return,
+};
 
-pub mod container;
-pub mod entry;
+pub mod body;
 pub mod button;
-pub mod scroll;
+pub mod checkbox;
+mod common;
+pub mod container;
+mod edit_history;
+pub mod entry;
+mod font_manager;
 pub mod image;
 pub mod label;
-mod edit_history;
-pub mod text;
 pub mod paragraph;
-pub mod body;
-mod font_manager;
-mod util;
-pub mod checkbox;
 pub mod radio;
-mod common;
 pub mod richtext;
+pub mod scroll;
+pub mod text;
+mod util;
 
 use crate as deft;
 use crate::computed::ComputedValue;
@@ -105,11 +124,9 @@ pub trait ViewEvent {
 #[js_methods]
 impl Element {
     pub fn create<T: ElementBackend + 'static, F: FnOnce(&mut Element) -> T>(backend: F) -> Self {
-        let empty_backend = EmptyElementBackend{};
-        let inner =  Mrc::new(ElementData::new(empty_backend));
-        let mut ele = Self {
-            inner,
-        };
+        let empty_backend = EmptyElementBackend {};
+        let inner = Mrc::new(ElementData::new(empty_backend));
+        let mut ele = Self { inner };
         let weak = ele.as_weak();
         ele.style.bind_element(weak);
         let ele_weak = ele.inner.as_weak();
@@ -137,9 +154,7 @@ impl Element {
 
     #[js_func]
     pub fn get_class(&self) -> String {
-        let classes: Vec<String> = self.classes.iter()
-            .map(|it| it.to_string())
-            .collect();
+        let classes: Vec<String> = self.classes.iter().map(|it| it.to_string()).collect();
         classes.join(" ")
     }
 
@@ -153,8 +168,15 @@ impl Element {
             }
         }
         let need_update = CSS_MANAGER.with_borrow_mut(|cm| {
-            old_classes.iter().find(|it| cm.contains_class(it)).is_some()
-                || self.classes.iter().find(|it| cm.contains_class(it)).is_some()
+            old_classes
+                .iter()
+                .find(|it| cm.contains_class(it))
+                .is_some()
+                || self
+                    .classes
+                    .iter()
+                    .find(|it| cm.contains_class(it))
+                    .is_some()
         });
         if need_update {
             self.select_style_recurse();
@@ -168,9 +190,7 @@ impl Element {
 
     #[js_func]
     pub fn set_attribute(&mut self, key: String, value: String) {
-        let need_update_style = CSS_MANAGER.with_borrow(|cm| {
-            cm.contains_attr(&key)
-        });
+        let need_update_style = CSS_MANAGER.with_borrow(|cm| cm.contains_attr(&key));
         let mut backend = self.backend.clone();
         let mut is_new = false;
         let v = self.attributes.entry(key.clone()).or_insert_with(|| {
@@ -188,9 +208,7 @@ impl Element {
 
     #[js_func]
     pub fn remove_attribute(&mut self, key: String) {
-        let need_update_style = CSS_MANAGER.with_borrow(|cm| {
-            cm.contains_attr(&key)
-        });
+        let need_update_style = CSS_MANAGER.with_borrow(|cm| cm.contains_attr(&key));
         self.attributes.remove(&key);
         self.backend.on_attribute_changed(&key, None);
         if need_update_style {
@@ -249,10 +267,11 @@ impl Element {
         self.resource_table.put(ElementJsContext { context });
     }
 
-
     #[js_func]
     pub fn get_js_context(&self) -> Result<JsValue, Error> {
-        let e = self.resource_table.get::<ElementJsContext>()
+        let e = self
+            .resource_table
+            .get::<ElementJsContext>()
             .map(|e| e.context.clone())
             .unwrap_or(JsValue::Undefined);
         Ok(e)
@@ -260,7 +279,11 @@ impl Element {
 
     #[js_func]
     pub fn add_child(&mut self, child: Element, position: i32) -> Result<(), Error> {
-        let position = if position < 0 { None } else { Some(position as u32) };
+        let position = if position < 0 {
+            None
+        } else {
+            Some(position as u32)
+        };
         self.add_child_view(child, position);
         Ok(())
     }
@@ -278,7 +301,11 @@ impl Element {
     }
 
     #[js_func]
-    pub fn add_js_event_listener(&mut self, event_type: String, listener: JsValue) -> Result<u32, JsError> {
+    pub fn add_js_event_listener(
+        &mut self,
+        event_type: String,
+        listener: JsValue,
+    ) -> Result<u32, JsError> {
         let mut id = bind_js_event_listener!(
             self, event_type.as_str(), listener.clone();
             "click" => ClickEventListener,
@@ -354,7 +381,7 @@ impl Element {
     #[js_func]
     pub fn set_scroll_left(&mut self, mut value: f32) {
         if value.is_nan() {
-            return
+            return;
         }
         let content_bounds = self.get_content_bounds();
         let width = content_bounds.width;
@@ -390,7 +417,7 @@ impl Element {
     #[js_func]
     pub fn set_scroll_top(&mut self, mut value: f32) {
         if value.is_nan() {
-            return
+            return;
         }
         let content_bounds = self.get_content_bounds();
         let height = content_bounds.height;
@@ -455,11 +482,11 @@ impl Element {
             None => {
                 self.on_window_changed(&None);
                 None
-            },
+            }
             Some(p) => {
                 self.on_window_changed(&p.get_window());
                 Some(p.as_weak())
-            },
+            }
         };
         self.applied_style.clear();
         if let Some(win) = self.get_window() {
@@ -509,9 +536,9 @@ impl Element {
     #[js_func]
     pub fn get_window(&self) -> Option<WindowWeak> {
         if let Some(p) = self.get_parent() {
-            return p.get_window()
+            return p.get_window();
         } else if let Some(ww) = &self.window {
-            return Some(ww.clone())
+            return Some(ww.clone());
         }
         None
     }
@@ -567,7 +594,6 @@ impl Element {
         }
     }
 
-
     /// bounds relative to parent
     pub fn get_bounds(&self) -> base::Rect {
         let ml = self.style.yoga_node.get_layout();
@@ -604,7 +630,12 @@ impl Element {
     pub fn get_origin_content_bounds(&self) -> base::Rect {
         let (t, r, b, l) = self.get_padding();
         let bounds = self.get_origin_bounds();
-        base::Rect::new(bounds.x + l, bounds.y + t, bounds.width - l - r, bounds.height - t - b)
+        base::Rect::new(
+            bounds.x + l,
+            bounds.y + t,
+            bounds.width - l - r,
+            bounds.height - t - b,
+        )
     }
 
     /// bounds relative to root node
@@ -619,12 +650,16 @@ impl Element {
             base::Rect::new(x, y, b.width, b.height)
         } else {
             b
-        }
+        };
     }
 
     pub fn add_child_view(&mut self, mut child: Element, position: Option<u32>) {
         if let Some(p) = child.get_parent() {
-            panic!("child({}) has parent({}) already", child.get_eid(), p.get_eid());
+            panic!(
+                "child({}) has parent({}) already",
+                child.get_eid(),
+                p.get_eid()
+            );
         }
         let pos = {
             let layout = &mut self.style;
@@ -681,10 +716,14 @@ impl Element {
         // mark all children dirty so that custom measure function could be call
         // self.mark_all_layout_dirty();
         self.before_layout_recurse();
-        self.style.calculate_layout(available_width, available_height, Direction::LTR);
+        self.style
+            .calculate_layout(available_width, available_height, Direction::LTR);
         if let Some(lr) = &mut self.layout_root {
             lr.update_layout();
-            assert_eq!(false, self.dirty_flags.contains(StyleDirtyFlags::LayoutDirty));
+            assert_eq!(
+                false,
+                self.dirty_flags.contains(StyleDirtyFlags::LayoutDirty)
+            );
         }
         self.on_layout_update();
     }
@@ -712,10 +751,7 @@ impl Element {
     pub fn get_style(&self) -> JsValue {
         let mut result = HashMap::new();
         for (_, v) in self.style_list.get_styles(self.hover) {
-            result.insert(
-                v.name().to_string(),
-                JsValue::String(v.to_style_string())
-            );
+            result.insert(v.name().to_string(), JsValue::String(v.to_style_string()));
         }
         JsValue::Object(result)
     }
@@ -806,12 +842,8 @@ impl Element {
         let style = self.style_list.get_styles(self.hover);
         let px = if let Some(StyleProp::FontSize(fs_prop)) = style.get(&StylePropKey::FontSize) {
             match fs_prop {
-                StylePropVal::Custom(c) => {
-                    c.to_px(&ctx)
-                }
-                _ => {
-                    ctx.font_size
-                }
+                StylePropVal::Custom(c) => c.to_px(&ctx),
+                _ => ctx.font_size,
             }
         } else {
             ctx.font_size
@@ -828,7 +860,11 @@ impl Element {
         }
     }
 
-    pub(crate) fn apply_style_update(&mut self, parent_changed: &Vec<StylePropKey>, length_ctx: &LengthContext) {
+    pub(crate) fn apply_style_update(
+        &mut self,
+        parent_changed: &Vec<StylePropKey>,
+        length_ctx: &LengthContext,
+    ) {
         let is_self_dirty = self.dirty_flags.contains(StyleDirtyFlags::SelfDirty);
         let is_children_dirty = self.dirty_flags.contains(StyleDirtyFlags::ChildrenDirty);
         let mut changed_keys = Vec::new();
@@ -848,15 +884,19 @@ impl Element {
         self.dirty_flags.remove(StyleDirtyFlags::SelfDirty);
     }
 
-    pub fn apply_own_style(&mut self, parent_changed: &Vec<StylePropKey>, length_ctx: &LengthContext) -> Vec<ResolvedStyleProp> {
+    pub fn apply_own_style(
+        &mut self,
+        parent_changed: &Vec<StylePropKey>,
+        length_ctx: &LengthContext,
+    ) -> Vec<ResolvedStyleProp> {
         let mut style_props = self.style_list.get_styles(self.hover);
         for (k, v) in &self.animation_style_props {
             style_props.insert(k.clone(), v.clone());
         }
         let old_style = self.applied_style.clone();
-        let changed_style_props = Self::calculate_changed_style(&old_style, &style_props, parent_changed);
+        let changed_style_props =
+            Self::calculate_changed_style(&old_style, &style_props, parent_changed);
         // println!("new styles {} => {:?}", self.id, style_props);
-
 
         let mut changed_list = Vec::new();
         for sp in changed_style_props {
@@ -871,7 +911,11 @@ impl Element {
         changed_list
     }
 
-    pub fn apply_style_prop(&mut self, prop: StyleProp, length_ctx: &LengthContext) -> (bool, bool, ResolvedStyleProp) {
+    pub fn apply_style_prop(
+        &mut self,
+        prop: StyleProp,
+        length_ctx: &LengthContext,
+    ) -> (bool, bool, ResolvedStyleProp) {
         if let Some(v) = self.backend.apply_style_prop(&prop, length_ctx) {
             v
         } else {
@@ -879,7 +923,10 @@ impl Element {
         }
     }
 
-    pub fn register_event_listener<T: 'static, H: EventListener<T, ElementWeak> + 'static>(&mut self, listener: H) -> u32 {
+    pub fn register_event_listener<T: 'static, H: EventListener<T, ElementWeak> + 'static>(
+        &mut self,
+        listener: H,
+    ) -> u32 {
         self.event_registration.register_event_listener(listener)
     }
 
@@ -909,7 +956,11 @@ impl Element {
         callback.call();
     }
 
-    fn handle_event<T: ViewEvent + 'static>(&mut self, event: &mut T, ctx: &mut EventContext<ElementWeak>) {
+    fn handle_event<T: ViewEvent + 'static>(
+        &mut self,
+        event: &mut T,
+        ctx: &mut EventContext<ElementWeak>,
+    ) {
         if TypeId::of::<T>() == TypeId::of::<MouseEnterEvent>() {
             self.hover = true;
             //TODO optimize performance
@@ -942,8 +993,14 @@ impl Element {
         }
     }
 
-    fn handle_default_behavior(&mut self, event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) {
-        if event.downcast_ref::<MouseDownEvent>().is_some() || event.downcast_ref::<TouchStartEvent>().is_some() {
+    fn handle_default_behavior(
+        &mut self,
+        event: &mut Box<dyn Any>,
+        ctx: &mut EventContext<ElementWeak>,
+    ) {
+        if event.downcast_ref::<MouseDownEvent>().is_some()
+            || event.downcast_ref::<TouchStartEvent>().is_some()
+        {
             if self.as_weak() == ctx.target {
                 if let Some(win) = self.get_window() {
                     if let Ok(mut win) = win.upgrade_mut() {
@@ -961,7 +1018,8 @@ impl Element {
 
     #[js_func]
     pub fn remove_event_listener(&mut self, event_type: String, id: u32) {
-        self.event_registration.remove_event_listener(&event_type, id)
+        self.event_registration
+            .remove_event_listener(&event_type, id)
     }
 
     pub fn set_as_layout_root(&mut self, layout_root: Option<Box<dyn LayoutRoot>>) {
@@ -1110,8 +1168,18 @@ impl Element {
     pub fn get_border_path_mut(&mut self) -> &mut BorderPath {
         let bounds = self.get_bounds();
         let border_widths = self.get_border_width();
-        let border_widths = [border_widths.0, border_widths.1, border_widths.2, border_widths.3];
-        let bp = BorderPath::new(bounds.width, bounds.height, self.style.border_radius, border_widths);
+        let border_widths = [
+            border_widths.0,
+            border_widths.1,
+            border_widths.2,
+            border_widths.3,
+        ];
+        let bp = BorderPath::new(
+            bounds.width,
+            bounds.height,
+            self.style.border_radius,
+            border_widths,
+        );
         if !self.border_path.is_same(&bp) {
             self.border_path = bp;
         }
@@ -1130,9 +1198,7 @@ impl Element {
 
     pub(crate) fn select_style(&mut self) {
         if self.element_type == ElementType::Widget {
-            let (style, pseudo_styles) = CSS_MANAGER.with_borrow(|cm| {
-                cm.match_styles(&self)
-            });
+            let (style, pseudo_styles) = CSS_MANAGER.with_borrow(|cm| cm.match_styles(&self));
             if self.style_list.set_selector_style(style) {
                 self.mark_style_dirty();
             }
@@ -1169,7 +1235,6 @@ impl Element {
             child.select_style_recurse();
         }
     }
-
 }
 
 impl ElementWeak {
@@ -1214,8 +1279,6 @@ pub struct Element {
 
     applied_style: HashMap<StylePropKey, StyleProp>,
     // animation_instance: Option<AnimationInstance>,
-
-
     scroll_top: f32,
     scroll_left: f32,
     draggable: bool,
@@ -1244,9 +1307,7 @@ pub struct PaintInfo {
 js_value!(Element);
 js_auto_upgrade!(ElementWeak, Element);
 
-
 impl ElementData {
-
     pub fn new<T: ElementBackend + 'static>(backend: T) -> Self {
         let id = NEXT_ELEMENT_ID.get();
         NEXT_ELEMENT_ID.set(id + 1);
@@ -1282,12 +1343,9 @@ impl ElementData {
             attributes: HashMap::new(),
         }
     }
-
 }
 
-pub struct EmptyElementBackend {
-
-}
+pub struct EmptyElementBackend {}
 
 impl ElementBackend for EmptyElementBackend {
     fn create(_ele: &mut Element) -> Self {
@@ -1303,9 +1361,10 @@ impl ElementBackend for EmptyElementBackend {
     }
 }
 
-pub trait ElementBackend : 'static {
-
-    fn create(element: &mut Element) -> Self where Self: Sized;
+pub trait ElementBackend: 'static {
+    fn create(element: &mut Element) -> Self
+    where
+        Self: Sized;
 
     fn get_name(&self) -> &str;
 
@@ -1331,7 +1390,11 @@ pub trait ElementBackend : 'static {
         }
     }
 
-    fn execute_default_behavior(&mut self, event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) -> bool {
+    fn execute_default_behavior(
+        &mut self,
+        event: &mut Box<dyn Any>,
+        ctx: &mut EventContext<ElementWeak>,
+    ) -> bool {
         if let Some(base) = self.get_base_mut() {
             base.execute_default_behavior(event, ctx)
         } else {
@@ -1351,7 +1414,11 @@ pub trait ElementBackend : 'static {
         }
     }
 
-    fn apply_style_prop(&mut self, prop: &StyleProp, length_ctx: &LengthContext) -> Option<(bool, bool, ResolvedStyleProp)> {
+    fn apply_style_prop(
+        &mut self,
+        prop: &StyleProp,
+        length_ctx: &LengthContext,
+    ) -> Option<(bool, bool, ResolvedStyleProp)> {
         if let Some(base) = self.get_base_mut() {
             base.apply_style_prop(prop, length_ctx)
         } else {
@@ -1390,7 +1457,6 @@ pub trait ElementBackend : 'static {
     fn backend_type_id(&self) -> TypeId {
         self.type_id()
     }
-
 }
 
 #[test]

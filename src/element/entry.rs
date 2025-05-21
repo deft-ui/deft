@@ -1,37 +1,41 @@
-use crate::{self as deft, some_or_return};
-use std::any::Any;
-use std::cell::Cell;
-use std::collections::HashMap;
-use std::rc::Rc;
-use std::string::ToString;
-use quick_js::{JsValue, ValueError};
-use skia_safe::{Color, Paint};
-use winit::dpi::{LogicalPosition, LogicalSize, Size};
-use winit::keyboard::NamedKey;
-use winit::window::CursorIcon;
-use yoga::{Context, MeasureMode, Node, NodeRef};
-use deft_macros::{element_backend, js_methods};
-use serde::{Deserialize, Serialize};
-use crate::base::{Callback, EventContext, Rect, StateMarker};
-use crate::element::{ElementBackend, Element, ElementWeak};
-use crate::number::DeNan;
-use crate::{ok_or_return, timer};
 use crate::app::AppEvent;
+use crate::base::{Callback, EventContext, Rect, StateMarker};
 use crate::canvas_util::CanvasHelper;
 use crate::element::common::ScrollBar;
 use crate::element::edit_history::{EditHistory, EditOpType};
 use crate::element::scroll::ScrollBarStrategy;
 use crate::element::util::is_form_event;
-use crate::event::{BlurEvent, BoundsChangeEvent, CaretChangeEvent, FocusEvent, KeyDownEvent, KeyEventDetail, MouseLeaveEvent, MouseMoveEvent, ScrollEvent, TextChangeEvent, TextInputEvent, TextUpdateEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
+use crate::element::{Element, ElementBackend, ElementWeak};
+use crate::event::{
+    BlurEvent, BoundsChangeEvent, CaretChangeEvent, FocusEvent, KeyDownEvent, KeyEventDetail,
+    MouseLeaveEvent, MouseMoveEvent, ScrollEvent, TextChangeEvent, TextInputEvent, TextUpdateEvent,
+    KEY_MOD_CTRL, KEY_MOD_SHIFT,
+};
 use crate::event_loop::create_event_loop_proxy;
 use crate::js::{FromJsValue, ToJsValue};
+use crate::number::DeNan;
 use crate::render::RenderFn;
 use crate::string::StringUtils;
 use crate::style::{StyleProp, StylePropKey, StylePropVal};
 use crate::style_list::ParsedStyleProp;
-use crate::text::TextAlign;
 use crate::text::textbox::{TextBox, TextCoord, TextElement, TextUnit};
+use crate::text::TextAlign;
 use crate::timer::TimerHandle;
+use crate::{self as deft, some_or_return};
+use crate::{ok_or_return, timer};
+use deft_macros::{element_backend, js_methods};
+use quick_js::{JsValue, ValueError};
+use serde::{Deserialize, Serialize};
+use skia_safe::{Color, Paint};
+use std::any::Any;
+use std::cell::Cell;
+use std::collections::HashMap;
+use std::rc::Rc;
+use std::string::ToString;
+use winit::dpi::{LogicalPosition, LogicalSize, Size};
+use winit::keyboard::NamedKey;
+use winit::window::CursorIcon;
+use yoga::{Context, MeasureMode, Node, NodeRef};
 
 const COPY_KEY: &str = "\x03";
 const PASTE_KEY: &str = "\x16";
@@ -88,10 +92,7 @@ extern "C" fn measure_entry(
                     let bounds = Rect::new(0.0, 0.0, width, height);
                     e.layout(&bounds);
                     let (width, height) = e.paragraph.get_size_without_padding();
-                    return yoga::Size {
-                        width,
-                        height,
-                    };
+                    return yoga::Size { width, height };
                 } else {
                     //TODO optimize line_height
                     let line_height = if let Some(lh) = e.line_height {
@@ -100,24 +101,19 @@ extern "C" fn measure_entry(
                         let element = ok_or_return!(e.element.upgrade(), default_size);
                         element.style.font_size * 1.0
                     };
-                    let height = line_height * if e.multiple_line {
-                         e.rows as f32
-                    } else {
-                        1.0
-                    };
+                    let height = line_height * if e.multiple_line { e.rows as f32 } else { 1.0 };
                     let bounds = Rect::new(0.0, 0.0, width, height);
                     e.layout(&bounds);
                     return yoga::Size {
                         width: e.paragraph.max_intrinsic_width(),
                         height,
-                    }
+                    };
                 }
             }
         }
     }
     default_size
 }
-
 
 #[element_backend]
 pub struct Entry {
@@ -145,7 +141,6 @@ pub type TextChangeHandler = dyn FnMut(&str);
 
 #[js_methods]
 impl Entry {
-
     #[js_func]
     pub fn get_text(&self) -> String {
         self.paragraph.get_text()
@@ -288,13 +283,13 @@ impl Entry {
         let el_offset = el.get_origin_bounds();
         let x = (el_offset.x + pos.x) as f64;
         let y = (el_offset.y + pos.bottom()) as f64;
-        win.window.set_ime_cursor_area(crate::winit::dpi::Position::Logical(LogicalPosition {
-            x,
-            y,
-        }), Size::Logical(LogicalSize {
-            width: 1.0,
-            height: 1.0
-        }));
+        win.window.set_ime_cursor_area(
+            crate::winit::dpi::Position::Logical(LogicalPosition { x, y }),
+            Size::Logical(LogicalSize {
+                width: 1.0,
+                height: 1.0,
+            }),
+        );
         Some(())
     }
 
@@ -348,8 +343,8 @@ impl Entry {
             Some(rect) => rect.translate(-scroll_left, -scroll_top),
         };
         // bounds relative to entry
-        let origin_bounds = bounds
-            .translate(origin_bounds.x + border_left, origin_bounds.y + border_top);
+        let origin_bounds =
+            bounds.translate(origin_bounds.x + border_left, origin_bounds.y + border_top);
 
         let mut element = ok_or_return!(self.element.upgrade_mut());
         element.emit(CaretChangeEvent {
@@ -394,31 +389,31 @@ impl Entry {
                             }
                         }
                         self.handle_input("");
-                    },
+                    }
                     NamedKey::Enter => {
                         if self.multiple_line {
                             self.handle_input("\n");
                         }
-                    },
+                    }
                     NamedKey::ArrowLeft => {
                         self.move_caret(-1);
-                    },
+                    }
                     NamedKey::ArrowRight => {
                         self.move_caret(1);
-                    },
+                    }
                     NamedKey::ArrowUp => {
                         self.move_caret_vertical(true);
-                    },
+                    }
                     NamedKey::ArrowDown => {
                         self.move_caret_vertical(false);
                     }
                     NamedKey::Space => {
                         self.handle_input(" ");
-                    },
+                    }
                     NamedKey::Tab => {
                         //TODO use \t?
                         self.handle_input("   ");
-                    },
+                    }
                     _ => {}
                 }
             } else if let Some(text) = &event.key_str {
@@ -435,14 +430,14 @@ impl Entry {
                     "c" | "x" => {
                         use clipboard::{ClipboardContext, ClipboardProvider};
                         if let Some(sel) = self.paragraph.get_selection_text() {
-                            let sel=  sel.to_string();
+                            let sel = sel.to_string();
                             if text == "x" {
                                 self.handle_input("");
                             }
                             let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
                             ctx.set_contents(sel).unwrap();
                         }
-                    },
+                    }
                     #[cfg(feature = "clipboard")]
                     "v" => {
                         use clipboard::{ClipboardContext, ClipboardProvider};
@@ -485,10 +480,13 @@ impl Entry {
         self.caret_timer_handle = Some({
             let caret_visible = self.caret_visible.clone();
             let context = self.element.clone();
-            timer::set_interval(move || {
-                //debug!("onInterval");
-                Self::caret_tick(caret_visible.clone(), context.clone());
-            }, 500)
+            timer::set_interval(
+                move || {
+                    //debug!("onInterval");
+                    Self::caret_tick(caret_visible.clone(), context.clone());
+                },
+                500,
+            )
         });
         let mut element = ok_or_return!(self.element.upgrade_mut());
         element.mark_dirty(false);
@@ -512,13 +510,17 @@ impl Entry {
                 let left = line_text.substring(0, start.1);
                 let right = line_text.substring(end.1, line_text.chars_count());
                 let new_text = format!("{}{}", left, right);
-                self.paragraph.update_line(caret.0, Self::build_line(new_text));
+                self.paragraph
+                    .update_line(caret.0, Self::build_line(new_text));
             } else {
                 let first_line = self.paragraph.get_line_text(start.0).unwrap();
                 let left = first_line.substring(0, start.1).to_string();
                 let last_line = self.paragraph.get_line_text(end.0).unwrap();
-                let right = last_line.substring(end.1, last_line.chars_count()).to_string();
-                self.paragraph.update_line(start.0, Self::build_line(format!("{}{}", left, right)));
+                let right = last_line
+                    .substring(end.1, last_line.chars_count())
+                    .to_string();
+                self.paragraph
+                    .update_line(start.0, Self::build_line(format!("{}{}", left, right)));
                 if end.0 > start.0 {
                     for _ in start.0..end.0 {
                         self.paragraph.delete_line(start.0 + 1);
@@ -538,21 +540,32 @@ impl Entry {
             let right_str = line_text.substring(caret.1, line_text.len() - caret.1);
             let input_lines = input.split('\n').collect::<Vec<&str>>();
             let new_caret = if input_lines.len() == 1 {
-                let new_text = format!("{}{}{}", left_str, input , right_str);
-                self.paragraph.update_line(caret.0, Self::build_line(new_text));
+                let new_text = format!("{}{}{}", left_str, input, right_str);
+                self.paragraph
+                    .update_line(caret.0, Self::build_line(new_text));
                 TextCoord(caret.0, caret.1 + input.chars_count())
             } else {
-                let first_line = format!("{}{}",left_str, unsafe { input_lines.get_unchecked(0) });
-                self.paragraph.insert_line(caret.0, Self::build_line(first_line));
+                let first_line = format!("{}{}", left_str, unsafe { input_lines.get_unchecked(0) });
+                self.paragraph
+                    .insert_line(caret.0, Self::build_line(first_line));
                 if input_lines.len() > 2 {
                     for i in 1..input_lines.len() - 1 {
                         let line = unsafe { input_lines.get_unchecked(i).to_string() };
-                        self.paragraph.insert_line(caret.0 + i, Self::build_line(line));
+                        self.paragraph
+                            .insert_line(caret.0 + i, Self::build_line(line));
                     }
                 }
-                let last_line = format!("{}{}", unsafe { input_lines.get_unchecked(input_lines.len() - 1) }, right_str);
-                self.paragraph.update_line(caret.0 + input_lines.len() - 1, Self::build_line(last_line));
-                TextCoord(caret.0 + input_lines.len() - 1, input_lines.last().unwrap().chars_count())
+                let last_line = format!(
+                    "{}{}",
+                    unsafe { input_lines.get_unchecked(input_lines.len() - 1) },
+                    right_str
+                );
+                self.paragraph
+                    .update_line(caret.0 + input_lines.len() - 1, Self::build_line(last_line));
+                TextCoord(
+                    caret.0 + input_lines.len() - 1,
+                    input_lines.last().unwrap().chars_count(),
+                )
             };
             //TODO maybe update caret twice?
             self.update_caret_value(new_caret, false);
@@ -561,13 +574,11 @@ impl Entry {
         // emit text update
         let text = self.paragraph.get_text().to_string();
         self.element.emit(TextUpdateEvent {
-            value: text.clone()
+            value: text.clone(),
         });
 
         // emit text change
-        self.element.emit(TextChangeEvent {
-            value: text,
-        });
+        self.element.emit(TextChangeEvent { value: text });
 
         self.element.mark_dirty(true);
     }
@@ -613,7 +624,8 @@ impl Entry {
         let mut layout_width = padding_box_width - vertical_bar_thickness;
         if !self.multiple_line {
             let border = element.get_border_width();
-            let content_height = element.get_bounds().height - padding.0 - border.0 - padding.2 - border.2;
+            let content_height =
+                element.get_bounds().height - padding.0 - border.0 - padding.2 - border.2;
             line_height = Some(content_height);
             layout_width = f32::NAN;
         }
@@ -632,8 +644,10 @@ impl Entry {
         let text_height = self.paragraph.height();
         let text_width = self.paragraph.max_intrinsic_width();
 
-        self.vertical_bar.set_length(padding_box_height, text_height, padding_box_width);
-        self.horizontal_bar.set_length(padding_box_width, text_width, padding_box_height);
+        self.vertical_bar
+            .set_length(padding_box_height, text_height, padding_box_width);
+        self.horizontal_bar
+            .set_length(padding_box_width, text_width, padding_box_height);
     }
 
     fn layout(&mut self, bounds: &Rect) {
@@ -646,11 +660,9 @@ impl Entry {
             }
         }
     }
-
 }
 
 impl ElementBackend for Entry {
-
     fn create(ele: &mut Element) -> Self {
         ele.set_focusable(true);
         // let mut base = Scroll::create(ele);
@@ -699,7 +711,6 @@ impl ElementBackend for Entry {
             })
         }
 
-
         let mut inst = EntryData {
             // base,
             paragraph,
@@ -721,7 +732,8 @@ impl ElementBackend for Entry {
             horizontal_bar,
             caret_change_marker: StateMarker::new(),
             auto_height: false,
-        }.to_ref();
+        }
+        .to_ref();
         inst.set_multiple_line(false);
         {
             let weak = inst.as_weak();
@@ -732,7 +744,9 @@ impl ElementBackend for Entry {
             });
         }
         ele.style.yoga_node.set_measure_func(Some(measure_entry));
-        ele.style.yoga_node.set_context(Some(Context::new(inst.as_weak())));
+        ele.style
+            .yoga_node
+            .set_context(Some(Context::new(inst.as_weak())));
         inst
     }
 
@@ -749,7 +763,7 @@ impl ElementBackend for Entry {
         match key {
             StylePropKey::FontStyle => {
                 self.paragraph.set_font_style(element.style.font_style);
-            },
+            }
             StylePropKey::FontSize => {
                 self.paragraph.set_font_size(element.style.font_size);
             }
@@ -763,7 +777,8 @@ impl ElementBackend for Entry {
                 self.paragraph.set_font_weight(element.style.font_weight);
             }
             StylePropKey::FontFamily => {
-                self.paragraph.set_font_families(element.style.font_family.clone());
+                self.paragraph
+                    .set_font_families(element.style.font_family.clone());
             }
             _ => {}
         }
@@ -895,7 +910,7 @@ impl ElementBackend for Entry {
     fn on_attribute_changed(&mut self, key: &str, value: Option<&str>) {
         match key {
             "disabled" => self.disabled = value.is_some(),
-            _ => {},
+            _ => {}
         }
     }
 
@@ -906,11 +921,11 @@ impl ElementBackend for Entry {
 
 #[cfg(test)]
 mod tests {
-    use measure_time::print_time;
-    use crate::element::{Element, ElementBackend};
     use crate::element::entry::Entry;
+    use crate::element::{Element, ElementBackend};
     use crate::string::StringUtils;
     use crate::text::textbox::TextCoord;
+    use measure_time::print_time;
 
     #[test]
     fn test_performance() {
@@ -927,7 +942,6 @@ mod tests {
         // entry.paragraph.render();
     }
 
-
     #[test]
     fn test_caret() {
         let mut el = Element::create(Entry::create);
@@ -936,9 +950,18 @@ mod tests {
         // entry.caret = TextCoord::new((0, 0));
         let expected_carets = vec![
             TextCoord(0, 1),
-            TextCoord(1, 0), TextCoord(1, 1), TextCoord(1, 2),
-            TextCoord(2, 0), TextCoord(2, 1), TextCoord(2, 2), TextCoord(2, 3),
-            TextCoord(3, 0), TextCoord(3, 1), TextCoord(3, 2), TextCoord(3, 3), TextCoord(3, 4),
+            TextCoord(1, 0),
+            TextCoord(1, 1),
+            TextCoord(1, 2),
+            TextCoord(2, 0),
+            TextCoord(2, 1),
+            TextCoord(2, 2),
+            TextCoord(2, 3),
+            TextCoord(3, 0),
+            TextCoord(3, 1),
+            TextCoord(3, 2),
+            TextCoord(3, 3),
+            TextCoord(3, 4),
         ];
         for c in expected_carets {
             entry.move_caret(1);
@@ -973,4 +996,3 @@ mod tests {
         assert_eq!(0, entry.paragraph.get_caret().1);
     }
 }
-

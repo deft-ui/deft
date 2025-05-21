@@ -1,10 +1,11 @@
-
 #[macro_export]
 macro_rules! js_value {
     ($ref_type: ty) => {
         impl deft::js::ToJsValue for $ref_type {
             fn to_js_value(self) -> Result<deft::js::JsValue, deft::js::ValueError> {
-                Ok(deft::js::JsValue::Resource(deft::js::ResourceValue { resource: std::rc::Rc::new(std::cell::RefCell::new(self)) }))
+                Ok(deft::js::JsValue::Resource(deft::js::ResourceValue {
+                    resource: std::rc::Rc::new(std::cell::RefCell::new(self)),
+                }))
             }
         }
 
@@ -27,7 +28,9 @@ macro_rules! js_weak_value {
         impl deft::js::ToJsValue for $ref_type {
             fn to_js_value(self) -> Result<deft::js::JsValue, deft::js::ValueError> {
                 let weak = self.as_weak();
-                Ok(deft::js::JsValue::Resource(deft::js::ResourceValue { resource: std::rc::Rc::new(std::cell::RefCell::new(weak)) }))
+                Ok(deft::js::JsValue::Resource(deft::js::ResourceValue {
+                    resource: std::rc::Rc::new(std::cell::RefCell::new(weak)),
+                }))
             }
         }
 
@@ -37,7 +40,9 @@ macro_rules! js_weak_value {
                     if let Ok(r) = r.upgrade() {
                         Ok(r)
                     } else {
-                        Err(deft::js::ValueError::Internal("failed to upgrade weak reference".to_string()))
+                        Err(deft::js::ValueError::Internal(
+                            "failed to upgrade weak reference".to_string(),
+                        ))
                     }
                 } else {
                     Err(deft::js::ValueError::UnexpectedType)
@@ -54,13 +59,13 @@ macro_rules! js_auto_upgrade {
         impl deft::js::ToJsValue for $weak_type {
             fn to_js_value(self) -> Result<deft::js::JsValue, deft::js::ValueError> {
                 if let Ok(e) = self.upgrade() {
-                    Ok(
-                        deft::js::JsValue::Resource(
-                            deft::js::ResourceValue { resource: std::rc::Rc::new(std::cell::RefCell::new(e)) }
-                        )
-                    )
+                    Ok(deft::js::JsValue::Resource(deft::js::ResourceValue {
+                        resource: std::rc::Rc::new(std::cell::RefCell::new(e)),
+                    }))
                 } else {
-                    Err(deft::js::ValueError::Internal("failed to upgrade weak reference".to_string()))
+                    Err(deft::js::ValueError::Internal(
+                        "failed to upgrade weak reference".to_string(),
+                    ))
                 }
             }
         }
@@ -74,7 +79,9 @@ macro_rules! js_serialize {
             fn to_js_value(self) -> Result<deft::js::JsValue, deft::js::ValueError> {
                 let serializer = deft::js::js_serde::JsValueSerializer {};
                 use serde::Serialize;
-                let js_r = self.serialize(serializer).map_err(|e| deft::js::ValueError::Internal(e.to_string()))?;
+                let js_r = self
+                    .serialize(serializer)
+                    .map_err(|e| deft::js::ValueError::Internal(e.to_string()))?;
                 Ok(js_r)
             }
         }
@@ -84,16 +91,18 @@ macro_rules! js_serialize {
 #[macro_export]
 macro_rules! js_deserialize {
     ($ty: ty) => {
-
-        impl deft::js::FromJsValue for $ty
-        {
-             fn from_js_value(value: deft::js::JsValue) -> Result<Self, deft::js::ValueError> {
-                 use serde::Deserialize;
-                 let v = Self::deserialize(deft::js::js_deserialze::JsDeserializer { value })
-                    .map_err(|e| deft::js::ValueError::Internal(format!("Failed to deserialize js valued: {:?}", e)))?;
-                 Ok(v)
-             }
-
+        impl deft::js::FromJsValue for $ty {
+            fn from_js_value(value: deft::js::JsValue) -> Result<Self, deft::js::ValueError> {
+                use serde::Deserialize;
+                let v = Self::deserialize(deft::js::js_deserialze::JsDeserializer { value })
+                    .map_err(|e| {
+                        deft::js::ValueError::Internal(format!(
+                            "Failed to deserialize js valued: {:?}",
+                            e
+                        ))
+                    })?;
+                Ok(v)
+            }
         }
     };
 }

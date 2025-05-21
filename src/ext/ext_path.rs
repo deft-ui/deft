@@ -1,14 +1,13 @@
 use crate as deft;
-use std::path::PathBuf;
 use anyhow::Error;
 use deft_macros::js_methods;
+use std::path::PathBuf;
 
 #[allow(nonstandard_style)]
 pub struct path;
 
 #[js_methods]
 impl path {
-
     #[js_func]
     pub fn filename(p: String) -> Result<Option<String>, Error> {
         let p = PathBuf::from(p);

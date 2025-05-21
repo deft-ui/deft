@@ -3,32 +3,35 @@ pub mod css_manager;
 mod select;
 
 use crate as deft;
-use std::collections::HashMap;
-use std::ops::{Deref, DerefMut};
-use std::str::FromStr;
-use anyhow::{anyhow, Error};
-use cssparser::parse_color_keyword;
-use deft_macros::mrc_object;
-use ordered_float::OrderedFloat;
-use quick_js::JsValue;
-use skia_safe::{Color, Image, Matrix};
-use skia_safe::font_style::{Slant, Weight};
-use swash::Style;
-use yoga::{Align, Direction, Display, Edge, FlexDirection, Justify, Node, Overflow, PositionType, StyleUnit, Wrap};
+use crate::animation::css_actor::CssAnimationActor;
+use crate::animation::ANIMATIONS;
+use crate::animation::{AnimationInstance, WindowAnimationController};
 use crate::base::Rect;
 use crate::color::parse_hex_color;
-use crate::{ok_or_return, some_or_return};
-use crate::animation::{AnimationInstance, WindowAnimationController};
-use crate::animation::ANIMATIONS;
-use crate::animation::css_actor::CssAnimationActor;
-use crate::element::ElementWeak;
 use crate::element::paragraph::parse_weight;
+use crate::element::ElementWeak;
 use crate::event_loop::create_event_loop_callback;
 use crate::font::family::{FontFamilies, FontFamily};
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::paint::MatrixCalculator;
 use crate::style_list::ParsedStyleProp;
+use crate::{ok_or_return, some_or_return};
+use anyhow::{anyhow, Error};
+use cssparser::parse_color_keyword;
+use deft_macros::mrc_object;
+use ordered_float::OrderedFloat;
+use quick_js::JsValue;
+use skia_safe::font_style::{Slant, Weight};
+use skia_safe::{Color, Image, Matrix};
+use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
+use std::str::FromStr;
+use swash::Style;
+use yoga::{
+    Align, Direction, Display, Edge, FlexDirection, Justify, Node, Overflow, PositionType,
+    StyleUnit, Wrap,
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum StylePropertyValue {
@@ -36,7 +39,6 @@ pub enum StylePropertyValue {
     String(String),
     Invalid,
 }
-
 
 //TODO rename
 pub trait PropValueParse: Sized {
@@ -81,13 +83,12 @@ impl PropValueParse for LineHeightVal {
 }
 
 impl PropValueParse for LengthOrPercent {
-
     fn parse_prop_value(value: &str) -> Option<Self> {
         let value = value.trim();
         if value.eq_ignore_ascii_case("auto") {
-            return Some(LengthOrPercent::Auto)
+            return Some(LengthOrPercent::Auto);
         } else if let Some(v) = Length::from_str(value) {
-            return Some(Self::Length(v))
+            return Some(Self::Length(v));
         } else {
             let value = value.trim();
             if let Some(v) = parse_percent(value) {
@@ -112,7 +113,13 @@ impl PropValueParse for Color {
         parse_color(value)
     }
     fn to_style_string(&self) -> String {
-        format!("#{:02X}{:02X}{:02X}{:02X}", self.r(), self.g(), self.b(), self.a())
+        format!(
+            "#{:02X}{:02X}{:02X}{:02X}",
+            self.r(),
+            self.g(),
+            self.b(),
+            self.a()
+        )
     }
 }
 
@@ -163,7 +170,11 @@ impl PropValueParse for Align {
 
 impl PropValueParse for PositionType {
     fn parse_prop_value(value: &str) -> Option<Self> {
-        Some(PositionType::from_str(value).ok().unwrap_or(PositionType::Static))
+        Some(
+            PositionType::from_str(value)
+                .ok()
+                .unwrap_or(PositionType::Static),
+        )
     }
     fn to_style_string(&self) -> String {
         self.to_string()
@@ -197,20 +208,18 @@ impl PropValueParse for Wrap {
     }
 }
 
-
 impl PropValueParse for StyleTransform {
     fn parse_prop_value(value: &str) -> Option<Self> {
         //TODO support multiple op
         if let Some(op) = StyleTransformOp::parse(value) {
-            Some(Self {
-                op_list: vec![op]
-            })
+            Some(Self { op_list: vec![op] })
         } else {
             None
         }
     }
     fn to_style_string(&self) -> String {
-        self.op_list.iter()
+        self.op_list
+            .iter()
             .map(|it| it.to_style_string())
             .collect::<Vec<_>>()
             .join(" ")
@@ -249,16 +258,14 @@ impl TranslateLength {
     }
     pub fn to_absolute(&self, block_length: f32) -> f32 {
         match self {
-            TranslateLength::Point(p) => { *p }
-            TranslateLength::Percent(p) => { *p / 100.0 * block_length }
+            TranslateLength::Point(p) => *p,
+            TranslateLength::Percent(p) => *p / 100.0 * block_length,
         }
     }
 
     pub fn to_style_string(&self) -> String {
         match self {
-            TranslateLength::Point(v) => {
-                v.to_string()
-            }
+            TranslateLength::Point(v) => v.to_string(),
             TranslateLength::Percent(p) => {
                 format!("{}%", p)
             }
@@ -313,7 +320,11 @@ impl StyleTransformOp {
                 format!("scale({}, {})", v.0, v.1)
             }
             StyleTransformOp::Translate(p) => {
-                format!("translate({}, {})", p.0.to_style_string(), p.1.to_style_string())
+                format!(
+                    "translate({}, {})",
+                    p.0.to_style_string(),
+                    p.1.to_style_string()
+                )
             }
         }
     }
@@ -363,7 +374,6 @@ impl StyleTransform {
             }
         }
     }
-
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -380,26 +390,21 @@ impl<T: Clone + PropValueParse> StylePropVal<T> {
     //TODO remove
     pub fn resolve(&self, default: &T) -> T {
         match self {
-            StylePropVal::Custom(v) => { v.clone() }
-            StylePropVal::Unset => { default.clone() }
-            StylePropVal::Inherit => { todo!() }
+            StylePropVal::Custom(v) => v.clone(),
+            StylePropVal::Unset => default.clone(),
+            StylePropVal::Inherit => {
+                todo!()
+            }
         }
     }
 
     pub fn to_style_string(&self) -> String {
         match self {
-            StylePropVal::Custom(v) => {
-                v.to_style_string()
-            }
-            StylePropVal::Inherit => {
-                "inherit".to_string()
-            }
-            StylePropVal::Unset => {
-                "unset".to_string()
-            }
+            StylePropVal::Custom(v) => v.to_style_string(),
+            StylePropVal::Inherit => "inherit".to_string(),
+            StylePropVal::Unset => "unset".to_string(),
         }
     }
-
 }
 
 macro_rules! define_style_props {
@@ -617,12 +622,17 @@ define_style_props!(
     AnimationIterationCount => f32, f32;
 );
 
-pub fn parse_box_prop(value: StylePropertyValue) -> (StylePropertyValue, StylePropertyValue, StylePropertyValue, StylePropertyValue) {
+pub fn parse_box_prop(
+    value: StylePropertyValue,
+) -> (
+    StylePropertyValue,
+    StylePropertyValue,
+    StylePropertyValue,
+    StylePropertyValue,
+) {
     match value {
         StylePropertyValue::String(str) => {
-            let parts: Vec<&str> = str.split(" ")
-                .filter(|e| !e.is_empty())
-                .collect();
+            let parts: Vec<&str> = str.split(" ").filter(|e| !e.is_empty()).collect();
             let top = if let Some(v) = parts.get(0) {
                 StylePropertyValue::String((*v).to_string())
             } else {
@@ -645,9 +655,7 @@ pub fn parse_box_prop(value: StylePropertyValue) -> (StylePropertyValue, StylePr
             };
             (top, right, bottom, left)
         }
-        e => {
-            (e.clone(), e.clone(), e.clone(), e.clone())
-        }
+        e => (e.clone(), e.clone(), e.clone(), e.clone()),
     }
 }
 
@@ -677,12 +685,11 @@ impl StylePropertyValue {
 
     pub fn to_str(&self, default: &str) -> String {
         match self {
-            StylePropertyValue::Float(f) => { f.to_string() }
-            StylePropertyValue::String(s) => { s.to_string() }
-            StylePropertyValue::Invalid => default.to_string()
+            StylePropertyValue::Float(f) => f.to_string(),
+            StylePropertyValue::String(s) => s.to_string(),
+            StylePropertyValue::Invalid => default.to_string(),
         }
     }
-
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]
@@ -746,9 +753,7 @@ impl LineHeightVal {
             LineHeightVal::Length(l) => l.to_px(length_context),
             LineHeightVal::Percent(p) => length_context.font_size * p / 100.0,
             LineHeightVal::Number(n) => length_context.font_size * n,
-            LineHeightVal::Normal => {
-                return None
-            },
+            LineHeightVal::Normal => return None,
         };
         Some(v)
     }
@@ -770,7 +775,11 @@ impl PropValueParse for FontFamilies {
     }
 
     fn to_style_string(&self) -> String {
-        let list: Vec<String> = self.as_slice().iter().map(|it| format!("'{}'", it.name())).collect();
+        let list: Vec<String> = self
+            .as_slice()
+            .iter()
+            .map(|it| format!("'{}'", it.name()))
+            .collect();
         list.join(",")
     }
 }
@@ -795,7 +804,6 @@ impl PropValueParse for FontStyle {
     }
 }
 
-
 impl LengthOrPercent {
     pub fn to_style_unit(&self, ctx: &LengthContext) -> StyleUnit {
         match self {
@@ -803,15 +811,9 @@ impl LengthOrPercent {
                 let value = v.to_px(ctx);
                 StyleUnit::Point(OrderedFloat(value))
             }
-            LengthOrPercent::Percent(p) => {
-                StyleUnit::Percent(OrderedFloat(*p))
-            }
-            LengthOrPercent::Undefined => {
-                StyleUnit::UndefinedValue
-            }
-            LengthOrPercent::Auto => {
-                StyleUnit::Auto
-            }
+            LengthOrPercent::Percent(p) => StyleUnit::Percent(OrderedFloat(*p)),
+            LengthOrPercent::Undefined => StyleUnit::UndefinedValue,
+            LengthOrPercent::Auto => StyleUnit::Auto,
         }
     }
 }
@@ -880,7 +882,7 @@ impl Length {
             Length::IN(v) => format!("{}in", v),
             Length::PT(v) => format!("{}pt", v),
             Length::EM(v) => format!("{}em", v),
-           Length::REM(v) => format!("{}rem", v),
+            Length::REM(v) => format!("{}rem", v),
             Length::VH(v) => format!("{}vh", v),
             Length::VW(v) => format!("{}vw", v),
         }
@@ -890,7 +892,6 @@ impl Length {
         let value = value.trim();
         f32::from_str(value).ok()
     }
-
 }
 
 impl PropValueParse for Weight {
@@ -964,7 +965,6 @@ impl DerefMut for YogaNode {
     }
 }
 
-
 #[mrc_object]
 pub struct StyleNode {
     element: ElementWeak,
@@ -976,7 +976,7 @@ pub struct StyleNode {
 
     // (inherited, computed)
     pub border_radius: [f32; 4],
-    pub border_color: [Color;4],
+    pub border_color: [Color; 4],
     pub background_image: Option<Image>,
     pub transform: Option<StyleTransform>,
     animation_params: AnimationParams,
@@ -992,10 +992,9 @@ pub struct StyleNode {
     pub font_style: FontStyle,
 }
 
-
 impl StyleNode {
     pub fn new() -> Self {
-        let transparent = Color::from_argb(0,0,0,0);
+        let transparent = Color::from_argb(0, 0, 0, 0);
         let mut inner = StyleNodeData {
             element: ElementWeak::invalid(),
             yoga_node: YogaNode::new(),
@@ -1057,7 +1056,12 @@ impl StyleNode {
         // let (width, height) = self.with_container_node(|n| {
         //     (n.get_layout_width().de_nan(0.0), n.get_layout_height().de_nan(0.0))
         // });
-        Rect::new(l + bl, t + bt, width - l - r - bl - br, height - t - b - bt - bb)
+        Rect::new(
+            l + bl,
+            t + bt,
+            width - l - r - bl - br,
+            height - t - b - bt - bb,
+        )
     }
 
     fn get_resolved_value(&self, key: StylePropKey) -> ResolvedStyleProp {
@@ -1073,42 +1077,24 @@ impl StyleNode {
         let default_border_width = LengthOrPercent::Length(Length::PX(0.0));
         let default_border_color = Color::TRANSPARENT;
         match key {
-            StylePropKey::Color => {
-                ResolvedStyleProp::Color(Color::BLACK)
-            }
-            StylePropKey::BackgroundColor  =>   {
-                ResolvedStyleProp::BackgroundColor(Color::TRANSPARENT)
-            }
-            StylePropKey::FontSize => {
-                ResolvedStyleProp::FontSize(Length::PX(12.0))
-            }
-            StylePropKey::FontFamily => {
-                ResolvedStyleProp::FontFamily(FontFamilies::default())
-            }
-            StylePropKey::FontWeight => {
-                ResolvedStyleProp::FontWeight(Weight::NORMAL)
-            }
-            StylePropKey::FontStyle => {
-                ResolvedStyleProp::FontStyle(FontStyle::Normal)
-            }
-            StylePropKey::LineHeight => {
-                ResolvedStyleProp::LineHeight(LineHeightVal::Normal)
-            }
-            StylePropKey::BorderTopWidth  =>   {
-                ResolvedStyleProp::BorderTopWidth(default_border_width)
-            }
-            StylePropKey::BorderRightWidth  =>   {
+            StylePropKey::Color => ResolvedStyleProp::Color(Color::BLACK),
+            StylePropKey::BackgroundColor => ResolvedStyleProp::BackgroundColor(Color::TRANSPARENT),
+            StylePropKey::FontSize => ResolvedStyleProp::FontSize(Length::PX(12.0)),
+            StylePropKey::FontFamily => ResolvedStyleProp::FontFamily(FontFamilies::default()),
+            StylePropKey::FontWeight => ResolvedStyleProp::FontWeight(Weight::NORMAL),
+            StylePropKey::FontStyle => ResolvedStyleProp::FontStyle(FontStyle::Normal),
+            StylePropKey::LineHeight => ResolvedStyleProp::LineHeight(LineHeightVal::Normal),
+            StylePropKey::BorderTopWidth => ResolvedStyleProp::BorderTopWidth(default_border_width),
+            StylePropKey::BorderRightWidth => {
                 ResolvedStyleProp::BorderRightWidth(default_border_width)
             }
-            StylePropKey::BorderBottomWidth  =>   {
+            StylePropKey::BorderBottomWidth => {
                 ResolvedStyleProp::BorderBottomWidth(default_border_width)
             }
-            StylePropKey::BorderLeftWidth  =>   {
+            StylePropKey::BorderLeftWidth => {
                 ResolvedStyleProp::BorderLeftWidth(default_border_width)
             }
-            StylePropKey::BorderTopColor => {
-                ResolvedStyleProp::BorderTopColor(default_border_color)
-            }
+            StylePropKey::BorderTopColor => ResolvedStyleProp::BorderTopColor(default_border_color),
             StylePropKey::BorderRightColor => {
                 ResolvedStyleProp::BorderRightColor(default_border_color)
             }
@@ -1118,160 +1104,115 @@ impl StyleNode {
             StylePropKey::BorderLeftColor => {
                 ResolvedStyleProp::BorderLeftColor(default_border_color)
             }
-            StylePropKey::Display  =>   {
-                ResolvedStyleProp::Display(Display::Flex)
-            }
-            StylePropKey::Width  =>   {
+            StylePropKey::Display => ResolvedStyleProp::Display(Display::Flex),
+            StylePropKey::Width => {
                 // ResolvedStyleProp::Width(standard_node.get_style_width())
                 //TODO fix
                 ResolvedStyleProp::Width(LengthOrPercent::Undefined)
-            },
-            StylePropKey::Height  =>   {
+            }
+            StylePropKey::Height => {
                 //TODO fix
                 ResolvedStyleProp::Height(LengthOrPercent::Undefined)
-            },
-            StylePropKey::MaxWidth  =>   {
+            }
+            StylePropKey::MaxWidth => {
                 //TODO fix
                 ResolvedStyleProp::MaxWidth(LengthOrPercent::Undefined)
-            },
-            StylePropKey::MaxHeight  =>   {
+            }
+            StylePropKey::MaxHeight => {
                 //TODO fix
                 ResolvedStyleProp::MaxHeight(LengthOrPercent::Undefined)
-            },
-            StylePropKey::MinWidth  =>   {
+            }
+            StylePropKey::MinWidth => {
                 //TODO fix
                 ResolvedStyleProp::MinWidth(LengthOrPercent::Undefined)
-            },
-            StylePropKey::MinHeight  =>   {
+            }
+            StylePropKey::MinHeight => {
                 //TODO fix
                 ResolvedStyleProp::MinHeight(LengthOrPercent::Undefined)
-            },
-            StylePropKey::MarginTop  =>   {
-                ResolvedStyleProp::MarginTop(LengthOrPercent::Undefined)
-            },
-            StylePropKey::MarginRight  =>   {
-                ResolvedStyleProp::MarginRight(LengthOrPercent::Undefined)
-            },
-            StylePropKey::MarginBottom  =>   {
+            }
+            StylePropKey::MarginTop => ResolvedStyleProp::MarginTop(LengthOrPercent::Undefined),
+            StylePropKey::MarginRight => ResolvedStyleProp::MarginRight(LengthOrPercent::Undefined),
+            StylePropKey::MarginBottom => {
                 ResolvedStyleProp::MarginBottom(LengthOrPercent::Undefined)
-            },
-            StylePropKey::MarginLeft  =>   {
-                ResolvedStyleProp::MarginLeft(LengthOrPercent::Undefined)
-            },
-            StylePropKey::PaddingTop  =>   {
-                ResolvedStyleProp::PaddingTop(LengthOrPercent::Undefined)
-            },
-            StylePropKey::PaddingRight  =>   {
+            }
+            StylePropKey::MarginLeft => ResolvedStyleProp::MarginLeft(LengthOrPercent::Undefined),
+            StylePropKey::PaddingTop => ResolvedStyleProp::PaddingTop(LengthOrPercent::Undefined),
+            StylePropKey::PaddingRight => {
                 ResolvedStyleProp::PaddingRight(LengthOrPercent::Undefined)
-            },
-            StylePropKey::PaddingBottom  =>   {
+            }
+            StylePropKey::PaddingBottom => {
                 ResolvedStyleProp::PaddingBottom(LengthOrPercent::Undefined)
-            },
-            StylePropKey::PaddingLeft  =>   {
-                ResolvedStyleProp::PaddingLeft(LengthOrPercent::Undefined)
-            },
-            StylePropKey::Flex  =>   {
-                ResolvedStyleProp::Flex(standard_node.get_flex())
-            },
-            StylePropKey::FlexBasis  =>   {
-                ResolvedStyleProp::FlexBasis(LengthOrPercent::Undefined)
-            },
-            StylePropKey::FlexGrow  =>   {
-                ResolvedStyleProp::FlexGrow(standard_node.get_flex_grow())
-            },
-            StylePropKey::FlexShrink  =>   {
+            }
+            StylePropKey::PaddingLeft => ResolvedStyleProp::PaddingLeft(LengthOrPercent::Undefined),
+            StylePropKey::Flex => ResolvedStyleProp::Flex(standard_node.get_flex()),
+            StylePropKey::FlexBasis => ResolvedStyleProp::FlexBasis(LengthOrPercent::Undefined),
+            StylePropKey::FlexGrow => ResolvedStyleProp::FlexGrow(standard_node.get_flex_grow()),
+            StylePropKey::FlexShrink => {
                 ResolvedStyleProp::FlexShrink(standard_node.get_flex_shrink())
-            },
-            StylePropKey::AlignSelf  =>   {
-                ResolvedStyleProp::AlignSelf(Align::FlexStart)
-            },
-            StylePropKey::Direction  =>   {
-                ResolvedStyleProp::Direction(Direction::LTR)
-            },
-            StylePropKey::Position  =>   {
-                ResolvedStyleProp::Position(PositionType::Static)
-            },
-            StylePropKey::Top  =>   {
-                ResolvedStyleProp::Top(LengthOrPercent::Undefined)
-            },
-            StylePropKey::Right  =>   {
-                ResolvedStyleProp::Right(LengthOrPercent::Undefined)
-            },
-            StylePropKey::Bottom  =>   {
-                ResolvedStyleProp::Bottom(LengthOrPercent::Undefined)
-            },
-            StylePropKey::Left  =>   {
-                ResolvedStyleProp::Left(LengthOrPercent::Undefined)
-            },
-            StylePropKey::Overflow  =>   {
-                ResolvedStyleProp::Overflow(Overflow::Hidden)
-            },
-            StylePropKey::BorderTopLeftRadius  =>   {
+            }
+            StylePropKey::AlignSelf => ResolvedStyleProp::AlignSelf(Align::FlexStart),
+            StylePropKey::Direction => ResolvedStyleProp::Direction(Direction::LTR),
+            StylePropKey::Position => ResolvedStyleProp::Position(PositionType::Static),
+            StylePropKey::Top => ResolvedStyleProp::Top(LengthOrPercent::Undefined),
+            StylePropKey::Right => ResolvedStyleProp::Right(LengthOrPercent::Undefined),
+            StylePropKey::Bottom => ResolvedStyleProp::Bottom(LengthOrPercent::Undefined),
+            StylePropKey::Left => ResolvedStyleProp::Left(LengthOrPercent::Undefined),
+            StylePropKey::Overflow => ResolvedStyleProp::Overflow(Overflow::Hidden),
+            StylePropKey::BorderTopLeftRadius => {
                 ResolvedStyleProp::BorderTopLeftRadius(Length::PX(0.0))
-            },
-            StylePropKey::BorderTopRightRadius  =>   {
+            }
+            StylePropKey::BorderTopRightRadius => {
                 ResolvedStyleProp::BorderTopRightRadius(Length::PX(0.0))
-            },
-            StylePropKey::BorderBottomRightRadius  =>   {
+            }
+            StylePropKey::BorderBottomRightRadius => {
                 ResolvedStyleProp::BorderBottomRightRadius(Length::PX(0.0))
-            },
-            StylePropKey::BorderBottomLeftRadius  =>   {
+            }
+            StylePropKey::BorderBottomLeftRadius => {
                 ResolvedStyleProp::BorderBottomLeftRadius(Length::PX(0.0))
-            },
-            StylePropKey::Transform  =>   {
-                ResolvedStyleProp::Transform(StyleTransform::empty())
             }
-            StylePropKey::AnimationName => {
-                ResolvedStyleProp::AnimationName("".to_string())
-            }
-            StylePropKey::AnimationDuration => {
-                ResolvedStyleProp::AnimationDuration(0.0)
-            }
+            StylePropKey::Transform => ResolvedStyleProp::Transform(StyleTransform::empty()),
+            StylePropKey::AnimationName => ResolvedStyleProp::AnimationName("".to_string()),
+            StylePropKey::AnimationDuration => ResolvedStyleProp::AnimationDuration(0.0),
             StylePropKey::AnimationIterationCount => {
                 ResolvedStyleProp::AnimationIterationCount(1.0)
             }
 
-            StylePropKey::JustifyContent  =>   {
-                ResolvedStyleProp::JustifyContent(Justify::FlexStart)
-            },
-            StylePropKey::FlexDirection  =>   {
-                ResolvedStyleProp::FlexDirection(FlexDirection::Column)
-            },
-            StylePropKey::AlignContent  =>   {
-                ResolvedStyleProp::AlignContent(Align::FlexStart)
-            },
-            StylePropKey::AlignItems  =>   {
-                ResolvedStyleProp::AlignItems(Align::FlexStart)
-            },
-            StylePropKey::FlexWrap  =>   {
-                ResolvedStyleProp::FlexWrap(Wrap::NoWrap)
-            },
-            StylePropKey::ColumnGap  =>   {
-                ResolvedStyleProp::ColumnGap(Length::PX(0.0))
-            },
-            StylePropKey::RowGap  =>   {
-                ResolvedStyleProp::RowGap(Length::PX(0.0))
-            },
+            StylePropKey::JustifyContent => ResolvedStyleProp::JustifyContent(Justify::FlexStart),
+            StylePropKey::FlexDirection => ResolvedStyleProp::FlexDirection(FlexDirection::Column),
+            StylePropKey::AlignContent => ResolvedStyleProp::AlignContent(Align::FlexStart),
+            StylePropKey::AlignItems => ResolvedStyleProp::AlignItems(Align::FlexStart),
+            StylePropKey::FlexWrap => ResolvedStyleProp::FlexWrap(Wrap::NoWrap),
+            StylePropKey::ColumnGap => ResolvedStyleProp::ColumnGap(Length::PX(0.0)),
+            StylePropKey::RowGap => ResolvedStyleProp::RowGap(Length::PX(0.0)),
             //TODO aspectratio
         }
     }
 
     /// return (need_repaint, need_layout)
-    pub fn set_style(&mut self, p: StyleProp, length_ctx: &LengthContext) -> (bool, bool, ResolvedStyleProp) {
-        let v = p.resolve_value(|k| {
-            self.get_default_value(k)
-        }, |k| {
-            if let Some(p) = self.get_parent() {
-                p.get_resolved_value(k)
-            } else {
-                self.get_default_value(k)
-            }
-        });
+    pub fn set_style(
+        &mut self,
+        p: StyleProp,
+        length_ctx: &LengthContext,
+    ) -> (bool, bool, ResolvedStyleProp) {
+        let v = p.resolve_value(
+            |k| self.get_default_value(k),
+            |k| {
+                if let Some(p) = self.get_parent() {
+                    p.get_resolved_value(k)
+                } else {
+                    self.get_default_value(k)
+                }
+            },
+        );
         let (need_repaint, need_layout) = self.set_resolved_style_prop(v.clone(), length_ctx);
         (need_repaint, need_layout, v)
     }
 
-    pub fn set_resolved_style_prop(&mut self, p: ResolvedStyleProp, length_ctx: &LengthContext) -> (bool, bool) {
+    pub fn set_resolved_style_prop(
+        &mut self,
+        p: ResolvedStyleProp,
+        length_ctx: &LengthContext,
+    ) -> (bool, bool) {
         let prop_key = p.key();
         if self.resolved_style_props.get(&prop_key) == Some(&p) {
             return (false, false);
@@ -1286,7 +1227,7 @@ impl StyleNode {
                 self.color = v;
                 need_layout = false;
             }
-            ResolvedStyleProp::BackgroundColor (value) =>   {
+            ResolvedStyleProp::BackgroundColor(value) => {
                 self.background_color = value;
                 need_layout = false;
             }
@@ -1307,136 +1248,116 @@ impl StyleNode {
             ResolvedStyleProp::LineHeight(value) => {
                 self.line_height = value.to_px(length_ctx);
             }
-            ResolvedStyleProp::BorderTopWidth (value) =>   {
+            ResolvedStyleProp::BorderTopWidth(value) => {
                 self.set_border_width(&value, &vec![0], length_ctx);
             }
-            ResolvedStyleProp::BorderRightWidth (value) =>   {
+            ResolvedStyleProp::BorderRightWidth(value) => {
                 self.set_border_width(&value, &vec![1], length_ctx);
             }
-            ResolvedStyleProp::BorderBottomWidth (value) =>   {
+            ResolvedStyleProp::BorderBottomWidth(value) => {
                 self.set_border_width(&value, &vec![2], length_ctx);
             }
-            ResolvedStyleProp::BorderLeftWidth (value) =>   {
+            ResolvedStyleProp::BorderLeftWidth(value) => {
                 self.set_border_width(&value, &vec![3], length_ctx);
             }
-            ResolvedStyleProp::BorderTopColor (value) =>   {
+            ResolvedStyleProp::BorderTopColor(value) => {
                 self.set_border_color(&value, &vec![0]);
                 need_layout = false;
             }
-            ResolvedStyleProp::BorderRightColor (value) =>   {
+            ResolvedStyleProp::BorderRightColor(value) => {
                 self.set_border_color(&value, &vec![1]);
                 need_layout = false;
             }
-            ResolvedStyleProp::BorderBottomColor (value) =>   {
+            ResolvedStyleProp::BorderBottomColor(value) => {
                 self.set_border_color(&value, &vec![2]);
                 need_layout = false;
             }
-            ResolvedStyleProp::BorderLeftColor (value) =>   {
+            ResolvedStyleProp::BorderLeftColor(value) => {
                 self.set_border_color(&value, &vec![3]);
                 need_layout = false;
             }
-            ResolvedStyleProp::Display (value) =>   {
-                self.yoga_node.set_display(value)
-            }
-            ResolvedStyleProp::Width (value) =>   {
+            ResolvedStyleProp::Display(value) => self.yoga_node.set_display(value),
+            ResolvedStyleProp::Width(value) => {
                 self.yoga_node.set_width(value.to_style_unit(&length_ctx));
-            },
-            ResolvedStyleProp::Height (value) =>   {
+            }
+            ResolvedStyleProp::Height(value) => {
                 self.yoga_node.set_height(value.to_style_unit(&length_ctx))
-            },
-            ResolvedStyleProp::MaxWidth (value) =>   {
-                self.yoga_node.set_max_width(value.to_style_unit(&length_ctx))
-            },
-            ResolvedStyleProp::MaxHeight (value) =>   {
-                self.yoga_node.set_max_height(value.to_style_unit(&length_ctx))
-            },
-            ResolvedStyleProp::MinWidth (value) =>   {
-                self.yoga_node.set_min_width(value.to_style_unit(&length_ctx))
-            },
-            ResolvedStyleProp::MinHeight (value) =>   {
-                self.yoga_node.set_min_height(value.to_style_unit(&length_ctx))
-            },
-            ResolvedStyleProp::MarginTop (value) =>   {
-                self.yoga_node.set_margin(Edge::Top, value.to_style_unit(&length_ctx))
-            },
-            ResolvedStyleProp::MarginRight (value) =>   {
-                self.yoga_node.set_margin(Edge::Right, value.to_style_unit(&length_ctx))
-            },
-            ResolvedStyleProp::MarginBottom (value) =>   {
-                self.yoga_node.set_margin(Edge::Bottom, value.to_style_unit(&length_ctx))
-            },
-            ResolvedStyleProp::MarginLeft (value) =>   {
-                self.yoga_node.set_margin(Edge::Left, value.to_style_unit(&length_ctx))
-            },
-            ResolvedStyleProp::PaddingTop (value) =>   {
-                self.with_container_node_mut(|n| {
-                    n.set_padding(Edge::Top, value.to_style_unit(&length_ctx))
-                })
-            },
-            ResolvedStyleProp::PaddingRight (value) =>   {
-                self.with_container_node_mut(|n| {
-                    n.set_padding(Edge::Right, value.to_style_unit(&length_ctx))
-                })
-            },
-            ResolvedStyleProp::PaddingBottom (value) =>   {
-                self.with_container_node_mut(|n| {
-                    n.set_padding(Edge::Bottom, value.to_style_unit(&length_ctx))
-                })
-            },
-            ResolvedStyleProp::PaddingLeft (value) =>   {
-                self.with_container_node_mut(|n| {
-                    n.set_padding(Edge::Left, value.to_style_unit(&length_ctx))
-                })
-            },
-            ResolvedStyleProp::Flex (value) =>   {
-                self.yoga_node.set_flex(value)
-            },
-            ResolvedStyleProp::FlexBasis (value) =>   {
-                self.yoga_node.set_flex_basis(value.to_style_unit(&length_ctx))
-            },
-            ResolvedStyleProp::FlexGrow (value) =>   {
-                self.yoga_node.set_flex_grow(value)
-            },
-            ResolvedStyleProp::FlexShrink (value) =>   {
-                self.yoga_node.set_flex_shrink(value)
-            },
-            ResolvedStyleProp::AlignSelf (value) =>   {
-                self.yoga_node.set_align_self(value)
-            },
-            ResolvedStyleProp::Direction (value) =>   {
-                self.yoga_node.set_direction(value)
-            },
-            ResolvedStyleProp::Position (value) =>   {
-                self.yoga_node.set_position_type(value)
-            },
-            ResolvedStyleProp::Top (value) =>   {
-                self.yoga_node.set_position(Edge::Top, value.to_style_unit(&length_ctx));
-            },
-            ResolvedStyleProp::Right (value) =>   {
-                self.yoga_node.set_position(Edge::Right, value.to_style_unit(&length_ctx));
-            },
-            ResolvedStyleProp::Bottom (value) =>   {
-                self.yoga_node.set_position(Edge::Bottom, value.to_style_unit(&length_ctx));
-            },
-            ResolvedStyleProp::Left (value) =>   {
-                self.yoga_node.set_position(Edge::Left, value.to_style_unit(&length_ctx));
-            },
-            ResolvedStyleProp::Overflow (value) =>   {
-                self.yoga_node.set_overflow(value)
-            },
-            ResolvedStyleProp::BorderTopLeftRadius (value) =>   {
+            }
+            ResolvedStyleProp::MaxWidth(value) => self
+                .yoga_node
+                .set_max_width(value.to_style_unit(&length_ctx)),
+            ResolvedStyleProp::MaxHeight(value) => self
+                .yoga_node
+                .set_max_height(value.to_style_unit(&length_ctx)),
+            ResolvedStyleProp::MinWidth(value) => self
+                .yoga_node
+                .set_min_width(value.to_style_unit(&length_ctx)),
+            ResolvedStyleProp::MinHeight(value) => self
+                .yoga_node
+                .set_min_height(value.to_style_unit(&length_ctx)),
+            ResolvedStyleProp::MarginTop(value) => self
+                .yoga_node
+                .set_margin(Edge::Top, value.to_style_unit(&length_ctx)),
+            ResolvedStyleProp::MarginRight(value) => self
+                .yoga_node
+                .set_margin(Edge::Right, value.to_style_unit(&length_ctx)),
+            ResolvedStyleProp::MarginBottom(value) => self
+                .yoga_node
+                .set_margin(Edge::Bottom, value.to_style_unit(&length_ctx)),
+            ResolvedStyleProp::MarginLeft(value) => self
+                .yoga_node
+                .set_margin(Edge::Left, value.to_style_unit(&length_ctx)),
+            ResolvedStyleProp::PaddingTop(value) => self.with_container_node_mut(|n| {
+                n.set_padding(Edge::Top, value.to_style_unit(&length_ctx))
+            }),
+            ResolvedStyleProp::PaddingRight(value) => self.with_container_node_mut(|n| {
+                n.set_padding(Edge::Right, value.to_style_unit(&length_ctx))
+            }),
+            ResolvedStyleProp::PaddingBottom(value) => self.with_container_node_mut(|n| {
+                n.set_padding(Edge::Bottom, value.to_style_unit(&length_ctx))
+            }),
+            ResolvedStyleProp::PaddingLeft(value) => self.with_container_node_mut(|n| {
+                n.set_padding(Edge::Left, value.to_style_unit(&length_ctx))
+            }),
+            ResolvedStyleProp::Flex(value) => self.yoga_node.set_flex(value),
+            ResolvedStyleProp::FlexBasis(value) => self
+                .yoga_node
+                .set_flex_basis(value.to_style_unit(&length_ctx)),
+            ResolvedStyleProp::FlexGrow(value) => self.yoga_node.set_flex_grow(value),
+            ResolvedStyleProp::FlexShrink(value) => self.yoga_node.set_flex_shrink(value),
+            ResolvedStyleProp::AlignSelf(value) => self.yoga_node.set_align_self(value),
+            ResolvedStyleProp::Direction(value) => self.yoga_node.set_direction(value),
+            ResolvedStyleProp::Position(value) => self.yoga_node.set_position_type(value),
+            ResolvedStyleProp::Top(value) => {
+                self.yoga_node
+                    .set_position(Edge::Top, value.to_style_unit(&length_ctx));
+            }
+            ResolvedStyleProp::Right(value) => {
+                self.yoga_node
+                    .set_position(Edge::Right, value.to_style_unit(&length_ctx));
+            }
+            ResolvedStyleProp::Bottom(value) => {
+                self.yoga_node
+                    .set_position(Edge::Bottom, value.to_style_unit(&length_ctx));
+            }
+            ResolvedStyleProp::Left(value) => {
+                self.yoga_node
+                    .set_position(Edge::Left, value.to_style_unit(&length_ctx));
+            }
+            ResolvedStyleProp::Overflow(value) => self.yoga_node.set_overflow(value),
+            ResolvedStyleProp::BorderTopLeftRadius(value) => {
                 self.border_radius[0] = value.to_px(&length_ctx);
-            },
-            ResolvedStyleProp::BorderTopRightRadius (value) =>   {
+            }
+            ResolvedStyleProp::BorderTopRightRadius(value) => {
                 self.border_radius[1] = value.to_px(&length_ctx);
-            },
-            ResolvedStyleProp::BorderBottomRightRadius (value) =>   {
+            }
+            ResolvedStyleProp::BorderBottomRightRadius(value) => {
                 self.border_radius[2] = value.to_px(&length_ctx);
-            },
-            ResolvedStyleProp::BorderBottomLeftRadius (value) =>   {
+            }
+            ResolvedStyleProp::BorderBottomLeftRadius(value) => {
                 self.border_radius[3] = value.to_px(&length_ctx);
-            },
-            ResolvedStyleProp::Transform (value) =>   {
+            }
+            ResolvedStyleProp::Transform(value) => {
                 need_layout = false;
                 self.transform = Some(value);
             }
@@ -1460,42 +1381,29 @@ impl StyleNode {
             }
 
             // container node style
-            ResolvedStyleProp::JustifyContent (value) =>   {
-                self.with_container_node_mut(|layout| {
-                    layout.set_justify_content(value)
-                });
-            },
-            ResolvedStyleProp::FlexDirection (value) =>   {
-                self.with_container_node_mut(|layout| {
-                    layout.set_flex_direction(value)
-                });
-            },
-            ResolvedStyleProp::AlignContent (value) =>   {
-                self.with_container_node_mut(|layout| {
-                    layout.set_align_content(value)
-                });
-            },
-            ResolvedStyleProp::AlignItems (value) =>   {
-                self.with_container_node_mut(|layout| {
-                    layout.set_align_items(value)
-                });
-            },
-            ResolvedStyleProp::FlexWrap (value) =>   {
-                self.with_container_node_mut(|layout| {
-                    layout.set_flex_wrap(value)
-                });
-            },
-            ResolvedStyleProp::ColumnGap (value) =>   {
+            ResolvedStyleProp::JustifyContent(value) => {
+                self.with_container_node_mut(|layout| layout.set_justify_content(value));
+            }
+            ResolvedStyleProp::FlexDirection(value) => {
+                self.with_container_node_mut(|layout| layout.set_flex_direction(value));
+            }
+            ResolvedStyleProp::AlignContent(value) => {
+                self.with_container_node_mut(|layout| layout.set_align_content(value));
+            }
+            ResolvedStyleProp::AlignItems(value) => {
+                self.with_container_node_mut(|layout| layout.set_align_items(value));
+            }
+            ResolvedStyleProp::FlexWrap(value) => {
+                self.with_container_node_mut(|layout| layout.set_flex_wrap(value));
+            }
+            ResolvedStyleProp::ColumnGap(value) => {
                 self.with_container_node_mut(|layout| {
                     layout.set_column_gap(value.to_px(&length_ctx))
                 });
-            },
-            ResolvedStyleProp::RowGap (value) =>   {
-                self.with_container_node_mut(|layout| {
-                    layout.set_row_gap(value.to_px(&length_ctx))
-                });
-            },
-            //TODO aspectratio
+            }
+            ResolvedStyleProp::RowGap(value) => {
+                self.with_container_node_mut(|layout| layout.set_row_gap(value.to_px(&length_ctx)));
+            } //TODO aspectratio
         }
         if !change_notified {
             if let Some(on_changed) = &mut self.on_changed {
@@ -1510,22 +1418,28 @@ impl StyleNode {
         let mut me = self.clone();
         let task = create_event_loop_callback(move || {
             let p = &me.animation_params;
-            me.animation_instance = if p.name.is_empty() || p.duration <= 0.0 || p.iteration_count <= 0.0  {
-                None
-            } else {
-                let element = ok_or_return!(me.element.upgrade());
-                let window = some_or_return!(element.get_window());
-                ANIMATIONS.with_borrow(|m| {
-                    let ani = m.get(&p.name)?.preprocess();
-                    let frame_controller = WindowAnimationController::new(window);
-                    let duration = p.duration * 1000000.0;
-                    let iteration_count = p.iteration_count;
-                    let actor = CssAnimationActor::new(ani, element.as_weak());
-                    let mut ani_instance = AnimationInstance::new(actor, duration, iteration_count, Box::new(frame_controller));
-                    ani_instance.run();
-                    Some(ani_instance)
-                })
-            };
+            me.animation_instance =
+                if p.name.is_empty() || p.duration <= 0.0 || p.iteration_count <= 0.0 {
+                    None
+                } else {
+                    let element = ok_or_return!(me.element.upgrade());
+                    let window = some_or_return!(element.get_window());
+                    ANIMATIONS.with_borrow(|m| {
+                        let ani = m.get(&p.name)?.preprocess();
+                        let frame_controller = WindowAnimationController::new(window);
+                        let duration = p.duration * 1000000.0;
+                        let iteration_count = p.iteration_count;
+                        let actor = CssAnimationActor::new(ani, element.as_weak());
+                        let mut ani_instance = AnimationInstance::new(
+                            actor,
+                            duration,
+                            iteration_count,
+                            Box::new(frame_controller),
+                        );
+                        ani_instance.run();
+                        Some(ani_instance)
+                    })
+                };
         });
         task.call();
     }
@@ -1533,20 +1447,23 @@ impl StyleNode {
     pub fn get_parent(&self) -> Option<StyleNode> {
         if let Some(p) = &self.parent {
             if let Ok(sn) = p.upgrade() {
-                return Some(StyleNode {
-                    inner: sn,
-                })
+                return Some(StyleNode { inner: sn });
             }
         }
-        return None
+        return None;
     }
 
-    fn set_border_width(&mut self, value: &LengthOrPercent, edges: &Vec<usize>, length_ctx: &LengthContext) {
+    fn set_border_width(
+        &mut self,
+        value: &LengthOrPercent,
+        edges: &Vec<usize>,
+        length_ctx: &LengthContext,
+    ) {
         // let default_border = StyleBorder(StyleUnit::UndefinedValue, StyleColor::Color(Color::TRANSPARENT));
         // let value = value.resolve(&default_border);
         //TODO fix percent?
         let width = match value.to_style_unit(length_ctx) {
-            StyleUnit::Point(f) => {f.0},
+            StyleUnit::Point(f) => f.0,
             _ => 0.0,
         };
         for index in edges {
@@ -1590,20 +1507,23 @@ impl StyleNode {
         self.inner.children.len() as u32
     }
 
-    pub fn calculate_layout(&mut self,
-                            available_width: f32,
-                            available_height: f32,
-                            parent_direction: Direction,
+    pub fn calculate_layout(
+        &mut self,
+        available_width: f32,
+        available_height: f32,
+        parent_direction: Direction,
     ) {
-        self.inner.yoga_node.calculate_layout(available_width, available_height, parent_direction);
+        self.inner
+            .yoga_node
+            .calculate_layout(available_width, available_height, parent_direction);
         // self.calculate_shadow_layout();
     }
 
-
-    pub fn calculate_shadow_layout(&mut self,
-                               available_width: f32,
-                               available_height: f32,
-                               parent_direction: Direction,
+    pub fn calculate_shadow_layout(
+        &mut self,
+        available_width: f32,
+        available_height: f32,
+        parent_direction: Direction,
     ) {
         if let Some(s) = &mut self.inner.shadow_node {
             s.calculate_layout(available_width, available_height, parent_direction);
@@ -1645,7 +1565,6 @@ pub fn parse_style_obj(style: JsValue) -> Vec<ParsedStyleProp> {
     result
 }
 
-
 pub fn parse_float(value: &str) -> f32 {
     f32::from_str(value).unwrap_or(0.0)
 }
@@ -1676,7 +1595,6 @@ pub fn parse_optional_color_str(value: Option<&String>) -> Option<Color> {
     }
 }
 
-
 fn parse_matrix(value: &str) -> Result<Matrix, Error> {
     let parts: Vec<&str> = value.split(",").collect();
     if parts.len() != 6 {
@@ -1693,20 +1611,26 @@ fn parse_matrix(value: &str) -> Result<Matrix, Error> {
 }
 
 pub fn format_matrix(v: &Matrix) -> String {
-    format!("matrix({},{},{},{},{},{})", v.scale_x(), v.skew_y(), v.skew_x(), v.scale_y(), v.translate_x(), v.translate_y())
+    format!(
+        "matrix({},{},{},{},{},{})",
+        v.scale_x(),
+        v.skew_y(),
+        v.skew_x(),
+        v.scale_y(),
+        v.translate_x(),
+        v.translate_y()
+    )
 }
 
 fn create_matrix(values: [f32; 6]) -> Matrix {
     let scale_x = values[0];
-    let skew_y =  values[1];
-    let skew_x =  values[2];
+    let skew_y = values[1];
+    let skew_x = values[2];
     let scale_y = values[3];
     let trans_x = values[4];
     let trans_y = values[5];
     Matrix::new_all(
-        scale_x, skew_x, trans_x,
-        skew_y, scale_y, trans_y,
-        0.0, 0.0, 1.0,
+        scale_x, skew_x, trans_x, skew_y, scale_y, trans_y, 0.0, 0.0, 1.0,
     )
 }
 
@@ -1769,14 +1693,12 @@ fn parse_color(value: &str) -> Option<Color> {
     } else if let Ok(c) = parse_color_keyword(value) {
         match c {
             cssparser::Color::CurrentColor => None,
-            cssparser::Color::RGBA(rgba) => {
-                Some(Color::from_argb(rgba.alpha, rgba.red, rgba.green, rgba.blue))
-            }
+            cssparser::Color::RGBA(rgba) => Some(Color::from_argb(
+                rgba.alpha, rgba.red, rgba.green, rgba.blue,
+            )),
         }
     } else if let Some(rgb) = value.strip_prefix("rgb(") {
-        let mut params = rgb.strip_suffix(")")?
-            .split(',')
-            .map(|p| p.trim());
+        let mut params = rgb.strip_suffix(")")?.split(',').map(|p| p.trim());
         let r = u8::from_str(params.next()?).ok()?;
         let g = u8::from_str(params.next()?).ok()?;
         let b = u8::from_str(params.next()?).ok()?;
@@ -1786,9 +1708,7 @@ fn parse_color(value: &str) -> Option<Color> {
             None
         }
     } else if let Some(rgba) = value.strip_prefix("rgba(") {
-        let mut params = rgba.strip_suffix(")")?
-            .split(',')
-            .map(|p| p.trim());
+        let mut params = rgba.strip_suffix(")")?.split(',').map(|p| p.trim());
         let r = u8::from_str(params.next()?).ok()?;
         let g = u8::from_str(params.next()?).ok()?;
         let b = u8::from_str(params.next()?).ok()?;
@@ -1808,7 +1728,10 @@ fn test_inherit() {
     let color = Color::from_rgb(10, 20, 30);
     let mut p = StyleNode::new();
     let length_context = LengthContext::default();
-    p.set_style(StyleProp::Color(StylePropVal::Custom(color)), &length_context);
+    p.set_style(
+        StyleProp::Color(StylePropVal::Custom(color)),
+        &length_context,
+    );
     let mut c = StyleNode::new();
     p.insert_child(&mut c, 0);
     c.set_style(StyleProp::Color(StylePropVal::Inherit), &length_context);

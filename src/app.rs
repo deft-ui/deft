@@ -1,5 +1,16 @@
-use std::fmt::{Debug, Formatter};
-use std::sync::{Arc, Mutex};
+use crate::base::ResultWaiter;
+use crate::event_loop::{
+    init_event_loop_proxy, run_event_loop_task, run_with_event_loop, AppEventProxy,
+};
+use crate::ext::ext_localstorage::localstorage;
+use crate::ext::ext_window::WINDOWS;
+use crate::js::js_engine::JsEngine;
+use crate::js::js_event_loop::{js_init_event_loop, JsEvent, JsEventLoopClosedError};
+use crate::js::loader::JsModuleLoader;
+use crate::mrc::Mrc;
+use crate::window::{
+    window_check_update, window_input, window_on_render_idle, window_send_key, window_update_inset,
+};
 use anyhow::Error;
 #[cfg(target_os = "android")]
 use jni::objects::JValue;
@@ -8,23 +19,16 @@ use jni::sys::{jboolean, jlong};
 use log::debug;
 use measure_time::debug_time;
 use skia_safe::Rect;
-use crate::js::loader::JsModuleLoader;
+use std::fmt::{Debug, Formatter};
+use std::sync::{Arc, Mutex};
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, WindowEvent};
 use winit::event_loop::ActiveEventLoop;
 #[cfg(target_os = "android")]
-use winit::platform::android::ActiveEventLoopExtAndroid;
-#[cfg(target_os = "android")]
 use winit::platform::android::activity::AndroidApp;
+#[cfg(target_os = "android")]
+use winit::platform::android::ActiveEventLoopExtAndroid;
 use winit::window::WindowId;
-use crate::base::ResultWaiter;
-use crate::event_loop::{init_event_loop_proxy, run_event_loop_task, run_with_event_loop, AppEventProxy};
-use crate::ext::ext_localstorage::localstorage;
-use crate::ext::ext_window::WINDOWS;
-use crate::window::{window_check_update, window_input, window_on_render_idle, window_send_key, window_update_inset};
-use crate::js::js_engine::JsEngine;
-use crate::js::js_event_loop::{js_init_event_loop, JsEvent, JsEventLoopClosedError};
-use crate::mrc::Mrc;
 
 #[derive(Debug)]
 pub struct AppEventPayload {
@@ -82,7 +86,6 @@ pub trait IApp {
     fn create_module_loader(&mut self) -> Box<dyn JsModuleLoader + Send + Sync + 'static>;
 }
 
-
 pub struct WinitApp {
     pub js_engine: Mrc<JsEngine>,
 }
@@ -107,22 +110,21 @@ impl WinitApp {
         js_engine.init_api();
         init_event_loop_proxy(event_loop_proxy.clone());
         let _ = js_init_event_loop(move |js_event| {
-            let _ = event_loop_proxy.send_event(AppEvent::JsEvent(js_event)).map_err(|_| JsEventLoopClosedError {});
+            let _ = event_loop_proxy
+                .send_event(AppEvent::JsEvent(js_event))
+                .map_err(|_| JsEventLoopClosedError {});
             Ok(())
         });
         {
             let mut app = app.app_impl.lock().unwrap();
             app.init_js_engine(&mut js_engine);
         }
-        Self {
-            js_engine,
-        }
+        Self { js_engine }
     }
 
     fn execute_pending_jobs(&mut self) {
         self.js_engine.execute_pending_jobs();
     }
-
 }
 
 impl ApplicationHandler<AppEventPayload> for WinitApp {
@@ -153,14 +155,12 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
                 }
                 AppEvent::Callback(callback) => {
                     callback();
-                },
-                AppEvent::JsEvent(js_event) => {
-                    match js_event {
-                        JsEvent::MacroTask(callback) => {
-                            callback();
-                        }
-                    }
                 }
+                AppEvent::JsEvent(js_event) => match js_event {
+                    JsEvent::MacroTask(callback) => {
+                        callback();
+                    }
+                },
                 AppEvent::ShowSoftInput(window_id) => {
                     debug!("show soft input");
                     #[cfg(target_os = "android")]
@@ -168,7 +168,7 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
                     #[cfg(ohos)]
                     platform::show_soft_keyboard(window_id);
                     let _ = window_id;
-                },
+                }
                 AppEvent::HideSoftInput(window_id) => {
                     debug!("hide soft input");
                     #[cfg(target_os = "android")]
@@ -176,19 +176,19 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
                     #[cfg(ohos)]
                     platform::hide_soft_keyboard(window_id);
                     let _ = window_id;
-                },
+                }
                 AppEvent::CommitInput(window_id, content) => {
                     window_input(window_id, content);
-                },
+                }
                 AppEvent::NamedKeyInput(window_id, key, pressed) => {
                     window_send_key(window_id, &key, pressed);
                 }
                 AppEvent::SetInset(window_id, ty, rect) => {
                     window_update_inset(window_id, ty, rect);
-                },
+                }
                 AppEvent::RenderIdle(window_id) => {
                     window_on_render_idle(window_id);
-                },
+                }
                 AppEvent::Update(window_id) => {
                     window_check_update(window_id);
                 }
@@ -198,7 +198,12 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
         });
     }
 
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        window_id: WindowId,
+        event: WindowEvent,
+    ) {
         // debug!("onWindowEvent: {:?}, {:?}", &window_id, event);
         run_event_loop_task(event_loop, move || {
             self.js_engine.handle_window_event(window_id, event);
@@ -206,14 +211,18 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
         });
     }
 
-    fn device_event(&mut self, event_loop: &ActiveEventLoop, device_id: DeviceId, event: DeviceEvent) {
+    fn device_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        device_id: DeviceId,
+        event: DeviceEvent,
+    ) {
         // debug!("onDeviceEvent: {:?}", event);
         run_event_loop_task(event_loop, move || {
             self.js_engine.handle_device_event(device_id, event);
             self.execute_pending_jobs();
         });
     }
-
 }
 
 pub fn exit_app(_code: i32) -> Result<(), Error> {
@@ -227,37 +236,48 @@ pub fn exit_app(_code: i32) -> Result<(), Error> {
 
 #[cfg(target_os = "android")]
 pub fn bind_deft_window(app: AndroidApp, window_id: i32) -> Result<(), jni::errors::Error> {
-    use jni::JavaVM;
     use jni::objects::JObject;
+    use jni::JavaVM;
     let vm = unsafe { JavaVM::from_raw(app.vm_as_ptr() as _)? };
     let activity = unsafe { JObject::from_raw(app.activity_as_ptr() as _) };
     let mut env = vm.attach_current_thread()?;
     let window_id = window_id as jlong;
-    env.call_method(&activity, "bindDeftWindow", "(J)V", &[
-        JValue::Long(window_id)
-    ])?.v()?;
+    env.call_method(
+        &activity,
+        "bindDeftWindow",
+        "(J)V",
+        &[JValue::Long(window_id)],
+    )?
+    .v()?;
     Ok(())
 }
 
 #[cfg(target_os = "android")]
-fn show_hide_keyboard_fallible(app: AndroidApp, window_id: i32, show: bool) -> Result<(), jni::errors::Error> {
-    use jni::JavaVM;
+fn show_hide_keyboard_fallible(
+    app: AndroidApp,
+    window_id: i32,
+    show: bool,
+) -> Result<(), jni::errors::Error> {
     use jni::objects::JObject;
+    use jni::JavaVM;
     let vm = unsafe { JavaVM::from_raw(app.vm_as_ptr() as _)? };
     let activity = unsafe { JObject::from_raw(app.activity_as_ptr() as _) };
     let mut env = vm.attach_current_thread()?;
     let window_id = window_id as jlong;
     let show = show as jboolean;
-    env.call_method(&activity, "showInput", "(JZ)V", &[
-        JValue::Long(window_id), JValue::Bool(show)
-    ])?.v()?;
+    env.call_method(
+        &activity,
+        "showInput",
+        "(JZ)V",
+        &[JValue::Long(window_id), JValue::Bool(show)],
+    )?
+    .v()?;
     Ok(())
 }
 
 #[cfg(target_os = "android")]
 fn show_hide_keyboard(app: AndroidApp, window_id: i32, show: bool) {
     if let Err(e) = show_hide_keyboard_fallible(app, window_id, show) {
-       log::error!("Showing or hiding the soft keyboard failed: {e:?}");
+        log::error!("Showing or hiding the soft keyboard failed: {e:?}");
     };
 }
-

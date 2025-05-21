@@ -1,27 +1,23 @@
 use crate as deft;
-use deft_macros::js_func;
 use crate::base::Id;
 use crate::element::CSS_MANAGER;
 use crate::ext::ext_window::WINDOWS;
 use crate::js::JsError;
 use crate::style::css_manager::CSS;
+use deft_macros::js_func;
 
 #[js_func]
 pub fn stylesheet_add(source: String) -> Result<Id<CSS>, JsError> {
-    let id = CSS_MANAGER.with_borrow_mut(|manager| {
-        manager.add(&source)
-    }).map_err(|e| {
-        JsError::new(format!("failed to add stylesheet: {}", e))
-    });
+    let id = CSS_MANAGER
+        .with_borrow_mut(|manager| manager.add(&source))
+        .map_err(|e| JsError::new(format!("failed to add stylesheet: {}", e)));
     refresh_windows_style();
     id
 }
 
 #[js_func]
 pub fn stylesheet_remove(id: Id<CSS>) -> Result<(), JsError> {
-    CSS_MANAGER.with_borrow_mut(|manager| {
-        manager.remove(&id)
-    });
+    CSS_MANAGER.with_borrow_mut(|manager| manager.remove(&id));
     refresh_windows_style();
     Ok(())
 }

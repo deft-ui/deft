@@ -5,12 +5,12 @@ use std::sync::{Arc, Mutex};
 
 use crate::base::{Event, EventRegistration};
 use crate::ext::audio_player::{AudioNotify, AudioServer, AudioSources};
+use crate::js::js_event_loop::{js_create_event_loop_proxy, JsEventLoopProxy};
 use crate::{js_deserialize, js_value};
-use anyhow::{Error};
+use anyhow::Error;
 use deft_macros::{js_methods, mrc_object};
 use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
-use crate::js::js_event_loop::{js_create_event_loop_proxy, JsEventLoopProxy};
 
 thread_local! {
     pub static NEXT_ID: Cell<u32> = Cell::new(1);
@@ -40,7 +40,6 @@ impl AudioData {
         }
     }
 }
-
 
 #[derive(Serialize, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -108,10 +107,8 @@ fn unregistry_playing(audio: &Audio) {
 js_value!(Audio);
 js_deserialize!(AudioOptions);
 
-
 #[js_methods]
 impl Audio {
-
     #[js_func]
     pub fn create(options: AudioOptions) -> Result<Audio, Error> {
         let id = NEXT_ID.get();
@@ -131,38 +128,37 @@ impl Audio {
     #[js_func]
     pub fn play(audio: Audio) -> Result<(), Error> {
         registry_playing(&audio);
-        PLAYER.with(move |p| {
-            p.play(audio.id, audio.sources.clone())
-        });
+        PLAYER.with(move |p| p.play(audio.id, audio.sources.clone()));
         Ok(())
     }
 
     #[js_func]
     pub fn pause(audio: Audio) -> Result<(), Error> {
-        PLAYER.with(|p| {
-            p.pause(audio.id)
-        });
+        PLAYER.with(|p| p.pause(audio.id));
         Ok(())
     }
 
     #[js_func]
     pub fn stop(&self) -> Result<(), Error> {
         unregistry_playing(&self);
-        PLAYER.with(|p| {
-            p.stop(self.id)
-        });
+        PLAYER.with(|p| p.stop(self.id));
         Ok(())
     }
 
     #[js_func]
-    pub fn add_event_listener(&mut self, event_type: String, callback: JsValue) -> Result<i32, Error> {
+    pub fn add_event_listener(
+        &mut self,
+        event_type: String,
+        callback: JsValue,
+    ) -> Result<i32, Error> {
         let er = &mut self.event_registration;
         Ok(er.add_js_event_listener(&event_type, callback))
     }
 
     #[js_func]
     pub fn remove_event_listener(&mut self, event_type: String, id: u32) -> Result<(), Error> {
-        self.event_registration.remove_event_listener(&event_type, id);
+        self.event_registration
+            .remove_event_listener(&event_type, id);
         Ok(())
     }
 }

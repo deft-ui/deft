@@ -57,7 +57,9 @@ pub struct JsEventLoopCallback {
 impl JsEventLoopCallback {
     pub fn call(mut self) {
         let callback = self.callback.take().unwrap();
-        self.event_loop_proxy.schedule_macro_task(callback.into_box()).unwrap();
+        self.event_loop_proxy
+            .schedule_macro_task(callback.into_box())
+            .unwrap();
     }
 }
 
@@ -70,10 +72,12 @@ pub struct JsEventLoopFnMutCallback<P> {
 impl<P: Send + Sync + 'static> JsEventLoopFnMutCallback<P> {
     pub fn call(&mut self, param: P) {
         let cb = self.callback.clone();
-        self.event_loop_proxy.schedule_macro_task(move || {
-            let mut cb = cb.lock().unwrap();
-            (cb.callback)(param);
-        }).unwrap();
+        self.event_loop_proxy
+            .schedule_macro_task(move || {
+                let mut cb = cb.lock().unwrap();
+                (cb.callback)(param);
+            })
+            .unwrap();
     }
 }
 
@@ -117,9 +121,11 @@ pub fn js_create_event_loop_callback<F: FnOnce() + 'static>(callback: F) -> JsEv
     }
 }
 
-pub fn js_create_event_loop_fn_mut<P: Send + Sync, F: FnMut(P) + 'static>(callback: F) -> JsEventLoopFnMutCallback<P> {
+pub fn js_create_event_loop_fn_mut<P: Send + Sync, F: FnMut(P) + 'static>(
+    callback: F,
+) -> JsEventLoopFnMutCallback<P> {
     let fn_mut = UnsafeFnMut {
-        callback: Box::new(callback)
+        callback: Box::new(callback),
     };
     let event_loop_proxy = js_create_event_loop_proxy();
     JsEventLoopFnMutCallback {

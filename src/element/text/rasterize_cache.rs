@@ -21,12 +21,7 @@ impl RasterizeCache {
             cache: Mrc::new(HashMap::new()),
         }
     }
-    pub fn get_image(
-        &self,
-        font: &Font,
-        glyph_id: GlyphId,
-        size: f32,
-    ) -> Option<Image> {
+    pub fn get_image(&self, font: &Font, glyph_id: GlyphId, size: f32) -> Option<Image> {
         let key = RasterizeCacheKey {
             font_cache_key: font.as_ref().key,
             glyph_id,

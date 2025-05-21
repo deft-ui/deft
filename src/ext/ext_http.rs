@@ -1,14 +1,14 @@
 use crate as deft;
+use crate::{js_deserialize, js_serialize};
+use anyhow::Error;
+use deft_macros::js_methods;
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+use reqwest::{multipart, Body};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
-use anyhow::Error;
-use reqwest::{Body, multipart};
-use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
-use serde::{Deserialize, Serialize};
 use tokio::fs::File;
 use tokio_util::codec::{BytesCodec, FramedRead};
-use deft_macros::js_methods;
-use crate::{js_deserialize, js_serialize};
 
 pub struct HttpOptions {}
 
@@ -33,16 +33,12 @@ js_serialize!(HttpResponse);
 js_deserialize!(UploadOptions);
 #[js_methods]
 impl http {
-
     #[js_func]
     pub async fn request(url: String) -> Result<HttpResponse, Error> {
         let rsp = reqwest::get(url).await?;
         let status = rsp.status().as_u16();
         let body = rsp.text().await?;
-        Ok(HttpResponse {
-            status,
-            body,
-        })
+        Ok(HttpResponse { status, body })
     }
 
     #[js_func]
@@ -67,13 +63,10 @@ impl http {
             .post(url)
             .headers(headers)
             .multipart(form)
-            .send().await?;
+            .send()
+            .await?;
         let status = rsp.status().as_u16();
         let body = rsp.text().await?;
-        Ok(HttpResponse {
-            status,
-            body,
-        })
+        Ok(HttpResponse { status, body })
     }
 }
-

@@ -1,4 +1,6 @@
-use crate::element::{Element};
+use crate::element::Element;
+use crate::some_or_return;
+use anyhow::{anyhow, Error};
 use cssparser::{self, CowRcStr, ParseError, SourceLocation, ToCss};
 use selectors::attr::{AttrSelectorOperation, CaseSensitivity, NamespaceConstraint};
 use selectors::context::{MatchingMode, QuirksMode};
@@ -8,8 +10,6 @@ use selectors::parser::{
 };
 use selectors::{self, matching, OpaqueElement};
 use std::fmt;
-use anyhow::{anyhow, Error};
-use crate::some_or_return;
 
 type LocalName = String;
 type Namespace = String;
@@ -55,12 +55,15 @@ impl<'i> Parser<'i> for DeftParser {
         }
     }
 
-    fn parse_pseudo_element(&self, _location: SourceLocation, name: CowRcStr<'i>) -> Result<<Self::Impl as SelectorImpl>::PseudoElement, ParseError<'i, Self::Error>> {
+    fn parse_pseudo_element(
+        &self,
+        _location: SourceLocation,
+        name: CowRcStr<'i>,
+    ) -> Result<<Self::Impl as SelectorImpl>::PseudoElement, ParseError<'i, Self::Error>> {
         Ok(PseudoElement {
             name: name.to_string(),
         })
     }
-
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, Hash)]
@@ -182,19 +185,15 @@ impl selectors::Element for Element {
     ) -> bool {
         let attr = some_or_return!(self.attributes.get(local_name), false);
         match operation {
-            AttrSelectorOperation::Exists => {
-                true
-            }
-            AttrSelectorOperation::WithValue { expected_value, case_sensitivity, .. } => {
-                match case_sensitivity {
-                    CaseSensitivity::CaseSensitive => {
-                        attr == *expected_value
-                    }
-                    CaseSensitivity::AsciiCaseInsensitive => {
-                        attr.eq_ignore_ascii_case(expected_value)
-                    }
-                }
-            }
+            AttrSelectorOperation::Exists => true,
+            AttrSelectorOperation::WithValue {
+                expected_value,
+                case_sensitivity,
+                ..
+            } => match case_sensitivity {
+                CaseSensitivity::CaseSensitive => attr == *expected_value,
+                CaseSensitivity::AsciiCaseInsensitive => attr.eq_ignore_ascii_case(expected_value),
+            },
         }
     }
 
@@ -208,15 +207,9 @@ impl selectors::Element for Element {
         F: FnMut(&Self, matching::ElementSelectorFlags),
     {
         match pseudo {
-            PseudoClass::Focus => {
-                self.is_focused()
-            }
-            PseudoClass::Hover => {
-                self.hover
-            }
-            PseudoClass::Unsupported(_) => {
-                false
-            }
+            PseudoClass::Focus => self.is_focused(),
+            PseudoClass::Hover => self.hover,
+            PseudoClass::Unsupported(_) => false,
         }
     }
 
@@ -247,12 +240,12 @@ impl selectors::Element for Element {
     #[inline]
     fn has_class(&self, name: &LocalName, case_sensitivity: CaseSensitivity) -> bool {
         match case_sensitivity {
-            CaseSensitivity::AsciiCaseInsensitive => {
-                self.classes.iter().find(|it| it.eq_ignore_ascii_case(name)).is_some()
-            }
-            CaseSensitivity::CaseSensitive => {
-                self.classes.contains(name)
-            }
+            CaseSensitivity::AsciiCaseInsensitive => self
+                .classes
+                .iter()
+                .find(|it| it.eq_ignore_ascii_case(name))
+                .is_some(),
+            CaseSensitivity::CaseSensitive => self.classes.contains(name),
         }
     }
 
@@ -288,18 +281,16 @@ pub struct Selectors(pub Vec<Selector>);
 pub struct Selector {
     selector: GenericSelector<DeftSelectors>,
     class_names: Vec<String>,
-    attribute_names: Vec<String>
+    attribute_names: Vec<String>,
 }
 
 impl Selectors {
     pub fn compile(s: &str) -> Result<Selectors, Error> {
         let mut input = cssparser::ParserInput::new(s);
         match SelectorList::parse(&DeftParser, &mut cssparser::Parser::new(&mut input)) {
-            Ok(list) => Ok(
-                Selectors(
-                    list.0.into_iter().map(|s| Selector::new(s)).collect()
-                )
-            ),
+            Ok(list) => Ok(Selectors(
+                list.0.into_iter().map(|s| Selector::new(s)).collect(),
+            )),
             Err(e) => Err(anyhow!("failed to parse css: {:?}", e)),
         }
     }
@@ -311,11 +302,9 @@ impl Selectors {
     pub fn selectors(&self) -> Vec<Selector> {
         self.0.clone()
     }
-
 }
 
 impl Selector {
-
     pub fn new(selector: GenericSelector<DeftSelectors>) -> Self {
         let mut list = Vec::new();
         let mut attribute_names = Vec::new();
@@ -375,13 +364,15 @@ impl Selector {
         } else {
             MatchingMode::Normal
         };
-        let mut context = matching::MatchingContext::new(
-            mode,
+        let mut context = matching::MatchingContext::new(mode, None, None, QuirksMode::NoQuirks);
+        matching::matches_selector(
+            &self.selector,
+            0,
             None,
-            None,
-            QuirksMode::NoQuirks,
-        );
-        matching::matches_selector(&self.selector, 0, None, element, &mut context, &mut |_, _| {})
+            element,
+            &mut context,
+            &mut |_, _| {},
+        )
     }
 
     pub fn pseudo_element(&self) -> Option<&PseudoElement> {
@@ -399,7 +390,6 @@ impl Selector {
     pub fn specificity(&self) -> u32 {
         self.selector.specificity()
     }
-
 }
 
 #[cfg(test)]
@@ -429,5 +419,3 @@ pub mod tests {
         assert_eq!(classes, &vec!["b", "a"]);
     }
 }
-
-

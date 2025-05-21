@@ -35,7 +35,11 @@ impl<T: Clone> ComputedValueInner<T> {
         Some(result)
     }
 
-    pub fn register_dep<F: FnMut(Vec<T>)>(&mut self, keys: &Vec<String>, mut consumer: Box<dyn FnMut(Vec<T>)>) -> u32 {
+    pub fn register_dep<F: FnMut(Vec<T>)>(
+        &mut self,
+        keys: &Vec<String>,
+        mut consumer: Box<dyn FnMut(Vec<T>)>,
+    ) -> u32 {
         if let Some(v) = self.get_values(keys) {
             consumer(v);
         }
@@ -44,10 +48,7 @@ impl<T: Clone> ComputedValueInner<T> {
         self.id2keys.insert(id, keys.to_owned());
         self.consumers.insert(id, consumer);
         for k in keys {
-            self.keys
-                .entry(k.to_owned())
-                .or_insert(Vec::new())
-                .push(id);
+            self.keys.entry(k.to_owned()).or_insert(Vec::new()).push(id);
         }
         id
     }
@@ -86,7 +87,11 @@ impl<T: Clone + 'static> ComputedValue<T> {
     pub fn update_value(&self, key: &str, value: T) {
         self.inner.borrow_mut().update(key, value);
     }
-    pub fn dep<F: FnMut(Vec<T>) + 'static>(&self, keys: &Vec<String>, consumer: F) -> ComputedValueHandle {
+    pub fn dep<F: FnMut(Vec<T>) + 'static>(
+        &self,
+        keys: &Vec<String>,
+        consumer: F,
+    ) -> ComputedValueHandle {
         let mut inner = self.inner.borrow_mut();
         let id = inner.register_dep::<F>(keys, Box::new(consumer));
         let inner_clone = self.inner.clone();
@@ -110,9 +115,9 @@ impl Drop for ComputedValueHandle {
 
 #[cfg(test)]
 mod tests {
+    use crate::computed::ComputedValue;
     use std::cell::Cell;
     use std::rc::Rc;
-    use crate::computed::ComputedValue;
 
     #[test]
     fn test_computed_value() {
@@ -120,7 +125,7 @@ mod tests {
         let counter = Rc::new(Cell::new(0));
         {
             let counter2 = counter.clone();
-            let _h1 = cv.dep(&vec!["counter".to_string()], move|v| {
+            let _h1 = cv.dep(&vec!["counter".to_string()], move |v| {
                 counter2.set(v[0]);
             });
             cv.update_value("counter", 1);
@@ -129,6 +134,4 @@ mod tests {
         cv.update_value("counter", 2);
         assert_eq!(counter.get(), 1);
     }
-
 }
-

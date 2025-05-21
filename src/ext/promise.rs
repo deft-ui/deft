@@ -14,14 +14,13 @@ pub struct Promise<T, E> {
 }
 
 impl<T, E> Promise<T, E> {
-
     pub fn new() -> Self {
         let inner: PromiseInner<T, E> = PromiseInner {
             value: None,
             waker: None,
         };
         Promise {
-            inner: Arc::new(Mutex::new(inner))
+            inner: Arc::new(Mutex::new(inner)),
         }
     }
 
@@ -55,22 +54,25 @@ impl<T, E> Promise<T, E> {
             wk.clone().wake();
         }
     }
-
 }
 
-impl<T, E> Future for Promise<T, E> where T: Clone, E: Clone {
+impl<T, E> Future for Promise<T, E>
+where
+    T: Clone,
+    E: Clone,
+{
     type Output = Result<T, E>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut inner = self.inner.lock().unwrap();
         return if let Some(result) = &inner.value {
             match result {
-                Ok(v) => { Poll::Ready(Ok(v.clone())) }
-                Err(e) => { Poll::Ready(Err(e.clone())) }
+                Ok(v) => Poll::Ready(Ok(v.clone())),
+                Err(e) => Poll::Ready(Err(e.clone())),
             }
         } else {
             inner.waker = Some(cx.waker().clone());
             Poll::Pending
-        }
+        };
     }
 }

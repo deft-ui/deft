@@ -1,18 +1,20 @@
+use crate::base::{Id, IdKey};
+use crate::element::Element;
+use crate::render::layout_tree::LayoutTree;
+use crate::render::paint_object::{ElementPO, LayerPO};
+use crate::render::RenderFn;
+use crate::renderer::CpuRenderer;
+use crate::{some_or_continue, some_or_return};
+use skia_safe::Canvas;
+use skia_safe::{
+    scalar, ClipOp, Color, Contains, Image, Matrix, Path, PathOp, Point, Rect, Vector,
+};
+use skia_window::layer::Layer;
 use std::cell::Cell;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::mem;
-use skia_safe::{scalar, ClipOp, Color, Contains, Image, Matrix, Path, PathOp, Point, Rect, Vector};
-use skia_safe::Canvas;
-use skia_window::layer::Layer;
 use yoga::PositionType;
-use crate::base::{Id, IdKey};
-use crate::element::Element;
-use crate::render::RenderFn;
-use crate::renderer::CpuRenderer;
-use crate::{some_or_continue, some_or_return};
-use crate::render::layout_tree::LayoutTree;
-use crate::render::paint_object::{ElementPO, LayerPO};
 
 thread_local! {
     pub static NEXT_UNIQUE_RECT_ID: Cell<u64> = Cell::new(1);
@@ -67,7 +69,11 @@ pub struct RenderLayerKey {
 
 impl RenderLayerKey {
     pub fn new(tree_id: Id<RenderTree>, root_element_id: u32, layer_type: RenderLayerType) -> Self {
-        Self { tree_id, root_element_id, layer_type }
+        Self {
+            tree_id,
+            root_element_id,
+            layer_type,
+        }
     }
 }
 
@@ -141,7 +147,6 @@ impl LayerObjectData {
         // error!("Invalid {:?}   {:?}", self.key, rect);
         self.invalid_area.add_rect(Some(rect));
     }
-
 }
 
 impl RenderTree {
@@ -155,42 +160,70 @@ impl RenderTree {
 
     pub fn get_element_total_matrix(&self, element: &Element) -> Option<Matrix> {
         let element_object = self.element_objects.get(element.render_object_idx?)?;
-        let layer_object = self.layout_tree.layer_objects.get(element_object.layer_object_idx?)?;
+        let layer_object = self
+            .layout_tree
+            .layer_objects
+            .get(element_object.layer_object_idx?)?;
         let mut mc = MatrixCalculator::new();
         mc.concat(&layer_object.total_matrix);
         mc.translate(element_object.layer_coord);
         Some(mc.get_total_matrix())
     }
 
-    pub fn get_element_object_by_pos(&self, x: f32, y: f32) -> Option<(&ElementObjectData, f32, f32)> {
+    pub fn get_element_object_by_pos(
+        &self,
+        x: f32,
+        y: f32,
+    ) -> Option<(&ElementObjectData, f32, f32)> {
         self.get_element_object_by_pos_recurse(self.layout_tree.layer_node.as_ref()?, x, y)
     }
 
-    fn get_element_object_by_pos_recurse(&self, lo: &LayerNode, abs_x: f32, abs_y: f32) -> Option<(&ElementObjectData, f32, f32)> {
+    fn get_element_object_by_pos_recurse(
+        &self,
+        lo: &LayerNode,
+        abs_x: f32,
+        abs_y: f32,
+    ) -> Option<(&ElementObjectData, f32, f32)> {
         let lod = &self.layout_tree.layer_objects[lo.layer_object_idx];
         let im = lod.total_matrix.invert()?;
-        let Point {x, y} = im.map_xy(abs_x, abs_y);
-        let rect = lod.clip_rect.unwrap_or(Rect::from_xywh(0.0, 0.0, lod.width, lod.height));
+        let Point { x, y } = im.map_xy(abs_x, abs_y);
+        let rect = lod
+            .clip_rect
+            .unwrap_or(Rect::from_xywh(0.0, 0.0, lod.width, lod.height));
         if !rect.contains(Point::new(x, y)) {
             return None;
         }
         for sub_lo in lo.layer_nodes.iter().rev() {
-            let result = some_or_continue!(self.get_element_object_by_pos_recurse(sub_lo, abs_x, abs_y));
+            let result =
+                some_or_continue!(self.get_element_object_by_pos_recurse(sub_lo, abs_x, abs_y));
             return Some(result);
         }
         for eo in lo.normal_nodes.iter().rev() {
-            let result = some_or_continue!(self.get_element_object_in_normal_nodes_by_pos_recurse(eo, x, y));
+            let result =
+                some_or_continue!(self.get_element_object_in_normal_nodes_by_pos_recurse(eo, x, y));
             return Some(result);
         }
         None
     }
 
-    fn get_element_object_in_normal_nodes_by_pos_recurse(&self, lo: &NormalNode, x: f32, y: f32) -> Option<(&ElementObjectData, f32, f32)> {
+    fn get_element_object_in_normal_nodes_by_pos_recurse(
+        &self,
+        lo: &NormalNode,
+        x: f32,
+        y: f32,
+    ) -> Option<(&ElementObjectData, f32, f32)> {
         let eod = &self.element_objects[lo.element_object_idx];
-        if x >= eod.coord.0 && x <= eod.coord.0 + eod.width
-            && y >= eod.coord.1 && y <= eod.coord.1 + eod.height {
+        if x >= eod.coord.0
+            && x <= eod.coord.0 + eod.width
+            && y >= eod.coord.1
+            && y <= eod.coord.1 + eod.height
+        {
             for c in lo.children.iter().rev() {
-                let r = some_or_continue!(self.get_element_object_in_normal_nodes_by_pos_recurse(c, x - eod.coord.0, y - eod.coord.1));
+                let r = some_or_continue!(self.get_element_object_in_normal_nodes_by_pos_recurse(
+                    c,
+                    x - eod.coord.0,
+                    y - eod.coord.1
+                ));
                 return Some(r);
             }
             Some((eod, x - eod.coord.0, y - eod.coord.1))
@@ -227,7 +260,17 @@ impl RenderTree {
         let old_layout_tree = mem::take(&mut self.layout_tree);
         let mut matrix_calculator = MatrixCalculator::new();
         let bounds = element.get_bounds();
-        let rro = self.build_render_object(element, 0.0, 0.0, None, &mut matrix_calculator, 0.0, 0.0, &bounds.to_skia_rect(), true);
+        let rro = self.build_render_object(
+            element,
+            0.0,
+            0.0,
+            None,
+            &mut matrix_calculator,
+            0.0,
+            0.0,
+            &bounds.to_skia_rect(),
+            true,
+        );
         if let RenderObject::Layer(lo) = &rro {
             self.layout_tree.layer_node = Some(self.build_layer_tree(&lo));
         } else {
@@ -242,16 +285,16 @@ impl RenderTree {
         let mut normal_nodes = Vec::new();
         let mut layer_objects = Vec::new();
         for c in &layer_object.objects {
-            let nn = some_or_continue!(
-                self.build_normal_node_recurse(c, &mut layer_objects)
-            );
+            let nn = some_or_continue!(self.build_normal_node_recurse(c, &mut layer_objects));
             normal_nodes.push(nn);
         }
         if layer_objects.len() > 1 {
             layer_objects.sort_by(|a, b| {
                 let la = &self.layout_tree.layer_objects[a.layer_object_idx];
                 let lb = &self.layout_tree.layer_objects[b.layer_object_idx];
-                if la.key.layer_type == RenderLayerType::Root && lb.key.layer_type == RenderLayerType::Children {
+                if la.key.layer_type == RenderLayerType::Root
+                    && lb.key.layer_type == RenderLayerType::Children
+                {
                     return Ordering::Greater;
                 }
                 return a.layer_object_idx.cmp(&b.layer_object_idx);
@@ -278,14 +321,17 @@ impl RenderTree {
         }
     }
 
-    fn build_normal_node_recurse(&mut self, render_object: &RenderObject, layer_objects: &mut Vec<LayerRO>) -> Option<NormalNode> {
+    fn build_normal_node_recurse(
+        &mut self,
+        render_object: &RenderObject,
+        layer_objects: &mut Vec<LayerRO>,
+    ) -> Option<NormalNode> {
         match render_object {
             RenderObject::Element(eo) => {
                 let mut children = Vec::new();
                 for c in &eo.children {
-                    let child_node = some_or_continue!(
-                        self.build_normal_node_recurse(c, layer_objects)
-                    );
+                    let child_node =
+                        some_or_continue!(self.build_normal_node_recurse(c, layer_objects));
                     children.push(child_node);
                 }
                 let nn = NormalNode {
@@ -301,14 +347,15 @@ impl RenderTree {
         }
     }
 
-    fn build_children_objects(&mut self,
-                              element: &Element,
-                              matrix_calculator: &mut MatrixCalculator,
-                              origin_x: f32,
-                              origin_y: f32,
-                              layer_x: f32,
-                              layer_y: f32,
-                              layer_object_idx: Option<usize>,
+    fn build_children_objects(
+        &mut self,
+        element: &Element,
+        matrix_calculator: &mut MatrixCalculator,
+        origin_x: f32,
+        origin_y: f32,
+        layer_x: f32,
+        layer_y: f32,
+        layer_object_idx: Option<usize>,
     ) -> Vec<RenderObject> {
         let mut children = Vec::new();
         for mut c in element.get_children() {
@@ -319,7 +366,17 @@ impl RenderTree {
             let child_origin_y = origin_y + child_bounds.y;
             let child_layer_x = layer_x + child_bounds.x;
             let child_layer_y = layer_y + child_bounds.y;
-            children.push(self.build_render_object(&mut c, child_origin_x, child_origin_y, layer_object_idx, matrix_calculator, child_layer_x, child_layer_y, &child_bounds.to_skia_rect(), false));
+            children.push(self.build_render_object(
+                &mut c,
+                child_origin_x,
+                child_origin_y,
+                layer_object_idx,
+                matrix_calculator,
+                child_layer_x,
+                child_layer_y,
+                &child_bounds.to_skia_rect(),
+                false,
+            ));
             matrix_calculator.restore();
         }
         children
@@ -369,13 +426,29 @@ impl RenderTree {
             };
             self.layout_tree.layer_objects.push(layer_object_data);
             let children_layer_object = LayerRO {
-                objects: self.build_children_objects(element, matrix_calculator, origin_x, origin_y, 0.0, 0.0, Some(layer_object_idx)),
+                objects: self.build_children_objects(
+                    element,
+                    matrix_calculator,
+                    origin_x,
+                    origin_y,
+                    0.0,
+                    0.0,
+                    Some(layer_object_idx),
+                ),
                 layer_object_idx,
             };
             matrix_calculator.restore();
             vec![RenderObject::Layer(children_layer_object)]
         } else {
-            self.build_children_objects(element, matrix_calculator, origin_x, origin_y, layer_x, layer_y, layer_object_idx)
+            self.build_children_objects(
+                element,
+                matrix_calculator,
+                origin_x,
+                origin_y,
+                layer_x,
+                layer_y,
+                layer_object_idx,
+            )
         }
     }
 
@@ -431,7 +504,16 @@ impl RenderTree {
             matrix_calculator.restore();
             RenderObject::Layer(layer_object)
         } else {
-            self.create_normal_render_object(element, bounds, origin_x, origin_y, layer_x, layer_y, layer_object_idx.unwrap(), matrix_calculator)
+            self.create_normal_render_object(
+                element,
+                bounds,
+                origin_x,
+                origin_y,
+                layer_x,
+                layer_y,
+                layer_object_idx.unwrap(),
+                matrix_calculator,
+            )
         }
     }
 
@@ -458,7 +540,15 @@ impl RenderTree {
         element_data.layer_coord = (layer_x, layer_y);
         let element_obj = ElementRO {
             element_object_idx,
-            children: self.build_render_object_children(element, origin_x, origin_y, Some(layer_object_idx), matrix_calculator, layer_x, layer_y),
+            children: self.build_render_object_children(
+                element,
+                origin_x,
+                origin_y,
+                Some(layer_object_idx),
+                matrix_calculator,
+                layer_x,
+                layer_y,
+            ),
         };
         RenderObject::Element(element_obj)
     }
@@ -487,11 +577,18 @@ impl RenderTree {
     pub fn build_paint_tree(&mut self, viewport: &Rect) -> LayerPO {
         // print_time!("Building paint tree");
         // let invalid_rects = InvalidArea::Full.build(viewport.clone());
-        self.build_paint_layer_node(self.layout_tree.layer_node.clone().as_mut().unwrap(), viewport)
+        self.build_paint_layer_node(
+            self.layout_tree.layer_node.clone().as_mut().unwrap(),
+            viewport,
+        )
     }
 
-
-    fn build_paint_normal_nodes(&mut self, nodes: &Vec<NormalNode>, viewport: &Rect, invalid_rects: &InvalidRects) -> Vec<ElementPO> {
+    fn build_paint_normal_nodes(
+        &mut self,
+        nodes: &Vec<NormalNode>,
+        viewport: &Rect,
+        invalid_rects: &InvalidRects,
+    ) -> Vec<ElementPO> {
         let mut result = Vec::with_capacity(nodes.len());
         for n in nodes {
             result.push(self.build_paint_normal_node(n, viewport, invalid_rects));
@@ -499,11 +596,22 @@ impl RenderTree {
         result
     }
 
-    fn build_paint_normal_node(&mut self, eod: &NormalNode, viewport: &Rect, invalid_rects: &InvalidRects) -> ElementPO {
-        let children = self.build_paint_normal_nodes(&mut eod.children.clone(), viewport, invalid_rects);
+    fn build_paint_normal_node(
+        &mut self,
+        eod: &NormalNode,
+        viewport: &Rect,
+        invalid_rects: &InvalidRects,
+    ) -> ElementPO {
+        let children =
+            self.build_paint_normal_nodes(&mut eod.children.clone(), viewport, invalid_rects);
         let eo = &mut self.element_objects[eod.element_object_idx];
 
-        let need_paint = invalid_rects.has_intersects(&Rect::from_xywh(eo.layer_coord.0, eo.layer_coord.1, eo.width, eo.height));
+        let need_paint = invalid_rects.has_intersects(&Rect::from_xywh(
+            eo.layer_coord.0,
+            eo.layer_coord.1,
+            eo.width,
+            eo.height,
+        ));
         let border_path_mut = eo.element.get_border_path_mut();
         let border_path = border_path_mut.get_paths().clone();
         let border_box_path = border_path_mut.get_box_path().clone();
@@ -514,7 +622,11 @@ impl RenderTree {
             border_path,
             border_box_path,
             border_color: eo.border_color,
-            render_fn: if need_paint { Some((eo.renderer)()) } else { None },
+            render_fn: if need_paint {
+                Some((eo.renderer)())
+            } else {
+                None
+            },
             background_image: eo.background_image.clone(),
             background_color: eo.background_color,
             border_width: eo.border_width,
@@ -534,15 +646,23 @@ impl RenderTree {
             let layer_path = Path::rect(&Rect::from_xywh(0.0, 0.0, lo.width, lo.height), None);
             let im = lo.total_matrix.invert().unwrap();
             let mut viewport_path = Path::rect(viewport, None);
-            let visible_path = viewport_path.transform(&im).op(&layer_path, PathOp::Intersect).unwrap_or(Path::new());
+            let visible_path = viewport_path
+                .transform(&im)
+                .op(&layer_path, PathOp::Intersect)
+                .unwrap_or(Path::new());
             let mut visible_bounds = visible_path.bounds().clone();
             visible_bounds.top = visible_bounds.top.floor();
             visible_bounds.bottom = visible_bounds.bottom.ceil();
 
-            let max_len = (viewport.width() * viewport.width() + viewport.height() * viewport.height()).sqrt().ceil();
+            let max_len = (viewport.width() * viewport.width()
+                + viewport.height() * viewport.height())
+            .sqrt()
+            .ceil();
             let max_surface_width = f32::min(lo.width, max_len).ceil();
             let max_surface_height = f32::min(lo.height, max_len).ceil();
-            if lo.surface_bounds.width() != max_surface_width || lo.surface_bounds.height() != max_surface_height {
+            if lo.surface_bounds.width() != max_surface_width
+                || lo.surface_bounds.height() != max_surface_height
+            {
                 invalid_area = InvalidArea::Full;
                 lo.surface_bounds = Rect::from_xywh(
                     visible_bounds.left,
@@ -559,7 +679,7 @@ impl RenderTree {
                             visible_bounds.left,
                             visible_bounds.top,
                             common_visible_bounds.left - visible_bounds.left,
-                            visible_bounds.height()
+                            visible_bounds.height(),
                         );
                         invalid_area.add_rect(Some(&new_rect));
                     }
@@ -577,7 +697,7 @@ impl RenderTree {
                             common_visible_bounds.right,
                             visible_bounds.top,
                             visible_bounds.right - common_visible_bounds.right,
-                            visible_bounds.height()
+                            visible_bounds.height(),
                         );
                         invalid_area.add_rect(Some(&new_rect));
                     }
@@ -602,7 +722,8 @@ impl RenderTree {
                         lo.surface_bounds.height(),
                     );
                     invalid_area.add_rect(Some(&new_rect));
-                    lo.surface_bounds.offset((visible_bounds.left - lo.surface_bounds.left, 0.0));
+                    lo.surface_bounds
+                        .offset((visible_bounds.left - lo.surface_bounds.left, 0.0));
                 } else if lo.surface_bounds.right < visible_bounds.right {
                     let new_rect = Rect::from_xywh(
                         lo.surface_bounds.right,
@@ -611,7 +732,8 @@ impl RenderTree {
                         lo.surface_bounds.height(),
                     );
                     invalid_area.add_rect(Some(&new_rect));
-                    lo.surface_bounds.offset((visible_bounds.right - lo.surface_bounds.right, 0.0));
+                    lo.surface_bounds
+                        .offset((visible_bounds.right - lo.surface_bounds.right, 0.0));
                 }
                 if lo.surface_bounds.top > visible_bounds.top {
                     let new_rect = Rect::from_xywh(
@@ -621,7 +743,8 @@ impl RenderTree {
                         lo.surface_bounds.top - visible_bounds.top,
                     );
                     invalid_area.add_rect(Some(&new_rect));
-                    lo.surface_bounds.offset((0.0, visible_bounds.top - lo.surface_bounds.top));
+                    lo.surface_bounds
+                        .offset((0.0, visible_bounds.top - lo.surface_bounds.top));
                 } else if lo.surface_bounds.bottom < visible_bounds.bottom {
                     let new_rect = Rect::from_xywh(
                         lo.surface_bounds.left,
@@ -630,13 +753,15 @@ impl RenderTree {
                         visible_bounds.bottom - lo.surface_bounds.bottom,
                     );
                     invalid_area.add_rect(Some(&new_rect));
-                    lo.surface_bounds.offset((0.0, visible_bounds.bottom - lo.surface_bounds.bottom));
+                    lo.surface_bounds
+                        .offset((0.0, visible_bounds.bottom - lo.surface_bounds.bottom));
                 }
             }
             lo.visible_bounds = visible_bounds.clone();
             invalid_area.build(visible_bounds.clone())
         };
-        let normal_nodes = self.build_paint_normal_nodes(&lod.normal_nodes, viewport, &invalid_rects);
+        let normal_nodes =
+            self.build_paint_normal_nodes(&lod.normal_nodes, viewport, &invalid_rects);
         let mut layers = Vec::new();
         for lo in &lod.layer_nodes {
             layers.push(self.build_paint_layer_node(lo, viewport));
@@ -660,7 +785,6 @@ impl RenderTree {
         lo.invalid_area = InvalidArea::None;
         lpo
     }
-
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -677,9 +801,7 @@ pub struct InvalidRects {
 
 impl Default for InvalidRects {
     fn default() -> Self {
-        InvalidRects {
-            rects: vec![],
-        }
+        InvalidRects { rects: vec![] }
     }
 }
 
@@ -716,10 +838,7 @@ impl UniqueRect {
     pub fn from_rect(rect: Rect) -> Self {
         let id = NEXT_UNIQUE_RECT_ID.get();
         NEXT_UNIQUE_RECT_ID.replace(id + 1);
-        Self {
-            id,
-            rect,
-        }
+        Self { id, rect }
     }
 }
 
@@ -727,17 +846,15 @@ impl InvalidArea {
     pub fn merge(&mut self, other: &Self) {
         match self {
             InvalidArea::Full => {}
-            InvalidArea::Partial(p) => {
-                match other {
-                    InvalidArea::Full => {
-                        *self = InvalidArea::Full;
-                    }
-                    InvalidArea::Partial(o) => {
-                        p.merge(o);
-                    }
-                    InvalidArea::None => {}
+            InvalidArea::Partial(p) => match other {
+                InvalidArea::Full => {
+                    *self = InvalidArea::Full;
                 }
-            }
+                InvalidArea::Partial(o) => {
+                    p.merge(o);
+                }
+                InvalidArea::None => {}
+            },
             InvalidArea::None => {
                 *self = other.clone();
             }
@@ -796,7 +913,7 @@ impl InvalidArea {
                 if pia.rects.len() > 100 {
                     rects.push(viewport);
                 } else {
-                    for (_,r) in &pia.rects {
+                    for (_, r) in &pia.rects {
                         rects.push(*r);
                     }
                 }
@@ -805,9 +922,7 @@ impl InvalidArea {
         }
         InvalidRects { rects }
     }
-
 }
-
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct PartialInvalidArea {
@@ -816,7 +931,9 @@ pub struct PartialInvalidArea {
 
 impl PartialInvalidArea {
     pub fn new() -> PartialInvalidArea {
-        Self { rects: HashMap::new() }
+        Self {
+            rects: HashMap::new(),
+        }
     }
     pub fn merge(&mut self, other: &PartialInvalidArea) {
         for other_rect in &other.rects {
@@ -847,9 +964,7 @@ pub struct MatrixCalculator {
 impl MatrixCalculator {
     pub fn new() -> MatrixCalculator {
         let cpu_renderer = CpuRenderer::new(1, 1);
-        Self {
-            cpu_renderer,
-        }
+        Self { cpu_renderer }
     }
 
     pub fn concat(&mut self, matrix: &Matrix) {
@@ -922,7 +1037,10 @@ impl ClipPath {
             *self = other.clone();
             return;
         }
-        self.path = self.path.op(&other.path, PathOp::Intersect).unwrap_or(Path::new());
+        self.path = self
+            .path
+            .op(&other.path, PathOp::Intersect)
+            .unwrap_or(Path::new());
     }
 
     pub fn offset(&mut self, d: impl Into<Vector>) {
@@ -957,16 +1075,14 @@ impl ClipPath {
             self.path.op(path, PathOp::Intersect).unwrap_or(Path::new())
         }
     }
-
 }
 
 #[cfg(test)]
 pub mod tests {
+    use crate::paint::InvalidArea;
     use log::debug;
     use measure_time::print_time;
     use skia_safe::{Matrix, Path, Rect, Vector};
-    use crate::paint::InvalidArea;
-    
 
     #[test]
     pub fn test_visible() {
@@ -1022,11 +1138,9 @@ pub mod tests {
         {
             print_time!("map rect time");
             for i in 0..10000 {
-                let rect=  Rect::from_xywh(0.0, 0.0, i as f32, i as f32);
+                let rect = Rect::from_xywh(0.0, 0.0, i as f32, i as f32);
                 let _p = matrix.map_rect(&rect);
             }
         }
-
     }
 }
-

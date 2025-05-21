@@ -1,11 +1,8 @@
-use crate::element::{ElementBackend, Element};
+use crate::element::{Element, ElementBackend};
 
-pub struct Container {
-}
+pub struct Container {}
 
-impl Container {
-
-}
+impl Container {}
 
 impl ElementBackend for Container {
     fn create(_element: &mut Element) -> Self {
@@ -20,4 +17,3 @@ impl ElementBackend for Container {
         None
     }
 }
-

@@ -1,7 +1,7 @@
+use crate::mrc::Mrc;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
-use crate::mrc::Mrc;
 
 #[derive(Clone)]
 pub struct ResourceTable {
@@ -57,6 +57,4 @@ impl ResourceTableInner {
             None
         }
     }
-
 }
-

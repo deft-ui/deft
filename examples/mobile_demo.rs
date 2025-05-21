@@ -1,8 +1,8 @@
 use deft::app::{App, IApp};
+use deft::bootstrap;
 use deft::js::js_engine::JsEngine;
 use deft::loader::StaticModuleLoader;
 use quick_js::loader::JsModuleLoader;
-use deft::bootstrap;
 
 struct AppImpl {}
 

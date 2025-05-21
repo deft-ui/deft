@@ -5,7 +5,6 @@ pub struct Console;
 
 #[js_methods]
 impl Console {
-
     #[js_func]
     pub fn print(text: String) {
         print!("{}", text);

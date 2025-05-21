@@ -1,8 +1,8 @@
 use crate as deft;
 use crate::js::js_engine::JsEngine;
 use crate::js::{JsError, ToJsValue};
+use crate::js_value;
 use crate::task_executor::TaskExecutor;
-use crate::{js_value};
 use deft_macros::{js_methods, mrc_object};
 use quick_js::JsValue;
 use rusqlite::types::{Type, Value};
@@ -33,11 +33,7 @@ js_value!(SqliteConn);
 impl SqliteConn {
     #[js_func]
     pub fn create() -> Result<Self, JsError> {
-        let task_executor = TaskExecutor::new(move || {
-            Session {
-                conn: None,
-            }
-        });
+        let task_executor = TaskExecutor::new(move || Session { conn: None });
         Ok(SqliteConnData { task_executor }.to_ref())
     }
 
@@ -65,9 +61,8 @@ impl SqliteConn {
             sql_values.push(js_value_to_sql_value(p)?);
         }
         let (promise, resolver) = JsEngine::get().create_promise();
-        self.task_executor.run(move |session| {
-            resolver.settle(execute(session, sql, sql_values))
-        });
+        self.task_executor
+            .run(move |session| resolver.settle(execute(session, sql, sql_values)));
         Ok(promise)
     }
 
@@ -79,8 +74,7 @@ impl SqliteConn {
         }
         let (promise, resolver) = JsEngine::get().create_promise();
         self.task_executor.run(move |conn| {
-            let r = query(conn, sql, sql_values)
-                .map_err(|e| format!("failed to query, {}", e));
+            let r = query(conn, sql, sql_values).map_err(|e| format!("failed to query, {}", e));
             resolver.settle(r);
         });
         Ok(promise)
@@ -108,18 +102,23 @@ fn query(sess: &mut Session, sql: String, sql_values: Vec<Value>) -> Result<JsVa
     for i in 0..sql_values.len() {
         sql_params_slice[i] = sql_values.get(i).unwrap() as &dyn ToSql;
     }
-    let mut stmt = conn.prepare(&sql)
+    let mut stmt = conn
+        .prepare(&sql)
         .map_err(|e| format!("Failed to prepare sql: {}", e))?;
     let columns_names: Vec<JsValue> = stmt
         .column_names()
         .iter()
         .map(|s| JsValue::String(s.to_string()))
         .collect();
-    let mut rows = stmt.query(&*sql_params_slice)
+    let mut rows = stmt
+        .query(&*sql_params_slice)
         .map_err(|e| format!("Failed to query: {}", e))?;
     let mut list = Vec::new();
     loop {
-        let row = match rows.next().map_err(|e| format!("Failed to fetch row: {}", e))? {
+        let row = match rows
+            .next()
+            .map_err(|e| format!("Failed to fetch row: {}", e))?
+        {
             Some(row) => row,
             None => break,
         };
@@ -140,7 +139,11 @@ fn query(sess: &mut Session, sql: String, sql_values: Vec<Value>) -> Result<JsVa
                 break;
             }
         }
-        list.push(result.to_js_value().map_err(|e| format!("Failed to convert value, {}", e))?);
+        list.push(
+            result
+                .to_js_value()
+                .map_err(|e| format!("Failed to convert value, {}", e))?,
+        );
     }
     Ok(JsValue::Array(vec![
         JsValue::Array(columns_names),

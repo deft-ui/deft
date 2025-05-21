@@ -1,30 +1,32 @@
 mod line;
 mod util;
 
-use std::any::Any;
 use crate as deft;
+use crate::base::EventContext;
 use crate::color::parse_hex_color;
+use crate::element::paragraph::simple_paragraph_builder::SimpleParagraphBuilder;
+use crate::element::paragraph::ParagraphParams;
 use crate::element::text::intersect_range;
+use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
 use crate::element::{ElementBackend, ElementWeak};
+use crate::event::{
+    KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent, KEY_MOD_CTRL,
+};
+use crate::font::family::{FontFamilies, FontFamily};
 use crate::number::DeNan;
+use crate::paint::Painter;
+use crate::render::RenderFn;
 use crate::string::StringUtils;
 use crate::style::{parse_optional_color_str, FontStyle, PropValueParse};
+use crate::text::textbox::line::Line;
+use crate::text::textbox::util::{parse_optional_text_decoration, parse_optional_weight};
+use crate::text::{TextAlign, TextStyle};
 use crate::{base, js_deserialize, js_serialize, some_or_continue};
+use measure_time::print_time;
 use serde::{Deserialize, Serialize};
 use skia_safe::font_style::{Weight, Width};
 use skia_safe::{Color, Paint};
-use measure_time::print_time;
-use crate::base::EventContext;
-use crate::element::paragraph::ParagraphParams;
-use crate::element::paragraph::simple_paragraph_builder::SimpleParagraphBuilder;
-use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
-use crate::event::{KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent, KEY_MOD_CTRL};
-use crate::font::family::{FontFamilies, FontFamily};
-use crate::paint::Painter;
-use crate::render::RenderFn;
-use crate::text::{TextAlign, TextStyle};
-use crate::text::textbox::line::Line;
-use crate::text::textbox::util::{parse_optional_text_decoration, parse_optional_weight};
+use std::any::Any;
 
 #[cfg(target_os = "windows")]
 pub const DEFAULT_FALLBACK_FONTS: &str = "sans-serif,Microsoft YaHei,Segoe UI Emoji";
@@ -34,7 +36,12 @@ pub const DEFAULT_FALLBACK_FONTS: &str = "sans-serif,Noto Sans CJK SC,Noto Sans 
 pub const DEFAULT_FALLBACK_FONTS: &str = "sans-serif,PingFang SC,Apple Color Emoji";
 #[cfg(target_os = "android")]
 pub const DEFAULT_FALLBACK_FONTS: &str = "Roboto,Noto Sans CJK SC,Noto Sans CJK TC,Noto Sans CJK HK,Noto Sans CJK KR,Noto Sans CJK JP,Noto Color Emoji";
-#[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos", target_os = "android")))]
+#[cfg(not(any(
+    target_os = "windows",
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "android"
+)))]
 pub const DEFAULT_FALLBACK_FONTS: &str = "sans-serif";
 
 const ZERO_WIDTH_WHITESPACE: &str = "\u{200B}";
@@ -51,27 +58,20 @@ js_deserialize!(TextElement);
 impl TextElement {
     fn atom_count(&self) -> usize {
         match self {
-            TextElement::Text(text) => {
-                text.text.chars_count()
-            }
+            TextElement::Text(text) => text.text.chars_count(),
         }
     }
     fn text(&self) -> &str {
         match self {
-            TextElement::Text(t) => {
-                t.text.as_str()
-            }
+            TextElement::Text(t) => t.text.as_str(),
         }
     }
 
     fn get_text(&self, begin: usize, end: usize) -> &str {
         match self {
-            TextElement::Text(t) => {
-                t.text.substring(begin, end - begin)
-            }
+            TextElement::Text(t) => t.text.substring(begin, end - begin),
         }
     }
-
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -120,7 +120,6 @@ pub struct TextBox {
 }
 
 impl TextBox {
-
     pub fn add_line(&mut self, units: Vec<TextElement>) {
         let line = Line::new(units, &self.params);
         self.lines.push(line);
@@ -214,7 +213,10 @@ impl TextBox {
     pub fn get_size_without_padding(&self) -> (f32, f32) {
         let width = self.max_intrinsic_width();
         let height = self.height();
-        (width - self.padding.1 - self.padding.0, height - self.padding.0 - self.padding.2)
+        (
+            width - self.padding.1 - self.padding.0,
+            height - self.padding.0 - self.padding.2,
+        )
     }
 
     pub fn set_layout_width(&mut self, width: f32) {
@@ -379,7 +381,10 @@ impl TextBox {
         for p in lines {
             height += p.sk_paragraph.height();
             if row == max_offset || height > expected_offset.1 {
-                let line_pixel_coord = (expected_offset.0, expected_offset.1 - (height - p.sk_paragraph.height()));
+                let line_pixel_coord = (
+                    expected_offset.0,
+                    expected_offset.1 - (height - p.sk_paragraph.height()),
+                );
                 let line_column = p.get_column_by_pixel_coord(line_pixel_coord);
                 return TextCoord(row, line_column);
             }
@@ -413,24 +418,34 @@ impl TextBox {
         let mut y_offset = 0.0;
         if row > 0 {
             for i in 0..row {
-                y_offset += unsafe {
-                    self.lines.get_unchecked(i).sk_paragraph.height()
-                }
+                y_offset += unsafe { self.lines.get_unchecked(i).sk_paragraph.height() }
             }
         }
         let (padding_top, _, _, padding_left) = self.padding;
-        Some(crate::base::Rect::new(bounds.left + padding_left, y_offset + bounds.top + padding_top, bounds.width(), bounds.height()))
+        Some(crate::base::Rect::new(
+            bounds.left + padding_left,
+            y_offset + bounds.top + padding_top,
+            bounds.width(),
+            bounds.height(),
+        ))
     }
 
-    pub fn on_event(&mut self, event: &Box<&mut dyn Any>, _ctx: &mut EventContext<ElementWeak>, scroll_x: f32, scroll_y: f32) -> bool {
+    pub fn on_event(
+        &mut self,
+        event: &Box<&mut dyn Any>,
+        _ctx: &mut EventContext<ElementWeak>,
+        scroll_x: f32,
+        scroll_y: f32,
+    ) -> bool {
         if let Some(d) = event.downcast_ref::<KeyDownEvent>() {
-            return self.on_key_down(&d.0)
+            return self.on_key_down(&d.0);
         } else if let Some(e) = event.downcast_ref::<MouseDownEvent>() {
             if e.0.button == 1 {
                 let event = e.0;
-                let begin_coord = self.get_text_coord_by_pixel_coord(
-                    (event.offset_x + scroll_x, event.offset_y + scroll_y)
-                );
+                let begin_coord = self.get_text_coord_by_pixel_coord((
+                    event.offset_x + scroll_x,
+                    event.offset_y + scroll_y,
+                ));
                 self.update_caret(begin_coord);
                 self.selection_start(begin_coord);
                 return true;
@@ -438,9 +453,10 @@ impl TextBox {
         } else if let Some(e) = event.downcast_ref::<MouseMoveEvent>() {
             if self.selecting_begin.is_some() {
                 let event = e.0;
-                let caret = self.get_text_coord_by_pixel_coord(
-                    (event.offset_x + scroll_x, event.offset_y + scroll_y)
-                );
+                let caret = self.get_text_coord_by_pixel_coord((
+                    event.offset_x + scroll_x,
+                    event.offset_y + scroll_y,
+                ));
                 self.update_caret(caret);
                 return self.selection_update(caret);
             }
@@ -460,15 +476,15 @@ impl TextBox {
                     "c" => {
                         use clipboard::{ClipboardContext, ClipboardProvider};
                         if let Some(sel) = self.get_selection_text() {
-                            let sel=  sel.to_string();
+                            let sel = sel.to_string();
                             if let Ok(mut ctx) = ClipboardContext::new() {
                                 if let Err(e) = ctx.set_contents(sel) {
                                     log::error!("Failed to write clipboard: {:?}", e);
                                 }
                             }
                         }
-                        return true
-                    },
+                        return true;
+                    }
                     _ => {}
                 }
             }
@@ -493,7 +509,7 @@ impl TextBox {
         let text = if start.0 == end.0 {
             start_line.subtext(start.1, end.1)
         } else {
-            let mut result =  start_line.subtext(start.1, start_line.atom_count());
+            let mut result = start_line.subtext(start.1, start_line.atom_count());
             if end.0 - start.0 > 1 {
                 for i in start.0 + 1..end.0 {
                     let ln = self.lines.get(i)?;
@@ -523,7 +539,7 @@ impl TextBox {
             let lines = self.get_lines();
             let line = match lines.get(row) {
                 None => return,
-                Some(ln) => ln
+                Some(ln) => ln,
             };
             let atom_count = line.atom_count() as isize;
             col += delta;
@@ -546,7 +562,6 @@ impl TextBox {
                 self.update_caret_value(TextCoord::new(new_caret), false);
                 break;
             }
-
         }
     }
 
@@ -555,7 +570,7 @@ impl TextBox {
         let (current_row, current_col) = (self.caret.0, self.caret.1);
         let line_height = match self.get_soft_line_height(current_row, current_col) {
             None => return,
-            Some(height) => {height}
+            Some(height) => height,
         };
         let caret_coord = match self.get_char_rect(caret) {
             None => return,
@@ -620,18 +635,20 @@ impl TextBox {
                         Some(list) => {
                             let list = list.iter().map(|it| FontFamily::new(it.as_str())).collect();
                             FontFamilies::new(list)
-                        },
-                        None => FontFamilies::default()
+                        }
+                        None => FontFamilies::default(),
                     };
                     text_style.set_font_families(Some(unit_font_families));
                     let font_size = unit.font_size.unwrap_or(paragraph_params.font_size);
                     text_style.set_font_size(font_size);
 
-                    let weight =
-                        parse_optional_weight(unit.weight.as_ref()).unwrap_or(paragraph_params.font_weight);
+                    let weight = parse_optional_weight(unit.weight.as_ref())
+                        .unwrap_or(paragraph_params.font_weight);
 
-                    let unit_style = Self::parse_font_style(&unit.style, paragraph_params.font_style);
-                    let font_style = skia_safe::FontStyle::new(weight, Width::NORMAL, unit_style.to_slant());
+                    let unit_style =
+                        Self::parse_font_style(&unit.style, paragraph_params.font_style);
+                    let font_style =
+                        skia_safe::FontStyle::new(weight, Width::NORMAL, unit_style.to_slant());
                     text_style.set_font_style(font_style);
 
                     let decoration =
@@ -709,7 +726,6 @@ impl TextBox {
     }
 
     pub fn render(&mut self) -> RenderFn {
-
         let mut consumed_top = 0.0;
         let mut consumed_rows = 0usize;
 
@@ -719,10 +735,12 @@ impl TextBox {
 
         let mut line_painters = Vec::with_capacity(self.lines.len());
         for ln in &mut self.lines {
-            let ln_row = consumed_rows; consumed_rows += 1;
+            let ln_row = consumed_rows;
+            consumed_rows += 1;
 
             let ln_height = ln.sk_paragraph.height();
-            let ln_top = consumed_top; consumed_top += ln_height;
+            let ln_top = consumed_top;
+            consumed_top += ln_height;
             let ln_bottom = consumed_top;
             let atom_count = ln.atom_count();
             let ln_layout = some_or_continue!(ln.sk_paragraph.layout.clone());
@@ -803,7 +821,6 @@ impl TextBox {
     fn request_repaint(&mut self) {
         (self.repaint_callback)();
     }
-
 }
 
 #[test]

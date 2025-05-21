@@ -9,9 +9,7 @@ pub fn init_console() {
     windows::attach_console();
 }
 
-pub struct Console {
-
-}
+pub struct Console {}
 
 impl Console {
     pub fn new() -> Self {
@@ -23,5 +21,4 @@ impl ConsoleBackend for Console {
     fn log(&self, level: Level, values: Vec<JsValue>) {
         println!("{}:{:?}", level, values);
     }
-
 }

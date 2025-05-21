@@ -1,9 +1,9 @@
+use crate::app::{AppEvent, AppEventPayload};
+use crate::base::{ResultWaiter, UnsafeFnMut, UnsafeFnOnce};
 use std::cell::{Cell, RefCell};
 use std::ptr::null_mut;
 use std::sync::{Arc, Mutex};
 use winit::event_loop::{ActiveEventLoop, EventLoopClosed, EventLoopProxy};
-use crate::app::{AppEvent, AppEventPayload};
-use crate::base::{ResultWaiter, UnsafeFnMut, UnsafeFnOnce};
 
 thread_local! {
     pub static ACTIVE_EVENT_LOOP: Cell<*const ActiveEventLoop> = Cell::new(null_mut());
@@ -16,12 +16,14 @@ pub struct AppEventProxy {
 }
 
 impl AppEventProxy {
-
     pub fn new(proxy: EventLoopProxy<AppEventPayload>) -> AppEventProxy {
         Self { proxy }
     }
 
-    pub fn send_event(&self, event: AppEvent) -> Result<ResultWaiter<()>, EventLoopClosed<AppEventPayload>> {
+    pub fn send_event(
+        &self,
+        event: AppEvent,
+    ) -> Result<ResultWaiter<()>, EventLoopClosed<AppEventPayload>> {
         let result_waiter = ResultWaiter::new();
         self.proxy.send_event(AppEventPayload {
             event,
@@ -39,9 +41,11 @@ pub struct EventLoopCallback {
 impl EventLoopCallback {
     pub fn call(mut self) {
         let callback = self.callback.take().unwrap();
-        self.event_loop_proxy.send_event(AppEvent::Callback(Box::new(|| {
-            callback.call();
-        }))).unwrap();
+        self.event_loop_proxy
+            .send_event(AppEvent::Callback(Box::new(|| {
+                callback.call();
+            })))
+            .unwrap();
     }
 }
 
@@ -54,10 +58,12 @@ pub struct EventLoopFnMutCallback<P> {
 impl<P: Send + Sync + 'static> EventLoopFnMutCallback<P> {
     pub fn call(&mut self, param: P) {
         let cb = self.callback.clone();
-        let _ = self.event_loop_proxy.send_event(AppEvent::Callback(Box::new(move || {
-            let mut cb = cb.lock().unwrap();
-            (cb.callback)(param);
-        })));
+        let _ = self
+            .event_loop_proxy
+            .send_event(AppEvent::Callback(Box::new(move || {
+                let mut cb = cb.lock().unwrap();
+                (cb.callback)(param);
+            })));
     }
 }
 
@@ -66,13 +72,15 @@ pub fn create_event_loop_callback<F: FnOnce() + 'static>(callback: F) -> EventLo
     let event_loop_proxy = create_event_loop_proxy();
     EventLoopCallback {
         event_loop_proxy,
-        callback: Some(callback)
+        callback: Some(callback),
     }
 }
 
-pub fn create_event_loop_fn_mut<P: Send + Sync, F: FnMut(P) + 'static>(callback: F) -> EventLoopFnMutCallback<P> {
+pub fn create_event_loop_fn_mut<P: Send + Sync, F: FnMut(P) + 'static>(
+    callback: F,
+) -> EventLoopFnMutCallback<P> {
     let fn_mut = UnsafeFnMut {
-        callback: Box::new(callback)
+        callback: Box::new(callback),
     };
     let event_loop_proxy = create_event_loop_proxy();
     EventLoopFnMutCallback {
@@ -105,6 +113,8 @@ pub fn init_event_loop_proxy(elp: AppEventProxy) {
 
 pub fn create_event_loop_proxy() -> AppEventProxy {
     STATIC_EVENT_LOOP_PROXY.with_borrow(|p| {
-        p.as_ref().expect("Failed to create event loop proxy").clone()
+        p.as_ref()
+            .expect("Failed to create event loop proxy")
+            .clone()
     })
 }

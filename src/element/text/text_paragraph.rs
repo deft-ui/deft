@@ -1,14 +1,14 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-use skia_safe::Paint;
-use skia_safe::font_style::Weight;
-use yoga::MeasureMode;
-use crate::element::text::{AtomOffset, ColOffset};
 use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
+use crate::element::text::{AtomOffset, ColOffset};
 use crate::font::family::FontFamilies;
 use crate::string::StringUtils;
 use crate::style::FontStyle;
 use crate::text::TextAlign;
+use skia_safe::font_style::Weight;
+use skia_safe::Paint;
+use std::cell::RefCell;
+use std::rc::Rc;
+use yoga::MeasureMode;
 
 #[derive(Clone)]
 pub struct ParagraphRef {
@@ -47,11 +47,7 @@ impl ParagraphData {
 
     pub fn force_layout(&mut self, width: f32) {
         self.lines.iter_mut().for_each(|it| {
-            let layout_width = if self.text_wrap {
-                width
-            } else {
-                f32::NAN
-            };
+            let layout_width = if self.text_wrap { width } else { f32::NAN };
             it.paragraph.layout(layout_width);
             it.paragraph_dirty = false;
         });
@@ -61,11 +57,7 @@ impl ParagraphData {
         self.lines.iter_mut().for_each(|it| {
             //TODO remove layout here
             if it.paragraph_dirty {
-                let layout_width = if self.text_wrap {
-                    width
-                } else {
-                    f32::NAN
-                };
+                let layout_width = if self.text_wrap { width } else { f32::NAN };
                 it.paragraph.layout(layout_width);
                 it.paragraph_dirty = false;
             }
@@ -91,5 +83,4 @@ impl Line {
     pub fn get_text(&self) -> &str {
         self.paragraph.get_text()
     }
-
 }

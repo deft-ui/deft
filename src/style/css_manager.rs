@@ -1,9 +1,9 @@
-use anyhow::{anyhow, Error};
-use std::collections::HashMap;
-use simplecss::StyleSheet;
 use crate::base::{Id, IdKey};
 use crate::element::Element;
 use crate::style::select::{Selector, Selectors};
+use anyhow::{anyhow, Error};
+use simplecss::StyleSheet;
+use std::collections::HashMap;
 
 thread_local! {
     static STYLESHEET_ID_KEY: IdKey = IdKey::new();
@@ -60,11 +60,11 @@ impl CssManager {
         self.stylesheets.retain(|css| css.id != *id);
     }
 
-    pub fn contains_class(&self, clazz: &str)  -> bool {
+    pub fn contains_class(&self, clazz: &str) -> bool {
         for ss in &self.stylesheets {
             for c in &ss.declared_classes {
                 if c == clazz {
-                   return true;
+                    return true;
                 }
             }
         }
@@ -123,8 +123,10 @@ impl CssManager {
             //println!("selectors: {:?} => {:?}", selectors, declarations.join(";"));
             let selectors = Selectors::compile(&selectors)?;
             for selector in selectors.0 {
-                css.declared_classes.append(&mut selector.get_classes().clone());
-                css.declared_attrs.append(&mut selector.get_attribute_names().clone());
+                css.declared_classes
+                    .append(&mut selector.get_classes().clone());
+                css.declared_attrs
+                    .append(&mut selector.get_attribute_names().clone());
                 let rule = CSSRule {
                     selector,
                     declarations: declarations.join(";"),
@@ -135,7 +137,6 @@ impl CssManager {
         }
         Ok(())
     }
-
 }
 
 #[cfg(test)]
@@ -157,6 +158,4 @@ mod tests {
         assert_eq!(1, containers_styles.len());
         assert_eq!(1, button_styles.len());
     }
-
 }
-

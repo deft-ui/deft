@@ -1,33 +1,36 @@
 #![allow(unused)]
-pub mod typeface_mgr;
 pub mod simple_paragraph_builder;
+pub mod typeface_mgr;
 
-use std::any::Any;
 use crate as deft;
-use crate::color::parse_hex_color;
-use crate::element::text::{intersect_range, ColOffset};
-use crate::element::{Element, ElementBackend, ElementWeak};
-use crate::number::DeNan;
-use crate::string::StringUtils;
-use crate::style::{parse_optional_color_str, FontStyle, PropValueParse, StylePropKey};
-use crate::{js_deserialize, js_serialize, some_or_continue};
-use deft_macros::{element_backend, js_methods};
-use serde::{Deserialize, Serialize};
-use skia_safe::font_style::{Weight, Width};
-use skia_safe::{Color, Paint};
-use std::str::FromStr;
-use measure_time::print_time;
-use skia_safe::wrapper::NativeTransmutableWrapper;
-use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 use crate::base::{EventContext, MouseDetail, MouseEventType};
+use crate::color::parse_hex_color;
 use crate::element::paragraph::simple_paragraph_builder::SimpleParagraphBuilder;
 use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
-use crate::event::{FocusShiftEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent, SelectEndEvent, SelectMoveEvent, SelectStartEvent, KEY_MOD_CTRL};
+use crate::element::text::{intersect_range, ColOffset};
+use crate::element::{Element, ElementBackend, ElementWeak};
+use crate::event::{
+    FocusShiftEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
+    SelectEndEvent, SelectMoveEvent, SelectStartEvent, KEY_MOD_CTRL,
+};
 use crate::font::family::{FontFamilies, FontFamily};
+use crate::number::DeNan;
 use crate::paint::Painter;
 use crate::render::RenderFn;
-use crate::text::{TextAlign, TextDecoration, TextStyle};
+use crate::string::StringUtils;
+use crate::style::{parse_optional_color_str, FontStyle, PropValueParse, StylePropKey};
 use crate::text::textbox::{TextCoord, TextUnit};
+use crate::text::{TextAlign, TextDecoration, TextStyle};
+use crate::{js_deserialize, js_serialize, some_or_continue};
+use deft_macros::{element_backend, js_methods};
+use measure_time::print_time;
+use serde::{Deserialize, Serialize};
+use skia_safe::font_style::{Weight, Width};
+use skia_safe::wrapper::NativeTransmutableWrapper;
+use skia_safe::{Color, Paint};
+use std::any::Any;
+use std::str::FromStr;
+use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 
 #[cfg(target_os = "windows")]
 pub const DEFAULT_FALLBACK_FONTS: &str = "sans-serif,Microsoft YaHei,Segoe UI Emoji";
@@ -37,7 +40,12 @@ pub const DEFAULT_FALLBACK_FONTS: &str = "sans-serif,Noto Sans CJK SC,Noto Sans 
 pub const DEFAULT_FALLBACK_FONTS: &str = "sans-serif,PingFang SC,Apple Color Emoji";
 #[cfg(target_os = "android")]
 pub const DEFAULT_FALLBACK_FONTS: &str = "Roboto,Noto Sans CJK SC,Noto Sans CJK TC,Noto Sans CJK HK,Noto Sans CJK KR,Noto Sans CJK JP,Noto Color Emoji";
-#[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos", target_os = "android")))]
+#[cfg(not(any(
+    target_os = "windows",
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "android"
+)))]
 pub const DEFAULT_FALLBACK_FONTS: &str = "sans-serif";
 
 const ZERO_WIDTH_WHITESPACE: &str = "\u{200B}";
@@ -67,27 +75,20 @@ js_deserialize!(ParagraphUnit);
 impl ParagraphUnit {
     fn atom_count(&self) -> usize {
         match self {
-            ParagraphUnit::Text(text) => {
-                text.text.chars_count()
-            }
+            ParagraphUnit::Text(text) => text.text.chars_count(),
         }
     }
     fn text(&self) -> &str {
         match self {
-            ParagraphUnit::Text(t) => {
-                t.text.as_str()
-            }
+            ParagraphUnit::Text(t) => t.text.as_str(),
         }
     }
 
     fn get_text(&self, begin: usize, end: usize) -> &str {
         match self {
-            ParagraphUnit::Text(t) => {
-                t.text.substring(begin, end - begin)
-            }
+            ParagraphUnit::Text(t) => t.text.substring(begin, end - begin),
         }
     }
-
 }
 
 #[element_backend]
@@ -144,8 +145,14 @@ impl Line {
                 None => break,
             };
             let unit_atom_count = u.atom_count();
-            if let Some(intersect) = intersect_range((start, end), (processed_atom_count, unit_atom_count + processed_atom_count)) {
-                result.push_str(u.get_text(intersect.0 - processed_atom_count, intersect.1 - processed_atom_count));
+            if let Some(intersect) = intersect_range(
+                (start, end),
+                (processed_atom_count, unit_atom_count + processed_atom_count),
+            ) {
+                result.push_str(u.get_text(
+                    intersect.0 - processed_atom_count,
+                    intersect.1 - processed_atom_count,
+                ));
             }
             processed_atom_count += unit_atom_count;
             if processed_atom_count >= end {
@@ -192,7 +199,6 @@ impl Line {
             self.force_layout(element_width);
         }
     }
-
 }
 
 extern "C" fn measure_paragraph(
@@ -221,7 +227,6 @@ extern "C" fn measure_paragraph(
 
 #[js_methods]
 impl Paragraph {
-
     #[js_func]
     pub fn add_line(&mut self, units: Vec<ParagraphUnit>) {
         let line = Line::new(units, &self.params);
@@ -363,7 +368,7 @@ impl Paragraph {
         if self.selecting_begin.is_some() {
             let caret = self.get_text_coord_by_pixel_coord(point);
             if let Some(sb) = self.selecting_begin {
-                self.element.emit(SelectMoveEvent{
+                self.element.emit(SelectMoveEvent {
                     row: caret.0,
                     col: caret.1,
                 });
@@ -392,12 +397,14 @@ impl Paragraph {
     fn handle_mouse_event(&mut self, event: &MouseDetail) {
         match event.event_type {
             MouseEventType::MouseDown => {
-                let begin_coord = self.get_text_coord_by_pixel_coord((event.offset_x, event.offset_y));
+                let begin_coord =
+                    self.get_text_coord_by_pixel_coord((event.offset_x, event.offset_y));
                 self.begin_select(begin_coord);
             }
             MouseEventType::MouseMove => {
                 if self.selecting_begin.is_some() {
-                    let caret = self.get_text_coord_by_pixel_coord((event.offset_x, event.offset_y));
+                    let caret =
+                        self.get_text_coord_by_pixel_coord((event.offset_x, event.offset_y));
                     if let Some(sb) = self.selecting_begin {
                         let start = TextCoord::min(sb, caret);
                         let end = TextCoord::max(sb, caret);
@@ -408,7 +415,7 @@ impl Paragraph {
             MouseEventType::MouseUp => {
                 self.end_select();
             }
-            _ => {},
+            _ => {}
         }
     }
 
@@ -424,7 +431,10 @@ impl Paragraph {
         for p in lines {
             height += p.sk_paragraph.height();
             if row == max_offset || height > expected_offset.1 {
-                let line_pixel_coord = (expected_offset.0, expected_offset.1 - (height - p.sk_paragraph.height()));
+                let line_pixel_coord = (
+                    expected_offset.0,
+                    expected_offset.1 - (height - p.sk_paragraph.height()),
+                );
                 let line_column = p.get_column_by_pixel_coord(line_pixel_coord);
                 return TextCoord(row, line_column);
             }
@@ -455,12 +465,15 @@ impl Paragraph {
         let mut y_offset = 0.0;
         if row > 0 {
             for i in 0..row {
-                y_offset += unsafe {
-                    self.lines.get_unchecked(i).sk_paragraph.height()
-                }
+                y_offset += unsafe { self.lines.get_unchecked(i).sk_paragraph.height() }
             }
         }
-        Some(crate::base::Rect::new(bounds.left, y_offset + bounds.top, bounds.width(), bounds.height()))
+        Some(crate::base::Rect::new(
+            bounds.left,
+            y_offset + bounds.top,
+            bounds.width(),
+            bounds.height(),
+        ))
     }
 
     fn handle_key_down(&mut self, event: &KeyEventDetail) -> bool {
@@ -471,13 +484,13 @@ impl Paragraph {
                     "c" => {
                         use clipboard::{ClipboardContext, ClipboardProvider};
                         if let Some(sel) = self.get_selection_text() {
-                            let sel=  sel.to_string();
+                            let sel = sel.to_string();
                             if let Ok(mut ctx) = ClipboardContext::new() {
                                 ctx.set_contents(sel);
                             }
                         }
-                        return true
-                    },
+                        return true;
+                    }
                     _ => {}
                 }
             }
@@ -503,7 +516,7 @@ impl Paragraph {
         let text = if start.0 == end.0 {
             start_line.subtext(start.1, end.1)
         } else {
-            let mut result =  start_line.subtext(start.1, start_line.atom_count());
+            let mut result = start_line.subtext(start.1, start_line.atom_count());
             if end.0 - start.0 > 1 {
                 for i in start.0 + 1..end.0 {
                     let ln = self.lines.get(i)?;
@@ -560,18 +573,20 @@ impl Paragraph {
                         Some(list) => {
                             let list = list.iter().map(|it| FontFamily::new(it.as_str())).collect();
                             FontFamilies::new(list)
-                        },
-                        None => FontFamilies::default()
+                        }
+                        None => FontFamilies::default(),
                     };
                     let font_families = unit_font_families.append(&paragraph_params.font_families);
                     let font_size = unit.font_size.unwrap_or(paragraph_params.font_size);
                     text_style.set_font_size(font_size);
 
-                    let weight =
-                        parse_optional_weight(unit.weight.as_ref()).unwrap_or(paragraph_params.font_weight);
+                    let weight = parse_optional_weight(unit.weight.as_ref())
+                        .unwrap_or(paragraph_params.font_weight);
 
-                    let unit_style = Self::parse_font_style(&unit.style, paragraph_params.font_style);
-                    let font_style = skia_safe::FontStyle::new(weight, Width::NORMAL, unit_style.to_slant());
+                    let unit_style =
+                        Self::parse_font_style(&unit.style, paragraph_params.font_style);
+                    let font_style =
+                        skia_safe::FontStyle::new(weight, Width::NORMAL, unit_style.to_slant());
                     text_style.set_font_style(font_style);
 
                     let decoration =
@@ -642,8 +657,12 @@ impl ElementBackend for Paragraph {
         .to_ref();
         element
             .style
-            .yoga_node.set_context(Some(Context::new(this.as_weak())));
-        element.style.yoga_node.set_measure_func(Some(measure_paragraph));
+            .yoga_node
+            .set_context(Some(Context::new(this.as_weak())));
+        element
+            .style
+            .yoga_node
+            .set_measure_func(Some(measure_paragraph));
         this
     }
 
@@ -702,11 +721,14 @@ impl ElementBackend for Paragraph {
 
         let mut line_painters = Vec::with_capacity(self.lines.len());
         for ln in &mut self.lines {
-            let ln_row = consumed_rows; consumed_rows += 1;
-            let ln_column = consumed_columns; consumed_columns += 1;
+            let ln_row = consumed_rows;
+            consumed_rows += 1;
+            let ln_column = consumed_columns;
+            consumed_columns += 1;
 
             let ln_height = ln.sk_paragraph.height();
-            let ln_top = consumed_top; consumed_top += ln_height;
+            let ln_top = consumed_top;
+            consumed_top += ln_height;
             let ln_bottom = consumed_top;
             let atom_count = ln.atom_count();
             let ln_layout = some_or_continue!(ln.sk_paragraph.layout.clone());
@@ -744,7 +766,6 @@ impl ElementBackend for Paragraph {
             line_painters.push(ln_renderer);
         }
 
-
         RenderFn::new(move |painter| {
             let canvas = painter.canvas;
             canvas.translate((padding.3, padding.0));
@@ -756,7 +777,11 @@ impl ElementBackend for Paragraph {
         })
     }
 
-    fn execute_default_behavior(&mut self, event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) -> bool {
+    fn execute_default_behavior(
+        &mut self,
+        event: &mut Box<dyn Any>,
+        ctx: &mut EventContext<ElementWeak>,
+    ) -> bool {
         if let Some(d) = event.downcast_ref::<KeyDownEvent>() {
             self.handle_key_down(&d.0);
         } else {
@@ -768,7 +793,7 @@ impl ElementBackend for Paragraph {
                 }
             } else if let Some(e) = event.downcast_ref::<MouseMoveEvent>() {
                 let event = e.0;
-                return self.selection_update((event.offset_x, event.offset_y))
+                return self.selection_update((event.offset_x, event.offset_y));
             } else if let Some(e) = event.downcast_ref::<MouseUpEvent>() {
                 if e.0.button == 1 {
                     return self.selection_end();
@@ -777,7 +802,6 @@ impl ElementBackend for Paragraph {
         }
         return false;
     }
-
 }
 
 pub fn parse_optional_weight(value: Option<&String>) -> Option<Weight> {

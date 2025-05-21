@@ -1,4 +1,3 @@
-
 #[macro_export]
 macro_rules! backend_as_api {
     ($trait_name: ident, $ty: ty, $as_name: ident, $as_mut_name: ident) => {

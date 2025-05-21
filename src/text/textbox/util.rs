@@ -1,6 +1,6 @@
-use std::str::FromStr;
-use skia_safe::font_style::Weight;
 use crate::text::TextDecoration;
+use skia_safe::font_style::Weight;
+use std::str::FromStr;
 
 pub fn parse_optional_weight(value: Option<&String>) -> Option<Weight> {
     if let Some(v) = value {

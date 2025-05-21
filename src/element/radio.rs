@@ -1,20 +1,20 @@
-use std::any::Any;
-use std::collections::HashMap;
 use crate as deft;
-use deft_macros::{element_backend, event, js_methods};
-use quick_js::JsValue;
-use yoga::{Align, Display, FlexDirection};
-use crate::element::{Element, ElementBackend, ElementWeak};
+use crate::base::EventContext;
 use crate::element::container::Container;
 use crate::element::image::Image;
 use crate::element::text::Text;
-use crate::{ok_or_return, some_or_return};
-use crate::base::EventContext;
 use crate::element::util::is_form_event;
-use crate::event::{ClickEvent};
+use crate::element::{Element, ElementBackend, ElementWeak};
+use crate::event::ClickEvent;
 use crate::js::FromJsValue;
 use crate::style::{LengthOrPercent, StyleProp, StylePropVal};
 use crate::style_list::ParsedStyleProp;
+use crate::{ok_or_return, some_or_return};
+use deft_macros::{element_backend, event, js_methods};
+use quick_js::JsValue;
+use std::any::Any;
+use std::collections::HashMap;
+use yoga::{Align, Display, FlexDirection};
 
 #[element_backend]
 pub struct Radio {
@@ -29,9 +29,7 @@ pub struct Radio {
 }
 
 #[event]
-pub struct ChangeEvent {
-
-}
+pub struct ChangeEvent {}
 
 fn find_group(mut p: Element) -> Option<Element> {
     loop {
@@ -44,10 +42,11 @@ fn find_group(mut p: Element) -> Option<Element> {
 
 #[js_methods]
 impl Radio {
-
     #[js_func]
     pub fn set_label(&mut self, label: String) {
-        self.label_element.get_backend_mut_as::<Text>().set_text(label);
+        self.label_element
+            .get_backend_mut_as::<Text>()
+            .set_text(label);
     }
 
     #[js_func]
@@ -119,24 +118,24 @@ impl Radio {
         } else {
             Display::None
         };
-        self.img_element.set_style_props(vec![
-            StyleProp::Display(StylePropVal::Custom(display)),
-        ]);
+        self.img_element
+            .set_style_props(vec![StyleProp::Display(StylePropVal::Custom(display))]);
     }
-
 }
 
 impl ElementBackend for Radio {
     fn create(element: &mut Element) -> Self
     where
-        Self: Sized
+        Self: Sized,
     {
         let base = Container::create(element);
         let mut wrapper_element = Element::create(Container::create);
         let mut box_element = Element::create(Container::create);
         let label_element = Element::create(Text::create);
         let mut img_element = Element::create(Image::create);
-        img_element.get_backend_mut_as::<Image>().set_src_svg_raw(include_bytes!("./selected.svg"));
+        img_element
+            .get_backend_mut_as::<Image>()
+            .set_src_svg_raw(include_bytes!("./selected.svg"));
         img_element.set_style_props(vec![
             StyleProp::Width(StylePropVal::Custom(LengthOrPercent::Percent(100.0))),
             StyleProp::Height(StylePropVal::Custom(LengthOrPercent::Percent(100.0))),
@@ -160,7 +159,8 @@ impl ElementBackend for Radio {
             label_element,
             checked: false,
             disabled: false,
-        }.to_ref();
+        }
+        .to_ref();
         inst.update_children();
         inst
     }
@@ -209,14 +209,14 @@ impl ElementBackend for Radio {
     fn bind_js_listener(&mut self, event_type: &str, listener: JsValue) -> Option<u32> {
         let mut element = self.element.upgrade().ok()?;
         let id = match event_type {
-            "change" => element.register_event_listener(ChangeEventListener::from_js_value(listener).ok()?),
+            "change" => {
+                element.register_event_listener(ChangeEventListener::from_js_value(listener).ok()?)
+            }
             _ => return None,
         };
         Some(id)
     }
-
 }
-
 
 #[element_backend]
 pub struct RadioGroup {
@@ -226,12 +226,10 @@ pub struct RadioGroup {
 impl ElementBackend for RadioGroup {
     fn create(element: &mut Element) -> Self
     where
-        Self: Sized
+        Self: Sized,
     {
         let base = Container::create(element);
-        RadioGroupData {
-            base
-        }.to_ref()
+        RadioGroupData { base }.to_ref()
     }
 
     fn get_name(&self) -> &str {

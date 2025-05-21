@@ -1,15 +1,14 @@
 use crate as deft;
+use crate::base;
+use crate::base::{MouseDetail, Rect, TouchDetail};
+use deft_macros::event;
 use serde::{Deserialize, Serialize};
 use winit::keyboard::{ModifiersState, NamedKey};
-use deft_macros::event;
-use crate::base::{MouseDetail, Rect, TouchDetail};
-use crate::{base};
 
 pub const KEY_MOD_CTRL: u32 = 0x1;
 pub const KEY_MOD_ALT: u32 = 0x1 << 1;
 pub const KEY_MOD_META: u32 = 0x1 << 2;
 pub const KEY_MOD_SHIFT: u32 = 0x1 << 3;
-
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -785,7 +784,6 @@ pub struct DragOverEvent;
 
 #[event]
 pub struct DropEvent;
-
 
 #[event]
 pub struct DroppedFileEvent(pub String);

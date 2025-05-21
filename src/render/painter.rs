@@ -1,12 +1,13 @@
-use std::collections::HashMap;
-use std::mem;
-use skia_safe::{Canvas, ClipOp, Color, FilterMode, Matrix, Paint, PaintStyle, Rect, SamplingOptions};
-use skia_window::context::RenderContext;
 use crate::canvas_util::CanvasHelper;
 use crate::paint::{InvalidRects, LayerState, Painter, RenderLayerKey};
 use crate::render::paint_object::{ElementPO, LayerPO};
 use crate::{show_focus_hint, show_layer_hint, show_repaint_area};
-
+use skia_safe::{
+    Canvas, ClipOp, Color, FilterMode, Matrix, Paint, PaintStyle, Rect, SamplingOptions,
+};
+use skia_window::context::RenderContext;
+use std::collections::HashMap;
+use std::mem;
 
 pub struct ElementPainter {
     scale: f32,
@@ -16,7 +17,6 @@ pub struct ElementPainter {
 }
 
 impl ElementPainter {
-
     fn new() -> Self {
         Self {
             scale: 1.0,
@@ -27,9 +27,9 @@ impl ElementPainter {
     }
 
     pub fn take(ctx: &mut RenderContext) -> Self {
-        ctx.user_context.take::<Self>().unwrap_or_else(
-            || Self::new()
-        )
+        ctx.user_context
+            .take::<Self>()
+            .unwrap_or_else(|| Self::new())
     }
     pub fn put(self, ctx: &mut RenderContext) {
         ctx.user_context.set(self);
@@ -47,12 +47,22 @@ impl ElementPainter {
         }
     }
 
-    pub fn draw_root(&mut self, painter: &Painter, root: &mut LayerPO, context: &mut RenderContext) {
+    pub fn draw_root(
+        &mut self,
+        painter: &Painter,
+        root: &mut LayerPO,
+        context: &mut RenderContext,
+    ) {
         let mut state = mem::take(&mut self.layer_state_map);
         self.draw_layer(painter, context, root, &mut state);
     }
 
-    fn draw_element_object_recurse(&mut self, painter: &Painter, epo: &mut ElementPO, context: &mut RenderContext) {
+    fn draw_element_object_recurse(
+        &mut self,
+        painter: &Painter,
+        epo: &mut ElementPO,
+        context: &mut RenderContext,
+    ) {
         let canvas = painter.canvas;
         // debug!("Painting {}", epo.element_id);
         //TODO optimize
@@ -71,7 +81,13 @@ impl ElementPainter {
         canvas.restore();
     }
 
-    fn submit_layer(&mut self, painter: &Painter, _context: &mut RenderContext, lpo: &mut LayerPO, layer: &mut LayerState) {
+    fn submit_layer(
+        &mut self,
+        painter: &Painter,
+        _context: &mut RenderContext,
+        lpo: &mut LayerPO,
+        layer: &mut LayerState,
+    ) {
         let img = layer.layer.as_image();
         let canvas = painter.canvas;
         canvas.save();
@@ -123,19 +139,27 @@ impl ElementPainter {
             return;
         }
         {
-            let mut graphic_layer = if let Some(mut ogl_state) = layer_state_map.remove(&layer.key) {
-                if ogl_state.surface_width != surface_width || ogl_state.surface_height != surface_height {
+            let mut graphic_layer = if let Some(mut ogl_state) = layer_state_map.remove(&layer.key)
+            {
+                if ogl_state.surface_width != surface_width
+                    || ogl_state.surface_height != surface_height
+                {
                     None
                 } else {
                     //TODO fix scroll delta
                     let scroll_delta_x = layer.surface_bounds.left - ogl_state.surface_bounds.left;
                     let scroll_delta_y = layer.surface_bounds.top - ogl_state.surface_bounds.top;
                     if scroll_delta_x != 0.0 || scroll_delta_y != 0.0 {
-                        let mut temp_gl = context.create_layer(surface_width, surface_height).unwrap();
+                        let mut temp_gl =
+                            context.create_layer(surface_width, surface_height).unwrap();
                         temp_gl.canvas().session(|canvas| {
                             // canvas.clip_rect(&Rect::new(0.0, 0.0, layer.width * scale, layer.height * scale), ClipOp::Intersect, false);
                             canvas.clear(Color::TRANSPARENT);
-                            canvas.draw_image(&ogl_state.layer.as_image(), (-scroll_delta_x * scale, -scroll_delta_y * scale), None);
+                            canvas.draw_image(
+                                &ogl_state.layer.as_image(),
+                                (-scroll_delta_x * scale, -scroll_delta_y * scale),
+                                None,
+                            );
                         });
                         context.flush();
 
@@ -152,7 +176,8 @@ impl ElementPainter {
                 }
             } else {
                 None
-            }.unwrap_or_else(|| {
+            }
+            .unwrap_or_else(|| {
                 let mut gl = context.create_layer(surface_width, surface_height).unwrap();
                 gl.canvas().scale((scale, scale));
                 LayerState {
@@ -170,10 +195,17 @@ impl ElementPainter {
             let layer_canvas = graphic_layer.layer.canvas();
             layer_canvas.save();
 
-            layer_canvas.translate((-graphic_layer.surface_bounds.left, -graphic_layer.surface_bounds.top));
+            layer_canvas.translate((
+                -graphic_layer.surface_bounds.left,
+                -graphic_layer.surface_bounds.top,
+            ));
             if !layer.invalid_rects.is_empty() {
                 layer_canvas.clip_path(&layer.invalid_rects.to_path(), ClipOp::Intersect, false);
-                layer_canvas.clip_rect(&Rect::from_xywh(0.0, 0.0, layer.width, layer.height), ClipOp::Intersect, false);
+                layer_canvas.clip_rect(
+                    &Rect::from_xywh(0.0, 0.0, layer.width, layer.height),
+                    ClipOp::Intersect,
+                    false,
+                );
                 layer_canvas.clear(Color::TRANSPARENT);
             }
             let layer_painter = Painter::new(layer_canvas, painter.context.clone());
@@ -196,7 +228,8 @@ impl ElementPainter {
             self.submit_layer(painter, context, layer, &mut graphic_layer);
             context.flush();
             if self.layer_cache_enabled {
-                self.layer_state_map.insert(layer.key.clone(), graphic_layer);
+                self.layer_state_map
+                    .insert(layer.key.clone(), graphic_layer);
             }
             root_canvas.set_matrix(&old_total_matrix);
         }
@@ -216,7 +249,6 @@ impl ElementPainter {
         // node.clip_path.apply(canvas);
 
         painter.canvas.session(move |canvas| {
-
             // draw background and border
             node.draw_background(&canvas);
             node.draw_border(&canvas);

@@ -1,4 +1,3 @@
-
 pub trait LayoutRoot {
     fn update_layout(&mut self);
     fn should_propagate_dirty(&self) -> bool;

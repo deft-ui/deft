@@ -1,13 +1,15 @@
-use std::collections::HashMap;
-use log::warn;
 use crate::element::font_manager::FontManager;
 use crate::element::paragraph::ParagraphParams;
-use crate::element::text::simple_text_paragraph::{chars_to_glyphs_vec, SimpleTextParagraph, TextBlock};
+use crate::element::text::simple_text_paragraph::{
+    chars_to_glyphs_vec, SimpleTextParagraph, TextBlock,
+};
 use crate::font::Font;
 use crate::mrc::Mrc;
 use crate::some_or_continue;
 use crate::string::StringUtils;
 use crate::text::TextStyle;
+use log::warn;
+use std::collections::HashMap;
 
 thread_local! {
     pub static FONT_MANAGER: FontManager = FontManager::new();
@@ -42,16 +44,30 @@ impl SimpleParagraphBuilder {
     pub fn add_text(&mut self, text: impl Into<String>) {
         let text = text.into();
         let style = self.styles.last().unwrap().clone();
-        let font_families = style.font_families().as_ref().unwrap_or(&self.paragraph_params.font_families);
-        let font_families_names = font_families.as_slice().iter().map(|it| it.name()).collect::<Vec<_>>();
+        let font_families = style
+            .font_families()
+            .as_ref()
+            .unwrap_or(&self.paragraph_params.font_families);
+        let font_families_names = font_families
+            .as_slice()
+            .iter()
+            .map(|it| it.name())
+            .collect::<Vec<_>>();
         let mut text_blocks = self.resolve_font(&font_families_names, &style, &text);
         // debug!("text_blocks: {:?} {:?}", &text, &text_blocks);
         self.text_blocks.append(&mut text_blocks);
     }
 
-    fn resolve_font(&self, font_families_names: &Vec<&str>, style: &TextStyle, text: &str) -> Vec<TextBlock> {
+    fn resolve_font(
+        &self,
+        font_families_names: &Vec<&str>,
+        style: &TextStyle,
+        text: &str,
+    ) -> Vec<TextBlock> {
         let font_families_names = font_families_names.clone();
-        let mut fonts = self.font_manager.match_best(&font_families_names, style.font_style());
+        let mut fonts = self
+            .font_manager
+            .match_best(&font_families_names, style.font_style());
         if fonts.is_empty() {
             warn!("No matching font found for {:?}", &font_families_names);
             return Vec::new();
@@ -139,17 +155,16 @@ impl SimpleParagraphBuilder {
         }
         (resolved_typefaces, unresolved_char_count)
     }
-
 }
 
 #[cfg(test)]
 mod tests {
-    use measure_time::print_time;
-    use skia_safe::font_style::Weight;
-    use crate::element::paragraph::{ParagraphParams, ZERO_WIDTH_WHITESPACE};
     use crate::element::paragraph::simple_paragraph_builder::SimpleParagraphBuilder;
+    use crate::element::paragraph::{ParagraphParams, ZERO_WIDTH_WHITESPACE};
     use crate::font::family::{FontFamilies, FontFamily};
     use crate::style::FontStyle;
+    use measure_time::print_time;
+    use skia_safe::font_style::Weight;
 
     #[test]
     fn test_performance() {
@@ -203,4 +218,3 @@ mod tests {
         assert!(paragraph.max_intrinsic_width() > 0.0);
     }
 }
-

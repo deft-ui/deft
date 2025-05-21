@@ -1,13 +1,13 @@
 use crate as deft;
-use std::any::Any;
-use deft_macros::{element_backend, js_methods};
 use crate::base::{EventContext, Rect};
-use crate::element::{ElementBackend, Element, ElementWeak};
 use crate::element::container::Container;
 use crate::element::util::is_form_event;
+use crate::element::{Element, ElementBackend, ElementWeak};
 use crate::ok_or_return;
 use crate::render::RenderFn;
 use crate::style::StylePropKey;
+use deft_macros::{element_backend, js_methods};
+use std::any::Any;
 
 #[element_backend]
 pub struct Button {
@@ -18,7 +18,6 @@ pub struct Button {
 
 #[js_methods]
 impl Button {
-
     #[js_func]
     pub fn is_disabled(&self) -> bool {
         self.disabled
@@ -33,7 +32,6 @@ impl Button {
             ele.remove_attribute("disabled".to_string());
         }
     }
-
 }
 
 impl ElementBackend for Button {
@@ -44,7 +42,8 @@ impl ElementBackend for Button {
             base,
             element_weak: element.as_weak(),
             disabled: false,
-        }.to_ref()
+        }
+        .to_ref()
     }
 
     fn get_name(&self) -> &str {
@@ -71,7 +70,11 @@ impl ElementBackend for Button {
         }
     }
 
-    fn execute_default_behavior(&mut self, event: &mut Box<dyn Any>, ctx: &mut EventContext<ElementWeak>) -> bool {
+    fn execute_default_behavior(
+        &mut self,
+        event: &mut Box<dyn Any>,
+        ctx: &mut EventContext<ElementWeak>,
+    ) -> bool {
         self.base.execute_default_behavior(event, ctx)
     }
 
@@ -89,5 +92,4 @@ impl ElementBackend for Button {
     fn can_focus(&mut self) -> bool {
         !self.disabled
     }
-
 }

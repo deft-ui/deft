@@ -1,7 +1,7 @@
-use quick_js::loader::{JsModuleLoader};
 use deft::app::{App, IApp};
 use deft::bootstrap;
 use deft::loader::StaticModuleLoader;
+use quick_js::loader::JsModuleLoader;
 
 struct HelloAppImpl {}
 

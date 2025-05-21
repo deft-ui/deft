@@ -1,6 +1,6 @@
-use std::io::{Error, ErrorKind};
 use anyhow::anyhow;
 use quick_js::loader::{FsJsModuleLoader, JsModuleLoader};
+use std::io::{Error, ErrorKind};
 
 pub struct RemoteModuleLoader {
     base: Option<String>,
@@ -8,9 +8,7 @@ pub struct RemoteModuleLoader {
 
 impl RemoteModuleLoader {
     pub fn new(base: Option<String>) -> Self {
-        Self {
-            base,
-        }
+        Self { base }
     }
 }
 
@@ -19,14 +17,26 @@ impl JsModuleLoader for RemoteModuleLoader {
         let url = if module_name.starts_with("http://") || module_name.starts_with("https://") {
             module_name.to_string()
         } else if let Some(base) = &self.base {
-            format!("{}/{}", base.trim_end_matches("/"), module_name.trim_start_matches("/"))
+            format!(
+                "{}/{}",
+                base.trim_end_matches("/"),
+                module_name.trim_start_matches("/")
+            )
         } else {
-            return Err(Error::new(ErrorKind::AddrNotAvailable, anyhow!("Failed to resolve module: {}", module_name)));
+            return Err(Error::new(
+                ErrorKind::AddrNotAvailable,
+                anyhow!("Failed to resolve module: {}", module_name),
+            ));
         };
         let body = reqwest::blocking::get(&url)
             .map_err(|e| Error::new(ErrorKind::Other, format!("Failed to request {:?}", e)))?
             .text()
-            .map_err(|e| Error::new(ErrorKind::Other, format!("Failed to read response text: {:?}", e)))?;
+            .map_err(|e| {
+                Error::new(
+                    ErrorKind::Other,
+                    format!("Failed to read response text: {:?}", e),
+                )
+            })?;
         Ok(body)
     }
 }
@@ -74,7 +84,6 @@ pub struct DefaultModuleLoader {
 }
 
 impl DefaultModuleLoader {
-
     pub fn new(allow_remote: bool) -> Self {
         let remote_module_loader = if allow_remote {
             Some(RemoteModuleLoader::new(None))
@@ -90,14 +99,13 @@ impl DefaultModuleLoader {
     pub fn set_fs_base(&mut self, dir: &str) {
         self.fs_module_loader = Some(FsJsModuleLoader::new(dir))
     }
-
 }
 
 impl JsModuleLoader for DefaultModuleLoader {
     fn load(&mut self, module_name: &str) -> Result<String, Error> {
         if let Some(fs_loader) = &mut self.fs_module_loader {
             if let Ok(module) = fs_loader.load(module_name) {
-                return Ok(module)
+                return Ok(module);
             }
         }
         if let Some(remote_loader) = &mut self.remote_module_loader {

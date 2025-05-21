@@ -1,11 +1,11 @@
 use crate::base::{EventContext, Rect};
 use crate::canvas_util::CanvasHelper;
+use crate::element::scroll::ScrollBarStrategy;
 use crate::element::ElementWeak;
 use crate::event::{MouseDownEvent, MouseMoveEvent, MouseUpEvent};
 use crate::render::RenderFn;
 use skia_safe::{Color, Paint, PaintStyle};
 use std::any::Any;
-use crate::element::scroll::ScrollBarStrategy;
 
 pub enum ScrollBarDirection {
     Horizontal,
@@ -71,9 +71,7 @@ impl ScrollBar {
         self.length = length;
         self.scroll_length = scroll_length;
         let visible_thickness = match self.strategy {
-            ScrollBarStrategy::Never => {
-                0.0
-            }
+            ScrollBarStrategy::Never => 0.0,
             ScrollBarStrategy::Auto => {
                 if self.is_scrollable() {
                     self.thickness
@@ -81,9 +79,7 @@ impl ScrollBar {
                     0.0
                 }
             }
-            ScrollBarStrategy::Always => {
-                self.thickness
-            }
+            ScrollBarStrategy::Always => self.thickness,
         };
         self.padding = view_length - visible_thickness;
         let (width, height, x, y) = match self.direction {
@@ -154,7 +150,7 @@ impl ScrollBar {
 
     pub fn on_event(
         &mut self,
-        event: & Box<&mut dyn Any>,
+        event: &Box<&mut dyn Any>,
         _ctx: &mut EventContext<ElementWeak>,
     ) -> bool {
         if let Some(e) = event.downcast_ref::<MouseDownEvent>() {

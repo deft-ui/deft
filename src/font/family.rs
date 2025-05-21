@@ -45,14 +45,12 @@ impl FontFamily {
     }
 }
 
-
 #[derive(Default, Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct FontFamilies {
     list: Vec<FontFamily>,
 }
 
 impl FontFamilies {
-
     pub fn new(list: Vec<FontFamily>) -> FontFamilies {
         Self { list }
     }
@@ -69,7 +67,11 @@ impl FontFamilies {
         Self { list }
     }
 
-    fn add<'a>(result: &mut Vec<FontFamily>, hash_set: &mut HashSet<&'a FontFamily>, sources: &'a Vec<FontFamily>) {
+    fn add<'a>(
+        result: &mut Vec<FontFamily>,
+        hash_set: &mut HashSet<&'a FontFamily>,
+        sources: &'a Vec<FontFamily>,
+    ) {
         for it in sources {
             if !hash_set.contains(it) {
                 hash_set.insert(it);

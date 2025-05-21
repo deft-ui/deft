@@ -5,7 +5,6 @@ pub trait CanvasHelper {
 }
 
 impl CanvasHelper for Canvas {
-
     fn session<F: FnOnce(&Self)>(&self, callback: F) {
         self.save();
         callback(&self);

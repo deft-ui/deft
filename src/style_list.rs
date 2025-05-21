@@ -1,11 +1,14 @@
 use crate as deft;
-use std::collections::HashMap;
-use std::mem;
+use crate::mrc::MrcWeak;
+use crate::style::{
+    parse_border, parse_style_obj, PropValueParse, StyleProp, StylePropKey, StylePropVal,
+    StylePropertyValue,
+};
 use deft_macros::mrc_object;
 use quick_js::JsValue;
+use std::collections::HashMap;
+use std::mem;
 use yoga::PositionType;
-use crate::mrc::MrcWeak;
-use crate::style::{parse_border, parse_style_obj, PropValueParse, StyleProp, StylePropKey, StylePropVal, StylePropertyValue};
 
 type CssValueResolver = Box<dyn Fn(&HashMap<String, String>) -> String>;
 
@@ -17,18 +20,14 @@ pub enum ParsedStyleProp {
 impl PartialEq for ParsedStyleProp {
     fn eq(&self, other: &Self) -> bool {
         match self {
-            ParsedStyleProp::Fixed(v) => {
-                match other {
-                    ParsedStyleProp::Fixed(o) => v == o,
-                    ParsedStyleProp::Var(_, _, _, _) => false,
-                }
-            }
-            ParsedStyleProp::Var(k, v, _, _) => {
-                match other {
-                    ParsedStyleProp::Fixed(_) => false,
-                    ParsedStyleProp::Var(ok, ov, _, _) => k == ok && v == ov,
-                }
-            }
+            ParsedStyleProp::Fixed(v) => match other {
+                ParsedStyleProp::Fixed(o) => v == o,
+                ParsedStyleProp::Var(_, _, _, _) => false,
+            },
+            ParsedStyleProp::Var(k, v, _, _) => match other {
+                ParsedStyleProp::Fixed(_) => false,
+                ParsedStyleProp::Var(ok, ov, _, _) => k == ok && v == ov,
+            },
         }
     }
 }
@@ -39,7 +38,12 @@ impl ParsedStyleProp {
         let list = StyleList::expand_style(key, value);
         for (k, v) in list {
             if let Some(compute_fn) = StyleList::parse_variables(&v) {
-                result.push(ParsedStyleProp::Var(k.to_string(), v, Box::new(compute_fn), None));
+                result.push(ParsedStyleProp::Var(
+                    k.to_string(),
+                    v,
+                    Box::new(compute_fn),
+                    None,
+                ));
             } else {
                 StyleList::str_to_style_prop(k, &v, &mut |p| {
                     result.push(ParsedStyleProp::Fixed(p));
@@ -51,7 +55,7 @@ impl ParsedStyleProp {
 
     pub fn resolve(&mut self, vars: &MrcWeak<HashMap<String, String>>) {
         match self {
-            ParsedStyleProp::Fixed(_v) => {},
+            ParsedStyleProp::Fixed(_v) => {}
             ParsedStyleProp::Var(key, _v, resolver, resolved) => {
                 *resolved = None;
                 if let Ok(vars) = vars.upgrade() {
@@ -77,8 +81,6 @@ impl ParsedStyleProp {
         }
     }
 }
-
-
 
 #[mrc_object]
 pub struct StyleList {
@@ -110,7 +112,8 @@ impl StyleList {
             hover_style_props: HashMap::new(),
             selector_style_props: HashMap::new(),
             variables: MrcWeak::new(),
-        }.to_ref()
+        }
+        .to_ref()
     }
 
     pub fn set_variables(&mut self, variables: MrcWeak<HashMap<String, String>>) {
@@ -120,13 +123,19 @@ impl StyleList {
         self.variables = variables;
     }
 
-    fn resolve_variables(table: &mut HashMap<StylePropKey, ParsedStyleProp>, variables: &MrcWeak<HashMap<String, String>>)  {
+    fn resolve_variables(
+        table: &mut HashMap<StylePropKey, ParsedStyleProp>,
+        variables: &MrcWeak<HashMap<String, String>>,
+    ) {
         for (_k, v) in table {
             v.resolve(variables);
         }
     }
 
-    fn collect_resolved_props(table: &HashMap<StylePropKey, ParsedStyleProp>, result: &mut HashMap<StylePropKey, StyleProp>) {
+    fn collect_resolved_props(
+        table: &HashMap<StylePropKey, ParsedStyleProp>,
+        result: &mut HashMap<StylePropKey, StyleProp>,
+    ) {
         for (_, v) in table {
             if let Some(v) = v.resolved() {
                 result.insert(v.key(), v);
@@ -140,7 +149,8 @@ impl StyleList {
 
     pub fn set_style_props(&mut self, styles: Vec<StyleProp>) {
         for style_prop in &styles {
-            self.values.insert(style_prop.key(), ParsedStyleProp::Fixed(style_prop.clone()));
+            self.values
+                .insert(style_prop.key(), ParsedStyleProp::Fixed(style_prop.clone()));
         }
     }
 
@@ -217,9 +227,8 @@ impl StyleList {
         !self.hover_style_props.is_empty()
     }
 
-
     fn parse_style_list(str: &str) -> Vec<(&str, &str)> {
-        let mut result =  Vec::new();
+        let mut result = Vec::new();
         str.split(';').for_each(|item| {
             if let Some((k, v)) = item.split_once(':') {
                 result.push((k.trim(), v.trim()));
@@ -249,7 +258,8 @@ impl StyleList {
                 result
             }
             "margin" => {
-                let (t, r, b, l) = crate::style::parse_box_prop(StylePropertyValue::String(v_str.to_string()));
+                let (t, r, b, l) =
+                    crate::style::parse_box_prop(StylePropertyValue::String(v_str.to_string()));
                 vec![
                     ("MarginTop", t.to_str("none")),
                     ("MarginRight", r.to_str("none")),
@@ -258,7 +268,8 @@ impl StyleList {
                 ]
             }
             "padding" => {
-                let (t, r, b, l) = crate::style::parse_box_prop(StylePropertyValue::String(v_str.to_string()));
+                let (t, r, b, l) =
+                    crate::style::parse_box_prop(StylePropertyValue::String(v_str.to_string()));
                 vec![
                     ("PaddingTop", t.to_str("none")),
                     ("PaddingRight", r.to_str("none")),
@@ -267,7 +278,8 @@ impl StyleList {
                 ]
             }
             "borderradius" => {
-                let (t, r, b, l) = crate::style::parse_box_prop(StylePropertyValue::String(v_str.to_string()));
+                let (t, r, b, l) =
+                    crate::style::parse_box_prop(StylePropertyValue::String(v_str.to_string()));
                 vec![
                     ("BorderTopLeftRadius", t.to_str("none")),
                     ("BorderTopRightRadius", r.to_str("none")),
@@ -373,13 +385,11 @@ impl StyleList {
             None
         }
     }
-
 }
 
 #[cfg(test)]
 pub mod tests {
     use crate::computed::ComputedValue;
-    
 
     #[test]
     fn test_style_manager() {
@@ -392,4 +402,3 @@ pub mod tests {
         // style_vars.update_value("height", "6".to_string());
     }
 }
-

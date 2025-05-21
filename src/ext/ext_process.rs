@@ -3,10 +3,10 @@ use crate::app::exit_app;
 use crate::is_mobile_platform;
 use crate::js::js_engine::JsEngine;
 use deft_macros::js_methods;
+use log::error;
 use quick_js::exception::HostPromiseRejectionTracker;
 use quick_js::JsValue;
 use std::env;
-use log::error;
 
 struct UserPromiseRejectionTracker {
     handler: JsValue,

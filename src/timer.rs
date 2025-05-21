@@ -1,17 +1,16 @@
+use crate::js::js_event_loop::js_create_event_loop_proxy;
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::ops::Add;
-use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Sender};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
-use crate::js::js_event_loop::js_create_event_loop_proxy;
 
 thread_local! {
     pub static TIMER: RefCell<Timer> = RefCell::new(Timer::new());
 }
-
 
 enum Task {
     Timeout(Box<dyn FnOnce()>),
@@ -79,7 +78,6 @@ impl TimerHandle {
     pub fn get_id(&self) -> u64 {
         self.id
     }
-
 }
 
 impl Drop for TimerHandle {
@@ -87,7 +85,6 @@ impl Drop for TimerHandle {
         remove_time_task(self.id);
     }
 }
-
 
 impl Timer {
     fn new() -> Self {

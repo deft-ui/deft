@@ -11,14 +11,13 @@ struct CacheValueInner<P, R> {
 }
 
 impl<P: PartialEq, R: Clone> CacheValue<P, R> {
-
     pub fn new<C: (Fn(&P) -> R) + 'static>(compute: C) -> Self {
         Self {
             inner: RefCell::new(CacheValueInner {
                 last_value: None,
                 last_params: None,
                 compute: Box::new(compute),
-            })
+            }),
         }
     }
 

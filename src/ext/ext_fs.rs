@@ -1,14 +1,14 @@
+use crate as deft;
+use crate::js::JsPo;
+use deft_macros::js_func;
+use serde::{Deserialize, Serialize};
 use std::io;
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
 #[cfg(windows)]
 use std::os::windows::fs::MetadataExt;
 use std::path::PathBuf;
-use deft_macros::js_func;
-use serde::{Deserialize, Serialize};
 use tokio::fs;
-use crate as deft;
-use crate::js::JsPo;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Stat {

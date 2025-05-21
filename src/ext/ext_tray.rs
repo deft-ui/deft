@@ -1,15 +1,13 @@
-
 use crate as deft;
 use crate::base::{Event, EventHandler, EventRegistration};
 use crate::event_loop::{create_event_loop_fn_mut, create_event_loop_proxy, AppEventProxy};
+use crate::{js_deserialize, js_value};
 use anyhow::Error;
 use deft_macros::{js_methods, mrc_object};
+use deft_tray::{Tray, TrayMenu};
+use image::ImageReader;
 use quick_js::JsValue;
 use std::cell::Cell;
-use image::{ImageReader};
-use deft_tray::{Tray, TrayMenu};
-use crate::{js_deserialize, js_value};
-
 
 thread_local! {
     pub static NEXT_TRAY_ID: Cell<u32> = Cell::new(1);
@@ -25,13 +23,10 @@ pub struct SystemTray {
 
 js_value!(SystemTray);
 
-
 js_deserialize!(TrayMenu);
-
 
 #[js_methods]
 impl SystemTray {
-
     #[js_func]
     pub fn create(id: String) -> Result<SystemTray, Error> {
         let tray = SystemTray::create_tray(&id, create_event_loop_proxy());
@@ -49,7 +44,8 @@ impl SystemTray {
             event_registration: EventRegistration::new(),
             id: inner_id,
             tray_impl,
-        }.to_ref();
+        }
+        .to_ref();
 
         let mut me = inst.clone();
         let mut menu_active_callback = create_event_loop_fn_mut(move |menu_id: String| {
@@ -71,20 +67,28 @@ impl SystemTray {
         inst
     }
 
-    pub fn add_event_listener(&mut self, event_type: String, handler: Box<EventHandler<SystemTray>>) -> u32 {
-        self.inner.event_registration.add_event_listener(&event_type, handler)
+    pub fn add_event_listener(
+        &mut self,
+        event_type: String,
+        handler: Box<EventHandler<SystemTray>>,
+    ) -> u32 {
+        self.inner
+            .event_registration
+            .add_event_listener(&event_type, handler)
     }
 
     #[js_func]
     pub fn remove_event_listener(&mut self, event_type: String, id: i32) {
-        self.inner.event_registration.remove_event_listener(&event_type, id as u32);
+        self.inner
+            .event_registration
+            .remove_event_listener(&event_type, id as u32);
     }
 
     #[js_func]
     pub fn bind_event(&mut self, event_name: String, callback: JsValue) -> u32 {
-        self.event_registration.add_js_event_listener(&event_name, callback) as u32
+        self.event_registration
+            .add_js_event_listener(&event_name, callback) as u32
     }
-
 
     #[js_func]
     pub fn get_id(&self) -> u32 {
@@ -118,6 +122,4 @@ impl SystemTray {
         let height = img.height();
         Some((rgba_img.into_raw(), width, height))
     }
-
 }
-

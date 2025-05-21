@@ -3,16 +3,16 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use crate::js::JsPo;
+use crate::{js_serialize, js_value};
 use anyhow::{anyhow, Error};
-use reqwest::{Method, Response};
+use deft_macros::js_methods;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+use reqwest::{Method, Response};
 use serde::{Deserialize, Serialize};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
-use deft_macros::{js_methods};
-use crate::{js_serialize, js_value};
-use crate::js::JsPo;
 
 #[derive(Clone)]
 pub struct FetchResponse {
@@ -40,12 +40,13 @@ pub struct fetch;
 
 js_serialize!(Header);
 
-
 #[js_methods]
 impl fetch {
-
     #[js_func]
-    pub async fn create(url: String, options: Option<JsPo<FetchOptions>>) -> Result<FetchResponse, Error> {
+    pub async fn create(
+        url: String,
+        options: Option<JsPo<FetchOptions>>,
+    ) -> Result<FetchResponse, Error> {
         let mut client_builder = reqwest::Client::builder();
         let mut method = Method::GET;
         let mut headers = HeaderMap::new();
@@ -77,9 +78,7 @@ impl fetch {
             body = options.body.clone();
         }
         let client = client_builder.build()?;
-        let mut req_builder = client
-            .request(method, url)
-            .headers(headers);
+        let mut req_builder = client.request(method, url).headers(headers);
         if let Some(body) = body {
             req_builder = req_builder.body(body);
         }
@@ -136,5 +135,3 @@ impl fetch {
         Ok(size)
     }
 }
-
-

@@ -1,19 +1,22 @@
 pub mod actor;
 pub mod css_actor;
 
+use crate::animation::actor::AnimationActor;
+use crate::base::Callback;
 use crate::mrc::Mrc;
-use crate::style::{ScaleParams, StyleProp, StylePropKey, StylePropVal, StyleTransform, StyleTransformOp, TranslateLength, TranslateParams};
+use crate::style::{
+    ScaleParams, StyleProp, StylePropKey, StylePropVal, StyleTransform, StyleTransformOp,
+    TranslateLength, TranslateParams,
+};
 use crate::timer::{set_timeout, set_timeout_nanos, TimerHandle};
+use crate::window::WindowWeak;
+use log::debug;
 use ordered_float::OrderedFloat;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::ops::Bound::{Excluded, Included};
 use std::time::{Instant, SystemTime};
-use log::debug;
 use yoga::StyleUnit;
-use crate::animation::actor::AnimationActor;
-use crate::base::Callback;
-use crate::window::WindowWeak;
 
 macro_rules! interpolate_values {
     ($prev: expr, $next: expr, $percent: expr; $($ty: ident => $handler: ident,)* ) => {
@@ -49,11 +52,9 @@ macro_rules! match_both {
     };
 }
 
-
 thread_local! {
     pub static  ANIMATIONS: RefCell<HashMap<String, Animation>> = RefCell::new(HashMap::new());
 }
-
 
 fn interpolate_f32(prev: &f32, next: &f32, position: f32) -> Option<f32> {
     let delta = (next - prev) * position;
@@ -76,11 +77,15 @@ fn interpolate_style_unit(prev: &StyleUnit, next: &StyleUnit, position: f32) -> 
     return None;
 }
 
-fn interpolate_transform(prev: &StyleTransform, next: &StyleTransform, position: f32) -> Option<StyleTransform> {
+fn interpolate_transform(
+    prev: &StyleTransform,
+    next: &StyleTransform,
+    position: f32,
+) -> Option<StyleTransform> {
     let p_list = &prev.op_list;
     let n_list = &next.op_list;
     if p_list.len() != n_list.len() {
-        return None
+        return None;
     }
     let mut op_list = Vec::new();
     for i in 0..p_list.len() {
@@ -93,12 +98,14 @@ fn interpolate_transform(prev: &StyleTransform, next: &StyleTransform, position:
         }
         //TODO support other transform
     }
-    Some(StyleTransform {
-        op_list
-    })
+    Some(StyleTransform { op_list })
 }
 
-fn interpolate_translate_len(p: &TranslateLength, n: &TranslateLength, position: f32) -> Option<TranslateLength> {
+fn interpolate_translate_len(
+    p: &TranslateLength,
+    n: &TranslateLength,
+    position: f32,
+) -> Option<TranslateLength> {
     if let Some((px, nx)) = match_both!(TranslateLength::Point, p, n) {
         let x = interpolate_f32(&px, &nx, position)?;
         Some(TranslateLength::Point(x))
@@ -110,7 +117,11 @@ fn interpolate_translate_len(p: &TranslateLength, n: &TranslateLength, position:
     }
 }
 
-fn interpolate_transform_op(prev: &StyleTransformOp, next: &StyleTransformOp, position: f32) -> Option<StyleTransformOp> {
+fn interpolate_transform_op(
+    prev: &StyleTransformOp,
+    next: &StyleTransformOp,
+    position: f32,
+) -> Option<StyleTransformOp> {
     if let Some((p_deg, n_deg)) = match_both!(StyleTransformOp::Rotate, prev, next) {
         let deg = interpolate_f32(p_deg, n_deg, position)?;
         Some(StyleTransformOp::Rotate(deg))
@@ -133,7 +144,13 @@ fn interpolate_transform_op(prev: &StyleTransformOp, next: &StyleTransformOp, po
     }
 }
 
-fn interpolate(pre_position: f32, pre_value: StyleProp, next_position: f32, next_value: StyleProp, current_position: f32) -> Option<StyleProp> {
+fn interpolate(
+    pre_position: f32,
+    pre_value: StyleProp,
+    next_position: f32,
+    next_value: StyleProp,
+    current_position: f32,
+) -> Option<StyleProp> {
     let duration = next_position - pre_position;
     let percent = (current_position - pre_position) / duration;
     interpolate_values!(
@@ -176,7 +193,6 @@ fn interpolate(pre_position: f32, pre_value: StyleProp, next_position: f32, next
     None
 }
 
-
 pub struct AnimationDef {
     key_frames: BTreeMap<OrderedFloat<f32>, Vec<StyleProp>>,
 }
@@ -203,10 +219,11 @@ pub struct AnimationInstance {
     state: Mrc<AnimationState>,
 }
 
-
 impl AnimationDef {
     pub fn new() -> Self {
-        Self { key_frames: BTreeMap::new() }
+        Self {
+            key_frames: BTreeMap::new(),
+        }
     }
 
     pub fn key_frame(mut self, position: f32, styles: Vec<StyleProp>) -> Self {
@@ -222,9 +239,7 @@ impl AnimationDef {
                 map.insert(p.clone(), s.clone());
             }
         }
-        Animation {
-            styles
-        }
+        Animation { styles }
     }
 }
 
@@ -265,7 +280,13 @@ impl Animation {
             let next = v.range((Excluded(p), Included(end))).next();
             if let Some((prev_position, prev_value)) = prev {
                 if let Some((next_position, next_value)) = next {
-                    if let Some(value) = interpolate(prev_position.0, prev_value.clone(), next_position.0, next_value.clone(), p.0) {
+                    if let Some(value) = interpolate(
+                        prev_position.0,
+                        prev_value.clone(),
+                        next_position.0,
+                        next_value.clone(),
+                        p.0,
+                    ) {
                         result.push(value);
                     }
                 } else {
@@ -278,7 +299,12 @@ impl Animation {
 }
 
 impl AnimationInstance {
-    pub fn new<A: AnimationActor + 'static>(actor: A, duration: f32, iteration_count: f32, frame_controller: Box<dyn FrameController>) -> Self {
+    pub fn new<A: AnimationActor + 'static>(
+        actor: A,
+        duration: f32,
+        iteration_count: f32,
+        frame_controller: Box<dyn FrameController>,
+    ) -> Self {
         let state = AnimationState {
             actor: Box::new(actor),
             start_time: Instant::now(),
@@ -294,11 +320,13 @@ impl AnimationInstance {
 
     pub fn run(&mut self) {
         let mut state = self.state.clone();
-        self.state.frame_controller.request_next_frame(Box::new(move || {
-            // debug!("animation started:{}", t);
-            state.start_time = Instant::now();
-            Self::render_frame(state);
-        }));
+        self.state
+            .frame_controller
+            .request_next_frame(Box::new(move || {
+                // debug!("animation started:{}", t);
+                state.start_time = Instant::now();
+                Self::render_frame(state);
+            }));
     }
 
     fn stop(&mut self) {
@@ -314,7 +342,9 @@ impl AnimationInstance {
             state.actor.stop();
             is_ended = true;
         } else {
-            state.actor.apply_animation(position - position as usize as f32, &mut is_ended);
+            state
+                .actor
+                .apply_animation(position - position as usize as f32, &mut is_ended);
         };
         if !is_ended {
             let s = state.clone();
@@ -374,13 +404,19 @@ impl FrameController for SimpleFrameController {
         self.prev_frame_time = next_frame_time;
         if next_frame_time > now {
             let sleep_time = (next_frame_time - now) as u64;
-            self.timer_handle = Some(set_timeout_nanos(move || {
-                callback();
-            }, sleep_time));
+            self.timer_handle = Some(set_timeout_nanos(
+                move || {
+                    callback();
+                },
+                sleep_time,
+            ));
         } else {
-            self.timer_handle = Some(set_timeout(move || {
-                callback();
-            }, 0));
+            self.timer_handle = Some(set_timeout(
+                move || {
+                    callback();
+                },
+                0,
+            ));
         }
     }
 }

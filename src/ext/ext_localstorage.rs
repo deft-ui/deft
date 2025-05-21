@@ -1,17 +1,17 @@
 use crate as deft;
+use crate::js::JsError;
+use anyhow::{anyhow, Error};
+use deft_macros::js_methods;
+use log::debug;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Sender};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
-use anyhow::{anyhow, Error};
-use deft_macros::js_methods;
-use log::debug;
-use crate::js::JsError;
 
 thread_local! {
     static DB: RefCell<Option<KVStorage>> = RefCell::new(None);
@@ -22,7 +22,6 @@ pub struct localstorage {}
 
 #[js_methods]
 impl localstorage {
-
     pub fn init(path: PathBuf) {
         DB.with_borrow_mut(move |db| {
             *db = Some(KVStorage::new(path));
@@ -58,7 +57,6 @@ impl localstorage {
             }
         })
     }
-
 }
 
 enum KVMsg {
@@ -87,43 +85,39 @@ impl KVStorage {
         let (sender, receiver) = channel::<KVMsg>();
         let write_handle = {
             let dir = dir.clone();
-            thread::spawn(move || {
+            thread::spawn(move || loop {
+                let mut list = Vec::new();
+                let mut stopped = false;
                 loop {
-                    let mut list = Vec::new();
-                    let mut stopped = false;
-                    loop {
-                        match receiver.recv_timeout(Duration::from_millis(1000)) {
-                            Ok(e) => {
-                                match e {
-                                    KVMsg::Write((k, v)) => {
-                                        list.push((k, v));
-                                        if list.len() > 100 {
-                                            break;
-                                        }
-                                    }
-                                    KVMsg::Cleanup => {
-                                        stopped = true;
-                                        break;
-                                    }
+                    match receiver.recv_timeout(Duration::from_millis(1000)) {
+                        Ok(e) => match e {
+                            KVMsg::Write((k, v)) => {
+                                list.push((k, v));
+                                if list.len() > 100 {
+                                    break;
                                 }
                             }
-                            Err(_) => {
+                            KVMsg::Cleanup => {
+                                stopped = true;
                                 break;
                             }
+                        },
+                        Err(_) => {
+                            break;
                         }
                     }
-                    if !list.is_empty() {
-                        let db = Self::open_db(&dir).expect("failed to open localstorage");
-                        for (k, v) in list.iter() {
-                            db.insert(k, v.as_bytes()).unwrap();
-                        }
-                        db.flush().expect("failed to flush localstorage");
-                        debug!("localstorage flushed");
-                        list.clear();
+                }
+                if !list.is_empty() {
+                    let db = Self::open_db(&dir).expect("failed to open localstorage");
+                    for (k, v) in list.iter() {
+                        db.insert(k, v.as_bytes()).unwrap();
                     }
-                    if stopped {
-                        break;
-                    }
+                    db.flush().expect("failed to flush localstorage");
+                    debug!("localstorage flushed");
+                    list.clear();
+                }
+                if stopped {
+                    break;
                 }
             })
         };
@@ -165,5 +159,4 @@ impl KVStorage {
         }
         Err(anyhow!("failed to open localstorage"))
     }
-
 }

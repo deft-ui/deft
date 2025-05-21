@@ -1,14 +1,15 @@
-use std::sync::{Arc, LazyLock, Mutex};
-use log::debug;
-use ohos_ime_binding::{AttachOptions, IME};
-use winit::event_loop::EventLoop;
-use napi_derive_ohos::napi;
-use ohos_hilog_binding::hilog_info;
-use winit::platform::ohos::EventLoopExtOpenHarmony;
 use crate::app::{AppEvent, AppEventPayload, WinitApp};
 use crate::{send_app_event, some_or_return};
+use log::debug;
+use napi_derive_ohos::napi;
+use ohos_hilog_binding::hilog_info;
+use ohos_ime_binding::{AttachOptions, IME};
+use std::sync::{Arc, LazyLock, Mutex};
+use winit::event_loop::EventLoop;
+use winit::platform::ohos::EventLoopExtOpenHarmony;
 
-static LAST_INPUT_WIN_ID: LazyLock<Arc<Mutex<Option<i32>>>> = LazyLock::new(|| Arc::new(Mutex::new(None)));
+static LAST_INPUT_WIN_ID: LazyLock<Arc<Mutex<Option<i32>>>> =
+    LazyLock::new(|| Arc::new(Mutex::new(None)));
 
 fn set_last_focused_window_id(id: i32) {
     debug!("set_last_focused_window_id: {}", id);
@@ -33,7 +34,11 @@ fn create_ime_instance() -> IME {
         let window_id = some_or_return!(get_last_focused_window_id());
         hilog_info!("ime delete: {}, {}", window_id, len);
         for _ in 0..len {
-            if let Err(e) = send_app_event(AppEvent::NamedKeyInput(window_id, "Backspace".to_string(), true)) {
+            if let Err(e) = send_app_event(AppEvent::NamedKeyInput(
+                window_id,
+                "Backspace".to_string(),
+                true,
+            )) {
                 debug!("send app event error: {:?}", e);
             }
         }
@@ -54,7 +59,6 @@ pub fn show_soft_keyboard(window_id: i32) {
     if let Some(ime) = &*ime {
         ime.show_keyboard();
     }
-
 }
 
 pub fn hide_soft_keyboard(_window_id: i32) {
@@ -69,7 +73,7 @@ pub fn run_app(event_loop: EventLoop<AppEventPayload>, app: WinitApp) {
 }
 
 #[napi]
-pub fn send_input(window_id: u32, input: String)  {
+pub fn send_input(window_id: u32, input: String) {
     ohos_hilog_binding::hilog_info!("js input: {}", input);
     if let Err(e) = send_app_event(AppEvent::CommitInput(window_id as i32, input)) {
         debug!("send app event error: {:?}", e);

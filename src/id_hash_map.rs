@@ -39,5 +39,4 @@ impl<T> IdHashMap<T> {
             f(*id, value);
         })
     }
-
 }

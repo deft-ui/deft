@@ -1,31 +1,34 @@
 use crate as deft;
-use std::fs::File;
-use std::io::Cursor;
 use anyhow::Error;
-use base64::Engine;
 use base64::prelude::*;
+use base64::Engine;
 use deft_macros::{element_backend, js_methods};
 use image::ImageReader;
 use log::error;
 use skia_safe::svg::Dom;
 use skia_safe::wrapper::PointerWrapper;
+use std::fs::File;
+use std::io::Cursor;
 use yoga::{Context, MeasureMode, Node, NodeRef, Size};
 
-use crate::element::{ElementBackend, Element, ElementWeak};
 use crate::element::label::FONT_MGR;
+use crate::element::{Element, ElementBackend, ElementWeak};
 use crate::img_manager::{dyn_image_to_skia_image, IMG_MANAGER};
-use crate::{ok_or_return};
+use crate::ok_or_return;
 use crate::render::RenderFn;
 use crate::style::StylePropKey;
 
-extern "C" fn measure_image(node_ref: NodeRef, _width: f32, _mode: MeasureMode, _height: f32, _height_mode: MeasureMode) -> Size {
+extern "C" fn measure_image(
+    node_ref: NodeRef,
+    _width: f32,
+    _mode: MeasureMode,
+    _height: f32,
+    _height_mode: MeasureMode,
+) -> Size {
     if let Some(ctx) = Node::get_context(&node_ref) {
         if let Some(img) = ctx.downcast_ref::<ImageSrc>() {
             let (width, height) = img.get_size();
-            return Size {
-                width,
-                height,
-            };
+            return Size { width, height };
         }
     }
     return Size {
@@ -46,18 +49,12 @@ unsafe impl Send for ImageSrc {}
 impl ImageSrc {
     pub fn get_size(&self) -> (f32, f32) {
         match self {
-            ImageSrc::Svg(dom) => {
-                unsafe {
-                    let size = *dom.inner().containerSize();
-                    (size.fWidth, size.fHeight)
-                }
-            }
-            ImageSrc::Img(img) => {
-                (img.width() as f32, img.height() as f32)
-            }
-            ImageSrc::None => {
-                (0.0, 0.0)
-            }
+            ImageSrc::Svg(dom) => unsafe {
+                let size = *dom.inner().containerSize();
+                (size.fWidth, size.fHeight)
+            },
+            ImageSrc::Img(img) => (img.width() as f32, img.height() as f32),
+            ImageSrc::None => (0.0, 0.0),
         }
     }
 }
@@ -71,7 +68,6 @@ pub struct Image {
 
 #[js_methods]
 impl Image {
-
     #[js_func]
     pub fn set_src(&mut self, src: String) {
         if let Some(data_url) = src.strip_prefix("data:") {
@@ -118,7 +114,7 @@ impl Image {
             Ok(img) => {
                 let sk_img = dyn_image_to_skia_image(&img);
                 ImageSrc::Img(sk_img)
-            },
+            }
             Err(e) => {
                 error!("Failed to load image: {:?}", e);
                 ImageSrc::None
@@ -141,17 +137,20 @@ impl Image {
             None
         }
     }
-
 }
 
 impl ElementBackend for Image {
     fn create(element: &mut Element) -> Self {
-        element.style.yoga_node.set_measure_func(Some(measure_image));
+        element
+            .style
+            .yoga_node
+            .set_measure_func(Some(measure_image));
         ImageData {
             element: element.as_weak(),
             src: "".to_string(),
             img: ImageSrc::None,
-        }.to_ref()
+        }
+        .to_ref()
     }
 
     fn get_name(&self) -> &str {
@@ -168,7 +167,7 @@ impl ElementBackend for Image {
                 if let ImageSrc::Svg(_dom) = &mut self.img {
                     self.element.mark_dirty(false);
                 }
-            },
+            }
             _ => {}
         }
     }
@@ -182,7 +181,7 @@ impl ElementBackend for Image {
         let element = self.element.clone();
         let element = element.upgrade_mut().unwrap();
         let color = element.style.color;
-        
+
         RenderFn::new(move |painter| {
             let canvas = painter.canvas;
             canvas.save();
@@ -200,5 +199,4 @@ impl ElementBackend for Image {
             canvas.restore();
         })
     }
-
 }

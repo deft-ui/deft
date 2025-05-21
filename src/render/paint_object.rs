@@ -1,8 +1,8 @@
-use skia_safe::{Canvas, Color, Image, Matrix, Paint, Path, Rect};
-use skia_safe::PaintStyle::{Fill, Stroke};
 use crate::paint::{InvalidRects, RenderLayerKey};
 use crate::render::RenderFn;
 use crate::style::ColorHelper;
+use skia_safe::PaintStyle::{Fill, Stroke};
+use skia_safe::{Canvas, Color, Image, Matrix, Paint, Path, Rect};
 
 pub struct ElementPO {
     pub coord: (f32, f32),
@@ -65,7 +65,6 @@ impl ElementPO {
         paint.set_stroke_width(2.0);
         canvas.draw_rect(&rect, &paint);
     }
-
 }
 
 pub struct LayerPO {

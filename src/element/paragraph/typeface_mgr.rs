@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use skia_safe::{FontMgr, Typeface};
+use std::collections::HashMap;
 
 pub struct TypefaceMgr {
     system_font_mgr: FontMgr,

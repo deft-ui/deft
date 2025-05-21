@@ -1,15 +1,15 @@
+use crate::mrc::Mrc;
+use crate::some_or_return;
+use anyhow::anyhow;
+use futures_util::stream::{SplitSink, SplitStream};
+use futures_util::StreamExt;
 use std::collections::HashMap;
 use std::io;
 use std::io::ErrorKind;
 use std::ops::{Deref, DerefMut};
-use anyhow::anyhow;
-use futures_util::stream::{SplitSink, SplitStream};
-use futures_util::StreamExt;
 use tokio::net::TcpStream;
-use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 use tokio_tungstenite::tungstenite::Message;
-use crate::mrc::Mrc;
-use crate::some_or_return;
+use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 
 #[derive(Clone)]
 pub struct WebSocketManager {
@@ -58,7 +58,8 @@ impl WebSocketManagerInner {
     pub async fn create_connection(&mut self, url: &str) -> Result<i32, io::Error> {
         let id = self.next_client_id;
         self.next_client_id += 1;
-        let (socket, _) = connect_async(url).await
+        let (socket, _) = connect_async(url)
+            .await
             .map_err(|e| io::Error::new(ErrorKind::Other, e))?;
         let (writer, reader) = socket.split();
         self.clients.insert(id, (writer, reader));
@@ -68,7 +69,10 @@ impl WebSocketManagerInner {
     pub async fn read_msg(&mut self, id: i32) -> Result<Message, io::Error> {
         let (_, reader) = some_or_return!(
             self.clients.get_mut(&id),
-            Err(io::Error::new(ErrorKind::InvalidInput, format!("invalid client id: {}", id)))
+            Err(io::Error::new(
+                ErrorKind::InvalidInput,
+                format!("invalid client id: {}", id)
+            ))
         );
         if let Some(result) = reader.next().await {
             result.map_err(|e| io::Error::new(ErrorKind::Other, e))
@@ -76,5 +80,4 @@ impl WebSocketManagerInner {
             Err(io::Error::new(ErrorKind::Other, anyhow!("eof")))
         }
     }
-
 }

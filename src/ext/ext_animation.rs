@@ -1,10 +1,9 @@
-use std::str::FromStr;
-use crate::animation::{AnimationDef};
-use crate::animation::ANIMATIONS;
-use crate::style::parse_style_obj;
 use crate as deft;
+use crate::animation::AnimationDef;
+use crate::animation::ANIMATIONS;
 use crate::js::js_binding::JsError;
-
+use crate::style::parse_style_obj;
+use std::str::FromStr;
 
 #[deft_macros::js_func]
 pub fn animation_create(name: String, key_frames: deft::JsValue) -> Result<(), JsError> {

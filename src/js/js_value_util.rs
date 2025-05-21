@@ -1,7 +1,7 @@
 use crate as deft;
+use crate::js_deserialize;
 use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
-use crate::js_deserialize;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,7 @@ impl JsValueHelper for JsValue {
         match self {
             JsValue::Int(i) => Some(*i as f64),
             JsValue::Float(f) => Some(*f),
-            _ => None
+            _ => None,
         }
     }
 }

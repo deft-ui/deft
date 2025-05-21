@@ -1,7 +1,7 @@
-use crate::element::text::{intersect_range, ColOffset};
 use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
+use crate::element::text::{intersect_range, ColOffset};
 use crate::string::StringUtils;
-use crate::text::textbox::{TextBox, ParagraphParams, TextElement};
+use crate::text::textbox::{ParagraphParams, TextBox, TextElement};
 
 pub struct Line {
     pub units: Vec<TextElement>,
@@ -45,8 +45,14 @@ impl Line {
                 None => break,
             };
             let unit_atom_count = u.atom_count();
-            if let Some(intersect) = intersect_range((start, end), (processed_atom_count, unit_atom_count + processed_atom_count)) {
-                result.push_str(u.get_text(intersect.0 - processed_atom_count, intersect.1 - processed_atom_count));
+            if let Some(intersect) = intersect_range(
+                (start, end),
+                (processed_atom_count, unit_atom_count + processed_atom_count),
+            ) {
+                result.push_str(u.get_text(
+                    intersect.0 - processed_atom_count,
+                    intersect.1 - processed_atom_count,
+                ));
             }
             processed_atom_count += unit_atom_count;
             if processed_atom_count >= end {
@@ -85,5 +91,4 @@ impl Line {
         self.sk_paragraph.layout(available_width);
         self.layout_calculated = true;
     }
-
 }

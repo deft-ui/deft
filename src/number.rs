@@ -6,7 +6,11 @@ pub trait DeNan {
 
 impl DeNan for f32 {
     fn de_nan(self, default: Self) -> Self {
-        if self.is_nan() { default } else { self }
+        if self.is_nan() {
+            default
+        } else {
+            self
+        }
     }
 
     fn nan_to_zero(self) -> Self {

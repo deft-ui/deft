@@ -1,14 +1,15 @@
 #![allow(unused)]
-use std::collections::HashMap;
 use quick_js::JsValue;
+use serde::ser::{
+    SerializeMap, SerializeSeq, SerializeStruct, SerializeStructVariant, SerializeTuple,
+    SerializeTupleStruct, SerializeTupleVariant,
+};
 use serde::{Serialize, Serializer};
-use serde::ser::{SerializeMap, SerializeSeq, SerializeStruct, SerializeStructVariant, SerializeTuple, SerializeTupleStruct, SerializeTupleVariant};
+use std::collections::HashMap;
 
 type Error = std::fmt::Error;
 
-pub struct JsValueSerializer {
-
-}
+pub struct JsValueSerializer {}
 
 pub struct JsArraySerializer {
     serializer: JsValueSerializer,
@@ -93,7 +94,7 @@ impl Serializer for JsValueSerializer {
 
     fn serialize_some<T>(self, value: &T) -> Result<Self::Ok, Self::Error>
     where
-        T: ?Sized + Serialize
+        T: ?Sized + Serialize,
     {
         value.serialize(self)
     }
@@ -106,20 +107,35 @@ impl Serializer for JsValueSerializer {
         Ok(JsValue::Null)
     }
 
-    fn serialize_unit_variant(self, name: &'static str, variant_index: u32, variant: &'static str) -> Result<Self::Ok, Self::Error> {
+    fn serialize_unit_variant(
+        self,
+        name: &'static str,
+        variant_index: u32,
+        variant: &'static str,
+    ) -> Result<Self::Ok, Self::Error> {
         Ok(JsValue::String(variant.to_string()))
     }
 
-    fn serialize_newtype_struct<T>(self, name: &'static str, value: &T) -> Result<Self::Ok, Self::Error>
+    fn serialize_newtype_struct<T>(
+        self,
+        name: &'static str,
+        value: &T,
+    ) -> Result<Self::Ok, Self::Error>
     where
-        T: ?Sized + Serialize
+        T: ?Sized + Serialize,
     {
         value.serialize(self)
     }
 
-    fn serialize_newtype_variant<T>(self, name: &'static str, variant_index: u32, variant: &'static str, value: &T) -> Result<Self::Ok, Self::Error>
+    fn serialize_newtype_variant<T>(
+        self,
+        name: &'static str,
+        variant_index: u32,
+        variant: &'static str,
+        value: &T,
+    ) -> Result<Self::Ok, Self::Error>
     where
-        T: ?Sized + Serialize
+        T: ?Sized + Serialize,
     {
         let mut result: HashMap<String, JsValue> = HashMap::new();
         result.insert(variant.to_string(), value.serialize(self)?);
@@ -128,27 +144,37 @@ impl Serializer for JsValueSerializer {
     }
 
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
-        Ok(JsArraySerializer{
+        Ok(JsArraySerializer {
             serializer: self,
             array: Vec::new(),
         })
     }
 
     fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, Self::Error> {
-        Ok(JsArraySerializer{
+        Ok(JsArraySerializer {
             serializer: self,
             array: Vec::new(),
         })
     }
 
-    fn serialize_tuple_struct(self, name: &'static str, len: usize) -> Result<Self::SerializeTupleStruct, Self::Error> {
-        Ok(JsArraySerializer{
+    fn serialize_tuple_struct(
+        self,
+        name: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeTupleStruct, Self::Error> {
+        Ok(JsArraySerializer {
             serializer: self,
             array: Vec::new(),
         })
     }
 
-    fn serialize_tuple_variant(self, name: &'static str, variant_index: u32, variant: &'static str, len: usize) -> Result<Self::SerializeTupleVariant, Self::Error> {
+    fn serialize_tuple_variant(
+        self,
+        name: &'static str,
+        variant_index: u32,
+        variant: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeTupleVariant, Self::Error> {
         todo!()
     }
 
@@ -159,14 +185,24 @@ impl Serializer for JsValueSerializer {
         })
     }
 
-    fn serialize_struct(self, name: &'static str, len: usize) -> Result<Self::SerializeStruct, Self::Error> {
+    fn serialize_struct(
+        self,
+        name: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeStruct, Self::Error> {
         Ok(JsObjectSerializer {
             serializer: self,
             map: HashMap::new(),
         })
     }
 
-    fn serialize_struct_variant(self, name: &'static str, variant_index: u32, variant: &'static str, len: usize) -> Result<Self::SerializeStructVariant, Self::Error> {
+    fn serialize_struct_variant(
+        self,
+        name: &'static str,
+        variant_index: u32,
+        variant: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeStructVariant, Self::Error> {
         todo!()
     }
 }
@@ -177,7 +213,7 @@ impl SerializeSeq for JsArraySerializer {
 
     fn serialize_element<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
-        T: ?Sized + Serialize
+        T: ?Sized + Serialize,
     {
         self.array.push(value.serialize(JsValueSerializer {})?);
         Ok(())
@@ -194,7 +230,7 @@ impl SerializeTuple for JsArraySerializer {
 
     fn serialize_element<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
-        T: ?Sized + Serialize
+        T: ?Sized + Serialize,
     {
         self.array.push(value.serialize(JsValueSerializer {})?);
         Ok(())
@@ -211,7 +247,7 @@ impl SerializeTupleStruct for JsArraySerializer {
 
     fn serialize_field<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
-        T: ?Sized + Serialize
+        T: ?Sized + Serialize,
     {
         self.array.push(value.serialize(JsValueSerializer {})?);
         Ok(())
@@ -228,7 +264,7 @@ impl SerializeTupleVariant for JsArraySerializer {
 
     fn serialize_field<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
-        T: ?Sized + Serialize
+        T: ?Sized + Serialize,
     {
         self.array.push(value.serialize(JsValueSerializer {})?);
         Ok(())
@@ -245,14 +281,14 @@ impl SerializeMap for JsObjectSerializer {
 
     fn serialize_key<T>(&mut self, key: &T) -> Result<(), Self::Error>
     where
-        T: ?Sized + Serialize
+        T: ?Sized + Serialize,
     {
         todo!()
     }
 
     fn serialize_value<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
-        T: ?Sized + Serialize
+        T: ?Sized + Serialize,
     {
         todo!()
     }
@@ -268,9 +304,10 @@ impl SerializeStruct for JsObjectSerializer {
 
     fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>
     where
-        T: ?Sized + Serialize
+        T: ?Sized + Serialize,
     {
-        self.map.insert(key.to_string(), value.serialize(JsValueSerializer {})?);
+        self.map
+            .insert(key.to_string(), value.serialize(JsValueSerializer {})?);
         Ok(())
     }
 
@@ -285,7 +322,7 @@ impl SerializeStructVariant for JsObjectSerializer {
 
     fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>
     where
-        T: ?Sized + Serialize
+        T: ?Sized + Serialize,
     {
         todo!()
     }

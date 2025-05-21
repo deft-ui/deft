@@ -3,7 +3,6 @@ use crate::js_deserialize;
 use deft_macros::js_func;
 use serde::{Deserialize, Serialize};
 
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TypefaceSource {
     family: String,

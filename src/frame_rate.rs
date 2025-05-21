@@ -21,7 +21,8 @@ impl FrameRateController {
     /// Advance frame and return time to wait as nanos.
     pub fn next_frame(&mut self) -> u64 {
         let now = Instant::now();
-        let mut next_frame_no = now.duration_since(self.start_time).as_nanos() as u64 / NANOS_PER_FRAME + 1;
+        let mut next_frame_no =
+            now.duration_since(self.start_time).as_nanos() as u64 / NANOS_PER_FRAME + 1;
         if next_frame_no == self.current_frame {
             next_frame_no += 1;
         }

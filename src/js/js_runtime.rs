@@ -1,16 +1,16 @@
+use crate::base::UnsafeFnOnce;
+use crate::element::label::parse_align;
+use crate::js::js_event_loop::{js_create_event_loop_proxy, JsEventLoopProxy};
+use crate::js::js_value_util::JsValueHelper;
+use crate::js::ToJsCallResult;
+use crate::text::TextAlign;
+use quick_js::{Context, ExecutionError, JsPromise, JsValue, ValueError};
 use std::env;
 use std::future::Future;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
-use quick_js::{Context, ExecutionError, JsPromise, JsValue, ValueError};
 use tokio::runtime::Runtime;
 use winit::window::CursorIcon;
-use crate::base::UnsafeFnOnce;
-use crate::js::js_value_util::JsValueHelper;
-use crate::element::label::parse_align;
-use crate::js::ToJsCallResult;
-use crate::js::js_event_loop::{js_create_event_loop_proxy, JsEventLoopProxy};
-use crate::text::TextAlign;
 
 pub struct JsContext {
     context: Context,
@@ -19,10 +19,7 @@ pub struct JsContext {
 
 impl JsContext {
     pub fn new(context: Context, runtime: Runtime) -> Self {
-        Self {
-            context,
-            runtime,
-        }
+        Self { context, runtime }
     }
 
     pub fn create_promise(&mut self) -> (JsValue, PromiseResolver) {
@@ -35,15 +32,15 @@ impl JsContext {
 
     pub fn create_async_task2<F, O>(&mut self, future: F) -> JsValue
     where
-        F: Future<Output=O> + Send + 'static,
+        F: Future<Output = O> + Send + 'static,
         O: ToJsCallResult,
     {
         let (result, resolver) = self.create_promise();
         self.runtime.spawn(async move {
             let res = future.await;
             match res.to_js_call_result() {
-                Ok(r) => {resolver.resolve(r)}
-                Err(e) => {resolver.reject(JsValue::String(format!("js call error:{:?}", e)))}
+                Ok(r) => resolver.resolve(r),
+                Err(e) => resolver.reject(JsValue::String(format!("js call error:{:?}", e))),
             }
         });
         result
@@ -61,7 +58,6 @@ impl JsContext {
     pub fn execute_pending_job(&self) -> Result<bool, ExecutionError> {
         self.context.execute_pending_job()
     }
-
 }
 
 impl Deref for JsContext {
@@ -77,7 +73,6 @@ impl DerefMut for JsContext {
         &mut self.context
     }
 }
-
 
 pub struct PromiseResolver {
     promise: Option<*mut JsPromise>,
@@ -98,15 +93,15 @@ impl PromiseResolver {
                 let mut promise = Box::from_raw(p);
                 promise.resolve(value)
             });
-            self.event_loop_proxy.schedule_macro_task(callback.into_box()).unwrap();
+            self.event_loop_proxy
+                .schedule_macro_task(callback.into_box())
+                .unwrap();
         }
     }
 
     pub fn settle(self, result: Result<JsValue, String>) {
         match result {
-            Ok(v) => {
-                self.resolve(v)
-            }
+            Ok(v) => self.resolve(v),
             Err(e) => self.reject(JsValue::String(e)),
         }
     }
@@ -118,10 +113,11 @@ impl PromiseResolver {
                 let mut promise = Box::from_raw(p);
                 promise.reject(value)
             });
-            self.event_loop_proxy.schedule_macro_task(callback.into_box()).unwrap();
+            self.event_loop_proxy
+                .schedule_macro_task(callback.into_box())
+                .unwrap();
         }
     }
-
 }
 
 unsafe impl Send for PromiseResolver {}
@@ -136,7 +132,9 @@ impl Drop for PromiseResolver {
                     let _ = Box::from_raw(p);
                 })
             };
-            self.event_loop_proxy.schedule_macro_task(callback.into_box()).unwrap();
+            self.event_loop_proxy
+                .schedule_macro_task(callback.into_box())
+                .unwrap();
         }
     }
 }
@@ -145,18 +143,13 @@ pub trait JsValueView {
     fn as_bool(&self) -> Option<bool>;
 
     fn as_number_array(&self) -> Option<Vec<f32>>;
-
 }
 
 impl JsValueView for JsValue {
     fn as_bool(&self) -> Option<bool> {
         match &self {
-            JsValue::Bool(v) => {
-                Some(*v)
-            }
-            _ => {
-                None
-            }
+            JsValue::Bool(v) => Some(*v),
+            _ => None,
         }
     }
 
@@ -173,7 +166,6 @@ impl JsValueView for JsValue {
     }
 }
 
-
 pub trait FromJsValue: Sized {
     fn from_js_value(value: &JsValue) -> Option<Self>;
 }
@@ -183,7 +175,7 @@ impl FromJsValue for f32 {
         match value {
             JsValue::Int(i) => Some(*i as f32),
             JsValue::Float(f) => Some(*f as f32),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -229,14 +221,11 @@ impl FromJsValue for Vec<usize> {
                     result.push(usize::from_js_value(e)?);
                 }
                 Some(result)
-            },
-            _ => {
-                None
             }
+            _ => None,
         }
 
         //let arr = Vec::<usize>::from_js_value(value)?;
-
     }
 }
 
@@ -244,10 +233,7 @@ impl FromJsValue for (usize, usize) {
     fn from_js_value(value: &JsValue) -> Option<Self> {
         let arr = Vec::<usize>::from_js_value(value)?;
         if arr.len() == 2 {
-            let v = (
-                *arr.get(0).unwrap(),
-                *arr.get(1).unwrap()
-            );
+            let v = (*arr.get(0).unwrap(), *arr.get(1).unwrap());
             Some(v)
         } else {
             None
@@ -258,7 +244,9 @@ impl FromJsValue for (usize, usize) {
 impl crate::js::js_binding::FromJsValue for CursorIcon {
     fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
         match value {
-            JsValue::String(str) => CursorIcon::from_str(&str).map_err(|_e| ValueError::UnexpectedType),
+            JsValue::String(str) => {
+                CursorIcon::from_str(&str).map_err(|_e| ValueError::UnexpectedType)
+            }
             _ => Err(ValueError::UnexpectedType),
         }
     }

@@ -1,19 +1,22 @@
-use std::ffi::c_void;
-use std::ptr::slice_from_raw_parts_mut;
-use std::sync::Arc;
-use libc::memcpy;
-use log::warn;
-use skia_safe::{scalar, AlphaType, Bitmap, Color, ColorType, FilterMode, ImageInfo, Paint, Point, Rect, SamplingOptions};
-use swash::GlyphId;
-use swash::scale::image::Content;
-use crate::some_or_return;
 use crate::element::text::rasterize_cache::RasterizeCache;
 use crate::font::Font;
 use crate::number::DeNan;
 use crate::paint::Painter;
+use crate::some_or_return;
 use crate::string::StringUtils;
 use crate::style::ColorHelper;
 use crate::text::{calculate_line_char_count, TextStyle};
+use libc::memcpy;
+use log::warn;
+use skia_safe::{
+    scalar, AlphaType, Bitmap, Color, ColorType, FilterMode, ImageInfo, Paint, Point, Rect,
+    SamplingOptions,
+};
+use std::ffi::c_void;
+use std::ptr::slice_from_raw_parts_mut;
+use std::sync::Arc;
+use swash::scale::image::Content;
+use swash::GlyphId;
 
 thread_local! {
     static RASTERIZE_CACHE: RasterizeCache = RasterizeCache::new();
@@ -63,8 +66,10 @@ impl LineUnit {
             if !compact {
                 bounds[i].left = 0.0;
                 bounds[i].right = widths[i];
-                bounds[i].bottom = metrics.descent / metrics.units_per_em as f32 * self.block.style.font_size();
-                bounds[i].top = -metrics.ascent / metrics.units_per_em as f32 * self.block.style.font_size();
+                bounds[i].bottom =
+                    metrics.descent / metrics.units_per_em as f32 * self.block.style.font_size();
+                bounds[i].top =
+                    -metrics.ascent / metrics.units_per_em as f32 * self.block.style.font_size();
             }
             result.push(BoundsWithOffset::new(x, bounds[i]));
             x += widths[i];
@@ -72,14 +77,23 @@ impl LineUnit {
         result
     }
 
-    fn paint(&self, painter: &Painter, origin: Point, range: Option<(usize, usize)>, paint: Option<&Paint>) {
+    fn paint(
+        &self,
+        painter: &Painter,
+        origin: Point,
+        range: Option<(usize, usize)>,
+        paint: Option<&Paint>,
+    ) {
         let font = &self.block.font;
         let font_size = self.block.style.font_size();
         let foreground = self.block.style.foreground();
         let paint = paint.unwrap_or(&foreground);
         let mut glyphs = str_to_glyphs_vec(&font, self.block.text.as_str());
-        let mut layout_bounds = self.get_inner_layout_bounds(false)
-            .iter().map(|b| Point::new(b.x, 0.0)).collect::<Vec<_>>();
+        let mut layout_bounds = self
+            .get_inner_layout_bounds(false)
+            .iter()
+            .map(|b| Point::new(b.x, 0.0))
+            .collect::<Vec<_>>();
         let mut offset = 0;
         let (mut range_start, mut range_end) = range.unwrap_or((0, glyphs.len()));
         for i in 0..glyphs.len() {
@@ -105,9 +119,8 @@ impl LineUnit {
         for idx in range_start..range_end {
             let lb = layout_bounds[idx];
             let glyph = glyphs[idx];
-            let rasterized_img = RASTERIZE_CACHE.with(
-                move |cache| cache.get_image(&font, glyph, font_size * scale)
-            );
+            let rasterized_img =
+                RASTERIZE_CACHE.with(move |cache| cache.get_image(&font, glyph, font_size * scale));
             if let Some(img) = rasterized_img {
                 if let Some(bmp) = Self::swash_to_bitmap(&img, color) {
                     let x = img.placement.left;
@@ -116,7 +129,10 @@ impl LineUnit {
                     options.filter = FilterMode::Linear;
                     canvas.draw_image_with_sampling_options(
                         bmp.as_image(),
-                        ((origin.x + lb.x) * scale + x as f32, origin.y * scale - y as f32),
+                        (
+                            (origin.x + lb.x) * scale + x as f32,
+                            origin.y * scale - y as f32,
+                        ),
                         options,
                         None,
                     );
@@ -124,7 +140,6 @@ impl LineUnit {
             }
         }
         canvas.restore();
-
     }
 
     fn swash_to_bitmap(img: &swash::scale::image::Image, color: Color) -> Option<Bitmap> {
@@ -162,15 +177,16 @@ impl LineUnit {
             Content::SubpixelMask => {
                 warn!("SubpixelMast is unsupported yet");
             }
-            Content::Color => {
-                unsafe {
-                    memcpy(bmp.pixels(),  img.data.as_ptr() as *const c_void, img.data.len());
-                }
-            }
+            Content::Color => unsafe {
+                memcpy(
+                    bmp.pixels(),
+                    img.data.as_ptr() as *const c_void,
+                    img.data.len(),
+                );
+            },
         };
         Some(bmp)
     }
-
 }
 
 struct TextLine {
@@ -248,15 +264,31 @@ impl TextLayout {
         let char_offset = char_offset - unit.char_offset;
         let unit_origin = (unit.x, ln.y + ln.baseline);
         let bounds = unit.get_inner_layout_bounds(false);
-        Some(bounds[char_offset].bounds_with_offset().with_offset(unit_origin))
+        Some(
+            bounds[char_offset]
+                .bounds_with_offset()
+                .with_offset(unit_origin),
+        )
     }
 
-    pub fn paint_chars(&self, painter: &Painter, mut start: usize, end: usize, paint: Option<&Paint>) {
+    pub fn paint_chars(
+        &self,
+        painter: &Painter,
+        mut start: usize,
+        end: usize,
+        paint: Option<&Paint>,
+    ) {
         while start < end {
             if let Some((ln, unit)) = self.get_unit_at_char_offset(start) {
                 let unit_start = start - unit.char_offset;
-                let paint_char_count = usize::min(unit.block.text.chars_count() - unit_start, end - start);
-                unit.paint(painter, Point::new(unit.x, ln.y + ln.baseline), Some((unit_start, unit_start + paint_char_count)), paint);
+                let paint_char_count =
+                    usize::min(unit.block.text.chars_count() - unit_start, end - start);
+                unit.paint(
+                    painter,
+                    Point::new(unit.x, ln.y + ln.baseline),
+                    Some((unit_start, unit_start + paint_char_count)),
+                    paint,
+                );
                 start += paint_char_count;
             } else {
                 return;
@@ -267,7 +299,7 @@ impl TextLayout {
     pub fn paint_selection(
         &self,
         painter: &Painter,
-        line_offset: (f32,f32),
+        line_offset: (f32, f32),
         line_height: f32,
         selection: (usize, usize),
         bg_paint: &Paint,
@@ -275,7 +307,10 @@ impl TextLayout {
     ) {
         let canvas = painter.canvas;
         let (start_offset, end_offset) = selection;
-        let line_offset = Point { x: line_offset.0, y: line_offset.1 };
+        let line_offset = Point {
+            x: line_offset.0,
+            y: line_offset.1,
+        };
         canvas.save();
         canvas.translate(line_offset);
         for i in start_offset..end_offset {
@@ -288,9 +323,7 @@ impl TextLayout {
         self.paint_chars(painter, start_offset, end_offset, Some(fg_paint));
         canvas.restore();
     }
-
 }
-
 
 pub struct TextBlock {
     pub text: String,
@@ -358,7 +391,10 @@ impl SimpleTextParagraph {
             let metrics_scale = tb.style.font_size() / font_metrics.units_per_em as f32;
             let mut consumed_char_count = 0;
             while consumed_char_count < char_count {
-                let mut cc = calculate_line_char_count(&x_pos[consumed_char_count..], available_width - left);
+                let mut cc = calculate_line_char_count(
+                    &x_pos[consumed_char_count..],
+                    available_width - left,
+                );
                 if cc == 0 && left == 0.0 {
                     cc = 1;
                 }
@@ -381,15 +417,19 @@ impl SimpleTextParagraph {
                     char_offset,
                 });
                 char_offset += cc;
-                left += x_pos[consumed_char_count + cc - 1] - x_pos[consumed_char_count] + widths[consumed_char_count + cc - 1];
+                left += x_pos[consumed_char_count + cc - 1] - x_pos[consumed_char_count]
+                    + widths[consumed_char_count + cc - 1];
                 consumed_char_count += cc;
-                let text_height = (font_metrics.ascent + font_metrics.descent  + font_metrics.leading) * metrics_scale;
+                let text_height =
+                    (font_metrics.ascent + font_metrics.descent + font_metrics.leading)
+                        * metrics_scale;
                 //TODO fix leading?
                 let text_base_line = font_metrics.ascent * metrics_scale /* + font_metrics.leading */;
                 let line_height = self.line_height.unwrap_or(text_height);
                 let line_space = line_height - text_height;
-                current_line.baseline = f32::max(current_line.baseline, text_base_line + line_space / 2.0);
-                current_line.height =  f32::max(current_line.height, line_height);
+                current_line.baseline =
+                    f32::max(current_line.baseline, text_base_line + line_space / 2.0);
+                current_line.height = f32::max(current_line.height, line_height);
                 max_intrinsic_width = f32::max(max_intrinsic_width, left);
             }
         }
@@ -463,9 +503,6 @@ impl SimpleTextParagraph {
         let ln = layout.lines.get(line_number)?;
         Some(ln.height)
     }
-
-
-
 }
 
 pub fn get_fixed_widths_bounds(

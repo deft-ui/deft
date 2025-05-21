@@ -1,5 +1,5 @@
-pub mod paint_object;
 pub mod layout_tree;
+pub mod paint_object;
 pub mod painter;
 
 use crate::paint::Painter;

@@ -11,12 +11,11 @@ pub struct BorderPath {
 }
 
 impl BorderPath {
-
     pub fn is_same(&self, other: &BorderPath) -> bool {
         self.box_width == other.box_width
-        && self.box_height == other.box_height
-        && self.radius == other.radius
-        && self.widths == other.widths
+            && self.box_height == other.box_height
+            && self.radius == other.radius
+            && self.widths == other.widths
     }
 
     pub fn new(box_width: f32, box_height: f32, radius: [f32; 4], widths: [f32; 4]) -> Self {

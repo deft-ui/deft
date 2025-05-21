@@ -1,70 +1,70 @@
 #![allow(dead_code)]
 #![allow(deprecated)]
 
-use crate::app::{WinitApp, AppEvent, AppEventPayload, App};
+use crate::app::{App, AppEvent, AppEventPayload, WinitApp};
+use anyhow::{anyhow, Error};
 use measure_time::debug_time;
 use std::sync::OnceLock;
-use anyhow::{anyhow, Error};
 #[cfg(target_os = "android")]
 use winit::platform::android::activity::AndroidApp;
 
 pub use quick_js::JsValue;
 pub use winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopBuilder, EventLoopProxy};
-pub mod border;
-pub mod base;
-pub mod style;
-pub mod mrc;
-pub mod console;
-pub mod color;
 pub mod app;
+pub mod base;
+pub mod border;
+pub mod color;
+pub mod console;
+pub mod mrc;
+pub mod style;
 // mod graphics;
-pub mod renderer;
-pub mod window;
+pub mod canvas_util;
+pub mod cursor;
+pub mod data_dir;
 pub mod element;
+pub mod event;
+pub mod event_loop;
+pub mod ext;
+pub mod img_manager;
+pub mod js;
 pub mod loader;
-pub mod time;
+pub mod macro_mod;
+pub mod number;
+pub mod performance;
+pub mod renderer;
 pub mod resource_table;
+pub mod string;
+pub mod time;
+pub mod timer;
+mod trace;
 #[cfg(feature = "websocket")]
 pub mod websocket;
-pub mod number;
-pub mod timer;
-pub mod event_loop;
-pub mod string;
-pub mod canvas_util;
-pub mod event;
-pub mod cursor;
-pub mod img_manager;
-pub mod data_dir;
-pub mod macro_mod;
-pub mod ext;
-pub mod js;
-pub mod performance;
-mod trace;
+pub mod window;
 
-pub mod cache;
-pub mod animation;
 #[cfg(target_os = "android")]
 mod android;
-mod id_hash_map;
-mod id_generator;
-mod typeface;
-mod text;
-mod frame_rate;
-mod paint;
-mod layout;
-pub mod render;
+pub mod animation;
+pub mod cache;
 mod computed;
-mod style_list;
-pub mod winit;
-mod task_executor;
-mod stylesheet;
 mod font;
+mod frame_rate;
+mod id_generator;
+mod id_hash_map;
+mod layout;
+mod paint;
 mod platform;
+pub mod render;
+mod style_list;
+mod stylesheet;
+mod task_executor;
+mod text;
+mod typeface;
+pub mod winit;
 
-pub use deft_macros::*;
 use crate::base::ResultWaiter;
 use crate::console::init_console;
-use crate::event_loop::{AppEventProxy};
+use crate::event_loop::AppEventProxy;
+pub use deft_macros::*;
 
 pub static APP_EVENT_PROXY: OnceLock<AppEventProxy> = OnceLock::new();
 
@@ -93,7 +93,9 @@ pub fn bootstrap(deft_app: App) {
 
 /// Send an app event. Could call from any thread.
 pub fn send_app_event(event: AppEvent) -> Result<ResultWaiter<()>, Error> {
-    let proxy = APP_EVENT_PROXY.get().ok_or_else(|| anyhow!("no app event proxy found"))?;
+    let proxy = APP_EVENT_PROXY
+        .get()
+        .ok_or_else(|| anyhow!("no app event proxy found"))?;
     let result = proxy.send_event(event)?;
     Ok(result)
 }
@@ -139,16 +141,21 @@ pub fn android_bootstrap(app: AndroidApp, deft_app: App) {
         }
     }
     log::debug!("data path: {:?}", data_dir::get_data_path(""));
-    let event_loop = EventLoop::with_user_event().with_android_app(app).build().unwrap();
+    let event_loop = EventLoop::with_user_event()
+        .with_android_app(app)
+        .build()
+        .unwrap();
     run_event_loop(event_loop, deft_app);
 }
-
 
 #[cfg(ohos)]
 pub fn ohos_bootstrap(openharmony_app: openharmony_ability::OpenHarmonyApp, deft_app: App) {
     use winit::platform::ohos::EventLoopBuilderExtOpenHarmony;
     let a = openharmony_app.clone();
 
-    let event_loop = EventLoop::with_user_event().with_openharmony_app(a).build().unwrap();
+    let event_loop = EventLoop::with_user_event()
+        .with_openharmony_app(a)
+        .build()
+        .unwrap();
     run_event_loop(event_loop, deft_app);
 }

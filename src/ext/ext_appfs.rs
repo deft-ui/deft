@@ -1,18 +1,16 @@
 use crate as deft;
+use crate::data_dir::get_data_path;
+use deft_macros::js_methods;
 use std::io;
 use tokio::fs;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use deft_macros::js_methods;
-use crate::data_dir::get_data_path;
 
 #[allow(nonstandard_style)]
-pub struct appfs{}
-
+pub struct appfs {}
 
 #[js_methods]
 impl appfs {
-
     #[js_func]
     pub fn data_path(name: Option<String>) -> io::Result<String> {
         let p = if let Some(name) = name {
@@ -94,4 +92,3 @@ impl appfs {
         fs::remove_dir_all(&path).await
     }
 }
-

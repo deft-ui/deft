@@ -1,13 +1,13 @@
-use std::error::Error;
-use std::fmt::Display;
-use std::ops::{Deref, DerefMut};
-use quick_js::{JsValue, ValueError};
-use serde::{Deserialize, Serialize};
 use crate::js::js_deserialze::JsDeserializer;
 use crate::js::js_runtime::{JsContext, JsValueView};
 use crate::js::js_serde::JsValueSerializer;
 use crate::js::js_value_util::JsValueHelper;
 use crate::mrc::Mrc;
+use quick_js::{JsValue, ValueError};
+use serde::{Deserialize, Serialize};
+use std::error::Error;
+use std::fmt::Display;
+use std::ops::{Deref, DerefMut};
 
 #[derive(Clone, Debug)]
 pub struct JsError {
@@ -30,7 +30,7 @@ where
     #[cold]
     fn from(error: E) -> Self {
         Self {
-            message: error.to_string()
+            message: error.to_string(),
         }
     }
 }
@@ -56,13 +56,16 @@ impl Display for JsError {
 pub trait JsFunc {
     fn name(&self) -> &str;
     fn args_count(&self) -> usize;
-    fn call(&self, js_context: &mut Mrc<JsContext>, args: Vec<JsValue>) -> Result<JsValue, JsCallError>;
+    fn call(
+        &self,
+        js_context: &mut Mrc<JsContext>,
+        args: Vec<JsValue>,
+    ) -> Result<JsValue, JsCallError>;
 }
 
 pub trait FromJsValue: Sized {
     fn from_js_value(value: JsValue) -> Result<Self, ValueError>;
 }
-
 
 pub trait ToJsValue {
     fn to_js_value(self) -> Result<JsValue, ValueError>;
@@ -85,7 +88,8 @@ macro_rules! impl_number_from_js_value {
     ($ty: ty) => {
         impl FromJsValue for $ty {
             fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
-                value.as_number()
+                value
+                    .as_number()
                     .map(|f| f as $ty)
                     .ok_or(ValueError::UnexpectedType)
             }
@@ -137,7 +141,7 @@ impl<T: FromJsValue> FromJsValue for Vec<T> {
                 }
                 Ok(result)
             }
-            _ => {Err(ValueError::UnexpectedType)}
+            _ => Err(ValueError::UnexpectedType),
         }
     }
 }
@@ -168,7 +172,6 @@ impl_tuple_from_js_value!(A, B, C, D,);
 impl_tuple_from_js_value!(A, B, C, D, E,);
 impl_tuple_from_js_value!(A, B, C, D, E, F,);
 impl_tuple_from_js_value!(A, B, C, D, E, F, G,);
-
 
 impl ToJsValue for () {
     fn to_js_value(self) -> Result<JsValue, ValueError> {
@@ -240,8 +243,8 @@ impl<T: ToJsValue> ToJsValue for Vec<T> {
 impl<T: ToJsValue> ToJsValue for Option<T> {
     fn to_js_value(self) -> Result<JsValue, ValueError> {
         match self {
-            None => {Ok(JsValue::Undefined)}
-            Some(e) => {Ok(e.to_js_value()?)}
+            None => Ok(JsValue::Undefined),
+            Some(e) => Ok(e.to_js_value()?),
         }
     }
 }
@@ -303,8 +306,8 @@ impl_tuple_to_js_value!(
 impl<T: ToJsValue> ToJsCallResult for T {
     fn to_js_call_result(self) -> Result<JsValue, JsCallError> {
         match self.to_js_value() {
-            Ok(v) => { Ok(v) }
-            Err(e) => { Err(JsCallError::ConversionError(e)) }
+            Ok(v) => Ok(v),
+            Err(e) => Err(JsCallError::ConversionError(e)),
         }
     }
 }
@@ -312,9 +315,7 @@ impl<T: ToJsValue> ToJsCallResult for T {
 impl<T: ToJsValue, E: ToString> ToJsCallResult for Result<T, E> {
     fn to_js_call_result(self) -> Result<JsValue, JsCallError> {
         match self {
-            Ok(v) => {
-                v.to_js_call_result()
-            }
+            Ok(v) => v.to_js_call_result(),
             Err(e) => {
                 let e = JsError::from_str(&e.to_string());
                 Err(JsCallError::ExecutionError(e))
@@ -322,7 +323,6 @@ impl<T: ToJsValue, E: ToString> ToJsCallResult for Result<T, E> {
         }
     }
 }
-
 
 pub struct JsPo<T> {
     value: T,
@@ -353,7 +353,7 @@ impl<T> DerefMut for JsPo<T> {
 
 impl<T> FromJsValue for JsPo<T>
 where
-    T: for <'a> Deserialize<'a>,
+    T: for<'a> Deserialize<'a>,
 {
     fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
         match T::deserialize(JsDeserializer { value }) {
@@ -364,7 +364,9 @@ where
 }
 
 impl<T> ToJsValue for JsPo<T>
-where T: Serialize {
+where
+    T: Serialize,
+{
     fn to_js_value(self) -> Result<JsValue, ValueError> {
         T::serialize(&self.value, JsValueSerializer {})
             .map_err(|e| ValueError::Internal(format!("Failed to serialize value: {:?}", e)))
@@ -377,7 +379,9 @@ pub struct JsResource<T> {
 
 impl<T: 'static> ToJsValue for JsResource<T> {
     fn to_js_value(self) -> Result<JsValue, ValueError> {
-        Ok(JsValue::Resource(quick_js::ResourceValue { resource: std::rc::Rc::new(std::cell::RefCell::new(self.value)) }))
+        Ok(JsValue::Resource(quick_js::ResourceValue {
+            resource: std::rc::Rc::new(std::cell::RefCell::new(self.value)),
+        }))
     }
 }
 

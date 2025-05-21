@@ -1,7 +1,7 @@
 pub mod element;
-pub mod style;
 pub mod js_type;
 mod performance;
+pub mod style;
 
 #[macro_export]
 macro_rules! ok_or_return {
@@ -18,7 +18,7 @@ macro_rules! ok_or_return {
         } else {
             return $default;
         }
-    }
+    };
 }
 
 #[macro_export]
@@ -36,7 +36,7 @@ macro_rules! some_or_return {
         } else {
             return $default;
         }
-    }
+    };
 }
 
 #[macro_export]

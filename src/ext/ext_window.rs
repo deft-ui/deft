@@ -1,17 +1,16 @@
 use crate as deft;
-use std::cell::RefCell;
-use std::collections::HashMap;
 use log::{debug, warn};
 use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
+use std::collections::HashMap;
 use winit::event::WindowEvent;
 #[cfg(x11_platform)]
 use winit::platform::x11::WindowAttributesExtX11;
-use winit::window::{WindowId as WinitWindowId};
+use winit::window::WindowId as WinitWindowId;
 
 use crate::element::Element;
-use crate::{js_deserialize, js_weak_value};
 use crate::window::{Window, WindowWeak};
-
+use crate::{js_deserialize, js_weak_value};
 
 thread_local! {
     pub static WINDOWS: RefCell<HashMap<i32, Window>> = RefCell::new(HashMap::new());
@@ -68,20 +67,17 @@ pub fn handle_window_event(window_id: WinitWindowId, event: WindowEvent) {
         WindowEvent::Occluded(_) => {}
         WindowEvent::RedrawRequested => {}
         _ => {
-            let has_modal = MODAL_TO_OWNERS.with_borrow_mut(|m| {
-                m.iter().find(|(_, o)| o == &&window_id).is_some()
-            });
+            let has_modal = MODAL_TO_OWNERS
+                .with_borrow_mut(|m| m.iter().find(|(_, o)| o == &&window_id).is_some());
             if has_modal {
                 debug!("modal window found");
-                return
+                return;
             }
         }
     }
-    let mut window = WINIT_TO_WINDOW.with_borrow_mut(|m| {
-        match m.get_mut(&window_id) {
-            None => None,
-            Some(f) => Some(f.clone())
-        }
+    let mut window = WINIT_TO_WINDOW.with_borrow_mut(|m| match m.get_mut(&window_id) {
+        None => None,
+        Some(f) => Some(f.clone()),
     });
     if let Some(window) = &mut window {
         if &WindowEvent::CloseRequested == &event {
@@ -99,13 +95,11 @@ pub fn handle_window_event(window_id: WinitWindowId, event: WindowEvent) {
 }
 
 impl WindowWeak {
-
     pub fn set_body(&mut self, body: Element) {
         if let Ok(mut f) = self.upgrade_mut() {
             f.set_body(body)
         }
     }
-
 }
 
 js_weak_value!(Window, WindowWeak);

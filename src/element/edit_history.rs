@@ -54,20 +54,16 @@ impl EditHistory {
         let prev_op = unsafe { self.history.get_unchecked(self.history_ptr - 1) };
         self.history_ptr -= 1;
         let op = match prev_op.op {
-            EditOpType::Insert => {
-                EditOp {
-                    caret: prev_op.caret,
-                    op: EditOpType::Delete,
-                    content: prev_op.content.to_string(),
-                }
-            }
-            EditOpType::Delete => {
-                EditOp {
-                    caret: prev_op.caret,
-                    op: EditOpType::Insert,
-                    content: prev_op.content.to_string(),
-                }
-            }
+            EditOpType::Insert => EditOp {
+                caret: prev_op.caret,
+                op: EditOpType::Delete,
+                content: prev_op.content.to_string(),
+            },
+            EditOpType::Delete => EditOp {
+                caret: prev_op.caret,
+                op: EditOpType::Insert,
+                content: prev_op.content.to_string(),
+            },
         };
         Some(op)
     }
@@ -77,7 +73,9 @@ impl EditHistory {
             return false;
         }
         let last_op = unsafe { self.history.get_unchecked_mut(self.history_ptr - 1) };
-        if last_op.op == EditOpType::Insert && last_op.caret + last_op.content.chars_count() == op_caret {
+        if last_op.op == EditOpType::Insert
+            && last_op.caret + last_op.content.chars_count() == op_caret
+        {
             last_op.content.push_str(content);
             true
         } else {
