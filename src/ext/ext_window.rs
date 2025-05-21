@@ -37,6 +37,7 @@ pub const ELEMENT_TYPE_PARAGRAPH: i32 = 11;
 pub const ELEMENT_TYPE_CHECKBOX: i32 = 12;
 pub const ELEMENT_TYPE_RADIO: i32 = 13;
 pub const ELEMENT_TYPE_RADIO_GROUP: i32 = 14;
+pub const ELEMENT_TYPE_RICH_TEXT: i32 = 15;
 
 pub type ElementId = i32;
 

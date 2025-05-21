@@ -30,7 +30,7 @@ use crate::element::scroll::Scroll;
 use crate::element::text::Text;
 use crate::event::{DragOverEventListener, BlurEventListener, BoundsChangeEventListener, CaretChangeEventListener, ClickEventListener, DragStartEventListener, DropEventListener, FocusEventListener, FocusShiftEventListener, KeyDownEventListener, KeyUpEventListener, MouseDownEventListener, MouseEnterEvent, MouseEnterEventListener, MouseLeaveEvent, MouseLeaveEventListener, MouseMoveEventListener, MouseUpEventListener, MouseWheelEventListener, ScrollEvent, ScrollEventListener, TextChangeEventListener, TextUpdateEventListener, TouchCancelEventListener, TouchEndEventListener, TouchMoveEventListener, TouchStartEventListener, BoundsChangeEvent, ContextMenuEventListener, MouseDownEvent, TouchStartEvent, DroppedFileEventListener, HoveredFileEventListener};
 use crate::event_loop::{create_event_loop_callback};
-use crate::ext::ext_window::{ELEMENT_TYPE_BUTTON, ELEMENT_TYPE_CONTAINER, ELEMENT_TYPE_ENTRY, ELEMENT_TYPE_IMAGE, ELEMENT_TYPE_LABEL, ELEMENT_TYPE_SCROLL, ELEMENT_TYPE_TEXT_EDIT, ELEMENT_TYPE_BODY, ELEMENT_TYPE_PARAGRAPH, ELEMENT_TYPE_CHECKBOX, ELEMENT_TYPE_RADIO, ELEMENT_TYPE_RADIO_GROUP};
+use crate::ext::ext_window::{ELEMENT_TYPE_BUTTON, ELEMENT_TYPE_CONTAINER, ELEMENT_TYPE_ENTRY, ELEMENT_TYPE_IMAGE, ELEMENT_TYPE_LABEL, ELEMENT_TYPE_SCROLL, ELEMENT_TYPE_TEXT_EDIT, ELEMENT_TYPE_BODY, ELEMENT_TYPE_PARAGRAPH, ELEMENT_TYPE_CHECKBOX, ELEMENT_TYPE_RADIO, ELEMENT_TYPE_RADIO_GROUP, ELEMENT_TYPE_RICH_TEXT};
 use crate::window::{Window, WindowWeak};
 use crate::img_manager::IMG_MANAGER;
 use crate::js::js_serde::JsValueSerializer;
@@ -55,6 +55,7 @@ mod util;
 pub mod checkbox;
 pub mod radio;
 mod common;
+pub mod richtext;
 
 use crate as deft;
 use crate::app::AppEvent;
@@ -64,6 +65,7 @@ use crate::element::checkbox::Checkbox;
 use crate::element::label::Label;
 use crate::element::paragraph::Paragraph;
 use crate::element::radio::{Radio, RadioGroup};
+use crate::element::richtext::RichText;
 use crate::font::family::FontFamilies;
 use crate::js::JsError;
 use crate::layout::LayoutRoot;
@@ -247,6 +249,7 @@ impl Element {
             ELEMENT_TYPE_CHECKBOX => Element::create(Checkbox::create),
             ELEMENT_TYPE_RADIO => Element::create(Radio::create),
             ELEMENT_TYPE_RADIO_GROUP => Element::create(RadioGroup::create),
+            ELEMENT_TYPE_RICH_TEXT => Element::create(RichText::create),
             _ => return Err(anyhow!("invalid view_type")),
         };
         view.resource_table.put(ElementJsContext { context });

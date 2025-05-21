@@ -12,6 +12,7 @@ const VT_PARAGRAPH = 11;
 const VT_CHECKBOX = 12;
 const VT_RADIO = 13;
 const VT_RADIO_GROUP = 14;
+const VT_RICH_TEXT = 15;
 
 
 class Clipboard {
@@ -1178,6 +1179,8 @@ export class RadioElement extends Element {
  *   color ?: string,
  *   backgroundColor ?: string
  * }} ParagraphUnit
+ *
+ * @deprecated
  */
 export class ParagraphElement extends Element {
     constructor() {
@@ -1238,6 +1241,81 @@ export class ParagraphElement extends Element {
      */
     get selectionText() {
         return Paragraph_get_selection_text(this.handle);
+    }
+
+}
+
+/**
+ * @typedef {{
+ *   type: "text",
+ *   text: string,
+ *   weight ?: string,
+ *   textDecorationLine ?: string,
+ *   fontFamilies ?: string[],
+ *   fontSize ?: number,
+ *   color ?: string,
+ *   backgroundColor ?: string
+ * }} TextUnit
+ */
+export class RichTextElement extends Element {
+    constructor() {
+        super(VT_RICH_TEXT);
+    }
+
+    /**
+     *
+     * @param units {TextUnit[]}
+     */
+    addLine(units) {
+        RichText_add_line(this.handle, units);
+    }
+
+    /**
+     *
+     * @param index {number}
+     * @param units {TextUnit[]}
+     */
+    insertLine(index, units) {
+        RichText_insert_line(this.handle, index, units);
+    }
+
+
+    /**
+     *
+     * @param index {number}
+     */
+    deleteLine(index) {
+        RichText_delete_line(this.handle, index);
+    }
+
+    /**
+     *
+     * @param index {number}
+     * @param units {TextUnit[]}
+     */
+    updateLine(index, units) {
+        RichText_update_line(this.handle, index, units);
+    }
+
+    clear() {
+        RichText_clear(this.handle);
+    }
+
+    /**
+     *
+     * @param units {TextUnit[]}
+     * @return {[number, number]}
+     */
+    measureLine(units) {
+        return RichText_measure_line(this.handle, units);
+    }
+
+    /**
+     *
+     * @returns {string | undefined}
+     */
+    get selectionText() {
+        return RichText_get_selection_text(this.handle);
     }
 
 }
@@ -1994,6 +2072,7 @@ globalThis.TextEditElement = TextEditElement;
 globalThis.ButtonElement = ButtonElement;
 globalThis.ImageElement  = ImageElement;
 globalThis.ParagraphElement = ParagraphElement;
+globalThis.RichTextElement = RichTextElement;
 globalThis.CheckboxElement = CheckboxElement;
 globalThis.RadioElement = RadioElement;
 globalThis.RadioGroupElement = RadioGroupElement;

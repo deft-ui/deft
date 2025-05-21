@@ -20,6 +20,7 @@ use crate::element::image::Image;
 use crate::element::label::Label;
 use crate::element::paragraph::Paragraph;
 use crate::element::radio::Radio;
+use crate::element::richtext::RichText;
 use crate::element::text::Text;
 use crate::event_loop::run_with_event_loop;
 use crate::ext::ext_animation::animation_create;
@@ -123,6 +124,7 @@ impl JsEngine {
         engine.add_global_functions(Radio::create_js_apis());
         engine.add_global_functions(Entry::create_js_apis());
         engine.add_global_functions(Paragraph::create_js_apis());
+        engine.add_global_functions(RichText::create_js_apis());
         engine.add_global_functions(Text::create_js_apis());
         engine.add_global_functions(Label::create_js_apis());
         engine.add_global_functions(Image::create_js_apis());

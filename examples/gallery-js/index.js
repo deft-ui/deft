@@ -97,12 +97,12 @@ function createImage() {
     return img;
 }
 
-function createParagraph() {
-    const paragraph = new ParagraphElement();
-    paragraph.style = {
+function createRichText() {
+    const richText = new RichTextElement();
+    richText.style = {
         fontSize: 20,
     }
-    paragraph.addLine([
+    richText.addLine([
         {
             type: "text",
             text: "R",
@@ -126,7 +126,7 @@ function createParagraph() {
             style: 'italic',
         }
     ]);
-    return paragraph;
+    return richText;
 }
 
 function main() {
@@ -186,7 +186,7 @@ function main() {
     createElementRow("Radio", radioGroup)
     createElementRow("Checkbox", [checkbox, disabledCheckbox]);
     createElementRow("Image", createImage());
-    createElementRow("Paragraph", createParagraph());
+    createElementRow("RichText", createRichText());
 }
 
 try {
