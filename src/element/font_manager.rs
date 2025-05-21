@@ -1,7 +1,7 @@
 use crate as deft;
 use crate::element::paragraph::DEFAULT_FALLBACK_FONTS;
 use crate::font::Font;
-use crate::style::FontStyle;
+use crate::style::font::FontStyle;
 use deft_macros::mrc_object;
 use font_kit::family_name::FamilyName;
 use font_kit::handle::Handle;

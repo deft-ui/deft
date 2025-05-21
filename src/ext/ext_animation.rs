@@ -13,7 +13,7 @@ pub fn animation_create(name: String, key_frames: deft::JsValue) -> Result<(), J
             let p = f32::from_str(&k)?;
             let mut styles = Vec::new();
             for item in parse_style_obj(v) {
-                if let Some(v) = item.resolved() {
+                if let Some(v) = item.fixed() {
                     styles.push(v);
                 }
             }

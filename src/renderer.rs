@@ -25,10 +25,10 @@ pub fn test_border(canvas: &Canvas) {
     print_time!("draw border time");
     let mut style = StyleNode::new();
     style.border_radius = [10.0, 10.0, 10.0, 10.0];
-    style.set_style(&StyleProp::parse("BorderLeft", "1 #ccc").unwrap());
-    style.set_style(&StyleProp::parse("BorderRight", "1 #ccc").unwrap());
-    style.set_style(&StyleProp::parse("BorderTop", "1 #ccc").unwrap());
-    style.set_style(&StyleProp::parse("BorderBottom", "1 #ccc").unwrap());
+    style.set_style(&FixedStyleProp::parse("BorderLeft", "1 #ccc").unwrap());
+    style.set_style(&FixedStyleProp::parse("BorderRight", "1 #ccc").unwrap());
+    style.set_style(&FixedStyleProp::parse("BorderTop", "1 #ccc").unwrap());
+    style.set_style(&FixedStyleProp::parse("BorderBottom", "1 #ccc").unwrap());
     style.calculate_layout(70.0, 16.0, Direction::LTR);
     let width = style.get_layout_width();
     let height = style.get_layout_height();

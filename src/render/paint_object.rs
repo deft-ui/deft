@@ -1,6 +1,6 @@
 use crate::paint::{InvalidRects, RenderLayerKey};
 use crate::render::RenderFn;
-use crate::style::ColorHelper;
+use crate::style::color::ColorHelper;
 use skia_safe::PaintStyle::{Fill, Stroke};
 use skia_safe::{Canvas, Color, Image, Matrix, Paint, Path, Rect};
 

@@ -7,8 +7,8 @@ use crate::element::util::is_form_event;
 use crate::element::{Element, ElementBackend, ElementWeak};
 use crate::event::ClickEvent;
 use crate::js::FromJsValue;
-use crate::style::{LengthOrPercent, StyleProp, StylePropVal};
-use crate::style_list::ParsedStyleProp;
+use crate::style::length::LengthOrPercent;
+use crate::style::{FixedStyleProp, ResolvedStyleProp, StylePropVal};
 use crate::{ok_or_return, some_or_return};
 use deft_macros::{element_backend, event, js_methods};
 use quick_js::JsValue;
@@ -119,7 +119,7 @@ impl Radio {
             Display::None
         };
         self.img_element
-            .set_style_props(vec![StyleProp::Display(StylePropVal::Custom(display))]);
+            .set_style_props(vec![FixedStyleProp::Display(StylePropVal::Custom(display))]);
     }
 }
 
@@ -137,8 +137,8 @@ impl ElementBackend for Radio {
             .get_backend_mut_as::<Image>()
             .set_src_svg_raw(include_bytes!("./selected.svg"));
         img_element.set_style_props(vec![
-            StyleProp::Width(StylePropVal::Custom(LengthOrPercent::Percent(100.0))),
-            StyleProp::Height(StylePropVal::Custom(LengthOrPercent::Percent(100.0))),
+            FixedStyleProp::Width(StylePropVal::Custom(LengthOrPercent::Percent(100.0))),
+            FixedStyleProp::Height(StylePropVal::Custom(LengthOrPercent::Percent(100.0))),
         ]);
         box_element.add_child(img_element.clone(), 0).unwrap();
 
@@ -147,8 +147,8 @@ impl ElementBackend for Radio {
 
         element.add_child(wrapper_element.clone(), 0).unwrap();
         wrapper_element.set_style_props(vec![
-            StyleProp::AlignItems(StylePropVal::Custom(Align::Center)),
-            StyleProp::FlexDirection(StylePropVal::Custom(FlexDirection::Row)),
+            FixedStyleProp::AlignItems(StylePropVal::Custom(Align::Center)),
+            FixedStyleProp::FlexDirection(StylePropVal::Custom(FlexDirection::Row)),
         ]);
         let mut inst = RadioData {
             element: element.as_weak(),
@@ -185,19 +185,12 @@ impl ElementBackend for Radio {
         }
     }
 
-    fn accept_pseudo_styles(&mut self, styles: HashMap<String, Vec<ParsedStyleProp>>) {
+    fn accept_pseudo_element_styles(&mut self, styles: HashMap<String, Vec<ResolvedStyleProp>>) {
         if let Some(styles) = styles.get("box") {
-            let mut list = Vec::new();
-            for s in styles {
-                if let ParsedStyleProp::Fixed(p) = s {
-                    list.push(p.clone());
-                }
-            }
-            //TODO support set parsedStyleProp?
-            self.box_element.set_style_props(list);
+            let styles = styles.iter().map(|s| s.to_unresolved()).collect::<Vec<_>>();
+            self.box_element.set_style_props(styles);
         }
     }
-
     fn on_attribute_changed(&mut self, key: &str, value: Option<&str>) {
         match key {
             "checked" => self.update_checked(value.is_some()),

@@ -2,7 +2,7 @@ use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
 use crate::element::text::{AtomOffset, ColOffset};
 use crate::font::family::FontFamilies;
 use crate::string::StringUtils;
-use crate::style::FontStyle;
+use crate::style::font::FontStyle;
 use crate::text::TextAlign;
 use skia_safe::font_style::Weight;
 use skia_safe::Paint;

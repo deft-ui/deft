@@ -4,10 +4,10 @@ pub mod css_actor;
 use crate::animation::actor::AnimationActor;
 use crate::base::Callback;
 use crate::mrc::Mrc;
-use crate::style::{
-    ScaleParams, StyleProp, StylePropKey, StylePropVal, StyleTransform, StyleTransformOp,
-    TranslateLength, TranslateParams,
+use crate::style::transform::{
+    ScaleParams, StyleTransform, StyleTransformOp, TranslateLength, TranslateParams,
 };
+use crate::style::{FixedStyleProp, StylePropKey, StylePropVal};
 use crate::timer::{set_timeout, set_timeout_nanos, TimerHandle};
 use crate::window::WindowWeak;
 use log::debug;
@@ -21,12 +21,12 @@ use yoga::StyleUnit;
 macro_rules! interpolate_values {
     ($prev: expr, $next: expr, $percent: expr; $($ty: ident => $handler: ident,)* ) => {
         $(
-            if let StyleProp::$ty(pre) = $prev {
-                if let StyleProp::$ty(next) = $next {
+            if let FixedStyleProp::$ty(pre) = $prev {
+                if let FixedStyleProp::$ty(next) = $next {
                     if let StylePropVal::Custom(p) = pre {
                         if let StylePropVal::Custom(n) = next {
                             if let Some(v) = $handler(p, n, $percent) {
-                                return Some(StyleProp::$ty(StylePropVal::Custom(v)));
+                                return Some(FixedStyleProp::$ty(StylePropVal::Custom(v)));
                             }
                         }
                     }
@@ -146,11 +146,11 @@ fn interpolate_transform_op(
 
 fn interpolate(
     pre_position: f32,
-    pre_value: StyleProp,
+    pre_value: FixedStyleProp,
     next_position: f32,
-    next_value: StyleProp,
+    next_value: FixedStyleProp,
     current_position: f32,
-) -> Option<StyleProp> {
+) -> Option<FixedStyleProp> {
     let duration = next_position - pre_position;
     let percent = (current_position - pre_position) / duration;
     interpolate_values!(
@@ -194,12 +194,12 @@ fn interpolate(
 }
 
 pub struct AnimationDef {
-    key_frames: BTreeMap<OrderedFloat<f32>, Vec<StyleProp>>,
+    key_frames: BTreeMap<OrderedFloat<f32>, Vec<FixedStyleProp>>,
 }
 
 #[derive(Clone)]
 pub struct Animation {
-    styles: HashMap<StylePropKey, BTreeMap<OrderedFloat<f32>, StyleProp>>,
+    styles: HashMap<StylePropKey, BTreeMap<OrderedFloat<f32>, FixedStyleProp>>,
 }
 
 pub trait FrameController {
@@ -226,7 +226,7 @@ impl AnimationDef {
         }
     }
 
-    pub fn key_frame(mut self, position: f32, styles: Vec<StyleProp>) -> Self {
+    pub fn key_frame(mut self, position: f32, styles: Vec<FixedStyleProp>) -> Self {
         self.key_frames.insert(OrderedFloat::from(position), styles);
         self
     }
@@ -256,16 +256,16 @@ impl Animation {
         Animation { styles }
     }
 
-    fn preprocess_style(style: StyleProp) -> StyleProp {
-        if let StyleProp::Transform(tf) = &style {
+    fn preprocess_style(style: FixedStyleProp) -> FixedStyleProp {
+        if let FixedStyleProp::Transform(tf) = &style {
             if let StylePropVal::Custom(tf) = tf {
-                return StyleProp::Transform(StylePropVal::Custom(tf.preprocess()));
+                return FixedStyleProp::Transform(StylePropVal::Custom(tf.preprocess()));
             }
         }
         style
     }
 
-    pub fn get_frame(&self, position: f32) -> Vec<StyleProp> {
+    pub fn get_frame(&self, position: f32) -> Vec<FixedStyleProp> {
         //TODO support loop
         if position > 1.0 {
             return Vec::new();

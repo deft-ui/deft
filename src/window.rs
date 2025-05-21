@@ -26,7 +26,7 @@ use crate::mrc::{Mrc, MrcWeak};
 use crate::paint::{PaintContext, Painter, RenderTree};
 use crate::render::painter::ElementPainter;
 use crate::resource_table::ResourceTable;
-use crate::style::LengthContext;
+use crate::style::length::LengthContext;
 use crate::timer::{set_timeout_nanos, TimerHandle};
 use crate::{
     bind_js_event_listener, ok_or_return, send_app_event, show_focus_hint, some_or_return,
@@ -1171,7 +1171,7 @@ impl Window {
             };
             //TODO compute font size only when any font size changed
             body.compute_font_size_recurse(&length_ctx);
-            body.apply_style_update(&Vec::new(), &length_ctx);
+            body.apply_style_update(false, &length_ctx);
         }
         if self.layout_dirty {
             self.update_layout();

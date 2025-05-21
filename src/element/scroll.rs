@@ -14,8 +14,7 @@ use crate::js::js_runtime::FromJsValue;
 use crate::js::JsError;
 use crate::layout::LayoutRoot;
 use crate::render::RenderFn;
-use crate::style::{StyleProp, StylePropVal};
-use crate::style_list::ParsedStyleProp;
+use crate::style::ResolvedStyleProp;
 use crate::{
     backend_as_api, is_mobile_platform, js_deserialize, js_serialize, ok_or_return, some_or_return,
 };
@@ -685,31 +684,33 @@ impl ElementBackend for Scroll {
         })
     }
 
-    fn accept_pseudo_styles(&mut self, styles: HashMap<String, Vec<ParsedStyleProp>>) {
+    fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend> {
+        Some(&mut self.base)
+    }
+
+    fn accept_pseudo_element_styles(&mut self, styles: HashMap<String, Vec<ResolvedStyleProp>>) {
         if let Some(scrollbar_styles) = styles.get("scrollbar") {
             for style in scrollbar_styles {
-                if let Some(StyleProp::BackgroundColor(color)) = style.resolved() {
-                    if let StylePropVal::Custom(color) = color {
+                match style {
+                    ResolvedStyleProp::BackgroundColor(color) => {
                         self.bar_background_color = color.clone();
                         self.element.mark_dirty(false);
                     }
+                    _ => {}
                 }
             }
         }
         if let Some(thumb_styles) = styles.get("scrollbar-thumb") {
             for style in thumb_styles {
-                if let Some(StyleProp::BackgroundColor(color)) = style.resolved() {
-                    if let StylePropVal::Custom(color) = color {
+                match style {
+                    ResolvedStyleProp::BackgroundColor(color) => {
                         self.indicator_color = color.clone();
                         self.element.mark_dirty(false);
                     }
+                    _ => {}
                 }
             }
         }
-    }
-
-    fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend> {
-        Some(&mut self.base)
     }
 }
 

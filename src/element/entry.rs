@@ -16,8 +16,7 @@ use crate::js::{FromJsValue, ToJsValue};
 use crate::number::DeNan;
 use crate::render::RenderFn;
 use crate::string::StringUtils;
-use crate::style::{StyleProp, StylePropKey, StylePropVal};
-use crate::style_list::ParsedStyleProp;
+use crate::style::{ResolvedStyleProp, StylePropKey};
 use crate::text::textbox::{TextBox, TextCoord, TextElement, TextUnit};
 use crate::text::TextAlign;
 use crate::timer::TimerHandle;
@@ -873,35 +872,38 @@ impl ElementBackend for Entry {
         self.layout(bounds);
     }
 
-    fn accept_pseudo_styles(&mut self, styles: HashMap<String, Vec<ParsedStyleProp>>) {
+    fn accept_pseudo_element_styles(&mut self, styles: HashMap<String, Vec<ResolvedStyleProp>>) {
         if let Some(scrollbar_styles) = styles.get("scrollbar") {
             for style in scrollbar_styles {
-                if let Some(StyleProp::BackgroundColor(color)) = style.resolved() {
-                    if let StylePropVal::Custom(color) = color {
-                        self.vertical_bar.set_track_background_color(color);
-                        self.horizontal_bar.set_track_background_color(color);
+                match style {
+                    ResolvedStyleProp::BackgroundColor(color) => {
+                        self.vertical_bar.set_track_background_color(*color);
+                        self.horizontal_bar.set_track_background_color(*color);
                         self.element.mark_dirty(false);
                     }
+                    _ => {}
                 }
             }
         }
         if let Some(thumb_styles) = styles.get("scrollbar-thumb") {
             for style in thumb_styles {
-                if let Some(StyleProp::BackgroundColor(color)) = style.resolved() {
-                    if let StylePropVal::Custom(color) = color {
-                        self.vertical_bar.set_thumb_background_color(color);
-                        self.horizontal_bar.set_thumb_background_color(color);
+                match style {
+                    ResolvedStyleProp::BackgroundColor(color) => {
+                        self.vertical_bar.set_thumb_background_color(*color);
+                        self.horizontal_bar.set_thumb_background_color(*color);
                         self.element.mark_dirty(false);
                     }
+                    _ => {}
                 }
             }
         }
         if let Some(placeholder_styles) = styles.get("placeholder") {
             for style in placeholder_styles {
-                if let Some(StyleProp::Color(color)) = style.resolved() {
-                    if let StylePropVal::Custom(color) = color {
-                        self.placeholder.set_color(color);
+                match style {
+                    ResolvedStyleProp::Color(color) => {
+                        self.placeholder.set_color(*color);
                     }
+                    _ => {}
                 }
             }
         }

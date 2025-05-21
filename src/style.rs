@@ -1,28 +1,35 @@
+pub mod animation;
+pub mod border;
 pub mod border_path;
+pub mod color;
 pub mod css_manager;
+pub mod flex;
+pub mod font;
+pub mod length;
 mod select;
+pub mod styles;
+pub mod transform;
 
 use crate as deft;
 use crate::animation::css_actor::CssAnimationActor;
 use crate::animation::ANIMATIONS;
 use crate::animation::{AnimationInstance, WindowAnimationController};
 use crate::base::Rect;
-use crate::color::parse_hex_color;
-use crate::element::paragraph::parse_weight;
 use crate::element::ElementWeak;
 use crate::event_loop::create_event_loop_callback;
-use crate::font::family::{FontFamilies, FontFamily};
+use crate::font::family::FontFamilies;
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
-use crate::paint::MatrixCalculator;
+use crate::style::animation::AnimationParams;
+use crate::style::font::{FontStyle, LineHeightVal};
+use crate::style::length::{Length, LengthContext, LengthOrPercent};
+use crate::style::transform::StyleTransform;
 use crate::style_list::ParsedStyleProp;
 use crate::{ok_or_return, some_or_return};
 use anyhow::{anyhow, Error};
-use cssparser::parse_color_keyword;
 use deft_macros::mrc_object;
-use ordered_float::OrderedFloat;
 use quick_js::JsValue;
-use skia_safe::font_style::{Slant, Weight};
+use skia_safe::font_style::Weight;
 use skia_safe::{Color, Image, Matrix};
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
@@ -33,103 +40,10 @@ use yoga::{
     StyleUnit, Wrap,
 };
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum StylePropertyValue {
-    Float(f32),
-    String(String),
-    Invalid,
-}
-
 //TODO rename
 pub trait PropValueParse: Sized {
     fn parse_prop_value(value: &str) -> Option<Self>;
     fn to_style_string(&self) -> String;
-}
-
-impl PropValueParse for Length {
-    fn parse_prop_value(value: &str) -> Option<Self> {
-        Self::from_str(value)
-    }
-
-    fn to_style_string(&self) -> String {
-        self.to_str()
-    }
-}
-
-impl PropValueParse for LineHeightVal {
-    fn parse_prop_value(value: &str) -> Option<Self> {
-        let value = value.trim();
-        if value.eq_ignore_ascii_case("normal") {
-            Some(LineHeightVal::Normal)
-        } else if let Ok(v) = f32::from_str(value) {
-            Some(LineHeightVal::Number(v))
-        } else if let Some(len) = Length::from_str(value) {
-            Some(LineHeightVal::Length(len))
-        } else if let Some(v) = parse_percent(value) {
-            Some(LineHeightVal::Percent(v))
-        } else {
-            None
-        }
-    }
-
-    fn to_style_string(&self) -> String {
-        match self {
-            LineHeightVal::Length(l) => l.to_style_string(),
-            LineHeightVal::Percent(p) => format!("{}%", p),
-            LineHeightVal::Number(n) => format!("{}", n),
-            LineHeightVal::Normal => "normal".to_string(),
-        }
-    }
-}
-
-impl PropValueParse for LengthOrPercent {
-    fn parse_prop_value(value: &str) -> Option<Self> {
-        let value = value.trim();
-        if value.eq_ignore_ascii_case("auto") {
-            return Some(LengthOrPercent::Auto);
-        } else if let Some(v) = Length::from_str(value) {
-            return Some(Self::Length(v));
-        } else {
-            let value = value.trim();
-            if let Some(v) = parse_percent(value) {
-                return Some(Self::Percent(v));
-            }
-        }
-        Some(LengthOrPercent::Undefined)
-    }
-
-    fn to_style_string(&self) -> String {
-        match self {
-            LengthOrPercent::Length(v) => v.to_style_string(),
-            LengthOrPercent::Percent(v) => format!("{}%", v),
-            LengthOrPercent::Undefined => "".to_string(),
-            LengthOrPercent::Auto => "auto".to_string(),
-        }
-    }
-}
-
-impl PropValueParse for Color {
-    fn parse_prop_value(value: &str) -> Option<Self> {
-        parse_color(value)
-    }
-    fn to_style_string(&self) -> String {
-        format!(
-            "#{:02X}{:02X}{:02X}{:02X}",
-            self.r(),
-            self.g(),
-            self.b(),
-            self.a()
-        )
-    }
-}
-
-impl PropValueParse for Display {
-    fn parse_prop_value(value: &str) -> Option<Self> {
-        Display::from_str(value).ok()
-    }
-    fn to_style_string(&self) -> String {
-        self.to_string()
-    }
 }
 
 impl PropValueParse for f32 {
@@ -138,91 +52,6 @@ impl PropValueParse for f32 {
     }
     fn to_style_string(&self) -> String {
         self.to_string()
-    }
-}
-
-impl PropValueParse for FlexDirection {
-    fn parse_prop_value(value: &str) -> Option<Self> {
-        FlexDirection::from_str(value).ok()
-    }
-    fn to_style_string(&self) -> String {
-        self.to_string()
-    }
-}
-
-impl PropValueParse for Direction {
-    fn parse_prop_value(value: &str) -> Option<Self> {
-        Direction::from_str(value).ok()
-    }
-    fn to_style_string(&self) -> String {
-        self.to_string()
-    }
-}
-
-impl PropValueParse for Align {
-    fn parse_prop_value(value: &str) -> Option<Self> {
-        Some(Align::from_str(value).unwrap_or(Align::FlexStart))
-    }
-    fn to_style_string(&self) -> String {
-        self.to_string()
-    }
-}
-
-impl PropValueParse for PositionType {
-    fn parse_prop_value(value: &str) -> Option<Self> {
-        Some(
-            PositionType::from_str(value)
-                .ok()
-                .unwrap_or(PositionType::Static),
-        )
-    }
-    fn to_style_string(&self) -> String {
-        self.to_string()
-    }
-}
-
-impl PropValueParse for Overflow {
-    fn parse_prop_value(value: &str) -> Option<Self> {
-        Some(Overflow::from_str(value).unwrap_or(Overflow::Visible))
-    }
-    fn to_style_string(&self) -> String {
-        self.to_string()
-    }
-}
-
-impl PropValueParse for Justify {
-    fn parse_prop_value(value: &str) -> Option<Self> {
-        Some(Justify::from_str(value).unwrap_or(Justify::FlexStart))
-    }
-    fn to_style_string(&self) -> String {
-        self.to_string()
-    }
-}
-
-impl PropValueParse for Wrap {
-    fn parse_prop_value(value: &str) -> Option<Self> {
-        Some(Wrap::from_str(value).unwrap_or(Wrap::NoWrap))
-    }
-    fn to_style_string(&self) -> String {
-        self.to_string()
-    }
-}
-
-impl PropValueParse for StyleTransform {
-    fn parse_prop_value(value: &str) -> Option<Self> {
-        //TODO support multiple op
-        if let Some(op) = StyleTransformOp::parse(value) {
-            Some(Self { op_list: vec![op] })
-        } else {
-            None
-        }
-    }
-    fn to_style_string(&self) -> String {
-        self.op_list
-            .iter()
-            .map(|it| it.to_style_string())
-            .collect::<Vec<_>>()
-            .join(" ")
     }
 }
 
@@ -236,150 +65,6 @@ impl PropValueParse for String {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum TranslateLength {
-    Point(f32),
-    Percent(f32),
-}
-
-impl TranslateLength {
-    pub fn adapt_zero(&mut self, other: &mut Self) {
-        if self.is_zero() {
-            match other {
-                TranslateLength::Point(_) => {
-                    *self = TranslateLength::Point(0.0);
-                }
-                TranslateLength::Percent(_) => {
-                    *self = TranslateLength::Percent(0.0);
-                }
-            }
-        } else if other.is_zero() {
-            other.adapt_zero(self)
-        }
-    }
-    pub fn to_absolute(&self, block_length: f32) -> f32 {
-        match self {
-            TranslateLength::Point(p) => *p,
-            TranslateLength::Percent(p) => *p / 100.0 * block_length,
-        }
-    }
-
-    pub fn to_style_string(&self) -> String {
-        match self {
-            TranslateLength::Point(v) => v.to_string(),
-            TranslateLength::Percent(p) => {
-                format!("{}%", p)
-            }
-        }
-    }
-
-    fn is_zero(&self) -> bool {
-        match self {
-            TranslateLength::Point(v) => *v == 0.0,
-            TranslateLength::Percent(v) => *v == 0.0,
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct TranslateParams(pub TranslateLength, pub TranslateLength);
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct ScaleParams(pub f32, pub f32);
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum StyleTransformOp {
-    Rotate(f32),
-    Scale(ScaleParams),
-    Translate(TranslateParams),
-}
-
-impl StyleTransformOp {
-    pub fn parse(str: &str) -> Option<Self> {
-        let value = str.trim();
-        if !value.ends_with(")") {
-            return None;
-        }
-        let left_p = value.find("(")?;
-        let func = &value[0..left_p];
-        let param_str = &value[left_p + 1..value.len() - 1];
-        //TODO support double params
-        match func {
-            //"matrix" => parse_matrix(param_str).ok(),
-            "translate" => parse_translate_op(param_str),
-            "rotate" => parse_rotate_op(param_str),
-            "scale" => parse_scale_op(param_str),
-            _ => None,
-        }
-    }
-    pub fn to_style_string(&self) -> String {
-        match self {
-            StyleTransformOp::Rotate(v) => {
-                format!("rotate({})", v)
-            }
-            StyleTransformOp::Scale(v) => {
-                format!("scale({}, {})", v.0, v.1)
-            }
-            StyleTransformOp::Translate(p) => {
-                format!(
-                    "translate({}, {})",
-                    p.0.to_style_string(),
-                    p.1.to_style_string()
-                )
-            }
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct StyleTransform {
-    pub op_list: Vec<StyleTransformOp>,
-}
-
-impl StyleTransform {
-    pub fn empty() -> StyleTransform {
-        Self {
-            op_list: Vec::new(),
-        }
-    }
-
-    pub fn preprocess(&self) -> StyleTransform {
-        let mut list = Vec::new();
-        for op in self.op_list.clone() {
-            if let StyleTransformOp::Translate(params) = op {
-                let (mut tl, mut tl2) = (params.0, params.1);
-                tl.adapt_zero(&mut tl2);
-                list.push(StyleTransformOp::Translate(TranslateParams(tl, tl2)));
-                continue;
-            }
-            list.push(op);
-        }
-        StyleTransform { op_list: list }
-    }
-
-    pub fn apply(&self, width: f32, height: f32, mc: &mut MatrixCalculator) {
-        for op in &self.op_list {
-            match op {
-                StyleTransformOp::Rotate(deg) => {
-                    mc.rotate(*deg, None);
-                }
-                StyleTransformOp::Scale(ScaleParams(x, y)) => {
-                    mc.scale((*x, *y));
-                }
-                StyleTransformOp::Translate(params) => {
-                    let (x, y) = (&params.0, &params.1);
-                    let x = x.to_absolute(width);
-                    let y = y.to_absolute(height);
-                    mc.translate((x, y));
-                }
-            }
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct StyleBorder(LengthOrPercent, Color);
-
-#[derive(Clone, Debug, PartialEq)]
 pub enum StylePropVal<T: PropValueParse> {
     Custom(T),
     Inherit,
@@ -387,17 +72,6 @@ pub enum StylePropVal<T: PropValueParse> {
 }
 
 impl<T: Clone + PropValueParse> StylePropVal<T> {
-    //TODO remove
-    pub fn resolve(&self, default: &T) -> T {
-        match self {
-            StylePropVal::Custom(v) => v.clone(),
-            StylePropVal::Unset => default.clone(),
-            StylePropVal::Inherit => {
-                todo!()
-            }
-        }
-    }
-
     pub fn to_style_string(&self) -> String {
         match self {
             StylePropVal::Custom(v) => v.to_style_string(),
@@ -410,7 +84,7 @@ impl<T: Clone + PropValueParse> StylePropVal<T> {
 macro_rules! define_style_props {
     ($($name: ident => $type: ty, $compute_type: ty; )*) => {
         #[derive(Clone, Debug, PartialEq)]
-        pub enum StyleProp {
+        pub enum FixedStyleProp {
             $(
                 $name(StylePropVal<$type>),
             )*
@@ -431,6 +105,14 @@ macro_rules! define_style_props {
                     )*
                 }
             }
+
+            pub fn to_unresolved(&self) -> FixedStyleProp {
+                 match self {
+                    $(
+                        Self::$name(v) => FixedStyleProp::$name(StylePropVal::Custom(v.clone())),
+                    )*
+                }
+             }
         }
 
         #[derive(Clone, Debug, PartialEq)]
@@ -458,16 +140,16 @@ macro_rules! define_style_props {
             }
         }
 
-        impl StyleProp {
-            pub fn parse_value(key: StylePropKey, value: &str) -> Option<StyleProp> {
+        impl FixedStyleProp {
+            pub fn parse_value(key: StylePropKey, value: &str) -> Option<FixedStyleProp> {
                 $(
                     if key == StylePropKey::$name {
-                        return <$type>::parse_prop_value(value).map(|v| StyleProp::$name(StylePropVal::Custom(v)));
+                        return <$type>::parse_prop_value(value).map(|v| FixedStyleProp::$name(StylePropVal::Custom(v)));
                     }
                 )*
                 return None
             }
-            pub fn parse(key: &str, value: &str) -> Option<StyleProp> {
+            pub fn parse(key: &str, value: &str) -> Option<FixedStyleProp> {
                 let key = key.to_lowercase();
                 let k = key.as_str();
                 $(
@@ -475,11 +157,11 @@ macro_rules! define_style_props {
                         let value_lowercase = value.to_lowercase();
                         let value_lowercase = value_lowercase.as_str();
                         if value_lowercase == "inherit" {
-                            return Some(StyleProp::$name(StylePropVal::Inherit));
+                            return Some(FixedStyleProp::$name(StylePropVal::Inherit));
                         } else if value_lowercase == "unset" {
-                            return Some(StyleProp::$name(StylePropVal::Unset));
+                            return Some(FixedStyleProp::$name(StylePropVal::Unset));
                         } else {
-                            return <$type>::parse_prop_value(value).map(|v| StyleProp::$name(StylePropVal::Custom(v)));
+                            return <$type>::parse_prop_value(value).map(|v| FixedStyleProp::$name(StylePropVal::Custom(v)));
                         }
                     }
                 )*
@@ -622,320 +304,22 @@ define_style_props!(
     AnimationIterationCount => f32, f32;
 );
 
-pub fn parse_box_prop(
-    value: StylePropertyValue,
-) -> (
-    StylePropertyValue,
-    StylePropertyValue,
-    StylePropertyValue,
-    StylePropertyValue,
-) {
-    match value {
-        StylePropertyValue::String(str) => {
-            let parts: Vec<&str> = str.split(" ").filter(|e| !e.is_empty()).collect();
-            let top = if let Some(v) = parts.get(0) {
-                StylePropertyValue::String((*v).to_string())
-            } else {
-                StylePropertyValue::Invalid
-            };
-            let right = if let Some(v) = parts.get(1) {
-                StylePropertyValue::String((*v).to_string())
-            } else {
-                top.clone()
-            };
-            let bottom = if let Some(v) = parts.get(2) {
-                StylePropertyValue::String((*v).to_string())
-            } else {
-                top.clone()
-            };
-            let left = if let Some(v) = parts.get(3) {
-                StylePropertyValue::String((*v).to_string())
-            } else {
-                right.clone()
-            };
-            (top, right, bottom, left)
-        }
-        e => (e.clone(), e.clone(), e.clone(), e.clone()),
-    }
-}
-
-impl StylePropertyValue {
-    pub fn from_js_value(js_value: JsValue) -> Self {
-        // AllStylePropertyKey::CompoundStylePropertyKey(1);
-        match js_value {
-            JsValue::Undefined => Self::Invalid,
-            JsValue::Null => Self::Invalid,
-            JsValue::Bool(_) => Self::Invalid,
-            JsValue::Int(i) => Self::Float(i as f32),
-            JsValue::Float(f) => Self::Float(f as f32),
-            JsValue::String(s) => Self::String(s),
-            JsValue::Array(_) => Self::Invalid,
-            JsValue::Object(_) => Self::Invalid,
-            JsValue::Raw(_) => Self::Invalid,
-            JsValue::Date(_) => Self::Invalid,
-            JsValue::Resource(_) => Self::Invalid,
-            // JsValue::BigInt(_) => Self::Invalid,
-            _ => Self::Invalid,
-        }
-    }
-
-    pub fn from_str(value: &str) -> Self {
-        Self::String(value.to_string())
-    }
-
-    pub fn to_str(&self, default: &str) -> String {
-        match self {
-            StylePropertyValue::Float(f) => f.to_string(),
-            StylePropertyValue::String(s) => s.to_string(),
-            StylePropertyValue::Invalid => default.to_string(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Default)]
-pub struct LengthContext {
-    pub root: f32,
-    pub font_size: f32,
-    pub viewport_width: f32,
-    pub viewport_height: f32,
-}
-
-#[derive(Clone, Debug, PartialEq, Copy)]
-pub enum Length {
-    PX(f32),
-    CM(f32),
-    MM(f32),
-    IN(f32),
-    PT(f32),
-
-    EM(f32),
-    REM(f32),
-    VH(f32),
-    VW(f32),
-}
-
-#[derive(Clone, Debug, PartialEq, Copy)]
-pub enum LengthOrPercent {
-    Length(Length),
-    Percent(f32),
-    Undefined,
-    Auto,
-}
-
-#[derive(Clone, Debug, PartialEq, Copy, Hash, Eq)]
-pub enum FontStyle {
-    Normal,
-    Italic,
-    Oblique,
-}
-
-impl FontStyle {
-    pub fn to_slant(&self) -> Slant {
-        match self {
-            FontStyle::Normal => Slant::Upright,
-            FontStyle::Italic => Slant::Italic,
-            FontStyle::Oblique => Slant::Oblique,
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Copy)]
-pub enum LineHeightVal {
-    Length(Length),
-    Percent(f32),
-    Number(f32),
-    Normal,
-}
-
-impl LineHeightVal {
-    pub fn to_px(&self, length_context: &LengthContext) -> Option<f32> {
-        let v = match self {
-            LineHeightVal::Length(l) => l.to_px(length_context),
-            LineHeightVal::Percent(p) => length_context.font_size * p / 100.0,
-            LineHeightVal::Number(n) => length_context.font_size * n,
-            LineHeightVal::Normal => return None,
-        };
-        Some(v)
-    }
-}
-
-impl PropValueParse for FontFamilies {
-    fn parse_prop_value(value: &str) -> Option<Self> {
-        let mut list = Vec::new();
-        for p in value.trim().split(",") {
-            if p.starts_with("\"") && p.ends_with("\"") {
-                list.push(FontFamily::new(&p[1..p.len() - 1]));
-            } else if p.starts_with("'") && p.ends_with("'") {
-                list.push(FontFamily::new(&p[1..p.len() - 1]));
-            } else {
-                list.push(FontFamily::new(p));
-            }
-        }
-        Some(Self::new(list))
-    }
-
-    fn to_style_string(&self) -> String {
-        let list: Vec<String> = self
-            .as_slice()
-            .iter()
-            .map(|it| format!("'{}'", it.name()))
-            .collect();
-        list.join(",")
-    }
-}
-
-impl PropValueParse for FontStyle {
-    fn parse_prop_value(value: &str) -> Option<Self> {
-        let value = value.trim();
-        match value {
-            "normal" => Some(Self::Normal),
-            "italic" => Some(Self::Italic),
-            "oblique" => Some(Self::Oblique),
-            _ => None,
-        }
-    }
-
-    fn to_style_string(&self) -> String {
-        match self {
-            Self::Normal => String::from("normal"),
-            Self::Italic => String::from("italic"),
-            Self::Oblique => String::from("oblique"),
-        }
-    }
-}
-
-impl LengthOrPercent {
-    pub fn to_style_unit(&self, ctx: &LengthContext) -> StyleUnit {
-        match self {
-            LengthOrPercent::Length(v) => {
-                let value = v.to_px(ctx);
-                StyleUnit::Point(OrderedFloat(value))
-            }
-            LengthOrPercent::Percent(p) => StyleUnit::Percent(OrderedFloat(*p)),
-            LengthOrPercent::Undefined => StyleUnit::UndefinedValue,
-            LengthOrPercent::Auto => StyleUnit::Auto,
-        }
-    }
-}
-
-impl Length {
-    pub fn from_str(value: &str) -> Option<Self> {
-        let value = value.trim();
-        let result = if let Some(v) = value.strip_suffix("px") {
-            Self::PX(Self::parse_f32(v)?)
-        } else if let Some(v) = value.strip_suffix("cm") {
-            Self::CM(Self::parse_f32(v)?)
-        } else if let Some(v) = value.strip_suffix("mm") {
-            Self::MM(Self::parse_f32(v)?)
-        } else if let Some(v) = value.strip_suffix("in") {
-            Self::IN(Self::parse_f32(v)?)
-        } else if let Some(v) = value.strip_suffix("pt") {
-            Self::PT(Self::parse_f32(v)?)
-        } else if let Some(v) = value.strip_suffix("em") {
-            Self::EM(Self::parse_f32(v)?)
-        } else if let Some(v) = value.strip_suffix("rem") {
-            Self::REM(Self::parse_f32(v)?)
-        } else if let Some(v) = value.strip_suffix("vh") {
-            Self::VH(Self::parse_f32(v)?)
-        } else if let Some(v) = value.strip_suffix("vw") {
-            Self::VW(Self::parse_f32(v)?)
-        } else {
-            let v = Self::parse_f32(value)?;
-            return Some(Self::PX(v));
-        };
-        Some(result)
-    }
-
-    pub fn update_value(&mut self, value: f32) {
-        match self {
-            Length::PX(x) => *x = value,
-            Length::CM(x) => *x = value,
-            Length::MM(x) => *x = value,
-            Length::IN(x) => *x = value,
-            Length::PT(x) => *x = value,
-            Length::EM(x) => *x = value,
-            Length::REM(x) => *x = value,
-            Length::VH(x) => *x = value,
-            Length::VW(x) => *x = value,
-        }
-    }
-
-    pub fn to_px(&self, ctx: &LengthContext) -> f32 {
-        match self {
-            Length::EM(em) => em * ctx.font_size,
-            Length::REM(rem) => rem * ctx.root,
-            Length::VH(vh) => vh / 100.0 * ctx.viewport_height,
-            Length::VW(vw) => vw / 100.0 * ctx.viewport_width,
-            Length::PX(px) => *px,
-            Length::CM(cm) => cm * 96.0 / 2.54,
-            Length::MM(mm) => mm * 96.0 / 2.54 / 10.0,
-            Length::IN(i) => i * 96.0,
-            Length::PT(pt) => pt * 96.0 / 72.0,
-        }
-    }
-
-    pub fn to_str(&self) -> String {
-        match self {
-            Length::PX(v) => format!("{}px", v),
-            Length::CM(v) => format!("{}cm", v),
-            Length::MM(v) => format!("{}mm", v),
-            Length::IN(v) => format!("{}in", v),
-            Length::PT(v) => format!("{}pt", v),
-            Length::EM(v) => format!("{}em", v),
-            Length::REM(v) => format!("{}rem", v),
-            Length::VH(v) => format!("{}vh", v),
-            Length::VW(v) => format!("{}vw", v),
-        }
-    }
-
-    fn parse_f32(value: &str) -> Option<f32> {
-        let value = value.trim();
-        f32::from_str(value).ok()
-    }
-}
-
-impl PropValueParse for Weight {
-    fn parse_prop_value(value: &str) -> Option<Self> {
-        parse_weight(value)
-    }
-
-    fn to_style_string(&self) -> String {
-        format!("{}", self.deref())
-    }
-}
-
-pub trait ColorHelper {
-    fn is_transparent(&self) -> bool;
-}
-
-impl ColorHelper for Color {
-    fn is_transparent(&self) -> bool {
-        self.a() == 0
-    }
-}
-
-struct AnimationParams {
-    name: String,
-    duration: f32,
-    iteration_count: f32,
-}
-
-impl AnimationParams {
-    pub fn new() -> Self {
-        Self {
-            name: "".to_string(),
-            duration: 0.0,
-            iteration_count: 1.0,
-        }
-    }
-}
-
-#[derive(PartialEq)]
-struct BorderParams {
-    border_width: [f32; 4],
-    border_radius: [f32; 4],
-    width: f32,
-    height: f32,
+pub fn parse_box_prop(str: &str, default: &str) -> (String, String, String, String) {
+    let parts: Vec<&str> = str.split(" ").filter(|e| !e.is_empty()).collect();
+    let top = if let Some(v) = parts.get(0) {
+        v
+    } else {
+        default
+    };
+    let right = if let Some(v) = parts.get(1) { v } else { top };
+    let bottom = if let Some(v) = parts.get(2) { v } else { top };
+    let left = if let Some(v) = parts.get(3) { v } else { right };
+    (
+        top.to_string(),
+        right.to_string(),
+        bottom.to_string(),
+        left.to_string(),
+    )
 }
 
 #[derive(PartialEq, Clone)]
@@ -1064,7 +448,7 @@ impl StyleNode {
         )
     }
 
-    fn get_resolved_value(&self, key: StylePropKey) -> ResolvedStyleProp {
+    pub fn get_resolved_value(&self, key: StylePropKey) -> ResolvedStyleProp {
         if let Some(v) = self.resolved_style_props.get(&key) {
             v.clone()
         } else {
@@ -1072,7 +456,7 @@ impl StyleNode {
         }
     }
 
-    fn get_default_value(&self, key: StylePropKey) -> ResolvedStyleProp {
+    pub fn get_default_value(&self, key: StylePropKey) -> ResolvedStyleProp {
         let standard_node = Node::new();
         let default_border_width = LengthOrPercent::Length(Length::PX(0.0));
         let default_border_color = Color::TRANSPARENT;
@@ -1186,26 +570,6 @@ impl StyleNode {
             StylePropKey::RowGap => ResolvedStyleProp::RowGap(Length::PX(0.0)),
             //TODO aspectratio
         }
-    }
-
-    /// return (need_repaint, need_layout)
-    pub fn set_style(
-        &mut self,
-        p: StyleProp,
-        length_ctx: &LengthContext,
-    ) -> (bool, bool, ResolvedStyleProp) {
-        let v = p.resolve_value(
-            |k| self.get_default_value(k),
-            |k| {
-                if let Some(p) = self.get_parent() {
-                    p.get_resolved_value(k)
-                } else {
-                    self.get_default_value(k)
-                }
-            },
-        );
-        let (need_repaint, need_layout) = self.set_resolved_style_prop(v.clone(), length_ctx);
-        (need_repaint, need_layout, v)
     }
 
     pub fn set_resolved_style_prop(
@@ -1565,36 +929,6 @@ pub fn parse_style_obj(style: JsValue) -> Vec<ParsedStyleProp> {
     result
 }
 
-pub fn parse_float(value: &str) -> f32 {
-    f32::from_str(value).unwrap_or(0.0)
-}
-
-pub fn parse_percent(value: &str) -> Option<f32> {
-    if let Some(v) = value.strip_suffix("%") {
-        let v = f32::from_str(v.trim()).ok()?;
-        Some(v)
-    } else {
-        None
-    }
-}
-
-pub fn parse_color_str(value: &str) -> Option<Color> {
-    //TODO support white,black and so on
-    if let Some(hex) = value.strip_prefix("#") {
-        parse_hex_color(hex)
-    } else {
-        None
-    }
-}
-
-pub fn parse_optional_color_str(value: Option<&String>) -> Option<Color> {
-    if let Some(str) = value {
-        parse_color_str(str)
-    } else {
-        None
-    }
-}
-
 fn parse_matrix(value: &str) -> Result<Matrix, Error> {
     let parts: Vec<&str> = value.split(",").collect();
     if parts.len() != 6 {
@@ -1632,109 +966,4 @@ fn create_matrix(values: [f32; 6]) -> Matrix {
     Matrix::new_all(
         scale_x, skew_x, trans_x, skew_y, scale_y, trans_y, 0.0, 0.0, 1.0,
     )
-}
-
-fn parse_rotate_op(value: &str) -> Option<StyleTransformOp> {
-    if let Some(v) = value.strip_suffix("deg") {
-        let v = f32::from_str(v).ok()?;
-        Some(StyleTransformOp::Rotate(v))
-    } else {
-        None
-    }
-}
-
-fn parse_scale_op(value: &str) -> Option<StyleTransformOp> {
-    let mut values = value.split(",").collect::<Vec<&str>>();
-    if values.len() < 2 {
-        values.push(values[0]);
-    }
-    let x = f32::from_str(values[0].trim()).ok()?;
-    let y = f32::from_str(values[1].trim()).ok()?;
-    Some(StyleTransformOp::Scale(ScaleParams(x, y)))
-}
-
-fn parse_translate_op(value: &str) -> Option<StyleTransformOp> {
-    let mut values = value.split(",").collect::<Vec<&str>>();
-    if values.len() < 2 {
-        values.push(values[0]);
-    }
-    let x = parse_translate_length(values[0].trim())?;
-    let y = parse_translate_length(values[1].trim())?;
-    Some(StyleTransformOp::Translate(TranslateParams(x, y)))
-}
-
-fn parse_translate_length(value: &str) -> Option<TranslateLength> {
-    if let Some(v) = parse_percent(value) {
-        Some(TranslateLength::Percent(v))
-    } else {
-        let v = f32::from_str(value).ok()?;
-        Some(TranslateLength::Point(v))
-    }
-}
-
-pub fn parse_border(value: &str) -> (LengthOrPercent, Color) {
-    let parts = value.split(" ");
-    let mut width = LengthOrPercent::Length(Length::PX(0.0));
-    let mut color = Color::from_rgb(0, 0, 0);
-    for p in parts {
-        let p = p.trim();
-        if let Some(c) = parse_color(p) {
-            color = c;
-        } else if let Some(w) = LengthOrPercent::parse_prop_value(p) {
-            width = w;
-        }
-    }
-    (width, color)
-}
-
-fn parse_color(value: &str) -> Option<Color> {
-    if let Some(hex) = value.strip_prefix("#") {
-        parse_hex_color(hex)
-    } else if let Ok(c) = parse_color_keyword(value) {
-        match c {
-            cssparser::Color::CurrentColor => None,
-            cssparser::Color::RGBA(rgba) => Some(Color::from_argb(
-                rgba.alpha, rgba.red, rgba.green, rgba.blue,
-            )),
-        }
-    } else if let Some(rgb) = value.strip_prefix("rgb(") {
-        let mut params = rgb.strip_suffix(")")?.split(',').map(|p| p.trim());
-        let r = u8::from_str(params.next()?).ok()?;
-        let g = u8::from_str(params.next()?).ok()?;
-        let b = u8::from_str(params.next()?).ok()?;
-        if params.next().is_none() {
-            Some(Color::from_rgb(r, g, b))
-        } else {
-            None
-        }
-    } else if let Some(rgba) = value.strip_prefix("rgba(") {
-        let mut params = rgba.strip_suffix(")")?.split(',').map(|p| p.trim());
-        let r = u8::from_str(params.next()?).ok()?;
-        let g = u8::from_str(params.next()?).ok()?;
-        let b = u8::from_str(params.next()?).ok()?;
-        let a = u8::from_str(params.next()?).ok()?;
-        if params.next().is_none() {
-            Some(Color::from_argb(a, r, g, b))
-        } else {
-            None
-        }
-    } else {
-        None
-    }
-}
-
-#[test]
-fn test_inherit() {
-    let color = Color::from_rgb(10, 20, 30);
-    let mut p = StyleNode::new();
-    let length_context = LengthContext::default();
-    p.set_style(
-        StyleProp::Color(StylePropVal::Custom(color)),
-        &length_context,
-    );
-    let mut c = StyleNode::new();
-    p.insert_child(&mut c, 0);
-    c.set_style(StyleProp::Color(StylePropVal::Inherit), &length_context);
-    let child_color = c.get_resolved_value(StylePropKey::Color);
-    assert_eq!(child_color, ResolvedStyleProp::Color(color));
 }

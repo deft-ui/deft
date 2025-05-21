@@ -4,7 +4,7 @@ use crate::number::DeNan;
 use crate::paint::Painter;
 use crate::some_or_return;
 use crate::string::StringUtils;
-use crate::style::ColorHelper;
+use crate::style::color::ColorHelper;
 use crate::text::{calculate_line_char_count, TextStyle};
 use libc::memcpy;
 use log::warn;

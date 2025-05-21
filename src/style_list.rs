@@ -1,20 +1,17 @@
 use crate as deft;
 use crate::mrc::MrcWeak;
-use crate::style::{
-    parse_border, parse_style_obj, PropValueParse, StyleProp, StylePropKey, StylePropVal,
-    StylePropertyValue,
-};
+use crate::style::border::parse_border;
+use crate::style::{parse_style_obj, FixedStyleProp, PropValueParse, StylePropKey, StylePropVal};
 use deft_macros::mrc_object;
 use quick_js::JsValue;
 use std::collections::HashMap;
-use std::mem;
 use yoga::PositionType;
 
 type CssValueResolver = Box<dyn Fn(&HashMap<String, String>) -> String>;
 
 pub enum ParsedStyleProp {
-    Fixed(StyleProp),
-    Var(String, String, CssValueResolver, Option<StyleProp>),
+    Fixed(FixedStyleProp),
+    Var(String, String, CssValueResolver, Option<FixedStyleProp>),
 }
 
 impl PartialEq for ParsedStyleProp {
@@ -53,19 +50,19 @@ impl ParsedStyleProp {
         result
     }
 
-    pub fn resolve(&mut self, vars: &MrcWeak<HashMap<String, String>>) {
+    pub fn fix(&mut self, vars: &MrcWeak<HashMap<String, String>>) {
         match self {
             ParsedStyleProp::Fixed(_v) => {}
-            ParsedStyleProp::Var(key, _v, resolver, resolved) => {
-                *resolved = None;
+            ParsedStyleProp::Var(key, _v, resolver, fixed) => {
+                *fixed = None;
                 if let Ok(vars) = vars.upgrade() {
                     let v = resolver(&vars);
-                    StyleList::str_to_style_prop(&key, &v, &mut |c| *resolved = Some(c));
+                    StyleList::str_to_style_prop(&key, &v, &mut |c| *fixed = Some(c));
                 }
             }
         }
     }
-    pub fn resolved(&self) -> Option<StyleProp> {
+    pub fn fixed(&self) -> Option<FixedStyleProp> {
         match self {
             ParsedStyleProp::Fixed(v) => Some(v.clone()),
             ParsedStyleProp::Var(_, _, _, v) => v.clone(),
@@ -88,6 +85,7 @@ pub struct StyleList {
     values: HashMap<StylePropKey, ParsedStyleProp>,
     hover_style_props: HashMap<StylePropKey, ParsedStyleProp>,
     selector_style_props: HashMap<StylePropKey, ParsedStyleProp>,
+    pseudo_element_style_props: HashMap<String, HashMap<StylePropKey, ParsedStyleProp>>,
     pub(crate) variables: MrcWeak<HashMap<String, String>>,
 }
 
@@ -95,13 +93,13 @@ impl StyleList {
     pub fn new() -> StyleList {
         let mut default_style_props = HashMap::new();
         let default_styles = vec![
-            StyleProp::Position(StylePropVal::Custom(PositionType::Static)),
-            StyleProp::Color(StylePropVal::Inherit),
-            StyleProp::FontSize(StylePropVal::Inherit),
-            StyleProp::LineHeight(StylePropVal::Inherit),
-            StyleProp::FontFamily(StylePropVal::Inherit),
-            StyleProp::FontWeight(StylePropVal::Inherit),
-            StyleProp::FontStyle(StylePropVal::Inherit),
+            FixedStyleProp::Position(StylePropVal::Custom(PositionType::Static)),
+            FixedStyleProp::Color(StylePropVal::Inherit),
+            FixedStyleProp::FontSize(StylePropVal::Inherit),
+            FixedStyleProp::LineHeight(StylePropVal::Inherit),
+            FixedStyleProp::FontFamily(StylePropVal::Inherit),
+            FixedStyleProp::FontWeight(StylePropVal::Inherit),
+            FixedStyleProp::FontStyle(StylePropVal::Inherit),
         ];
         for d in default_styles {
             default_style_props.insert(d.key(), ParsedStyleProp::Fixed(d));
@@ -112,32 +110,33 @@ impl StyleList {
             hover_style_props: HashMap::new(),
             selector_style_props: HashMap::new(),
             variables: MrcWeak::new(),
+            pseudo_element_style_props: HashMap::new(),
         }
         .to_ref()
     }
 
     pub fn set_variables(&mut self, variables: MrcWeak<HashMap<String, String>>) {
-        StyleList::resolve_variables(&mut self.values, &variables);
-        StyleList::resolve_variables(&mut self.hover_style_props, &variables);
-        StyleList::resolve_variables(&mut self.selector_style_props, &variables);
+        StyleList::fix_variables(&mut self.values, &variables);
+        StyleList::fix_variables(&mut self.hover_style_props, &variables);
+        StyleList::fix_variables(&mut self.selector_style_props, &variables);
         self.variables = variables;
     }
 
-    fn resolve_variables(
+    fn fix_variables(
         table: &mut HashMap<StylePropKey, ParsedStyleProp>,
         variables: &MrcWeak<HashMap<String, String>>,
     ) {
         for (_k, v) in table {
-            v.resolve(variables);
+            v.fix(variables);
         }
     }
 
-    fn collect_resolved_props(
+    fn collect_fixed_props(
         table: &HashMap<StylePropKey, ParsedStyleProp>,
-        result: &mut HashMap<StylePropKey, StyleProp>,
+        result: &mut HashMap<StylePropKey, FixedStyleProp>,
     ) {
         for (_, v) in table {
-            if let Some(v) = v.resolved() {
+            if let Some(v) = v.fixed() {
                 result.insert(v.key(), v);
             }
         }
@@ -147,7 +146,7 @@ impl StyleList {
         self.values.clear();
     }
 
-    pub fn set_style_props(&mut self, styles: Vec<StyleProp>) {
+    pub fn set_style_props(&mut self, styles: Vec<FixedStyleProp>) {
         for style_prop in &styles {
             self.values
                 .insert(style_prop.key(), ParsedStyleProp::Fixed(style_prop.clone()));
@@ -177,18 +176,30 @@ impl StyleList {
     pub fn set_style_str(&mut self, k: &str, v_str: &str) {
         let list = ParsedStyleProp::parse(k, v_str);
         for mut p in list {
-            p.resolve(&self.variables);
+            p.fix(&self.variables);
             self.values.insert(p.key(), p);
         }
     }
 
-    pub fn get_styles(&self, is_hover: bool) -> HashMap<StylePropKey, StyleProp> {
+    pub fn get_styles(&self, is_hover: bool) -> HashMap<StylePropKey, FixedStyleProp> {
         let mut result = HashMap::new();
-        Self::collect_resolved_props(&self.default_style_props, &mut result);
-        Self::collect_resolved_props(&self.selector_style_props, &mut result);
-        Self::collect_resolved_props(&self.values, &mut result);
+        Self::collect_fixed_props(&self.default_style_props, &mut result);
+        Self::collect_fixed_props(&self.selector_style_props, &mut result);
+        Self::collect_fixed_props(&self.values, &mut result);
         if is_hover {
-            Self::collect_resolved_props(&self.hover_style_props, &mut result);
+            Self::collect_fixed_props(&self.hover_style_props, &mut result);
+        }
+        result
+    }
+
+    pub fn get_pseudo_element_style_props(
+        &self,
+    ) -> HashMap<String, HashMap<StylePropKey, FixedStyleProp>> {
+        let mut result = HashMap::new();
+        for (name, styles) in self.pseudo_element_style_props.iter() {
+            let mut props = HashMap::new();
+            Self::collect_fixed_props(styles, &mut props);
+            result.insert(name.clone(), props);
         }
         result
     }
@@ -202,15 +213,43 @@ impl StyleList {
     }
 
     pub fn set_selector_style(&mut self, styles: Vec<String>) -> bool {
-        let old_style_props = mem::take(&mut self.selector_style_props);
-        for s in &styles {
+        let mut new_style_props = HashMap::new();
+        self.parse_style_vec(&styles, &mut new_style_props);
+        if new_style_props != self.selector_style_props {
+            self.selector_style_props = new_style_props;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn set_pseudo_element_style(&mut self, styles_map: HashMap<String, Vec<String>>) -> bool {
+        let mut pseudo_element_props = HashMap::new();
+        for (k, styles) in styles_map {
+            let mut parsed_styles = HashMap::new();
+            self.parse_style_vec(&styles, &mut parsed_styles);
+            pseudo_element_props.insert(k, parsed_styles);
+        }
+        if pseudo_element_props != self.pseudo_element_style_props {
+            self.pseudo_element_style_props = pseudo_element_props;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn parse_style_vec(
+        &self,
+        styles: &Vec<String>,
+        result: &mut HashMap<StylePropKey, ParsedStyleProp>,
+    ) {
+        for s in styles {
             let list = Self::parse_style(s);
             for mut p in list {
-                p.resolve(&self.variables);
-                self.selector_style_props.insert(p.key(), p);
+                p.fix(&self.variables);
+                result.insert(p.key(), p);
             }
         }
-        self.selector_style_props != old_style_props
     }
 
     pub fn parse_style(style: &str) -> Vec<ParsedStyleProp> {
@@ -258,33 +297,30 @@ impl StyleList {
                 result
             }
             "margin" => {
-                let (t, r, b, l) =
-                    crate::style::parse_box_prop(StylePropertyValue::String(v_str.to_string()));
+                let (t, r, b, l) = crate::style::parse_box_prop(v_str, "none");
                 vec![
-                    ("MarginTop", t.to_str("none")),
-                    ("MarginRight", r.to_str("none")),
-                    ("MarginBottom", b.to_str("none")),
-                    ("MarginLeft", l.to_str("none")),
+                    ("MarginTop", t),
+                    ("MarginRight", r),
+                    ("MarginBottom", b),
+                    ("MarginLeft", l),
                 ]
             }
             "padding" => {
-                let (t, r, b, l) =
-                    crate::style::parse_box_prop(StylePropertyValue::String(v_str.to_string()));
+                let (t, r, b, l) = crate::style::parse_box_prop(v_str, "none");
                 vec![
-                    ("PaddingTop", t.to_str("none")),
-                    ("PaddingRight", r.to_str("none")),
-                    ("PaddingBottom", b.to_str("none")),
-                    ("PaddingLeft", l.to_str("none")),
+                    ("PaddingTop", t),
+                    ("PaddingRight", r),
+                    ("PaddingBottom", b),
+                    ("PaddingLeft", l),
                 ]
             }
             "borderradius" => {
-                let (t, r, b, l) =
-                    crate::style::parse_box_prop(StylePropertyValue::String(v_str.to_string()));
+                let (t, r, b, l) = crate::style::parse_box_prop(v_str, "none");
                 vec![
-                    ("BorderTopLeftRadius", t.to_str("none")),
-                    ("BorderTopRightRadius", r.to_str("none")),
-                    ("BorderBottomRightRadius", b.to_str("none")),
-                    ("BorderBottomLeftRadius", l.to_str("none")),
+                    ("BorderTopLeftRadius", t),
+                    ("BorderTopRightRadius", r),
+                    ("BorderBottomRightRadius", b),
+                    ("BorderBottomLeftRadius", l),
                 ]
             }
             "bordertop" => {
@@ -325,9 +361,9 @@ impl StyleList {
         }
     }
 
-    fn str_to_style_prop<C: FnMut(StyleProp)>(k: &str, v_str: &str, c: &mut C) {
+    fn str_to_style_prop<C: FnMut(FixedStyleProp)>(k: &str, v_str: &str, c: &mut C) {
         let k = k.to_lowercase().replace("-", "");
-        if let Some(sp) = StyleProp::parse(&k, v_str) {
+        if let Some(sp) = FixedStyleProp::parse(&k, v_str) {
             c(sp);
         }
     }

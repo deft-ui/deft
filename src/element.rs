@@ -40,9 +40,7 @@ use crate::ext::ext_window::{
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::resource_table::ResourceTable;
-use crate::style::{
-    LengthContext, ResolvedStyleProp, StyleNode, StyleProp, StylePropKey, StylePropVal,
-};
+use crate::style::{FixedStyleProp, ResolvedStyleProp, StyleNode, StylePropKey, StylePropVal};
 use crate::window::{Window, WindowWeak};
 use crate::{
     base, bind_js_event_listener, js_auto_upgrade, js_deserialize, js_serialize, js_value,
@@ -80,7 +78,9 @@ use crate::paint::MatrixCalculator;
 use crate::render::RenderFn;
 use crate::style::border_path::BorderPath;
 use crate::style::css_manager::CssManager;
-use crate::style_list::{ParsedStyleProp, StyleList};
+use crate::style::length::LengthContext;
+use crate::style::styles::Styles;
+use crate::style_list::StyleList;
 
 thread_local! {
     pub static NEXT_ELEMENT_ID: Cell<u32> = Cell::new(1);
@@ -488,7 +488,7 @@ impl Element {
                 Some(p.as_weak())
             }
         };
-        self.applied_style.clear();
+        self.applied_style = Styles::new();
         if let Some(win) = self.get_window() {
             if let Ok(win) = win.upgrade_mut() {
                 self.refresh_style_variables(&win.style_variables.as_weak());
@@ -764,7 +764,7 @@ impl Element {
         self.sync_style();
     }
 
-    pub fn set_style_props(&mut self, styles: Vec<StyleProp>) {
+    pub fn set_style_props(&mut self, styles: Vec<FixedStyleProp>) {
         // self.style_props.clear();
         self.style_list.set_style_props(styles);
         self.sync_style();
@@ -785,10 +785,10 @@ impl Element {
 
     //TODO remove
     fn calculate_changed_style<'a>(
-        old_style_map: &'a HashMap<StylePropKey, StyleProp>,
-        new_style_map: &'a HashMap<StylePropKey, StyleProp>,
+        old_style_map: &'a HashMap<StylePropKey, FixedStyleProp>,
+        new_style_map: &'a HashMap<StylePropKey, FixedStyleProp>,
         parent_changed: &Vec<StylePropKey>,
-    ) -> Vec<StyleProp> {
+    ) -> Vec<FixedStyleProp> {
         let mut changed_style_props = HashMap::new();
         let mut keys = HashSet::new();
         for k in old_style_map.keys() {
@@ -840,7 +840,8 @@ impl Element {
 
     pub(crate) fn compute_font_size_recurse(&mut self, ctx: &LengthContext) {
         let style = self.style_list.get_styles(self.hover);
-        let px = if let Some(StyleProp::FontSize(fs_prop)) = style.get(&StylePropKey::FontSize) {
+        let px = if let Some(FixedStyleProp::FontSize(fs_prop)) = style.get(&StylePropKey::FontSize)
+        {
             match fs_prop {
                 StylePropVal::Custom(c) => c.to_px(&ctx),
                 _ => ctx.font_size,
@@ -860,67 +861,101 @@ impl Element {
         }
     }
 
-    pub(crate) fn apply_style_update(
-        &mut self,
-        parent_changed: &Vec<StylePropKey>,
-        length_ctx: &LengthContext,
-    ) {
+    pub(crate) fn apply_style_update(&mut self, parent_changed: bool, length_ctx: &LengthContext) {
         let is_self_dirty = self.dirty_flags.contains(StyleDirtyFlags::SelfDirty);
         let is_children_dirty = self.dirty_flags.contains(StyleDirtyFlags::ChildrenDirty);
-        let mut changed_keys = Vec::new();
-        if is_self_dirty || !parent_changed.is_empty() {
-            let changed_styles = self.apply_own_style(parent_changed, length_ctx);
-            for s in changed_styles {
-                changed_keys.push(s.key());
-            }
-        }
-        if is_children_dirty || !changed_keys.is_empty() {
+        let changed = if is_self_dirty || parent_changed {
+            self.apply_owned_style(length_ctx)
+        } else {
+            false
+        };
+        if is_children_dirty || changed {
             let mut children = self.get_children();
             for c in &mut children {
-                c.apply_style_update(&changed_keys, length_ctx);
+                c.apply_style_update(changed, length_ctx);
             }
         }
         self.dirty_flags.remove(StyleDirtyFlags::ChildrenDirty);
         self.dirty_flags.remove(StyleDirtyFlags::SelfDirty);
     }
 
-    pub fn apply_own_style(
-        &mut self,
-        parent_changed: &Vec<StylePropKey>,
-        length_ctx: &LengthContext,
-    ) -> Vec<ResolvedStyleProp> {
+    fn compute_owned_style(&mut self) -> (Styles, HashMap<String, Styles>) {
         let mut style_props = self.style_list.get_styles(self.hover);
         for (k, v) in &self.animation_style_props {
             style_props.insert(k.clone(), v.clone());
         }
-        let old_style = self.applied_style.clone();
-        let changed_style_props =
-            Self::calculate_changed_style(&old_style, &style_props, parent_changed);
-        // println!("new styles {} => {:?}", self.id, style_props);
+        let styles = self.resolve_style_props(style_props);
+        let mut pseudo_element_styles = HashMap::new();
 
-        let mut changed_list = Vec::new();
-        for sp in changed_style_props {
-            let (repaint, need_layout, v) = self.apply_style_prop(sp, length_ctx);
-            if need_layout || repaint {
-                self.mark_dirty(need_layout);
-                changed_list.push(v);
-            }
+        for (k, v) in self.style_list.get_pseudo_element_style_props() {
+            let pe_styles = self.resolve_style_props(v);
+            pseudo_element_styles.insert(k, pe_styles);
         }
-        // println!("changed list: {} {:?}", self.id, changed_list);
-        self.applied_style = style_props;
-        changed_list
+        (styles, pseudo_element_styles)
     }
 
-    pub fn apply_style_prop(
-        &mut self,
-        prop: StyleProp,
-        length_ctx: &LengthContext,
-    ) -> (bool, bool, ResolvedStyleProp) {
-        if let Some(v) = self.backend.apply_style_prop(&prop, length_ctx) {
-            v
-        } else {
-            self.style.set_style(prop, length_ctx)
+    fn resolve_style_props(&self, style_props: HashMap<StylePropKey, FixedStyleProp>) -> Styles {
+        let mut resolved = HashMap::new();
+        for (k, prop) in style_props {
+            let v = prop.resolve_value(
+                |k| self.style.get_default_value(k),
+                |k| {
+                    if let Some(p) = self.get_parent() {
+                        p.style.get_resolved_value(k)
+                    } else {
+                        self.style.get_default_value(k)
+                    }
+                },
+            );
+            resolved.insert(k, v);
         }
+        Styles::from_map(resolved)
+    }
+
+    pub fn apply_owned_style(&mut self, length_ctx: &LengthContext) -> bool {
+        let (styles, pseudo_element_styles) = self.compute_owned_style();
+
+        let changed_styles =
+            styles.compute_changed_style(&self.applied_style, |k| self.style.get_default_value(k));
+        let mut changed = !changed_styles.is_empty();
+        for sp in changed_styles {
+            let (repaint, need_layout) = self.style.set_resolved_style_prop(sp, length_ctx);
+            if need_layout || repaint {
+                self.mark_dirty(need_layout);
+            }
+        }
+
+        let mut pseudo_element_keys = Vec::new();
+        for (k, _) in &pseudo_element_styles {
+            pseudo_element_keys.push(k);
+        }
+        for (k, _) in &self.applied_pseudo_element_styles {
+            pseudo_element_keys.push(k);
+        }
+        let empty_styles = Styles::default();
+        let mut changed_pe_styles_map = HashMap::new();
+        for k in pseudo_element_keys {
+            let new_style = pseudo_element_styles.get(k).unwrap_or(&empty_styles);
+            let old_style = self
+                .applied_pseudo_element_styles
+                .get(k)
+                .unwrap_or(&empty_styles);
+            let changed_pe_styles =
+                new_style.compute_changed_style(&old_style, |k| self.style.get_default_value(k));
+            if !changed_pe_styles.is_empty() {
+                changed_pe_styles_map.insert(k.clone(), changed_pe_styles);
+            }
+        }
+        if !changed_pe_styles_map.is_empty() {
+            self.backend
+                .accept_pseudo_element_styles(changed_pe_styles_map);
+            changed = true;
+        }
+
+        // println!("changed list: {} {:?}", self.id, changed_list);
+        self.applied_style = styles;
+        self.applied_pseudo_element_styles = pseudo_element_styles;
+        changed
     }
 
     pub fn register_event_listener<T: 'static, H: EventListener<T, ElementWeak> + 'static>(
@@ -1199,19 +1234,11 @@ impl Element {
     pub(crate) fn select_style(&mut self) {
         if self.element_type == ElementType::Widget {
             let (style, pseudo_styles) = CSS_MANAGER.with_borrow(|cm| cm.match_styles(&self));
-            if self.style_list.set_selector_style(style) {
+            let selector_style_changed = self.style_list.set_selector_style(style);
+            let pseudo_element_style_changed =
+                self.style_list.set_pseudo_element_style(pseudo_styles);
+            if selector_style_changed || pseudo_element_style_changed {
                 self.mark_style_dirty();
-            }
-            if !pseudo_styles.is_empty() {
-                let mut ps = HashMap::new();
-                for (k, v) in pseudo_styles {
-                    let mut style_props = StyleList::parse_style(&v);
-                    for p in &mut style_props {
-                        p.resolve(&self.style_list.variables)
-                    }
-                    ps.insert(k, style_props);
-                }
-                self.backend.accept_pseudo_styles(ps);
             }
         }
     }
@@ -1271,13 +1298,14 @@ pub struct Element {
     window: Option<WindowWeak>,
     event_registration: EventRegistration<ElementWeak>,
     pub style: StyleNode,
-    pub(crate) animation_style_props: HashMap<StylePropKey, StyleProp>,
+    pub(crate) animation_style_props: HashMap<StylePropKey, FixedStyleProp>,
     pub(crate) hover: bool,
     auto_focus: bool,
     dirty_flags: StyleDirtyFlags,
     element_type: ElementType,
 
-    applied_style: HashMap<StylePropKey, StyleProp>,
+    applied_style: Styles,
+    applied_pseudo_element_styles: HashMap<String, Styles>,
     // animation_instance: Option<AnimationInstance>,
     scroll_top: f32,
     scroll_left: f32,
@@ -1319,7 +1347,7 @@ impl ElementData {
             event_registration: EventRegistration::new(),
             style: StyleNode::new(),
             animation_style_props: HashMap::new(),
-            applied_style: HashMap::new(),
+            applied_style: Styles::new(),
             hover: false,
             element_type: ElementType::Inner,
 
@@ -1341,6 +1369,7 @@ impl ElementData {
             dirty_flags: StyleDirtyFlags::LayoutDirty,
             classes: HashSet::new(),
             attributes: HashMap::new(),
+            applied_pseudo_element_styles: HashMap::new(),
         }
     }
 }
@@ -1414,21 +1443,9 @@ pub trait ElementBackend: 'static {
         }
     }
 
-    fn apply_style_prop(
-        &mut self,
-        prop: &StyleProp,
-        length_ctx: &LengthContext,
-    ) -> Option<(bool, bool, ResolvedStyleProp)> {
+    fn accept_pseudo_element_styles(&mut self, styles: HashMap<String, Vec<ResolvedStyleProp>>) {
         if let Some(base) = self.get_base_mut() {
-            base.apply_style_prop(prop, length_ctx)
-        } else {
-            None
-        }
-    }
-
-    fn accept_pseudo_styles(&mut self, styles: HashMap<String, Vec<ParsedStyleProp>>) {
-        if let Some(base) = self.get_base_mut() {
-            base.accept_pseudo_styles(styles);
+            base.accept_pseudo_element_styles(styles);
         }
     }
 

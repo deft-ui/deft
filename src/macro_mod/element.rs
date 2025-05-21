@@ -26,7 +26,7 @@ macro_rules! create_element {
             use crate::HashMap;
             let mut style = Vec::new();
             $(
-                if let Some(p) = crate::element::StyleProp::parse(stringify!($key), $value) {
+                if let Some(p) = crate::element::FixedStyleProp::parse(stringify!($key), $value) {
                    style.push(p);
                 }
             )*
