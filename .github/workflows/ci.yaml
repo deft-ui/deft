@@ -39,6 +39,9 @@ jobs:
         run: cargo build --all-features
       - name: Tests
         run: cargo test
+
+      - name: Install Targets For Android
+        run: rustup target add aarch64-linux-android
       - name: Build Android
         run: ./scripts/build-android.sh
         env:
