@@ -1,4 +1,6 @@
 @echo off
+
+set OHOS_NDK_HOME=%OHOS_SDK_HOME%
 set LLVM_BIN_PATH=%OHOS_SDK_HOME%/native/llvm/bin
 set LIBCLANG_PATH=%OHOS_SDK_HOME%/native/llvm/lib
 set PATH=%LLVM_BIN_PATH%;%PATH%

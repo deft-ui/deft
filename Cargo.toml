@@ -25,7 +25,7 @@ anyhow = { version = "1.0.75" }
 tokio = { version = "1.38.0", features = ["rt-multi-thread", "fs", "macros", "io-std", "io-util", "sync"] }
 tokio-tungstenite = { version = "0.23.1", features = ["tokio-rustls"], optional = true }
 futures-util = "0.3.30"
-clipboard = { version = "0.5.0", optional = true }
+clipboard = { version = "0.5.1", package="deft-clipboard", optional = true }
 image = { version = "0.25.2", default-features = false, features = ["bmp", "jpeg", "png", "gif", "ico"] }
 libc = "0.2.155"
 sled = "0.34.7"
@@ -50,7 +50,7 @@ memmap2 = "0.9.5"
 simplecss = { version = "0.3.0", package = "deft-simplecss" }
 
 [features]
-default = ["gl", "websocket", "http", "tray"]
+default = ["gl", "websocket", "http", "tray", "clipboard"]
 tray = ["deft-tray"]
 sqlite = ["rusqlite"]
 http = ["reqwest"]

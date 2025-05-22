@@ -628,19 +628,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4bfbf56724aa9eca8afa4fcfadeb479e722935bb2a0900c2d37e0cc477af0688"
 
 [[package]]
-name = "clipboard"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25a904646c0340239dcf7c51677b33928bf24fdf424b79a57909c0109075b2e7"
-dependencies = [
- "clipboard-win",
- "objc",
- "objc-foundation",
- "objc_id",
- "x11-clipboard",
-]
-
-[[package]]
 name = "clipboard-win"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1019,8 +1006,8 @@ dependencies = [
  "bezier-rs",
  "bitflags 2.9.0",
  "cfg_aliases 0.2.1",
- "clipboard",
  "cssparser",
+ "deft-clipboard",
  "deft-font-kit",
  "deft-macros",
  "deft-ohos-logger",
@@ -1061,6 +1048,19 @@ dependencies = [
  "tokio-tungstenite",
  "tokio-util",
  "windows 0.61.1",
+]
+
+[[package]]
+name = "deft-clipboard"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9dfdb35f32d53cc6e139d852a13de0ffc14bde1b207486eda9dd68fe98f91b81"
+dependencies = [
+ "clipboard-win",
+ "objc",
+ "objc-foundation",
+ "objc_id",
+ "x11-clipboard",
 ]
 
 [[package]]
