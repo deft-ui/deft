@@ -166,7 +166,7 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
                     #[cfg(target_os = "android")]
                     show_hide_keyboard(event_loop.android_app().clone(), window_id, true);
                     #[cfg(ohos)]
-                    platform::show_soft_keyboard(window_id);
+                    crate::platform::show_soft_keyboard(window_id);
                     let _ = window_id;
                 }
                 AppEvent::HideSoftInput(window_id) => {
@@ -174,7 +174,7 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
                     #[cfg(target_os = "android")]
                     show_hide_keyboard(event_loop.android_app().clone(), window_id, false);
                     #[cfg(ohos)]
-                    platform::hide_soft_keyboard(window_id);
+                    crate::platform::hide_soft_keyboard(window_id);
                     let _ = window_id;
                 }
                 AppEvent::CommitInput(window_id, content) => {

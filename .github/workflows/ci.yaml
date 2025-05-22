@@ -23,11 +23,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
-      - uses: nttld/setup-ndk@v1
-        id: setup-ndk
-        with:
-          ndk-version: r26d
-          add-to-path: false
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Install
@@ -39,15 +34,8 @@ jobs:
         run: cargo build --all-features
       - name: Tests
         run: cargo test
-
-      - name: Install Targets For Android
-        run: rustup target add aarch64-linux-android
-      - name: Build Android
-        run: ./scripts/build-android.sh
-        env:
-          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
-#      - name: Format
-#        run: cargo fmt --all -- --check
+  #      - name: Format
+  #        run: cargo fmt --all -- --check
 
   ci-macos:
     name: macOS
@@ -76,3 +64,41 @@ jobs:
         run: cargo build --all-features
       - name: Tests
         run: cargo test
+
+  ci-android:
+    name: Android
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r26d
+          add-to-path: false
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install Targets For Android
+        run: rustup target add aarch64-linux-android
+      - name: Build Targets For Android
+        run: ./scripts/build-android.sh
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+
+  ci-ohos:
+    name: OHOS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Setup OHOS SDK
+        id: setup-ohos-sdk
+        uses: openharmony-rs/setup-ohos-sdk@v0.2.1
+      - name: Setup OHOS Target
+        run: rustup target add x86_64-unknown-linux-ohos
+      - name: Build OHOS Target
+        run: scripts/build-ohos-example.sh
+        env:
+          OHOS_SDK_HOME: ${{ steps.setup-ohos-sdk.outputs.ohos-base-sdk-home }}

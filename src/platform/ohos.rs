@@ -22,7 +22,7 @@ fn get_last_focused_window_id() -> Option<i32> {
 }
 
 fn create_ime_instance() -> IME {
-    let mut ime = IME::new(AttachOptions::default());
+    let ime = IME::new(AttachOptions::default());
     ime.insert_text(|input| {
         let window_id = some_or_return!(get_last_focused_window_id());
         hilog_info!("ime input: {}, {}", window_id, input);

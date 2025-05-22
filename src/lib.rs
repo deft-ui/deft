@@ -74,6 +74,7 @@ fn run_event_loop(event_loop: EventLoop<AppEventPayload>, deft_app: App) {
         let el_proxy = el_proxy.clone();
         APP_EVENT_PROXY.get_or_init(move || el_proxy);
     }
+    #[allow(unused_mut)]
     let mut app = {
         debug_time!("init engine time");
         WinitApp::new(deft_app, el_proxy)

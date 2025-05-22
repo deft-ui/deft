@@ -291,7 +291,7 @@ impl Window {
     pub fn resume(&mut self) {
         self.window = Self::create_window(self.attributes.clone(), &self.render_backend_types);
         #[cfg(ohos)]
-        platform::resume_ime();
+        crate::platform::resume_ime();
     }
 
     pub fn notify_update(&mut self) {
