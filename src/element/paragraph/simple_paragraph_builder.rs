@@ -162,7 +162,7 @@ mod tests {
     use crate::element::paragraph::simple_paragraph_builder::SimpleParagraphBuilder;
     use crate::element::paragraph::{ParagraphParams, ZERO_WIDTH_WHITESPACE};
     use crate::font::family::{FontFamilies, FontFamily};
-    use crate::style::FontStyle;
+    use crate::style::font::FontStyle;
     use measure_time::print_time;
     use skia_safe::font_style::Weight;
 
