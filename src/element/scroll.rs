@@ -10,18 +10,17 @@ use crate::event::{
     CaretChangeEvent, MouseDownEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent,
     TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent,
 };
-use crate::js::js_runtime::FromJsValue;
-use crate::js::JsError;
+use crate::js::{FromJsValue, JsError};
 use crate::layout::LayoutRoot;
 use crate::render::RenderFn;
 use crate::style::ResolvedStyleProp;
 use crate::{
-    backend_as_api, is_mobile_platform, js_deserialize, js_serialize, ok_or_return, some_or_return,
+    backend_as_api, is_mobile_platform, ok_or_return, some_or_return,
 };
 use bezier_rs::{Bezier, TValue};
 use deft_macros::{element_backend, js_methods};
 use log::debug;
-use quick_js::JsValue;
+use quick_js::{JsValue, ValueError};
 use serde::{Deserialize, Serialize};
 use skia_safe::{Color, Paint};
 use std::any::Any;
@@ -46,8 +45,6 @@ pub enum ScrollBarStrategy {
     Auto,
     Always,
 }
-js_serialize!(ScrollBarStrategy);
-js_deserialize!(ScrollBarStrategy);
 
 impl ScrollBarStrategy {
     pub fn from_str(str: &str) -> Option<ScrollBarStrategy> {
@@ -62,12 +59,12 @@ impl ScrollBarStrategy {
 }
 
 impl FromJsValue for ScrollBarStrategy {
-    fn from_js_value(value: &JsValue) -> Option<Self> {
-        if let JsValue::String(str) = value {
-            Self::from_str(str.as_str())
-        } else {
-            None
-        }
+    fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
+            if let JsValue::String(str) = value {
+                Self::from_str(str.as_str()).ok_or(ValueError::UnexpectedType)
+            } else {
+                Err(ValueError::Internal("ScrollBarStrategy is not a string".into()))
+            }
     }
 }
 

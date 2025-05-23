@@ -1,9 +1,7 @@
 use crate::base::UnsafeFnOnce;
-use crate::element::label::parse_align;
 use crate::js::js_event_loop::{js_create_event_loop_proxy, JsEventLoopProxy};
 use crate::js::js_value_util::JsValueHelper;
 use crate::js::ToJsCallResult;
-use crate::text::TextAlign;
 use quick_js::{Context, ExecutionError, JsPromise, JsValue, ValueError};
 use std::env;
 use std::future::Future;
@@ -160,81 +158,6 @@ impl JsValueView for JsValue {
                 result.push(e.as_number()? as f32);
             }
             Some(result)
-        } else {
-            None
-        }
-    }
-}
-
-pub trait FromJsValue: Sized {
-    fn from_js_value(value: &JsValue) -> Option<Self>;
-}
-
-impl FromJsValue for f32 {
-    fn from_js_value(value: &JsValue) -> Option<Self> {
-        match value {
-            JsValue::Int(i) => Some(*i as f32),
-            JsValue::Float(f) => Some(*f as f32),
-            _ => None,
-        }
-    }
-}
-
-impl FromJsValue for String {
-    fn from_js_value(value: &JsValue) -> Option<Self> {
-        Some(value.as_str()?.to_string())
-    }
-}
-
-impl FromJsValue for bool {
-    fn from_js_value(value: &JsValue) -> Option<Self> {
-        value.as_bool()
-    }
-}
-
-impl FromJsValue for TextAlign {
-    fn from_js_value(value: &JsValue) -> Option<Self> {
-        if let JsValue::String(str) = value {
-            Some(parse_align(str))
-        } else {
-            None
-        }
-    }
-}
-
-impl FromJsValue for usize {
-    fn from_js_value(value: &JsValue) -> Option<Self> {
-        if let JsValue::Int(i) = value {
-            Some(*i as usize)
-        } else {
-            None
-        }
-    }
-}
-
-impl FromJsValue for Vec<usize> {
-    fn from_js_value(value: &JsValue) -> Option<Self> {
-        match value {
-            JsValue::Array(a) => {
-                let mut result = Vec::with_capacity(a.len());
-                for e in a {
-                    result.push(usize::from_js_value(e)?);
-                }
-                Some(result)
-            }
-            _ => None,
-        }
-
-        //let arr = Vec::<usize>::from_js_value(value)?;
-    }
-}
-
-impl FromJsValue for (usize, usize) {
-    fn from_js_value(value: &JsValue) -> Option<Self> {
-        let arr = Vec::<usize>::from_js_value(value)?;
-        if arr.len() == 2 {
-            let v = (*arr.get(0).unwrap(), *arr.get(1).unwrap());
-            Some(v)
         } else {
             None
         }
