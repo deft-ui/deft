@@ -5,15 +5,15 @@ const VT_ENTRY = "entry"
 const VT_GROUP = "group"
 const VT_PROGRESS_BAR = "progressbar"
 const VT_SCROLL = "scroll"
-const VT_TEXT_INPUT = "textinput"
-const VT_TEXT_EDIT = "textedit"
+const VT_TEXT_INPUT = "text-input"
+const VT_TEXT_EDIT = "text-edit"
 const VT_IMAGE = "image"
 const VT_BODY = "body"
 const VT_PARAGRAPH = "paragraph"
 const VT_CHECKBOX = "checkbox"
 const VT_RADIO = "radio"
-const VT_RADIO_GROUP = "radiogroup"
-const VT_RICH_TEXT = "richtext"
+const VT_RADIO_GROUP = "radio-group"
+const VT_RICH_TEXT = "rich-text"
 
 
 class Clipboard {
@@ -587,7 +587,7 @@ export class Element {
     constructor(el, context) {
         const myContext = this;
         if (typeof el === "string") {
-            this.handle = Element_create_by_type(el, myContext);
+            this.handle = Element_create_by_tag(el, myContext);
         } else {
             Element_set_js_context(el, myContext);
             this.handle = el;

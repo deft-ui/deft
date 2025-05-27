@@ -10,7 +10,7 @@ use crate::element::text::intersect_range;
 use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
 use crate::element::{ElementBackend, ElementWeak};
 use crate::event::{
-    ClickEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent, MouseMoveEvent,
+    ClickEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent,
     MouseUpEvent, KEY_MOD_CTRL,
 };
 use crate::font::family::{FontFamilies, FontFamily};

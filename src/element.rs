@@ -32,12 +32,6 @@ use crate::event::{
     TouchStartEventListener,
 };
 use crate::event_loop::create_event_loop_callback;
-use crate::ext::ext_window::{
-    ELEMENT_TYPE_BODY, ELEMENT_TYPE_BUTTON, ELEMENT_TYPE_CHECKBOX, ELEMENT_TYPE_CONTAINER,
-    ELEMENT_TYPE_ENTRY, ELEMENT_TYPE_IMAGE, ELEMENT_TYPE_LABEL, ELEMENT_TYPE_PARAGRAPH,
-    ELEMENT_TYPE_RADIO, ELEMENT_TYPE_RADIO_GROUP, ELEMENT_TYPE_RICH_TEXT, ELEMENT_TYPE_SCROLL,
-    ELEMENT_TYPE_TEXT_EDIT, ELEMENT_TYPE_TEXT_INPUT,
-};
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
 use crate::resource_table::ResourceTable;
@@ -89,10 +83,13 @@ use crate::style::length::LengthContext;
 use crate::style::styles::Styles;
 use crate::style_list::StyleList;
 
+type BackendCreator = Box<dyn FnMut(&mut Element) -> Box<dyn ElementBackend + 'static>>;
+
 thread_local! {
     pub static NEXT_ELEMENT_ID: Cell<u32> = Cell::new(1);
     pub static STYLE_VARS: ComputedValue<String> = ComputedValue::new();
     pub static CSS_MANAGER: RefCell<CssManager> = RefCell::new(CssManager::new());
+    pub static ELEMENT_CREATORS: RefCell<HashMap<String, BackendCreator>> = RefCell::new(HashMap::new());
 }
 
 bitflags! {
@@ -121,9 +118,34 @@ pub trait ViewEvent {
     fn allow_bubbles(&self) -> bool;
 }
 
+pub fn register_component<T: ElementBackend>(tag: &str) {
+    let tag = tag.to_string();
+    let bc: BackendCreator = Box::new(move |ele| Box::new(T::create(ele)));
+    ELEMENT_CREATORS.with_borrow_mut(move |map| {
+        map.insert(tag, bc);
+    })
+}
+
+pub fn init_base_components() {
+    register_component::<Container>("container");
+    register_component::<Scroll>("scroll");
+    register_component::<Button>("button");
+    register_component::<Checkbox>("checkbox");
+    register_component::<Radio>("radio");
+    register_component::<Image>("image");
+    register_component::<Label>("label");
+    register_component::<Paragraph>("paragraph");
+    register_component::<Entry>("entry");
+    register_component::<TextInput>("text-input");
+    register_component::<TextEdit>("text-edit");
+    register_component::<Body>("body");
+    register_component::<RadioGroup>("radio-group");
+    register_component::<RichText>("rich-text");
+}
+
 #[js_methods]
 impl Element {
-    pub fn create<T: ElementBackend + 'static, F: FnOnce(&mut Element) -> T>(backend: F) -> Self {
+    pub fn new(backend_creator: &mut BackendCreator) -> Self {
         let empty_backend = EmptyElementBackend {};
         let inner = Mrc::new(ElementData::new(empty_backend));
         let mut ele = Self { inner };
@@ -131,7 +153,7 @@ impl Element {
         ele.style.bind_element(weak);
         let ele_weak = ele.inner.as_weak();
         // let bk = backend(ele_cp);
-        ele.backend = Mrc::new(Box::new(backend(&mut ele)));
+        ele.backend = Mrc::new(backend_creator(&mut ele));
         ele.style.on_changed = Some(Box::new(move |key| {
             if let Ok(mut inner) = ele_weak.upgrade() {
                 inner.backend.handle_style_changed(key);
@@ -158,6 +180,13 @@ impl Element {
         ele.style.bind_element(weak);
         //ele.backend.bind(ele_cp);
         ele
+    }
+
+    pub fn create<T: ElementBackend + 'static, F: 'static + FnMut(&mut Element) -> T>(
+        mut backend: F,
+    ) -> Self {
+        let mut backend_creator: BackendCreator = Box::new(move |ele| Box::new(backend(ele)));
+        Self::new(&mut backend_creator)
     }
 
     #[js_func]
@@ -282,25 +311,15 @@ impl Element {
     }
 
     #[js_func]
-    pub fn create_by_type(tag: String, context: JsValue) -> Result<Element, Error> {
+    pub fn create_by_tag(tag: String, context: JsValue) -> Result<Element, Error> {
         let tag = tag.to_lowercase();
-        let mut view = match tag.as_str() {
-            ELEMENT_TYPE_CONTAINER => Element::create(Container::create),
-            ELEMENT_TYPE_SCROLL => Element::create(Scroll::create),
-            ELEMENT_TYPE_LABEL => Element::create(Label::create),
-            ELEMENT_TYPE_ENTRY => Element::create(Entry::create),
-            ELEMENT_TYPE_TEXT_INPUT => Element::create(TextInput::create),
-            ELEMENT_TYPE_TEXT_EDIT => Element::create(TextEdit::create),
-            ELEMENT_TYPE_BUTTON => Element::create(Button::create),
-            ELEMENT_TYPE_IMAGE => Element::create(Image::create),
-            ELEMENT_TYPE_BODY => Element::create(Body::create),
-            ELEMENT_TYPE_PARAGRAPH => Element::create(Paragraph::create),
-            ELEMENT_TYPE_CHECKBOX => Element::create(Checkbox::create),
-            ELEMENT_TYPE_RADIO => Element::create(Radio::create),
-            ELEMENT_TYPE_RADIO_GROUP => Element::create(RadioGroup::create),
-            ELEMENT_TYPE_RICH_TEXT => Element::create(RichText::create),
-            _ => Element::create(Container::create),
-        };
+        let mut view = ELEMENT_CREATORS.with_borrow_mut(|map| {
+            if let Some(creator) = map.get_mut(&tag) {
+                Element::new(creator)
+            } else {
+                Element::create(Container::create)
+            }
+        });
         view.resource_table.put(ElementJsContext { context });
         view.set_tag(tag);
         view.set_element_type(ElementType::Widget);

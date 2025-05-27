@@ -26,15 +26,15 @@ pub const ELEMENT_TYPE_LABEL: &str = "label";
 pub const ELEMENT_TYPE_BUTTON: &str = "button";
 pub const ELEMENT_TYPE_ENTRY: &str = "entry";
 pub const ELEMENT_TYPE_SCROLL: &str = "scroll";
-pub const ELEMENT_TYPE_TEXT_INPUT: &str = "textinput";
-pub const ELEMENT_TYPE_TEXT_EDIT: &str = "textedit";
+pub const ELEMENT_TYPE_TEXT_INPUT: &str = "text-input";
+pub const ELEMENT_TYPE_TEXT_EDIT: &str = "text-edit";
 pub const ELEMENT_TYPE_IMAGE: &str = "image";
 pub const ELEMENT_TYPE_BODY: &str = "body";
 pub const ELEMENT_TYPE_PARAGRAPH: &str = "paragraph";
 pub const ELEMENT_TYPE_CHECKBOX: &str = "checkbox";
 pub const ELEMENT_TYPE_RADIO: &str = "radio";
-pub const ELEMENT_TYPE_RADIO_GROUP: &str = "radiogroup";
-pub const ELEMENT_TYPE_RICH_TEXT: &str = "richtext";
+pub const ELEMENT_TYPE_RADIO_GROUP: &str = "radio-group";
+pub const ELEMENT_TYPE_RICH_TEXT: &str = "rich-text";
 
 pub type ElementId = i32;
 
