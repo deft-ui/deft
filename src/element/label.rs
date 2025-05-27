@@ -117,7 +117,8 @@ impl ElementBackend for Label {
             StylePropKey::Color => {
                 let color = element.style.color;
                 self.state.text_box.set_color(color);
-                self.mark_dirty(false);
+                //TODO optimize dont relayout
+                self.mark_dirty(true);
             }
             StylePropKey::FontSize => {
                 let font_size = element.style.font_size;
