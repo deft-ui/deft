@@ -26,6 +26,14 @@ impl RenderFn {
         })
     }
 
+    pub fn merge(renders: Vec<RenderFn>) -> RenderFn {
+        RenderFn::new(move |painter| {
+            for render in renders {
+                render.run(painter);
+            }
+        })
+    }
+
     pub fn run(self, canvas: &Painter) {
         (self.render)(canvas);
     }

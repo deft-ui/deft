@@ -1,18 +1,19 @@
-const VT_CONTAINER = 1
-const VT_LABEL = 2
-const VT_BUTTON = 3
-const VT_ENTRY = 4
-const VT_GROUP = 5
-const VT_PROGRESS_BAR = 6
-const VT_SCROLL = 7
-const VT_TEXT_EDIT = 8
-const VT_IMAGE = 9;
-const VT_BODY = 10;
-const VT_PARAGRAPH = 11;
-const VT_CHECKBOX = 12;
-const VT_RADIO = 13;
-const VT_RADIO_GROUP = 14;
-const VT_RICH_TEXT = 15;
+const VT_CONTAINER = "container"
+const VT_LABEL = "label"
+const VT_BUTTON = "button"
+const VT_ENTRY = "entry"
+const VT_GROUP = "group"
+const VT_PROGRESS_BAR = "progressbar"
+const VT_SCROLL = "scroll"
+const VT_TEXT_INPUT = "textinput"
+const VT_TEXT_EDIT = "textedit"
+const VT_IMAGE = "image"
+const VT_BODY = "body"
+const VT_PARAGRAPH = "paragraph"
+const VT_CHECKBOX = "checkbox"
+const VT_RADIO = "radio"
+const VT_RADIO_GROUP = "radiogroup"
+const VT_RICH_TEXT = "richtext"
 
 
 class Clipboard {
@@ -585,7 +586,7 @@ export class Element {
      */
     constructor(el, context) {
         const myContext = this;
-        if (typeof el === "number") {
+        if (typeof el === "string") {
             this.handle = Element_create_by_type(el, myContext);
         } else {
             Element_set_js_context(el, myContext);
@@ -1120,11 +1121,11 @@ export class CheckboxElement extends Element {
     }
 
     get disabled() {
-        return Checkbox_is_disabled(this.handle);
+        return Element_is_disabled(this.handle);
     }
 
     set disabled(value) {
-        Checkbox_set_disabled(this.handle, value);
+        Element_set_disabled(this.handle, value);
     }
 
     bindChange(callback) {
@@ -1155,11 +1156,11 @@ export class RadioElement extends Element {
     }
 
     get disabled() {
-        return Radio_is_disabled(this.handle);
+        return Element_is_disabled(this.handle);
     }
 
     set disabled(value) {
-        Radio_set_disabled(this.handle, value);
+        Element_set_disabled(this.handle, value);
     }
 
     bindChange(callback) {
@@ -1446,20 +1447,93 @@ export class EntryElement extends Element {
      * @param rows {number}
      */
     set rows(rows) {
-        Entry_set_rows(this.handle, rows);
+        TextInput_set_rows(this.handle, rows);
     }
 
     get disabled() {
-        return Entry_is_disabled(this.handle);
+        return Element_is_disabled(this.handle);
     }
 
     set disabled(value) {
-        Entry_set_disabled(this.handle, value);
+        Element_set_disabled(this.handle, value);
     }
 
 
     bindTextChange(callback) {
         this.bindEvent("textchange", callback);
+    }
+
+    bindCaretChange(callback) {
+        this.bindEvent("caretchange", callback);
+    }
+
+}
+
+export class TextInputElement extends Element {
+
+    constructor() {
+        super(VT_TEXT_INPUT);
+    }
+
+    /**
+     *
+     * @param text {string}
+     */
+    set text(text) {
+        TextInput_set_text(this.handle, text);
+    }
+
+    /**
+     *
+     * @param placeholder {string}
+     */
+    set placeholder(placeholder) {
+        TextInput_set_placeholder(this.handle, placeholder);
+    }
+
+    get placeholder() {
+        return TextInput_get_placeholder(this.handle);
+    }
+
+    /**
+     *
+     * @param type {"text"|"password"}
+     */
+    set type(type) {
+        TextInput_set_type(this.handle, type);
+    }
+
+    /**
+     *
+     * @returns {"text" | "password"}
+     */
+    get type() {
+        return TextInput_get_type(this.handle);
+    }
+
+    /**
+     *
+     * @returns {string}
+     */
+    get text() {
+        return TextInput_get_text(this.handle);
+    }
+
+    get disabled() {
+        return Element_is_disabled(this.handle);
+    }
+
+    set disabled(value) {
+        Element_set_disabled(this.handle, value);
+    }
+
+
+    bindTextChange(callback) {
+        this.bindEvent("textchange", callback);
+    }
+
+    bindCaretChange(callback) {
+        this.bindEvent("caretchange", callback);
     }
 
 }
@@ -1471,18 +1545,39 @@ export class TextEditElement extends Element {
 
     /**
      *
-     * @param align {"left"|"right"|"center"}
+     * @param text {string}
      */
-    set align(align) {
-        Element_set_property(this.handle, "align", align);
+    set text(text) {
+        TextEdit_set_text(this.handle, text);
     }
 
     /**
      *
-     * @param text {string}
+     * @param placeholder {string}
      */
-    set text(text) {
-        Element_set_property(this.handle, "text", text);
+    set placeholder(placeholder) {
+        TextEdit_set_placeholder(this.handle, placeholder);
+    }
+
+    get placeholder() {
+        return TextEdit_get_placeholder(this.handle);
+    }
+
+    /**
+     *
+     * @param start {number}
+     * @param end {number}
+     */
+    setSelectionByCharOffset(start, end) {
+        TextEdit_set_selection_by_char_offset(this.handle, start, end)
+    }
+
+    /**
+     *
+     * @param charOffset {number}
+     */
+    setCaretByCharOffset(charOffset) {
+        TextEdit_set_caret_by_char_offset(this.handle, charOffset);
     }
 
     /**
@@ -1490,32 +1585,17 @@ export class TextEditElement extends Element {
      * @returns {string}
      */
     get text() {
-        return Element_get_property(this.handle, "text");
+        return TextEdit_get_text(this.handle);
     }
 
-    /**
-     *
-     * @param selection {[number, number]}
-     */
-    set selection(selection) {
-        Element_set_property(this.handle, "selection", selection);
+    get disabled() {
+        return Element_is_disabled(this.handle);
     }
 
-    /**
-     *
-     * @param caret {number}
-     */
-    set caret(caret) {
-        Element_set_property(this.handle, "caret", caret);
+    set disabled(value) {
+        Element_set_disabled(this.handle, value);
     }
 
-    /**
-     *
-     * @param top {number}
-     */
-    scrollToTop(top) {
-        Element_set_property(this.handle, "scroll_to_top", top);
-    }
 
     bindTextChange(callback) {
         this.bindEvent("textchange", callback);
@@ -1614,11 +1694,11 @@ export class ButtonElement extends ContainerBasedElement {
     }
 
     get disabled() {
-        return Button_is_disabled(this.handle);
+        return Element_is_disabled(this.handle);
     }
 
     set disabled(value) {
-        Button_set_disabled(this.handle, value);
+        Element_set_disabled(this.handle, value);
     }
 
 }
@@ -2068,6 +2148,7 @@ globalThis.ContainerElement = ContainerElement;
 globalThis.ScrollElement = ScrollElement;
 globalThis.LabelElement = LabelElement;
 globalThis.EntryElement = EntryElement;
+globalThis.TextInputElement = TextInputElement;
 globalThis.TextEditElement = TextEditElement;
 globalThis.ButtonElement = ButtonElement;
 globalThis.ImageElement  = ImageElement;

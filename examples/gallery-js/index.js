@@ -4,6 +4,7 @@ const stylesheet = `
     padding: 10px;
     width: 100%;
     height: 100%;
+    overflow: auto;
 }
 .element-row {
     flex-direction: row;
@@ -28,27 +29,26 @@ function createLabel() {
     return label;
 }
 
-function createEntry() {
-    const entry = new EntryElement();
-    entry.placeholder = "You can input text here";
-    return entry;
+function createTextInput() {
+    const input = new TextInputElement();
+    input.placeholder = "You can input text here";
+    return input;
 }
 
 function createPassword() {
-    const entry = new EntryElement();
-    entry.type = "password";
-    entry.placeholder = "You can input password here"
-    return entry;
+    const input = new TextInputElement();
+    input.type = "password";
+    input.placeholder = "You can input password here"
+    return input;
 }
 
 function createMultiLineEntry() {
-    const entry = new EntryElement();
-    entry.placeholder = "You can input multiline text here";
-    entry.multipleLine = true;
-    entry.style = {
+    const textEdit = new TextEditElement();
+    textEdit.placeholder = "You can input multiline text here";
+    textEdit.style = {
         height: '4em',
     }
-    return entry;
+    return textEdit;
 }
 
 function createButton() {
@@ -137,7 +137,7 @@ function main() {
         height: 400,
     });
     window.title = "Deft Gallery";
-    const scroll = new ScrollElement();
+    const scroll = new ContainerElement();
     scroll.className = "main";
     window.body.addChild(scroll);
 
@@ -161,7 +161,7 @@ function main() {
         scroll.addChild(container);
     }
 
-    const entry = createEntry();
+    const entry = createTextInput();
     const password = createPassword();
     const multilineEntry = createMultiLineEntry();
     const button = createButton();
@@ -179,9 +179,9 @@ function main() {
 
 
     createElementRow("Label", createLabel);
-    createElementRow("Entry", entry);
+    createElementRow("TextInput", entry);
     createElementRow("Password", password);
-    createElementRow("Multiline Entry", multilineEntry);
+    createElementRow("TextEdit", multilineEntry);
     createElementRow("Button", button);
     createElementRow("Radio", radioGroup)
     createElementRow("Checkbox", [checkbox, disabledCheckbox]);

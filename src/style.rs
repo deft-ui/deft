@@ -6,6 +6,8 @@ pub mod css_manager;
 pub mod flex;
 pub mod font;
 pub mod length;
+mod node_item;
+pub mod overflow;
 mod select;
 pub mod styles;
 pub mod transform;
@@ -15,6 +17,7 @@ use crate::animation::css_actor::CssAnimationActor;
 use crate::animation::ANIMATIONS;
 use crate::animation::{AnimationInstance, WindowAnimationController};
 use crate::base::Rect;
+use crate::element::scroll::ScrollBarStrategy;
 use crate::element::ElementWeak;
 use crate::event_loop::create_event_loop_callback;
 use crate::font::family::FontFamilies;
@@ -23,6 +26,8 @@ use crate::number::DeNan;
 use crate::style::animation::AnimationParams;
 use crate::style::font::{FontStyle, LineHeightVal};
 use crate::style::length::{Length, LengthContext, LengthOrPercent};
+use crate::style::node_item::NodeItem;
+use crate::style::overflow::Overflow;
 use crate::style::transform::StyleTransform;
 use crate::style_list::ParsedStyleProp;
 use crate::{ok_or_return, some_or_return};
@@ -36,8 +41,7 @@ use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use swash::Style;
 use yoga::{
-    Align, Direction, Display, Edge, FlexDirection, Justify, Node, Overflow, PositionType,
-    StyleUnit, Wrap,
+    Align, Direction, Display, FlexDirection, Justify, Node, PositionType, StyleUnit, Wrap,
 };
 
 //TODO rename
@@ -352,8 +356,7 @@ impl DerefMut for YogaNode {
 #[mrc_object]
 pub struct StyleNode {
     element: ElementWeak,
-    pub yoga_node: YogaNode,
-    shadow_node: Option<YogaNode>,
+    pub yoga_node: NodeItem,
 
     parent: Option<MrcWeak<Self>>,
     children: Vec<StyleNode>,
@@ -381,8 +384,7 @@ impl StyleNode {
         let transparent = Color::from_argb(0, 0, 0, 0);
         let mut inner = StyleNodeData {
             element: ElementWeak::invalid(),
-            yoga_node: YogaNode::new(),
-            shadow_node: None,
+            yoga_node: NodeItem::new(),
             parent: None,
             children: Vec::new(),
             border_radius: [0.0, 0.0, 0.0, 0.0],
@@ -401,14 +403,12 @@ impl StyleNode {
             font_weight: Weight::NORMAL,
             font_style: FontStyle::Normal,
         };
-        inner.yoga_node.set_position_type(PositionType::Static);
+        inner.yoga_node.position_type = PositionType::Static;
         inner.to_ref()
     }
 
-    pub fn new_with_shadow() -> Self {
-        let mut sn = Self::new();
-        sn.inner.shadow_node = Some(YogaNode::new());
-        sn
+    pub fn has_shadow(&self) -> bool {
+        self.yoga_node.has_shadow()
     }
 
     pub fn bind_element(&mut self, element: ElementWeak) {
@@ -416,27 +416,26 @@ impl StyleNode {
     }
 
     pub fn get_padding(&self) -> (f32, f32, f32, f32) {
-        self.with_container_node(|n| {
-            (
-                n.get_layout_padding_top().de_nan(0.0),
-                n.get_layout_padding_right().de_nan(0.0),
-                n.get_layout_padding_bottom().de_nan(0.0),
-                n.get_layout_padding_left().de_nan(0.0),
-            )
-        })
+        let n = &self.yoga_node._yn;
+        (
+            n.get_layout_padding_top().de_nan(0.0),
+            n.get_layout_padding_right().de_nan(0.0),
+            n.get_layout_padding_bottom().de_nan(0.0),
+            n.get_layout_padding_left().de_nan(0.0),
+        )
     }
 
     pub fn get_content_bounds(&self) -> Rect {
-        let l = self.yoga_node.get_layout_padding_left().de_nan(0.0);
-        let r = self.yoga_node.get_layout_padding_right().de_nan(0.0);
-        let t = self.yoga_node.get_layout_padding_top().de_nan(0.0);
-        let b = self.yoga_node.get_layout_padding_bottom().de_nan(0.0);
-        let bl = self.yoga_node.get_layout_border_left().de_nan(0.0);
-        let br = self.yoga_node.get_layout_border_right().de_nan(0.0);
-        let bt = self.yoga_node.get_layout_border_top().de_nan(0.0);
-        let bb = self.yoga_node.get_layout_border_bottom().de_nan(0.0);
-        let width = self.yoga_node.get_layout_width();
-        let height = self.yoga_node.get_layout_height();
+        let l = self.yoga_node._yn.get_layout_padding_left().de_nan(0.0);
+        let r = self.yoga_node._yn.get_layout_padding_right().de_nan(0.0);
+        let t = self.yoga_node._yn.get_layout_padding_top().de_nan(0.0);
+        let b = self.yoga_node._yn.get_layout_padding_bottom().de_nan(0.0);
+        let bl = self.yoga_node._yn.get_layout_border_left().de_nan(0.0);
+        let br = self.yoga_node._yn.get_layout_border_right().de_nan(0.0);
+        let bt = self.yoga_node._yn.get_layout_border_top().de_nan(0.0);
+        let bb = self.yoga_node._yn.get_layout_border_bottom().de_nan(0.0);
+        let width = self.yoga_node._yn.get_layout_width();
+        let height = self.yoga_node._yn.get_layout_height();
         // let (width, height) = self.with_container_node(|n| {
         //     (n.get_layout_width().de_nan(0.0), n.get_layout_height().de_nan(0.0))
         // });
@@ -640,75 +639,94 @@ impl StyleNode {
                 self.set_border_color(&value, &vec![3]);
                 need_layout = false;
             }
-            ResolvedStyleProp::Display(value) => self.yoga_node.set_display(value),
+            ResolvedStyleProp::Display(value) => self.yoga_node.display = value,
             ResolvedStyleProp::Width(value) => {
-                self.yoga_node.set_width(value.to_style_unit(&length_ctx));
+                self.yoga_node.width = value.to_style_unit(&length_ctx);
             }
             ResolvedStyleProp::Height(value) => {
-                self.yoga_node.set_height(value.to_style_unit(&length_ctx))
+                self.yoga_node.height = value.to_style_unit(&length_ctx)
             }
-            ResolvedStyleProp::MaxWidth(value) => self
-                .yoga_node
-                .set_max_width(value.to_style_unit(&length_ctx)),
-            ResolvedStyleProp::MaxHeight(value) => self
-                .yoga_node
-                .set_max_height(value.to_style_unit(&length_ctx)),
-            ResolvedStyleProp::MinWidth(value) => self
-                .yoga_node
-                .set_min_width(value.to_style_unit(&length_ctx)),
-            ResolvedStyleProp::MinHeight(value) => self
-                .yoga_node
-                .set_min_height(value.to_style_unit(&length_ctx)),
-            ResolvedStyleProp::MarginTop(value) => self
-                .yoga_node
-                .set_margin(Edge::Top, value.to_style_unit(&length_ctx)),
-            ResolvedStyleProp::MarginRight(value) => self
-                .yoga_node
-                .set_margin(Edge::Right, value.to_style_unit(&length_ctx)),
-            ResolvedStyleProp::MarginBottom(value) => self
-                .yoga_node
-                .set_margin(Edge::Bottom, value.to_style_unit(&length_ctx)),
-            ResolvedStyleProp::MarginLeft(value) => self
-                .yoga_node
-                .set_margin(Edge::Left, value.to_style_unit(&length_ctx)),
-            ResolvedStyleProp::PaddingTop(value) => self.with_container_node_mut(|n| {
-                n.set_padding(Edge::Top, value.to_style_unit(&length_ctx))
-            }),
-            ResolvedStyleProp::PaddingRight(value) => self.with_container_node_mut(|n| {
-                n.set_padding(Edge::Right, value.to_style_unit(&length_ctx))
-            }),
-            ResolvedStyleProp::PaddingBottom(value) => self.with_container_node_mut(|n| {
-                n.set_padding(Edge::Bottom, value.to_style_unit(&length_ctx))
-            }),
-            ResolvedStyleProp::PaddingLeft(value) => self.with_container_node_mut(|n| {
-                n.set_padding(Edge::Left, value.to_style_unit(&length_ctx))
-            }),
-            ResolvedStyleProp::Flex(value) => self.yoga_node.set_flex(value),
-            ResolvedStyleProp::FlexBasis(value) => self
-                .yoga_node
-                .set_flex_basis(value.to_style_unit(&length_ctx)),
-            ResolvedStyleProp::FlexGrow(value) => self.yoga_node.set_flex_grow(value),
-            ResolvedStyleProp::FlexShrink(value) => self.yoga_node.set_flex_shrink(value),
-            ResolvedStyleProp::AlignSelf(value) => self.yoga_node.set_align_self(value),
-            ResolvedStyleProp::Direction(value) => self.yoga_node.set_direction(value),
-            ResolvedStyleProp::Position(value) => self.yoga_node.set_position_type(value),
+            ResolvedStyleProp::MaxWidth(value) => {
+                self.yoga_node.max_width = value.to_style_unit(&length_ctx)
+            }
+            ResolvedStyleProp::MaxHeight(value) => {
+                self.yoga_node.max_height = value.to_style_unit(&length_ctx)
+            }
+            ResolvedStyleProp::MinWidth(value) => {
+                self.yoga_node.min_width = value.to_style_unit(&length_ctx)
+            }
+            ResolvedStyleProp::MinHeight(value) => {
+                self.yoga_node.min_height = value.to_style_unit(&length_ctx)
+            }
+            ResolvedStyleProp::MarginTop(value) => {
+                self.yoga_node.margin_top = value.to_style_unit(&length_ctx)
+            }
+            ResolvedStyleProp::MarginRight(value) => {
+                self.yoga_node.margin_right = value.to_style_unit(&length_ctx)
+            }
+            ResolvedStyleProp::MarginBottom(value) => {
+                self.yoga_node.margin_bottom = value.to_style_unit(&length_ctx)
+            }
+            ResolvedStyleProp::MarginLeft(value) => {
+                self.yoga_node.margin_left = value.to_style_unit(&length_ctx)
+            }
+            ResolvedStyleProp::PaddingTop(value) => {
+                self.yoga_node.padding_top = value.to_style_unit(&length_ctx)
+            }
+            ResolvedStyleProp::PaddingRight(value) => {
+                self.yoga_node.padding_right = value.to_style_unit(&length_ctx)
+            }
+            ResolvedStyleProp::PaddingBottom(value) => {
+                self.yoga_node.padding_bottom = value.to_style_unit(&length_ctx)
+            }
+            ResolvedStyleProp::PaddingLeft(value) => {
+                self.yoga_node.padding_left = value.to_style_unit(&length_ctx)
+            }
+            ResolvedStyleProp::Flex(value) => {
+                self.yoga_node.flex = value
+            },
+            ResolvedStyleProp::FlexBasis(value) => {
+                self.yoga_node.flex_basis = value.to_style_unit(&length_ctx)
+            }
+            ResolvedStyleProp::FlexGrow(value) => {
+                self.yoga_node.flex_grow = value
+            },
+            ResolvedStyleProp::FlexShrink(value) => self.yoga_node.flex_shrink = value,
+            ResolvedStyleProp::AlignSelf(value) => self.yoga_node.align_self = value,
+            ResolvedStyleProp::Direction(value) => self.yoga_node.direction = value,
+            ResolvedStyleProp::Position(value) => self.yoga_node.position_type = value,
             ResolvedStyleProp::Top(value) => {
-                self.yoga_node
-                    .set_position(Edge::Top, value.to_style_unit(&length_ctx));
+                self.yoga_node.top = value.to_style_unit(&length_ctx);
             }
             ResolvedStyleProp::Right(value) => {
-                self.yoga_node
-                    .set_position(Edge::Right, value.to_style_unit(&length_ctx));
+                self.yoga_node.right = value.to_style_unit(&length_ctx);
             }
             ResolvedStyleProp::Bottom(value) => {
-                self.yoga_node
-                    .set_position(Edge::Bottom, value.to_style_unit(&length_ctx));
+                self.yoga_node.bottom = value.to_style_unit(&length_ctx);
             }
             ResolvedStyleProp::Left(value) => {
-                self.yoga_node
-                    .set_position(Edge::Left, value.to_style_unit(&length_ctx));
+                self.yoga_node.left = value.to_style_unit(&length_ctx);
             }
-            ResolvedStyleProp::Overflow(value) => self.yoga_node.set_overflow(value),
+            ResolvedStyleProp::Overflow(value) => {
+                self.yoga_node.overflow = value.to_yoga_overflow();
+                let scroll_strategy = match value {
+                    Overflow::Visible => ScrollBarStrategy::Never,
+                    Overflow::Hidden => ScrollBarStrategy::Never,
+                    Overflow::Scroll => ScrollBarStrategy::Always,
+                    Overflow::Auto => ScrollBarStrategy::Auto,
+                };
+                let mut el = ok_or_return!(self.element.upgrade(), (false, false));
+                match scroll_strategy {
+                    ScrollBarStrategy::Never => {
+                        el.need_snapshot = false;
+                    }
+                    ScrollBarStrategy::Auto | ScrollBarStrategy::Always => {
+                        el.need_snapshot = true;
+                    }
+                }
+                el.scrollable.vertical_bar.set_strategy(scroll_strategy);
+                el.scrollable.horizontal_bar.set_strategy(scroll_strategy);
+            }
             ResolvedStyleProp::BorderTopLeftRadius(value) => {
                 self.border_radius[0] = value.to_px(&length_ctx);
             }
@@ -746,27 +764,25 @@ impl StyleNode {
 
             // container node style
             ResolvedStyleProp::JustifyContent(value) => {
-                self.with_container_node_mut(|layout| layout.set_justify_content(value));
+                self.yoga_node.justify_content = value;
             }
             ResolvedStyleProp::FlexDirection(value) => {
-                self.with_container_node_mut(|layout| layout.set_flex_direction(value));
+                self.yoga_node.flex_direction = value;
             }
             ResolvedStyleProp::AlignContent(value) => {
-                self.with_container_node_mut(|layout| layout.set_align_content(value));
+                self.yoga_node.align_content = value;
             }
             ResolvedStyleProp::AlignItems(value) => {
-                self.with_container_node_mut(|layout| layout.set_align_items(value));
+                self.yoga_node.align_items = value;
             }
             ResolvedStyleProp::FlexWrap(value) => {
-                self.with_container_node_mut(|layout| layout.set_flex_wrap(value));
+                self.yoga_node.flex_wrap = value;
             }
             ResolvedStyleProp::ColumnGap(value) => {
-                self.with_container_node_mut(|layout| {
-                    layout.set_column_gap(value.to_px(&length_ctx))
-                });
+                self.yoga_node.column_gap = value.to_px(&length_ctx);
             }
             ResolvedStyleProp::RowGap(value) => {
-                self.with_container_node_mut(|layout| layout.set_row_gap(value.to_px(&length_ctx)));
+                self.yoga_node.row_gap = value.to_px(&length_ctx);
             } //TODO aspectratio
         }
         if !change_notified {
@@ -831,8 +847,13 @@ impl StyleNode {
             _ => 0.0,
         };
         for index in edges {
-            let edges_list = [Edge::Top, Edge::Right, Edge::Bottom, Edge::Left];
-            self.yoga_node.set_border(edges_list[*index], width);
+            match index {
+                0 => self.yoga_node.border_top = width,
+                1 => self.yoga_node.border_right = width,
+                2 => self.yoga_node.border_bottom = width,
+                3 => self.yoga_node.border_left = width,
+                _ => {}
+            }
         }
     }
 
@@ -843,11 +864,11 @@ impl StyleNode {
     }
 
     pub fn insert_child(&mut self, child: &mut StyleNode, index: u32) {
-        self.inner.children.insert(index as usize, child.clone());
+        self.children.insert(index as usize, child.clone());
         child.parent = Some(self.inner.as_weak());
-        self.with_container_node_mut(|n| {
-            n.insert_child(&mut child.inner.yoga_node, index as usize)
-        });
+        self.yoga_node
+            .children
+            .insert(index as usize, child.yoga_node.clone());
     }
 
     pub fn get_children(&self) -> Vec<StyleNode> {
@@ -860,9 +881,7 @@ impl StyleNode {
         } else {
             return;
         };
-        self.with_container_node_mut(|n| {
-            n.remove_child(&mut child.inner.yoga_node);
-        });
+        self.yoga_node.children.remove(idx);
         child.parent = None;
         self.inner.children.remove(idx);
     }
@@ -889,25 +908,8 @@ impl StyleNode {
         available_height: f32,
         parent_direction: Direction,
     ) {
-        if let Some(s) = &mut self.inner.shadow_node {
-            s.calculate_layout(available_width, available_height, parent_direction);
-        }
-    }
-
-    fn with_container_node_mut<R, F: FnOnce(&mut Node) -> R>(&mut self, callback: F) -> R {
-        if let Some(sn) = &mut self.inner.shadow_node {
-            callback(sn)
-        } else {
-            callback(&mut self.inner.yoga_node)
-        }
-    }
-
-    fn with_container_node<R, F: FnOnce(&Node) -> R>(&self, callback: F) -> R {
-        if let Some(sn) = &self.inner.shadow_node {
-            callback(sn)
-        } else {
-            callback(&self.inner.yoga_node)
-        }
+        self.yoga_node
+            .calculate_shadow_layout(available_width, available_height, parent_direction);
     }
 }
 

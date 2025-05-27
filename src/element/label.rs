@@ -10,7 +10,7 @@ use crate::text::textbox::{TextBox, TextElement, TextUnit};
 use crate::text::TextAlign;
 use deft_macros::{element_backend, js_methods};
 use skia_safe::FontMgr;
-use yoga::{Context, MeasureMode, Node, NodeRef, Size};
+use yoga::Size;
 
 thread_local! {
     //TODO remove
@@ -36,31 +36,6 @@ pub struct Label {
 struct LabelState {
     text_box: TextBox,
     layout_calculated: bool,
-}
-
-extern "C" fn measure_label_func(
-    node_ref: NodeRef,
-    width: f32,
-    _width_mode: MeasureMode,
-    _height: f32,
-    _height_mode: MeasureMode,
-) -> Size {
-    if let Some(ctx) = Node::get_context_mut(&node_ref) {
-        if let Some(state) = ctx.downcast_mut::<Mrc<LabelState>>() {
-            state.text_box.set_layout_width(width);
-            state.text_box.layout();
-            state.layout_calculated = true;
-            // measure_time::print_time!("text {}  width:{}, height:{}, {}, {}", paragraph.lines.get(0).unwrap().paragraph.get_text(),  width, _height, text_width, height);
-            return Size {
-                width: state.text_box.max_intrinsic_width(),
-                height: state.text_box.height(),
-            };
-        }
-    }
-    Size {
-        width: 0.0,
-        height: 0.0,
-    }
 }
 
 #[js_methods]
@@ -117,17 +92,20 @@ impl ElementBackend for Label {
             element: ele.as_weak(),
         }
         .to_ref();
-        ele.style
-            .yoga_node
-            .set_context(Some(Context::new(label.state.clone())));
-        ele.style
-            .yoga_node
-            .set_measure_func(Some(measure_label_func));
+        ele.style.yoga_node.set_measure_func(label.state.clone(), |state, params| {
+            state.text_box.set_layout_width(params.width);
+            state.text_box.layout();
+            state.layout_calculated = true;
+            let width = state.text_box.max_intrinsic_width();
+            let height = state.text_box.height();
+            // log::debug!("text measure params:{}x{}", params.width, params.height);
+            // log::debug!("text measure result:{}x{}, {}", width, height, state.text_box.get_text());
+            return Size {
+                width,
+                height,
+            };
+        });
         label
-    }
-
-    fn get_name(&self) -> &str {
-        "Label"
     }
 
     fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend> {

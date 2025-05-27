@@ -1,44 +1,32 @@
+use crate as deft;
+use std::any::Any;
+use std::cell::Cell;
+use std::collections::HashMap;
+use std::rc::Rc;
+use deft_macros::{element_backend, js_methods};
+use quick_js::{JsValue, ValueError};
+use serde::{Deserialize, Serialize};
+use skia_safe::{Color, Paint};
+use winit::keyboard::NamedKey;
+use winit::window::CursorIcon;
 use crate::app::AppEvent;
-use crate::base::{Callback, EventContext, Rect, StateMarker};
-use crate::canvas_util::CanvasHelper;
-use crate::element::common::ScrollBar;
+use crate::base::{Callback, EventContext, Rect};
 use crate::element::edit_history::{EditHistory, EditOpType};
-use crate::element::scroll::ScrollBarStrategy;
-use crate::element::util::is_form_event;
 use crate::element::{Element, ElementBackend, ElementWeak};
-use crate::event::{
-    BlurEvent, BoundsChangeEvent, CaretChangeEvent, FocusEvent, KeyDownEvent, KeyEventDetail,
-    MouseLeaveEvent, MouseMoveEvent, ScrollEvent, TextChangeEvent, TextInputEvent, TextUpdateEvent,
-    KEY_MOD_CTRL, KEY_MOD_SHIFT,
-};
+use crate::event::{BlurEvent, BoundsChangeEvent, CaretChangeEvent, CaretChangeEventListener, FocusEvent, KeyDownEvent, KeyEventDetail, MouseLeaveEvent, ScrollEvent, TextChangeEvent, TextInputEvent, TextUpdateEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
 use crate::event_loop::create_event_loop_proxy;
+use crate::{ok_or_return, some_or_return, timer};
+use crate::canvas_util::CanvasHelper;
+use crate::element::util::is_form_event;
 use crate::js::{FromJsValue, ToJsValue};
 use crate::number::DeNan;
 use crate::render::RenderFn;
 use crate::string::StringUtils;
 use crate::style::{ResolvedStyleProp, StylePropKey};
-use crate::text::textbox::{TextBox, TextCoord, TextElement, TextUnit};
 use crate::text::TextAlign;
+use crate::text::textbox::{TextBox, TextCoord, TextElement, TextUnit};
 use crate::timer::TimerHandle;
-use crate::{self as deft, some_or_return};
-use crate::{ok_or_return, timer};
-use deft_macros::{element_backend, js_methods};
-use quick_js::{JsValue, ValueError};
-use serde::{Deserialize, Serialize};
-use skia_safe::{Color, Paint};
-use std::any::Any;
-use std::cell::Cell;
-use std::collections::HashMap;
-use std::rc::Rc;
-use std::string::ToString;
-use winit::dpi::{LogicalPosition, LogicalSize, Size};
-use winit::keyboard::NamedKey;
-use winit::window::CursorIcon;
-
-const COPY_KEY: &str = "\x03";
-const PASTE_KEY: &str = "\x16";
-const KEY_BACKSPACE: &str = "\x08";
-const KEY_ENTER: &str = "\x0D";
+use crate::winit::dpi::{LogicalPosition, LogicalSize, Size};
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -73,7 +61,7 @@ impl FromJsValue for InputType {
 }
 
 #[element_backend]
-pub struct Entry {
+pub struct Editable {
     // base: Scroll,
     paragraph: TextBox,
     placeholder: TextBox,
@@ -88,16 +76,13 @@ pub struct Entry {
     rows: u32,
     disabled: bool,
     line_height: Option<f32>,
-    vertical_bar: ScrollBar,
-    horizontal_bar: ScrollBar,
-    caret_change_marker: StateMarker,
     auto_height: bool,
+    layout_dirty: bool,
 }
 
-pub type TextChangeHandler = dyn FnMut(&str);
 
 #[js_methods]
-impl Entry {
+impl Editable {
     #[js_func]
     pub fn get_text(&self) -> String {
         self.paragraph.get_text()
@@ -136,26 +121,11 @@ impl Entry {
         // self.placeholder_element.update_style(style, false);
     }
 
-    pub fn set_align(&mut self, align: TextAlign) {
-        self.align = align;
-        //self.update_paint_offset(self.context.layout.get_layout_width(), self.context.layout.get_layout_height());
-        self.element.clone().mark_dirty(false);
-    }
-
     #[js_func]
     pub fn set_multiple_line(&mut self, multiple_line: bool) {
         self.multiple_line = multiple_line;
         self.paragraph.set_text_wrap(multiple_line);
-        // self.base.content_auto_width = !multiple_line;
-        // self.base.content_auto_height = multiple_line;
-        if multiple_line {
-            self.vertical_bar.set_strategy(ScrollBarStrategy::Auto);
-        } else {
-            self.vertical_bar.set_strategy(ScrollBarStrategy::Never);
-        }
-        //self.base.set_text_wrap(multiple_line);
-        //self.update_paint_offset(self.context.layout.get_layout_width(), self.context.layout.get_layout_height());
-        self.element.clone().mark_dirty(true);
+        self.element.mark_dirty(true);
     }
 
     #[js_func]
@@ -221,8 +191,7 @@ impl Entry {
 
     fn get_caret_pixels_position(&self) -> Option<Rect> {
         let element = self.element.upgrade_mut().ok()?;
-        let scroll_left = element.get_scroll_left();
-        let scroll_top = element.get_scroll_top();
+        let (scroll_left, scroll_top) = element.scrollable.scroll_offset();
 
         let mut me = self.clone();
         let caret_rect = me.paragraph.get_caret_rect()?;
@@ -287,12 +256,22 @@ impl Entry {
         }
     }
 
+    fn setup_auto_scroll_callback(&mut self) {
+        let element = ok_or_return!(self.element.upgrade());
+        if let Some(mut p) = element.get_parent() {
+            let me = self.as_weak();
+            p.scrollable.set_autoscroll_callback(move || {
+                let me = me.upgrade().ok()?;
+                me.get_caret_pixels_position()
+            });
+        }
+    }
+
     fn emit_caret_change(&mut self) {
         let element = ok_or_return!(self.element.upgrade_mut());
         let origin_bounds = element.get_origin_bounds();
         let (border_top, _, _, border_left) = element.get_padding();
-        let scroll_left = element.get_scroll_left();
-        let scroll_top = element.get_scroll_top();
+        let (scroll_left, scroll_top) = element.scrollable.scroll_offset();
 
         let caret = self.paragraph.get_caret();
         let bounds = match self.paragraph.get_char_rect(caret) {
@@ -559,30 +538,17 @@ impl Entry {
         vec![unit]
     }
 
-    fn ensure_caret_into_view(&mut self) {
-        if let Some(cp) = self.get_caret_pixels_position() {
-            let scrolled_y = self.vertical_bar.scroll_into_view(cp.y, cp.height);
-            let scrolled_x = self.horizontal_bar.scroll_into_view(cp.x, cp.width);
-            if scrolled_y || scrolled_x {
-                self.element.mark_dirty(false);
-            }
-        }
-    }
-
-    fn do_layout(&mut self, bounds: &Rect) {
+    fn layout(&mut self, bounds: &Rect) {
         let element = ok_or_return!(self.element.upgrade());
         let padding = element.get_padding();
         let border = element.get_border_width();
         let mut line_height = self.line_height;
-        let vertical_bar_thickness = self.vertical_bar.visible_thickness();
         let padding_box_width = bounds.width.de_nan(f32::INFINITY) - border.1 - border.3;
         let padding_box_height = bounds.height.de_nan(f32::INFINITY) - border.0 - border.2;
 
-        let mut layout_width = padding_box_width - vertical_bar_thickness;
+        let mut layout_width = padding_box_width;
         if !self.multiple_line {
-            let border = element.get_border_width();
-            let content_height =
-                element.get_bounds().height - padding.0 - border.0 - padding.2 - border.2;
+            let content_height = padding_box_height;
             line_height = Some(content_height);
             layout_width = f32::NAN;
         }
@@ -597,29 +563,41 @@ impl Entry {
         self.paragraph.set_padding(padding);
         self.paragraph.set_layout_width(layout_width);
         self.paragraph.layout();
-
-        let text_height = self.paragraph.height();
-        let text_width = self.paragraph.max_intrinsic_width();
-
-        self.vertical_bar
-            .set_length(padding_box_height, text_height, padding_box_width);
-        self.horizontal_bar
-            .set_length(padding_box_width, text_width, padding_box_height);
+        self.layout_dirty = false;
     }
 
-    fn layout(&mut self, bounds: &Rect) {
-        let old_thickness = self.vertical_bar.visible_thickness();
-        self.do_layout(bounds);
-        if self.multiple_line {
-            let new_thickness = self.vertical_bar.visible_thickness();
-            if old_thickness != new_thickness {
-                self.do_layout(bounds);
-            }
+    pub fn handle_event(&mut self, event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>, scroll_offset: (f32, f32)) {
+        if self.disabled && is_form_event(&event) {
+            ctx.propagation_cancelled = true;
+            return;
+        }
+
+        let (offset_x, offset_y) = scroll_offset;
+        if self.paragraph.on_event(&event, ctx, offset_x, offset_y) {
+            return;
+        }
+        if let Some(_e) = event.downcast_ref::<FocusEvent>() {
+            self.handle_focus();
+        } else if let Some(_e) = event.downcast_ref::<BlurEvent>() {
+            self.handle_blur();
+        } else if let Some(e) = event.downcast_ref::<TextInputEvent>() {
+            self.insert_text(e.0.as_str(), self.paragraph.get_caret(), true);
+        } else if let Some(_e) = event.downcast_ref::<ScrollEvent>() {
+            //TODO update later?
+            let _ = self.update_ime();
+        } else if let Some(_e) = event.downcast_ref::<BoundsChangeEvent>() {
+            //TODO update later?
+            let _ = self.update_ime();
+        }  else if let Some(_e) = event.downcast_ref::<MouseLeaveEvent>() {
+            let mut el = ok_or_return!(self.element.upgrade());
+            el.set_cursor(CursorIcon::Default);
+        } else if let Some(e) = event.downcast_ref::<KeyDownEvent>() {
+            self.handle_key_down(&e.0);
         }
     }
 }
 
-impl ElementBackend for Entry {
+impl ElementBackend for Editable {
     fn create(ele: &mut Element) -> Self {
         ele.set_focusable(true);
         // let mut base = Scroll::create(ele);
@@ -651,24 +629,8 @@ impl ElementBackend for Entry {
 
         // Default style
         let caret_visible = Rc::new(Cell::new(false));
-        let mut vertical_bar = ScrollBar::new_vertical();
-        let mut horizontal_bar = ScrollBar::new_horizontal();
-        horizontal_bar.set_strategy(ScrollBarStrategy::Never);
 
-        {
-            let mut element_weak = ele.as_weak();
-            vertical_bar.set_scroll_callback(move |_| {
-                element_weak.mark_dirty(false);
-            });
-        }
-        {
-            let mut element_weak = ele.as_weak();
-            horizontal_bar.set_scroll_callback(move |_| {
-                element_weak.mark_dirty(false);
-            })
-        }
-
-        let mut inst = EntryData {
+        let mut inst = EditableData {
             // base,
             paragraph,
             placeholder,
@@ -685,52 +647,38 @@ impl ElementBackend for Entry {
             rows: 5,
             disabled: false,
             line_height: None,
-            vertical_bar,
-            horizontal_bar,
-            caret_change_marker: StateMarker::new(),
-            auto_height: false,
+            auto_height: true,
+            layout_dirty: true,
         }
-        .to_ref();
+            .to_ref();
         inst.set_multiple_line(false);
         {
             let weak = inst.as_weak();
             inst.paragraph.set_caret_change_callback(move || {
                 let mut entry = ok_or_return!(weak.upgrade());
-                entry.caret_change_marker.mark();
+                entry.setup_auto_scroll_callback();
+                entry.emit_caret_change();
                 entry.element.mark_dirty(false);
             });
         }
         ele.style.yoga_node.set_measure_func(inst.as_weak(), |entry, params| {
-            let width = params.width;
-            let height = params.height;
             let default_size = yoga::Size {
                 width: 0.0,
                 height: 0.0,
             };
             if let Ok(mut e) = entry.upgrade() {
-                if e.auto_height {
-                    let bounds = Rect::new(0.0, 0.0, width, height);
-                    e.layout(&bounds);
-                    let (width, height) = e.paragraph.get_size_without_padding();
-                    return yoga::Size { width, height };
+                let width = if e.multiple_line {
+                    params.width   
                 } else {
-                    //TODO optimize line_height
-                    let line_height = if let Some(lh) = e.line_height {
-                        lh
-                    } else {
-                        let element = ok_or_return!(e.element.upgrade(), default_size);
-                        element.style.font_size * 1.0
-                    };
-                    let height = line_height * if e.multiple_line { e.rows as f32 } else { 1.0 };
-                    let bounds = Rect::new(0.0, 0.0, width, height);
-                    e.layout(&bounds);
-                    return yoga::Size {
-                        width: e.paragraph.max_intrinsic_width(),
-                        height,
-                    };
-                }
+                    f32::NAN
+                };
+                let height = params.height;
+                let bounds = Rect::new(0.0, 0.0, width, height);
+                e.layout(&bounds);
+                let (width, height) = e.paragraph.get_size_without_padding();
+                return yoga::Size { width, height };
             }
-            unreachable!()
+            default_size
         });
         inst
     }
@@ -766,9 +714,6 @@ impl ElementBackend for Entry {
     }
 
     fn render(&mut self) -> RenderFn {
-        if self.caret_change_marker.unmark() {
-            self.ensure_caret_into_view();
-        }
         let element = ok_or_return!(self.element.upgrade(), RenderFn::empty());
         let mut paint = Paint::default();
         paint.set_color(element.style.color);
@@ -782,18 +727,13 @@ impl ElementBackend for Entry {
         } else {
             self.paragraph.render()
         };
-        let vertical_bar_renderer = self.vertical_bar.render();
-        let offset_y = self.vertical_bar.scroll_offset();
-        let offset_x = self.horizontal_bar.scroll_offset();
 
         RenderFn::new(move |painter| {
             let canvas = painter.canvas;
             canvas.session(|_| {
-                canvas.translate((-offset_x, -offset_y));
                 text_render.run(painter);
             });
             canvas.session(|_| {
-                canvas.translate((-offset_x, -offset_y));
                 if focusing && caret_visible {
                     paint.set_stroke_width(2.0);
                     let start = (caret_pos.x, caret_pos.y);
@@ -801,84 +741,24 @@ impl ElementBackend for Entry {
                     canvas.draw_line(start, end, &paint);
                 }
             });
-            canvas.session(move |_| {
-                vertical_bar_renderer.run(painter);
-            });
         })
     }
 
     fn on_event(&mut self, event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
-        if self.disabled && is_form_event(&event) {
-            ctx.propagation_cancelled = true;
-            return;
-        }
-        if self.vertical_bar.on_event(&event, ctx) || self.horizontal_bar.on_event(&event, ctx) {
-            return;
-        }
+        self.handle_event(event, ctx, (0.0, 0.0));
+    }
 
-        let offset_y = self.vertical_bar.scroll_offset();
-        let offset_x = self.horizontal_bar.scroll_offset();
-        if self.paragraph.on_event(&event, ctx, offset_x, offset_y) {
-            return;
-        }
-        if let Some(_e) = event.downcast_ref::<FocusEvent>() {
-            self.handle_focus();
-        } else if let Some(_e) = event.downcast_ref::<BlurEvent>() {
-            self.handle_blur();
-        } else if let Some(e) = event.downcast_ref::<TextInputEvent>() {
-            self.insert_text(e.0.as_str(), self.paragraph.get_caret(), true);
-        } else if let Some(_e) = event.downcast_ref::<ScrollEvent>() {
-            //TODO update later?
-            let _ = self.update_ime();
-        } else if let Some(_e) = event.downcast_ref::<BoundsChangeEvent>() {
-            //TODO update later?
-            let _ = self.update_ime();
-        } else if let Some(e) = event.downcast_ref::<MouseMoveEvent>() {
-            let d = e.0;
-            let is_over_vb = self.vertical_bar.is_mouse_over(d.offset_x, d.offset_y);
-            let mut el = ok_or_return!(self.element.upgrade());
-            if is_over_vb {
-                el.set_cursor(CursorIcon::Default);
-            } else {
-                el.set_cursor(CursorIcon::Text);
-            }
-        } else if let Some(_e) = event.downcast_ref::<MouseLeaveEvent>() {
-            let mut el = ok_or_return!(self.element.upgrade());
-            el.set_cursor(CursorIcon::Default);
-        } else if let Some(e) = event.downcast_ref::<KeyDownEvent>() {
-            self.handle_key_down(&e.0);
-        }
+    fn before_layout(&mut self) {
+        self.layout_dirty = true;
     }
 
     fn handle_origin_bounds_change(&mut self, bounds: &Rect) {
-        self.layout(bounds);
+        if self.layout_dirty {
+            self.layout(bounds);
+        }
     }
 
     fn accept_pseudo_element_styles(&mut self, styles: HashMap<String, Vec<ResolvedStyleProp>>) {
-        if let Some(scrollbar_styles) = styles.get("scrollbar") {
-            for style in scrollbar_styles {
-                match style {
-                    ResolvedStyleProp::BackgroundColor(color) => {
-                        self.vertical_bar.set_track_background_color(*color);
-                        self.horizontal_bar.set_track_background_color(*color);
-                        self.element.mark_dirty(false);
-                    }
-                    _ => {}
-                }
-            }
-        }
-        if let Some(thumb_styles) = styles.get("scrollbar-thumb") {
-            for style in thumb_styles {
-                match style {
-                    ResolvedStyleProp::BackgroundColor(color) => {
-                        self.vertical_bar.set_thumb_background_color(*color);
-                        self.horizontal_bar.set_thumb_background_color(*color);
-                        self.element.mark_dirty(false);
-                    }
-                    _ => {}
-                }
-            }
-        }
         if let Some(placeholder_styles) = styles.get("placeholder") {
             for style in placeholder_styles {
                 match style {
@@ -898,22 +778,31 @@ impl ElementBackend for Entry {
         }
     }
 
+    fn bind_js_listener(&mut self, event_type: &str, listener: JsValue) -> Option<u32> {
+        let mut element = self.element.upgrade().ok()?;
+        let id = match event_type {
+            "caretchange" => element
+                .register_event_listener(CaretChangeEventListener::from_js_value(listener).ok()?),
+            _ => return None,
+        };
+        Some(id)
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::element::entry::Entry;
     use crate::element::{Element, ElementBackend};
     use crate::string::StringUtils;
     use crate::text::textbox::TextCoord;
     use measure_time::print_time;
+    use crate::element::common::editable::Editable;
 
     #[test]
     fn test_performance() {
-        let mut entry_el = Element::create(Entry::create);
+        let mut entry_el = Element::create(Editable::create);
         let mut entry_el2 = entry_el.clone();
-        let entry = entry_el.get_backend_mut_as::<Entry>();
-        entry.set_text(include_str!("../../Cargo.lock").to_string().repeat(10));
+        let entry = entry_el.get_backend_mut_as::<Editable>();
+        entry.set_text(include_str!("../../../Cargo.lock").to_string().repeat(10));
         {
             print_time!("layout time");
             entry_el2.calculate_layout(1000.0, 100.0);
@@ -925,8 +814,8 @@ mod tests {
 
     #[test]
     fn test_caret() {
-        let mut el = Element::create(Entry::create);
-        let entry = el.get_backend_mut_as::<Entry>();
+        let mut el = Element::create(Editable::create);
+        let entry = el.get_backend_mut_as::<Editable>();
         entry.set_text("1\n12\n123\n1234".to_string());
         // entry.caret = TextCoord::new((0, 0));
         let expected_carets = vec![
@@ -953,8 +842,8 @@ mod tests {
     //TODO error because of missing event loop
     // #[test]
     pub fn test_edit_history() {
-        let mut el = Element::create(Entry::create);
-        let entry = el.get_backend_mut_as::<Entry>();
+        let mut el = Element::create(Editable::create);
+        let entry = el.get_backend_mut_as::<Editable>();
         let text1 = "hello";
         let text2 = "world";
         let text_all = "helloworld";

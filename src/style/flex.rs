@@ -1,6 +1,6 @@
 use crate::style::PropValueParse;
 use std::str::FromStr;
-use yoga::{Align, Direction, Display, FlexDirection, Justify, Overflow, PositionType, Wrap};
+use yoga::{Align, Direction, Display, FlexDirection, Justify, PositionType, Wrap};
 impl PropValueParse for Display {
     fn parse_prop_value(value: &str) -> Option<Self> {
         Display::from_str(value).ok()
@@ -43,15 +43,6 @@ impl PropValueParse for PositionType {
                 .ok()
                 .unwrap_or(PositionType::Static),
         )
-    }
-    fn to_style_string(&self) -> String {
-        self.to_string()
-    }
-}
-
-impl PropValueParse for Overflow {
-    fn parse_prop_value(value: &str) -> Option<Self> {
-        Some(Overflow::from_str(value).unwrap_or(Overflow::Visible))
     }
     fn to_style_string(&self) -> String {
         self.to_string()

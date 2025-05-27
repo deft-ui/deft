@@ -2,8 +2,7 @@ use crate as deft;
 use crate::base::EventContext;
 use crate::element::container::Container;
 use crate::element::image::Image;
-use crate::element::text::Text;
-use crate::element::util::is_form_event;
+use crate::element::label::Label;
 use crate::element::{Element, ElementBackend, ElementWeak};
 use crate::event::ClickEvent;
 use crate::js::FromJsValue;
@@ -28,7 +27,6 @@ pub struct Checkbox {
     box_element: Element,
     label_element: Element,
     checked: bool,
-    disabled: bool,
 }
 
 #[js_methods]
@@ -36,13 +34,13 @@ impl Checkbox {
     #[js_func]
     pub fn set_label(&mut self, label: String) {
         self.label_element
-            .get_backend_mut_as::<Text>()
+            .get_backend_mut_as::<Label>()
             .set_text(label);
     }
 
     #[js_func]
     pub fn get_label(&mut self) -> String {
-        self.label_element.get_backend_mut_as::<Text>().get_text()
+        self.label_element.get_backend_mut_as::<Label>().get_text()
     }
 
     #[js_func]
@@ -57,21 +55,6 @@ impl Checkbox {
             el.set_attribute("checked".to_string(), "".to_string());
         } else {
             el.remove_attribute("checked".to_string());
-        }
-    }
-
-    #[js_func]
-    pub fn is_disabled(&self) -> bool {
-        self.disabled
-    }
-
-    #[js_func]
-    pub fn set_disabled(&mut self, disabled: bool) {
-        let mut ele = ok_or_return!(self.element.upgrade());
-        if disabled {
-            ele.set_attribute("disabled".to_string(), "".to_string());
-        } else {
-            ele.remove_attribute("disabled".to_string());
         }
     }
 
@@ -99,10 +82,11 @@ impl ElementBackend for Checkbox {
     where
         Self: Sized,
     {
+        element.is_form_element = true;
         let base = Container::create(element);
         let mut wrapper_element = Element::create(Container::create);
         let mut box_element = Element::create(Container::create);
-        let label_element = Element::create(Text::create);
+        let label_element = Element::create(Label::create);
         let mut img_element = Element::create(Image::create);
         img_element
             .get_backend_mut_as::<Image>()
@@ -129,15 +113,10 @@ impl ElementBackend for Checkbox {
             box_element,
             label_element,
             checked: false,
-            disabled: false,
         }
         .to_ref();
         inst.update_children();
         inst
-    }
-
-    fn get_name(&self) -> &str {
-        "Checkbox"
     }
 
     fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend> {
@@ -145,10 +124,6 @@ impl ElementBackend for Checkbox {
     }
 
     fn on_event(&mut self, event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
-        if self.disabled && is_form_event(&event) {
-            ctx.propagation_cancelled = true;
-            return;
-        }
         if event.downcast_ref::<ClickEvent>().is_some() {
             self.update_checked(!self.checked);
         } else {
@@ -166,7 +141,6 @@ impl ElementBackend for Checkbox {
     fn on_attribute_changed(&mut self, key: &str, value: Option<&str>) {
         match key {
             "checked" => self.update_checked(value.is_some()),
-            "disabled" => self.disabled = value.is_some(),
             _ => self.base.on_attribute_changed(key, value),
         }
     }

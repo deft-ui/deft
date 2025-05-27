@@ -50,7 +50,6 @@ mod font;
 mod frame_rate;
 mod id_generator;
 mod id_hash_map;
-mod layout;
 mod paint;
 mod platform;
 pub mod render;

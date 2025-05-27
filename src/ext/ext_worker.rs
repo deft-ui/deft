@@ -175,11 +175,7 @@ impl Worker {
 
     fn receive_message(&mut self, data: MessageData) -> Result<(), JsError> {
         let mut event = MessageEvent { data };
-        let mut ctx = EventContext {
-            target: self.as_weak(),
-            propagation_cancelled: false,
-            prevent_default: false,
-        };
+        let mut ctx = EventContext::new(self.as_weak());
         self.event_registration.emit(&mut event, &mut ctx);
         Ok(())
     }
@@ -245,11 +241,7 @@ impl WorkerContext {
 
     fn receive_message(&mut self, data: MessageData) {
         let mut event = WorkerContextMessageEvent { data };
-        let mut ctx = EventContext {
-            target: self.as_weak(),
-            propagation_cancelled: false,
-            prevent_default: false,
-        };
+        let mut ctx = EventContext::new(self.as_weak());
         self.event_registration.emit(&mut event, &mut ctx);
     }
 }

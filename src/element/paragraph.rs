@@ -203,30 +203,6 @@ impl Line {
     }
 }
 
-extern "C" fn measure_paragraph(
-    node_ref: NodeRef,
-    width: f32,
-    width_mode: MeasureMode,
-    _height: f32,
-    height_mode: MeasureMode,
-) -> Size {
-    if let Some(ctx) = Node::get_context(&node_ref) {
-        if let Some(paragraph) = ctx.downcast_ref::<ParagraphWeak>() {
-            if let Ok(mut p) = paragraph.upgrade() {
-                p.layout(Some(width));
-                return Size {
-                    width: p.max_intrinsic_width(),
-                    height: p.height(),
-                };
-            }
-        }
-    }
-    Size {
-        width: 0.0,
-        height: 0.0,
-    }
-}
-
 #[js_methods]
 impl Paragraph {
     #[js_func]
@@ -657,19 +633,20 @@ impl ElementBackend for Paragraph {
             selection_fg,
         }
         .to_ref();
-        element
-            .style
-            .yoga_node
-            .set_context(Some(Context::new(this.as_weak())));
-        element
-            .style
-            .yoga_node
-            .set_measure_func(Some(measure_paragraph));
+        element.style.yoga_node.set_measure_func(this.as_weak(), |paragraph, params| {
+            if let Ok(mut p) = paragraph.upgrade() {
+                p.layout(Some(params.width));
+                return Size {
+                    width: p.max_intrinsic_width(),
+                    height: p.height(),
+                };
+            }
+            Size {
+                width: 0.0,
+                height: 0.0,
+            }
+        });
         this
-    }
-
-    fn get_name(&self) -> &str {
-        "Paragraph"
     }
 
     fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend> {

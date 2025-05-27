@@ -45,6 +45,13 @@ entry[disabled], entry[disabled]:hover {
     border: 1px #E1E1E1;
     color: #A8A9AA;
 }
+entry::scrollbar, scroll::scrollbar {
+    background: #E1E1E1;
+}
+
+entry::scrollbar-thumb, scroll::scrollbar-thumb {
+    background: #C1C1C1;
+}
 
 checkbox {
     color: #232629;
@@ -101,10 +108,43 @@ radio[disabled]::box, radio[disabled]:hover::box {
 }
 
 
-entry::scrollbar, scroll::scrollbar {
+textinput, textedit {
+    background: #FFFFFF;
+    border: 1px #BCBEBF;
+    border-radius: 3px;
+    min-height: 2em;
+    padding: 4px;
+    overflow: auto;
+}
+
+textinput, entry {
+    height: 2em;
+}
+
+textedit {
+    overflow: auto;
+    height: 5em;
+}
+
+textinput:hover, textedit:hover {
+    border: 1px #3DAEE9;
+}
+textinput:focus, textedit:focus {
+    border: 1px #3DAEE9;
+}
+textinput::placeholder, textedit::placeholder {
+    color: #666;
+}
+textinput[disabled], textedit[disabled], textinput[disabled]:hover, textedit[disabled]:hover {
+    background: #F3F3F3;
+    border: 1px #E1E1E1;
+    color: #A8A9AA;
+}
+
+textedit::scrollbar, scroll::scrollbar {
     background: #E1E1E1;
 }
 
-entry::scrollbar-thumb, scroll::scrollbar-thumb {
+textedit::scrollbar-thumb, scroll::scrollbar-thumb {
     background: #C1C1C1;
 }

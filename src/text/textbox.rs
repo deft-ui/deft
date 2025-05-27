@@ -380,19 +380,25 @@ impl TextBox {
 
         let lines = &self.lines;
         let max_offset = if lines.is_empty() { 0 } else { lines.len() - 1 };
-        for p in lines {
-            height += p.sk_paragraph.height();
-            if row == max_offset || height > expected_offset.1 {
-                let line_pixel_coord = (
-                    expected_offset.0,
-                    expected_offset.1 - (height - p.sk_paragraph.height()),
-                );
-                let line_column = p.get_column_by_pixel_coord(line_pixel_coord);
-                return TextCoord(row, line_column);
+        if expected_offset.1 > 0.0 {
+            let mut last_cols = 0;
+            for p in lines {
+                height += p.sk_paragraph.height();
+                if height > expected_offset.1 {
+                    let line_pixel_coord = (
+                        expected_offset.0,
+                        expected_offset.1 - (height - p.sk_paragraph.height()),
+                    );
+                    let line_column = p.get_column_by_pixel_coord(line_pixel_coord);
+                    return TextCoord(row, line_column);
+                }
+                row += 1;
+                last_cols = p.atom_count();
             }
-            row += 1;
+            TextCoord(max_offset, last_cols)
+        } else {
+            TextCoord(0, 0)
         }
-        TextCoord(0, 0)
     }
 
     pub fn get_text_coord_by_char_offset(&self, caret: usize) -> Option<TextCoord> {

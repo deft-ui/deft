@@ -309,10 +309,33 @@ where
     }
 }
 
+thread_local! {
+    pub static NEXT_EVENT_ID: Cell<u64> = Cell::new(1);
+}
+
 pub struct EventContext<T> {
+    id: u64,
     pub target: T,
     pub propagation_cancelled: bool,
     pub prevent_default: bool,
+}
+
+impl<T> EventContext<T> {
+    pub fn new(target: T) -> Self {
+        let id = NEXT_EVENT_ID.get();
+        NEXT_EVENT_ID.set(id + 1);
+        Self {
+            id,
+            target,
+            propagation_cancelled: false,
+            prevent_default: false,
+        }
+    }
+    
+    pub fn get_id(&self) -> u64 {
+        self.id
+    }
+    
 }
 
 pub struct Event<T> {
@@ -326,11 +349,7 @@ impl<E> Event<E> {
         Self {
             event_type: event_type.to_string(),
             detail: Box::new(detail),
-            context: EventContext {
-                propagation_cancelled: false,
-                prevent_default: false,
-                target,
-            },
+            context: EventContext::new(target),
         }
     }
 }
@@ -677,11 +696,7 @@ mod tests {
             &mut MyEvent {
                 value: Rc::clone(&value),
             },
-            &mut EventContext {
-                target: (),
-                propagation_cancelled: false,
-                prevent_default: false,
-            },
+            &mut EventContext::new(()),
         );
 
         assert_eq!(1, *value.borrow());

@@ -153,8 +153,10 @@ mod tests {
         let mut manager = CssManager::new();
         manager.add(include_str!("../../tests/demo.css")).unwrap();
         assert_eq!(1, manager.stylesheets.len());
-        let button = Element::create(Button::create);
-        let container = Element::create(Container::create);
+        let mut button = Element::create(Button::create);
+        button.set_tag("button".to_string());
+        let mut container = Element::create(Container::create);
+        container.set_tag("container".to_string());
         let (containers_styles, _) = manager.match_styles(&container);
         let (button_styles, _) = manager.match_styles(&button);
         assert_eq!(1, containers_styles.len());

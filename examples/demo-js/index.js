@@ -71,12 +71,9 @@ function createPassword() {
 }
 
 function createTextEdit() {
-    const textEdit = new EntryElement();
-
+    const textEdit = new TextEditElement();
     //textEdit.setAlign("center")
     textEdit.text = "1\n12\n测试\n123\n1234";
-    textEdit.multipleLine=true;
-    textEdit.autoHeight=true;
     textEdit.autoFocus=true;
 
     textEdit.style={
@@ -84,6 +81,8 @@ function createTextEdit() {
         // "width": 100,
         // "background": "#ccc",
         // "minWidth": 600,
+        overflow: "hidden",
+        height: "",
     };
     console.log("TextEdit id:", textEdit.eid);
     return textEdit;
@@ -247,6 +246,7 @@ function main() {
         width: '100%',
         padding: 5,
         gap: 5,
+        overflow: 'auto',
     }
     container.bindDroppedFile(e => {
         console.log("dropped file", e);

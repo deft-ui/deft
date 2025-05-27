@@ -241,7 +241,9 @@ impl RenderTree {
             coord: (bounds.x, bounds.y),
             children_viewport: element.get_children_viewport(),
             border_color: element.style.border_color,
-            renderer: Box::new(move || el.get_backend_mut().render()),
+            renderer: Box::new(move || {
+                RenderFn::merge(vec![el.scrollable.render(), el.get_backend_mut().render()])
+            }),
             background_image: element.style.background_image.clone(),
             background_color: element.style.background_color,
             border_width: element.get_border_width(),
@@ -395,8 +397,7 @@ impl RenderTree {
         let bounds = element.get_bounds();
         let need_create_children_layer = Self::need_create_children_layer(element);
         if need_create_children_layer {
-            let scroll_left = element.get_scroll_left();
-            let scroll_top = element.get_scroll_top();
+            let (scroll_left, scroll_top) = element.scrollable.scroll_offset();
             let clip_rect = bounds.translate(-bounds.x + scroll_left, -bounds.y + scroll_top);
             matrix_calculator.save();
 
@@ -566,12 +567,12 @@ impl RenderTree {
         if element.style.transform.is_some() {
             return true;
         }
-        let pos_type = element.style.yoga_node.get_position_type();
+        let pos_type = element.style.yoga_node._yn.get_position_type();
         pos_type == PositionType::Absolute || pos_type == PositionType::Relative
     }
 
     fn need_create_children_layer(element: &Element) -> bool {
-        element.need_snapshot
+        element.scrollable.vertical_bar.is_scrollable() || element.scrollable.horizontal_bar.is_scrollable()
     }
 
     pub fn build_paint_tree(&mut self, viewport: &Rect) -> LayerPO {

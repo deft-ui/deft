@@ -161,8 +161,7 @@ impl selectors::Element for Element {
     }
     #[inline]
     fn has_local_name(&self, name: &LocalName) -> bool {
-        let backend = self.get_backend();
-        backend.get_name().eq_ignore_ascii_case(name)
+        self.tag.eq_ignore_ascii_case(name)
     }
 
     #[inline]
@@ -403,8 +402,10 @@ pub mod tests {
     fn test_select() {
         let btn_selector = Selectors::compile("button").unwrap();
         let container_selector = Selectors::compile("container").unwrap();
-        let button = Element::create(Button::create);
-        let container = Element::create(Container::create);
+        let mut button = Element::create(Button::create);
+        button.set_tag("button".to_string());
+        let mut container = Element::create(Container::create);
+        container.set_tag("container".to_string());
         assert!(btn_selector.matches(&button));
         assert!(container_selector.matches(&container));
         assert!(!btn_selector.matches(&container));

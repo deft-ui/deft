@@ -21,19 +21,20 @@ thread_local! {
 pub const WINDOW_TYPE_NORMAL: &str = "normal";
 pub const WINDOW_TYPE_MENU: &str = "menu";
 
-pub const ELEMENT_TYPE_CONTAINER: i32 = 1;
-pub const ELEMENT_TYPE_LABEL: i32 = 2;
-pub const ELEMENT_TYPE_BUTTON: i32 = 3;
-pub const ELEMENT_TYPE_ENTRY: i32 = 4;
-pub const ELEMENT_TYPE_SCROLL: i32 = 7;
-pub const ELEMENT_TYPE_TEXT_EDIT: i32 = 8;
-pub const ELEMENT_TYPE_IMAGE: i32 = 9;
-pub const ELEMENT_TYPE_BODY: i32 = 10;
-pub const ELEMENT_TYPE_PARAGRAPH: i32 = 11;
-pub const ELEMENT_TYPE_CHECKBOX: i32 = 12;
-pub const ELEMENT_TYPE_RADIO: i32 = 13;
-pub const ELEMENT_TYPE_RADIO_GROUP: i32 = 14;
-pub const ELEMENT_TYPE_RICH_TEXT: i32 = 15;
+pub const ELEMENT_TYPE_CONTAINER: &str = "container";
+pub const ELEMENT_TYPE_LABEL: &str = "label";
+pub const ELEMENT_TYPE_BUTTON: &str = "button";
+pub const ELEMENT_TYPE_ENTRY: &str = "entry";
+pub const ELEMENT_TYPE_SCROLL: &str = "scroll";
+pub const ELEMENT_TYPE_TEXT_INPUT: &str = "textinput";
+pub const ELEMENT_TYPE_TEXT_EDIT: &str = "textedit";
+pub const ELEMENT_TYPE_IMAGE: &str = "image";
+pub const ELEMENT_TYPE_BODY: &str = "body";
+pub const ELEMENT_TYPE_PARAGRAPH: &str = "paragraph";
+pub const ELEMENT_TYPE_CHECKBOX: &str = "checkbox";
+pub const ELEMENT_TYPE_RADIO: &str = "radio";
+pub const ELEMENT_TYPE_RADIO_GROUP: &str = "radiogroup";
+pub const ELEMENT_TYPE_RICH_TEXT: &str = "richtext";
 
 pub type ElementId = i32;
 

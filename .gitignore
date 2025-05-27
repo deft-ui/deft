@@ -5,3 +5,4 @@ target
 *.log
 local*
 dist/
+examples/debug-js

@@ -7,35 +7,11 @@ use crate::style::StylePropKey;
 use crate::text::textbox::{TextBox, TextCoord, TextElement};
 use deft_macros::{element_backend, js_methods};
 use std::any::Any;
-use yoga::{Context, MeasureMode, Node, NodeRef, Size};
+use yoga::Size;
 #[element_backend]
 pub struct RichText {
     element: ElementWeak,
     text_box: TextBox,
-}
-
-extern "C" fn measure_richtext(
-    node_ref: NodeRef,
-    width: f32,
-    _width_mode: MeasureMode,
-    _height: f32,
-    _height_mode: MeasureMode,
-) -> Size {
-    if let Some(ctx) = Node::get_context(&node_ref) {
-        if let Some(rich_text_weak) = ctx.downcast_ref::<RichTextWeak>() {
-            if let Ok(mut rich_text) = rich_text_weak.upgrade() {
-                rich_text.layout(width);
-                return Size {
-                    width: rich_text.text_box.max_intrinsic_width(),
-                    height: rich_text.text_box.height(),
-                };
-            }
-        }
-    }
-    Size {
-        width: 0.0,
-        height: 0.0,
-    }
 }
 
 #[js_methods]
@@ -106,19 +82,20 @@ impl ElementBackend for RichText {
             text_box,
         }
         .to_ref();
-        element
-            .style
-            .yoga_node
-            .set_context(Some(Context::new(this.as_weak())));
-        element
-            .style
-            .yoga_node
-            .set_measure_func(Some(measure_richtext));
+        element.style.yoga_node.set_measure_func(this.as_weak(), |rich_text_weak, params| {
+            if let Ok(mut rich_text) = rich_text_weak.upgrade() {
+                rich_text.layout(params.width);
+                return Size {
+                    width: rich_text.text_box.max_intrinsic_width(),
+                    height: rich_text.text_box.height(),
+                };
+            }
+            return Size {
+                width: 0.0,
+                height: 0.0,
+            }
+        });
         this
-    }
-
-    fn get_name(&self) -> &str {
-        "RichText"
     }
 
     fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend> {

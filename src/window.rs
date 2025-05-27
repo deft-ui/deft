@@ -6,7 +6,7 @@ use crate::base::{
     MouseDetail, MouseEventType, ResultWaiter, Touch, TouchDetail,
 };
 use crate::cursor::search_cursor;
-use crate::element::Element;
+use crate::element::{Element};
 use crate::event::{
     build_modifier, named_key_to_str, str_to_named_key, BlurEvent, ClickEvent, ContextMenuEvent,
     DragOverEvent, DragStartEvent, DropEvent, DroppedFileEvent, FocusEvent, FocusShiftEvent,
@@ -21,7 +21,6 @@ use crate::ext::ext_window::{
 };
 use crate::frame_rate::FrameRateController;
 use crate::js::JsError;
-use crate::layout::LayoutRoot;
 use crate::mrc::{Mrc, MrcWeak};
 use crate::paint::{PaintContext, Painter, RenderTree};
 use crate::render::painter::ElementPainter;
@@ -29,7 +28,7 @@ use crate::resource_table::ResourceTable;
 use crate::style::length::LengthContext;
 use crate::timer::{set_timeout_nanos, TimerHandle};
 use crate::{
-    bind_js_event_listener, ok_or_return, send_app_event, show_focus_hint, some_or_return,
+    bind_js_event_listener, send_app_event, show_focus_hint, some_or_return,
     warn_time,
 };
 use anyhow::Error;
@@ -40,8 +39,8 @@ use skia_safe::{Color, Point, Rect};
 use skia_window::renderer::Renderer;
 use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 use std::cell::Cell;
-use std::collections::HashMap;
-use std::env;
+use std::collections::{HashMap};
+use std::{env, mem};
 use std::string::ToString;
 use std::time::SystemTime;
 use winit::dpi::Position::Logical;
@@ -53,6 +52,7 @@ use winit::keyboard::{Key, KeyCode, NamedKey, PhysicalKey};
 #[cfg(x11_platform)]
 use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorIcon, Fullscreen, ResizeDirection, WindowAttributes, WindowId};
+use crate::element::util::get_tree_level;
 
 #[derive(Clone)]
 struct MouseDownInfo {
@@ -102,7 +102,7 @@ pub struct Window {
     hover: Option<Element>,
     modifiers: Modifiers,
     dirty: bool,
-    layout_dirty: bool,
+    layout_dirty_list: HashMap<u32, Element>,
     repaint_timer_handle: Option<TimerHandle>,
     event_registration: EventRegistration<WindowWeak>,
     attributes: WindowAttributes,
@@ -141,17 +141,6 @@ pub struct WindowFocusEvent;
 
 #[window_event]
 pub struct WindowBlurEvent;
-
-impl LayoutRoot for WindowWeak {
-    fn update_layout(&mut self) {
-        let mut window = ok_or_return!(self.upgrade());
-        window.update_layout();
-    }
-
-    fn should_propagate_dirty(&self) -> bool {
-        false
-    }
-}
 
 #[js_methods]
 impl Window {
@@ -235,7 +224,6 @@ impl Window {
             focusing: None,
             hover: None,
             modifiers: Modifiers::default(),
-            layout_dirty: false,
             dirty: false,
             dragging: false,
             last_drag_over: None,
@@ -264,6 +252,7 @@ impl Window {
             resource_table: ResourceTable::new(),
             drag_window_called: false,
             render_backend_types,
+            layout_dirty_list: HashMap::new(),
         };
         let mut handle = Window {
             inner: Mrc::new(state),
@@ -301,10 +290,10 @@ impl Window {
         }
     }
 
-    pub fn invalid_layout(&mut self) {
+    pub fn invalid_layout(&mut self, element: Element) {
         // Note: Uncomment to debug layout problems
         // if layout_dirty && !self.layout_dirty { crate::trace::print_trace("layout dirty") }
-        self.layout_dirty = true;
+        self.layout_dirty_list.insert(element.get_eid(), element);
         self.notify_update();
     }
 
@@ -1099,7 +1088,7 @@ impl Window {
         )
     }
 
-    fn update_layout(&mut self) {
+    fn update_layout(&mut self, mut roots: Vec<Element>) {
         let auto_size = !self.attributes.resizable;
         let (win_width, win_height) = self.get_inner_size();
         let width = if auto_size {
@@ -1113,8 +1102,23 @@ impl Window {
             win_height
         };
         debug!("calculate layout, {} x {}", width, height);
+        roots.sort_by(|a, b| {
+            let level_a = get_tree_level(a);
+            let level_b = get_tree_level(b);
+            level_a.cmp(&level_b)
+        });
+        for mut root in roots {
+            let mut w = width;
+            let mut h = height;
+            if let Some(p) = root.get_parent() {
+                let p_bounds = p.get_content_bounds();
+                w = p_bounds.width;
+                h = p_bounds.height;
+            }
+            //TODO skip if calculated
+            root.calculate_layout(w, h);
+        }
         let body = some_or_return!(&mut self.body);
-        body.calculate_layout(width, height);
         if auto_size {
             let (final_width, final_height) = body.get_size();
             if win_width as u32 != final_width as u32 && win_height as u32 != final_height as u32 {
@@ -1173,14 +1177,20 @@ impl Window {
             body.compute_font_size_recurse(&length_ctx);
             body.apply_style_update(false, &length_ctx);
         }
-        if self.layout_dirty {
-            self.update_layout();
+        let dirty_roots = mem::take(&mut self.layout_dirty_list);
+        let layout_dirty = !dirty_roots.is_empty();
+        if layout_dirty {
+            self.update_layout(dirty_roots.values().cloned().collect());
+        }
+        //TODO optimize performance
+        // if layout_dirty {
             if let Some(body) = &mut self.body {
+                //TODO call before_renderer when layout is not dirty
+                body.before_render_recurse();
                 self.render_tree = build_render_nodes(body);
             }
-        }
+        // }
         let r = self.paint();
-        self.layout_dirty = false;
         self.dirty = false;
         r
     }
@@ -1193,8 +1203,8 @@ impl Window {
             self.focusing = Some(body.clone());
         }
         body.refresh_style_variables(&self.style_variables.as_weak());
-        self.body = Some(body);
-        self.invalid_layout();
+        self.body = Some(body.clone());
+        self.invalid_layout(body);
     }
 
     #[js_func]
@@ -1227,7 +1237,9 @@ impl Window {
             return;
         }
         self.window.resize_surface(width, height);
-        self.invalid_layout();
+        if let Some(body) = self.get_body() {
+            self.invalid_layout(body.clone());
+        }
         let scale_factor = self.window.scale_factor();
         self.emit(WindowResizeEvent {
             width: (width as f64 / scale_factor) as u32,
@@ -1236,11 +1248,7 @@ impl Window {
     }
 
     pub fn emit<T: 'static>(&mut self, mut event: T) -> EventContext<WindowWeak> {
-        let mut ctx = EventContext {
-            target: self.as_weak(),
-            propagation_cancelled: false,
-            prevent_default: false,
-        };
+        let mut ctx = EventContext::new(self.as_weak());
         self.event_registration.emit(&mut event, &mut ctx);
         ctx
     }
@@ -1471,7 +1479,7 @@ fn count_elements(root: &Element) -> usize {
 }
 
 fn print_tree(node: &Element, padding: &str) {
-    let name = node.get_backend().get_name();
+    let name = &node.tag;
     let children = node.get_children();
     if children.is_empty() {
         debug!("{}{}", padding, name);

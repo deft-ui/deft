@@ -1,9 +1,16 @@
+pub mod image_object;
+pub mod scrollable;
+pub mod editable;
+
+use crate as deft;
 use crate::base::{EventContext, Rect};
 use crate::canvas_util::CanvasHelper;
 use crate::element::scroll::ScrollBarStrategy;
 use crate::element::ElementWeak;
-use crate::event::{MouseDownEvent, MouseMoveEvent, MouseUpEvent};
+use crate::event::{MouseDownEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent};
 use crate::render::RenderFn;
+use crate::timer::{set_interval, set_timeout, TimerHandle};
+use deft_macros::mrc_object;
 use skia_safe::{Color, Paint, PaintStyle};
 use std::any::Any;
 
@@ -11,6 +18,8 @@ pub enum ScrollBarDirection {
     Horizontal,
     Vertical,
 }
+
+#[mrc_object]
 pub struct ScrollBar {
     direction: ScrollBarDirection,
     length: f32,
@@ -25,7 +34,8 @@ pub struct ScrollBar {
     scroll_begin_info: Option<(f32, f32)>,
     padding: f32,
     strategy: ScrollBarStrategy,
-    scroll_callback: Box<dyn FnMut()>,
+    scroll_callback: Box<dyn FnMut(f32)>,
+    auto_scroll_timer: Option<TimerHandle>,
 }
 
 impl ScrollBar {
@@ -38,7 +48,7 @@ impl ScrollBar {
     }
 
     fn new(direction: ScrollBarDirection) -> Self {
-        Self {
+        ScrollBarData {
             direction,
             thickness: 14.0,
             length: 0.0,
@@ -48,14 +58,16 @@ impl ScrollBar {
             scroll_begin_info: None,
             padding: 0.0,
             track_rect: Rect::new(0.0, 0.0, 0.0, 0.0),
-            strategy: ScrollBarStrategy::Auto,
-            scroll_callback: Box::new(|| {}),
+            strategy: ScrollBarStrategy::Never,
+            scroll_callback: Box::new(|_| {}),
             thumb_background_color: Color::from_rgb(0xC1, 0xC1, 0xC1),
             track_background_color: Color::from_rgb(0xE1, 0xE1, 0xE1),
+            auto_scroll_timer: None,
         }
+        .to_ref()
     }
 
-    fn is_scrollable(&self) -> bool {
+    pub fn is_scrollable(&self) -> bool {
         self.scroll_length > self.length
     }
 
@@ -63,7 +75,7 @@ impl ScrollBar {
         (self.scroll_length - self.length).max(0.0)
     }
 
-    pub fn set_scroll_callback<F: FnMut() + 'static>(&mut self, cb: F) {
+    pub fn set_scroll_callback<F: FnMut(f32) + 'static>(&mut self, cb: F) {
         self.scroll_callback = Box::new(cb);
     }
 
@@ -112,6 +124,10 @@ impl ScrollBar {
 
     pub fn scroll_offset(&self) -> f32 {
         self.scroll_offset
+    }
+    
+    pub fn set_scroll_offset(&mut self, scroll_offset: f32) {
+        self.update_scroll_offset(scroll_offset);
     }
 
     pub fn scroll_into_view(&mut self, offset: f32, length: f32) -> bool {
@@ -162,6 +178,14 @@ impl ScrollBar {
         } else if let Some(e) = event.downcast_ref::<MouseMoveEvent>() {
             let d = e.0;
             self.on_mouse_move(d.offset_x, d.offset_y)
+        } else if let Some(e) = event.downcast_ref::<MouseWheelEvent>() {
+            if self.is_scrollable() {
+                let new_scroll_top = self.scroll_offset - 40.0 * e.rows;
+                self.update_scroll_offset(new_scroll_top);
+                true
+            } else {
+                false
+            }
         } else {
             false
         }
@@ -175,8 +199,17 @@ impl ScrollBar {
             };
             self.scroll_begin_info = Some((mouse_offset, self.scroll_offset));
             true
+        } else if self.track_rect.contains_point(x, y) {
+            let is_up = match self.direction {
+                ScrollBarDirection::Horizontal => x < self.thumb_rect.x,
+                ScrollBarDirection::Vertical => y < self.thumb_rect.y,
+            };
+            let pages = if is_up { -1.0 } else { 1.0 };
+            self.scroll_page(pages);
+            self.start_auto_scroll(pages * 3.0);
+            true
         } else {
-            self.track_rect.contains_point(x, y)
+            false
         }
     }
 
@@ -201,7 +234,7 @@ impl ScrollBar {
             self.scroll_begin_info = None;
             true
         } else {
-            false
+            self.auto_scroll_timer.take().is_some()
         }
     }
 
@@ -228,7 +261,7 @@ impl ScrollBar {
         thumb_paint.set_style(PaintStyle::Fill);
         thumb_paint.set_color(self.thumb_background_color);
 
-        // println!("render scrollbar: {:?} {:?}", thumb_rect, rect);
+        // println!("render scrollbar: {:?} {:?}", thumb_rect, bar_rect);
 
         RenderFn::new(move |painter| {
             painter.canvas.session(|c| {
@@ -243,7 +276,32 @@ impl ScrollBar {
         if self.scroll_offset != new_scroll_offset {
             self.scroll_offset = new_scroll_offset;
             self.update_thumb_rect();
-            (self.scroll_callback)();
+            (self.scroll_callback)(new_scroll_offset);
         }
+    }
+
+    fn scroll_page(&mut self, pages: f32) {
+        let new_scroll_offset = self.scroll_offset + self.length * pages;
+        self.update_scroll_offset(new_scroll_offset);
+    }
+
+    fn start_auto_scroll(&mut self, speed: f32) {
+        let mut me = self.clone();
+        let timer_handle = set_timeout(
+            move || {
+                let interval_timer = {
+                    let me = me.clone();
+                    set_interval(
+                        move || {
+                            me.clone().scroll_page(speed / 10.0);
+                        },
+                        100,
+                    )
+                };
+                me.auto_scroll_timer = Some(interval_timer);
+            },
+            300,
+        );
+        self.auto_scroll_timer = Some(timer_handle);
     }
 }

@@ -300,7 +300,7 @@ impl TextLayout {
         &self,
         painter: &Painter,
         line_offset: (f32, f32),
-        line_height: f32,
+        _line_height: f32,
         selection: (usize, usize),
         bg_paint: &Paint,
         fg_paint: &Paint,
@@ -315,7 +315,7 @@ impl TextLayout {
         canvas.translate(line_offset);
         for i in start_offset..end_offset {
             if let Some(char_rect) = self.get_char_bounds(i) {
-                let select_rect = Rect::new(char_rect.left, 0.0, char_rect.right, line_height);
+                let select_rect = Rect::new(char_rect.left, char_rect.top, char_rect.right, char_rect.bottom);
                 canvas.draw_rect(&select_rect, &bg_paint);
             }
         }
