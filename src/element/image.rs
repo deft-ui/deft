@@ -36,16 +36,19 @@ impl ElementBackend for Image {
             img: ImageObject::none(),
         }
         .to_ref();
-        element.style.yoga_node.set_measure_func(img.as_weak(), |img, _params| {
-            if let Ok(img) = img.upgrade() {
-                let (width, height) = img.img.get_size();
-                return Size { width, height };
-            }
-            return Size {
-                width: 0.0,
-                height: 0.0,
-            }
-        });
+        element
+            .style
+            .yoga_node
+            .set_measure_func(img.as_weak(), |img, _params| {
+                if let Ok(img) = img.upgrade() {
+                    let (width, height) = img.img.get_size();
+                    return Size { width, height };
+                }
+                return Size {
+                    width: 0.0,
+                    height: 0.0,
+                };
+            });
         img
     }
 

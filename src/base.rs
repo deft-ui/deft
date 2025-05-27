@@ -331,11 +331,10 @@ impl<T> EventContext<T> {
             prevent_default: false,
         }
     }
-    
+
     pub fn get_id(&self) -> u64 {
         self.id
     }
-    
 }
 
 pub struct Event<T> {

@@ -9,7 +9,10 @@ use crate::element::paragraph::ParagraphParams;
 use crate::element::text::intersect_range;
 use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
 use crate::element::{ElementBackend, ElementWeak};
-use crate::event::{ClickEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent, MouseMoveEvent, MouseUpEvent, KEY_MOD_CTRL};
+use crate::event::{
+    ClickEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent, MouseMoveEvent,
+    MouseUpEvent, KEY_MOD_CTRL,
+};
 use crate::font::family::{FontFamilies, FontFamily};
 use crate::number::DeNan;
 use crate::paint::Painter;
@@ -471,10 +474,8 @@ impl TextBox {
                 return self.selection_end();
             }
         } else if let Some(e) = event.downcast_ref::<ClickEvent>() {
-            let caret = self.get_text_coord_by_pixel_coord((
-                e.0.offset_x + scroll_x,
-                e.0.offset_y + scroll_y,
-            ));
+            let caret = self
+                .get_text_coord_by_pixel_coord((e.0.offset_x + scroll_x, e.0.offset_y + scroll_y));
             self.update_caret(caret);
         }
         false

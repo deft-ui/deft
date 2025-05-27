@@ -700,38 +700,41 @@ impl ElementBackend for Entry {
                 entry.element.mark_dirty(false);
             });
         }
-        ele.style.yoga_node.set_measure_func(inst.as_weak(), |entry, params| {
-            let width = params.width;
-            let height = params.height;
-            let default_size = yoga::Size {
-                width: 0.0,
-                height: 0.0,
-            };
-            if let Ok(mut e) = entry.upgrade() {
-                if e.auto_height {
-                    let bounds = Rect::new(0.0, 0.0, width, height);
-                    e.layout(&bounds);
-                    let (width, height) = e.paragraph.get_size_without_padding();
-                    return yoga::Size { width, height };
-                } else {
-                    //TODO optimize line_height
-                    let line_height = if let Some(lh) = e.line_height {
-                        lh
+        ele.style
+            .yoga_node
+            .set_measure_func(inst.as_weak(), |entry, params| {
+                let width = params.width;
+                let height = params.height;
+                let default_size = yoga::Size {
+                    width: 0.0,
+                    height: 0.0,
+                };
+                if let Ok(mut e) = entry.upgrade() {
+                    if e.auto_height {
+                        let bounds = Rect::new(0.0, 0.0, width, height);
+                        e.layout(&bounds);
+                        let (width, height) = e.paragraph.get_size_without_padding();
+                        return yoga::Size { width, height };
                     } else {
-                        let element = ok_or_return!(e.element.upgrade(), default_size);
-                        element.style.font_size * 1.0
-                    };
-                    let height = line_height * if e.multiple_line { e.rows as f32 } else { 1.0 };
-                    let bounds = Rect::new(0.0, 0.0, width, height);
-                    e.layout(&bounds);
-                    return yoga::Size {
-                        width: e.paragraph.max_intrinsic_width(),
-                        height,
-                    };
+                        //TODO optimize line_height
+                        let line_height = if let Some(lh) = e.line_height {
+                            lh
+                        } else {
+                            let element = ok_or_return!(e.element.upgrade(), default_size);
+                            element.style.font_size * 1.0
+                        };
+                        let height =
+                            line_height * if e.multiple_line { e.rows as f32 } else { 1.0 };
+                        let bounds = Rect::new(0.0, 0.0, width, height);
+                        e.layout(&bounds);
+                        return yoga::Size {
+                            width: e.paragraph.max_intrinsic_width(),
+                            height,
+                        };
+                    }
                 }
-            }
-            unreachable!()
-        });
+                unreachable!()
+            });
         inst
     }
 
@@ -897,7 +900,6 @@ impl ElementBackend for Entry {
             _ => {}
         }
     }
-
 }
 
 #[cfg(test)]

@@ -633,19 +633,22 @@ impl ElementBackend for Paragraph {
             selection_fg,
         }
         .to_ref();
-        element.style.yoga_node.set_measure_func(this.as_weak(), |paragraph, params| {
-            if let Ok(mut p) = paragraph.upgrade() {
-                p.layout(Some(params.width));
-                return Size {
-                    width: p.max_intrinsic_width(),
-                    height: p.height(),
-                };
-            }
-            Size {
-                width: 0.0,
-                height: 0.0,
-            }
-        });
+        element
+            .style
+            .yoga_node
+            .set_measure_func(this.as_weak(), |paragraph, params| {
+                if let Ok(mut p) = paragraph.upgrade() {
+                    p.layout(Some(params.width));
+                    return Size {
+                        width: p.max_intrinsic_width(),
+                        height: p.height(),
+                    };
+                }
+                Size {
+                    width: 0.0,
+                    height: 0.0,
+                }
+            });
         this
     }
 

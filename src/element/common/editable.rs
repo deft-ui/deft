@@ -1,32 +1,36 @@
 use crate as deft;
-use std::any::Any;
-use std::cell::Cell;
-use std::collections::HashMap;
-use std::rc::Rc;
-use deft_macros::{element_backend, js_methods};
-use quick_js::{JsValue, ValueError};
-use serde::{Deserialize, Serialize};
-use skia_safe::{Color, Paint};
-use winit::keyboard::NamedKey;
-use winit::window::CursorIcon;
 use crate::app::AppEvent;
 use crate::base::{Callback, EventContext, Rect};
-use crate::element::edit_history::{EditHistory, EditOpType};
-use crate::element::{Element, ElementBackend, ElementWeak};
-use crate::event::{BlurEvent, BoundsChangeEvent, CaretChangeEvent, CaretChangeEventListener, FocusEvent, KeyDownEvent, KeyEventDetail, MouseLeaveEvent, ScrollEvent, TextChangeEvent, TextInputEvent, TextUpdateEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
-use crate::event_loop::create_event_loop_proxy;
-use crate::{ok_or_return, some_or_return, timer};
 use crate::canvas_util::CanvasHelper;
+use crate::element::edit_history::{EditHistory, EditOpType};
 use crate::element::util::is_form_event;
+use crate::element::{Element, ElementBackend, ElementWeak};
+use crate::event::{
+    BlurEvent, BoundsChangeEvent, CaretChangeEvent, CaretChangeEventListener, FocusEvent,
+    KeyDownEvent, KeyEventDetail, MouseLeaveEvent, ScrollEvent, TextChangeEvent, TextInputEvent,
+    TextUpdateEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT,
+};
+use crate::event_loop::create_event_loop_proxy;
 use crate::js::{FromJsValue, ToJsValue};
 use crate::number::DeNan;
 use crate::render::RenderFn;
 use crate::string::StringUtils;
 use crate::style::{ResolvedStyleProp, StylePropKey};
-use crate::text::TextAlign;
 use crate::text::textbox::{TextBox, TextCoord, TextElement, TextUnit};
+use crate::text::TextAlign;
 use crate::timer::TimerHandle;
 use crate::winit::dpi::{LogicalPosition, LogicalSize, Size};
+use crate::{ok_or_return, some_or_return, timer};
+use deft_macros::{element_backend, js_methods};
+use quick_js::{JsValue, ValueError};
+use serde::{Deserialize, Serialize};
+use skia_safe::{Color, Paint};
+use std::any::Any;
+use std::cell::Cell;
+use std::collections::HashMap;
+use std::rc::Rc;
+use winit::keyboard::NamedKey;
+use winit::window::CursorIcon;
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -79,7 +83,6 @@ pub struct Editable {
     auto_height: bool,
     layout_dirty: bool,
 }
-
 
 #[js_methods]
 impl Editable {
@@ -566,7 +569,12 @@ impl Editable {
         self.layout_dirty = false;
     }
 
-    pub fn handle_event(&mut self, event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>, scroll_offset: (f32, f32)) {
+    pub fn handle_event(
+        &mut self,
+        event: Box<&mut dyn Any>,
+        ctx: &mut EventContext<ElementWeak>,
+        scroll_offset: (f32, f32),
+    ) {
         if self.disabled && is_form_event(&event) {
             ctx.propagation_cancelled = true;
             return;
@@ -588,7 +596,7 @@ impl Editable {
         } else if let Some(_e) = event.downcast_ref::<BoundsChangeEvent>() {
             //TODO update later?
             let _ = self.update_ime();
-        }  else if let Some(_e) = event.downcast_ref::<MouseLeaveEvent>() {
+        } else if let Some(_e) = event.downcast_ref::<MouseLeaveEvent>() {
             let mut el = ok_or_return!(self.element.upgrade());
             el.set_cursor(CursorIcon::Default);
         } else if let Some(e) = event.downcast_ref::<KeyDownEvent>() {
@@ -650,7 +658,7 @@ impl ElementBackend for Editable {
             auto_height: true,
             layout_dirty: true,
         }
-            .to_ref();
+        .to_ref();
         inst.set_multiple_line(false);
         {
             let weak = inst.as_weak();
@@ -661,25 +669,27 @@ impl ElementBackend for Editable {
                 entry.element.mark_dirty(false);
             });
         }
-        ele.style.yoga_node.set_measure_func(inst.as_weak(), |entry, params| {
-            let default_size = yoga::Size {
-                width: 0.0,
-                height: 0.0,
-            };
-            if let Ok(mut e) = entry.upgrade() {
-                let width = if e.multiple_line {
-                    params.width   
-                } else {
-                    f32::NAN
+        ele.style
+            .yoga_node
+            .set_measure_func(inst.as_weak(), |entry, params| {
+                let default_size = yoga::Size {
+                    width: 0.0,
+                    height: 0.0,
                 };
-                let height = params.height;
-                let bounds = Rect::new(0.0, 0.0, width, height);
-                e.layout(&bounds);
-                let (width, height) = e.paragraph.get_size_without_padding();
-                return yoga::Size { width, height };
-            }
-            default_size
-        });
+                if let Ok(mut e) = entry.upgrade() {
+                    let width = if e.multiple_line {
+                        params.width
+                    } else {
+                        f32::NAN
+                    };
+                    let height = params.height;
+                    let bounds = Rect::new(0.0, 0.0, width, height);
+                    e.layout(&bounds);
+                    let (width, height) = e.paragraph.get_size_without_padding();
+                    return yoga::Size { width, height };
+                }
+                default_size
+            });
         inst
     }
 
@@ -791,11 +801,11 @@ impl ElementBackend for Editable {
 
 #[cfg(test)]
 mod tests {
+    use crate::element::common::editable::Editable;
     use crate::element::{Element, ElementBackend};
     use crate::string::StringUtils;
     use crate::text::textbox::TextCoord;
     use measure_time::print_time;
-    use crate::element::common::editable::Editable;
 
     #[test]
     fn test_performance() {

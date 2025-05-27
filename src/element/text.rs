@@ -3,7 +3,6 @@ mod rasterize_cache;
 pub mod simple_text_paragraph;
 pub mod text_paragraph;
 
-
 use crate::text::TextAlign;
 
 // zero-width space for caret

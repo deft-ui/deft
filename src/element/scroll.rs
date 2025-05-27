@@ -70,19 +70,19 @@ extern "C" fn measure_scroll(
     _height_mode: MeasureMode,
 ) -> Size {
     // if let Some(ctx) = Node::get_context(&node_ref) {
-        // if let Some(scroll) = ctx.downcast_ref::<ScrollWeak>() {
-            // if let Ok(s) = scroll.upgrade() {
-                // let width = s.default_width.unwrap_or(width);
-                // let height = s.default_height.unwrap_or(height);
-                // if s.default_width.is_none() || s.default_height.is_none() {
-                //     s.last_layout_size = (width, height);
-                //     s.do_layout_content();
-                // }
-                // let width = s.default_width.unwrap_or(s.real_content_width);
-                // let height = s.default_height.unwrap_or(s.real_content_height);
-                // return Size { width, height };
-            // }
-        // }
+    // if let Some(scroll) = ctx.downcast_ref::<ScrollWeak>() {
+    // if let Ok(s) = scroll.upgrade() {
+    // let width = s.default_width.unwrap_or(width);
+    // let height = s.default_height.unwrap_or(height);
+    // if s.default_width.is_none() || s.default_height.is_none() {
+    //     s.last_layout_size = (width, height);
+    //     s.do_layout_content();
+    // }
+    // let width = s.default_width.unwrap_or(s.real_content_width);
+    // let height = s.default_height.unwrap_or(s.real_content_height);
+    // return Size { width, height };
+    // }
+    // }
     // }
     Size {
         width: 0.0,

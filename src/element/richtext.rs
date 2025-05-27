@@ -82,19 +82,22 @@ impl ElementBackend for RichText {
             text_box,
         }
         .to_ref();
-        element.style.yoga_node.set_measure_func(this.as_weak(), |rich_text_weak, params| {
-            if let Ok(mut rich_text) = rich_text_weak.upgrade() {
-                rich_text.layout(params.width);
+        element
+            .style
+            .yoga_node
+            .set_measure_func(this.as_weak(), |rich_text_weak, params| {
+                if let Ok(mut rich_text) = rich_text_weak.upgrade() {
+                    rich_text.layout(params.width);
+                    return Size {
+                        width: rich_text.text_box.max_intrinsic_width(),
+                        height: rich_text.text_box.height(),
+                    };
+                }
                 return Size {
-                    width: rich_text.text_box.max_intrinsic_width(),
-                    height: rich_text.text_box.height(),
+                    width: 0.0,
+                    height: 0.0,
                 };
-            }
-            return Size {
-                width: 0.0,
-                height: 0.0,
-            }
-        });
+            });
         this
     }
 

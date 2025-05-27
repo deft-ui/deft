@@ -6,7 +6,8 @@ use crate::base::{
     MouseDetail, MouseEventType, ResultWaiter, Touch, TouchDetail,
 };
 use crate::cursor::search_cursor;
-use crate::element::{Element};
+use crate::element::util::get_tree_level;
+use crate::element::Element;
 use crate::event::{
     build_modifier, named_key_to_str, str_to_named_key, BlurEvent, ClickEvent, ContextMenuEvent,
     DragOverEvent, DragStartEvent, DropEvent, DroppedFileEvent, FocusEvent, FocusShiftEvent,
@@ -27,10 +28,7 @@ use crate::render::painter::ElementPainter;
 use crate::resource_table::ResourceTable;
 use crate::style::length::LengthContext;
 use crate::timer::{set_timeout_nanos, TimerHandle};
-use crate::{
-    bind_js_event_listener, send_app_event, show_focus_hint, some_or_return,
-    warn_time,
-};
+use crate::{bind_js_event_listener, send_app_event, show_focus_hint, some_or_return, warn_time};
 use anyhow::Error;
 use deft_macros::{js_methods, mrc_object, window_event};
 use log::{debug, error};
@@ -39,10 +37,10 @@ use skia_safe::{Color, Point, Rect};
 use skia_window::renderer::Renderer;
 use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 use std::cell::Cell;
-use std::collections::{HashMap};
-use std::{env, mem};
+use std::collections::HashMap;
 use std::string::ToString;
 use std::time::SystemTime;
+use std::{env, mem};
 use winit::dpi::Position::Logical;
 use winit::dpi::{LogicalPosition, LogicalSize, Size};
 use winit::event::{
@@ -52,7 +50,6 @@ use winit::keyboard::{Key, KeyCode, NamedKey, PhysicalKey};
 #[cfg(x11_platform)]
 use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{Cursor, CursorIcon, Fullscreen, ResizeDirection, WindowAttributes, WindowId};
-use crate::element::util::get_tree_level;
 
 #[derive(Clone)]
 struct MouseDownInfo {
@@ -1184,11 +1181,11 @@ impl Window {
         }
         //TODO optimize performance
         // if layout_dirty {
-            if let Some(body) = &mut self.body {
-                //TODO call before_renderer when layout is not dirty
-                body.before_render_recurse();
-                self.render_tree = build_render_nodes(body);
-            }
+        if let Some(body) = &mut self.body {
+            //TODO call before_renderer when layout is not dirty
+            body.before_render_recurse();
+            self.render_tree = build_render_nodes(body);
+        }
         // }
         let r = self.paint();
         self.dirty = false;

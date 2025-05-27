@@ -572,7 +572,8 @@ impl RenderTree {
     }
 
     fn need_create_children_layer(element: &Element) -> bool {
-        element.scrollable.vertical_bar.is_scrollable() || element.scrollable.horizontal_bar.is_scrollable()
+        element.scrollable.vertical_bar.is_scrollable()
+            || element.scrollable.horizontal_bar.is_scrollable()
     }
 
     pub fn build_paint_tree(&mut self, viewport: &Rect) -> LayerPO {

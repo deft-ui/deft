@@ -1,7 +1,10 @@
 use crate as deft;
 use crate::style::YogaNode;
 use deft_macros::mrc_object;
-use yoga::{Align, Context, Direction, Display, Edge, FlexDirection, Justify, MeasureMode, Node, NodeRef, Overflow, PositionType, Size, StyleUnit, Wrap};
+use yoga::{
+    Align, Context, Direction, Display, Edge, FlexDirection, Justify, MeasureMode, Node, NodeRef,
+    Overflow, PositionType, Size, StyleUnit, Wrap,
+};
 
 pub struct MeasureParams {
     pub width: f32,
@@ -28,7 +31,7 @@ extern "C" fn custom_measure_shadow(
             let sn = node_item._shadow_yn.as_ref().unwrap();
             return yoga::Size {
                 width: sn.get_layout_width(),
-                height: sn.get_layout_height()
+                height: sn.get_layout_height(),
             };
         }
     }
@@ -55,7 +58,6 @@ extern "C" fn custom_measure_fn(
     }
     unreachable!()
 }
-
 
 #[mrc_object]
 pub struct NodeItem {
@@ -131,7 +133,7 @@ impl NodeItem {
             min_width: std_node.get_style_min_width(),
             min_height: std_node.get_style_min_height(),
             margin_top: std_node.get_style_margin_top(),
-            margin_right:  std_node.get_style_margin_right(),
+            margin_right: std_node.get_style_margin_right(),
             margin_bottom: std_node.get_style_margin_bottom(),
             margin_left: std_node.get_style_margin_left(),
             flex_basis: std_node.get_flex_basis(),
@@ -261,22 +263,24 @@ impl NodeItem {
         }
     }
 
-    pub fn set_measure_func<C: 'static, F: FnMut(&mut C, MeasureParams) -> Size + 'static>(&mut self, mut context: C, mut measure_func: F) {
+    pub fn set_measure_func<C: 'static, F: FnMut(&mut C, MeasureParams) -> Size + 'static>(
+        &mut self,
+        mut context: C,
+        mut measure_func: F,
+    ) {
         let func = CustomMeasureFnData {
-            callback: Box::new(move |params| {
-                measure_func(&mut context, params)
-            }),
-        }.to_ref();
+            callback: Box::new(move |params| measure_func(&mut context, params)),
+        }
+        .to_ref();
         self.measure_fn = Some(func);
     }
-    
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::style::node_item::NodeItem;
     use ordered_float::OrderedFloat;
     use yoga::{Direction, Overflow, StyleUnit};
-    use crate::style::node_item::NodeItem;
 
     #[test]
     fn test_layout() {
@@ -309,6 +313,4 @@ mod tests {
         assert_eq!(sn.get_layout_height(), 100.0);
         // assert_eq!(root._yn.get_layout_height(), 20.0);
     }
-
-
 }

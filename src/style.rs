@@ -682,15 +682,11 @@ impl StyleNode {
             ResolvedStyleProp::PaddingLeft(value) => {
                 self.yoga_node.padding_left = value.to_style_unit(&length_ctx)
             }
-            ResolvedStyleProp::Flex(value) => {
-                self.yoga_node.flex = value
-            },
+            ResolvedStyleProp::Flex(value) => self.yoga_node.flex = value,
             ResolvedStyleProp::FlexBasis(value) => {
                 self.yoga_node.flex_basis = value.to_style_unit(&length_ctx)
             }
-            ResolvedStyleProp::FlexGrow(value) => {
-                self.yoga_node.flex_grow = value
-            },
+            ResolvedStyleProp::FlexGrow(value) => self.yoga_node.flex_grow = value,
             ResolvedStyleProp::FlexShrink(value) => self.yoga_node.flex_shrink = value,
             ResolvedStyleProp::AlignSelf(value) => self.yoga_node.align_self = value,
             ResolvedStyleProp::Direction(value) => self.yoga_node.direction = value,

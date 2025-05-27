@@ -36,7 +36,7 @@ use crate::ext::ext_window::{
     ELEMENT_TYPE_BODY, ELEMENT_TYPE_BUTTON, ELEMENT_TYPE_CHECKBOX, ELEMENT_TYPE_CONTAINER,
     ELEMENT_TYPE_ENTRY, ELEMENT_TYPE_IMAGE, ELEMENT_TYPE_LABEL, ELEMENT_TYPE_PARAGRAPH,
     ELEMENT_TYPE_RADIO, ELEMENT_TYPE_RADIO_GROUP, ELEMENT_TYPE_RICH_TEXT, ELEMENT_TYPE_SCROLL,
-    ELEMENT_TYPE_TEXT_EDIT, ELEMENT_TYPE_TEXT_INPUT
+    ELEMENT_TYPE_TEXT_EDIT, ELEMENT_TYPE_TEXT_INPUT,
 };
 use crate::mrc::{Mrc, MrcWeak};
 use crate::number::DeNan;
@@ -54,6 +54,7 @@ pub mod checkbox;
 mod common;
 pub mod container;
 mod edit_history;
+pub mod entry;
 mod font_manager;
 pub mod image;
 pub mod label;
@@ -62,10 +63,9 @@ pub mod radio;
 pub mod richtext;
 pub mod scroll;
 pub mod text;
-pub mod util;
 pub mod textedit;
 pub mod textinput;
-pub mod entry;
+pub mod util;
 
 use crate as deft;
 use crate::computed::ComputedValue;
@@ -140,23 +140,19 @@ impl Element {
 
         {
             let el = ele.as_weak();
-            ele.scrollable
-                .horizontal_bar
-                .set_scroll_callback(move |_| {
-                    let mut el = ok_or_return!(el.upgrade());
-                    el.mark_dirty(false);
-                    el.emit_scroll_event();
-                });
+            ele.scrollable.horizontal_bar.set_scroll_callback(move |_| {
+                let mut el = ok_or_return!(el.upgrade());
+                el.mark_dirty(false);
+                el.emit_scroll_event();
+            });
         }
         {
             let el = ele.as_weak();
-            ele.scrollable
-                .vertical_bar
-                .set_scroll_callback(move |_| {
-                    let mut el = ok_or_return!(el.upgrade());
-                    el.mark_dirty(false);
-                    el.emit_scroll_event();
-                });
+            ele.scrollable.vertical_bar.set_scroll_callback(move |_| {
+                let mut el = ok_or_return!(el.upgrade());
+                el.mark_dirty(false);
+                el.emit_scroll_event();
+            });
         }
         let weak = ele.as_weak();
         ele.style.bind_element(weak);
@@ -1014,7 +1010,7 @@ impl Element {
         event: &mut T,
         ctx: &mut EventContext<ElementWeak>,
     ) {
-        if self.is_form_element && is_form_event(&Box::new(event)) && self.is_disabled()  {
+        if self.is_form_element && is_form_event(&Box::new(event)) && self.is_disabled() {
             ctx.propagation_cancelled = true;
             return;
         }

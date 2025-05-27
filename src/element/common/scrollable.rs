@@ -19,7 +19,6 @@ use std::collections::HashMap;
 use std::time::Instant;
 use yoga::Direction::LTR;
 
-
 thread_local! {
     static CONSUMED_EVENT_ID: Cell<u64> = Cell::new(0);
 }
@@ -59,7 +58,7 @@ impl Scrollable {
         let scrolled_x = self.horizontal_bar.scroll_into_view(rect.x, rect.width);
         scrolled_x || scrolled_y
     }
-    
+
     pub fn execute_auto_scroll_callback(&mut self) {
         if let Some(auto_scroll_callback) = self.auto_scroll_callback.take() {
             if let Some(rect) = auto_scroll_callback() {
@@ -80,10 +79,13 @@ impl Scrollable {
         (offset_x, offset_y)
     }
 
-    pub fn set_autoscroll_callback<F: FnOnce() -> Option<Rect> + 'static>(&mut self, autoscroll_callback: F) {
+    pub fn set_autoscroll_callback<F: FnOnce() -> Option<Rect> + 'static>(
+        &mut self,
+        autoscroll_callback: F,
+    ) {
         self.auto_scroll_callback = Some(Box::new(autoscroll_callback));
     }
-    
+
     pub fn is_scrollable(&self) -> bool {
         self.vertical_bar.is_scrollable() || self.horizontal_bar.is_scrollable()
     }
@@ -252,7 +254,11 @@ impl Scrollable {
         //     return;
         // }
         let border = element.get_border_width();
-        self.do_layout_content(element, bounds.width - border.1 - border.3, bounds.height - border.0 - border.2);
+        self.do_layout_content(
+            element,
+            bounds.width - border.1 - border.3,
+            bounds.height - border.0 - border.2,
+        );
     }
 
     fn do_layout_content(&mut self, element: &mut Element, bounds_width: f32, bounds_height: f32) {

@@ -1,6 +1,6 @@
+pub mod editable;
 pub mod image_object;
 pub mod scrollable;
-pub mod editable;
 
 use crate as deft;
 use crate::base::{EventContext, Rect};
@@ -125,7 +125,7 @@ impl ScrollBar {
     pub fn scroll_offset(&self) -> f32 {
         self.scroll_offset
     }
-    
+
     pub fn set_scroll_offset(&mut self, scroll_offset: f32) {
         self.update_scroll_offset(scroll_offset);
     }

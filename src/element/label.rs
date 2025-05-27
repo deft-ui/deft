@@ -92,19 +92,18 @@ impl ElementBackend for Label {
             element: ele.as_weak(),
         }
         .to_ref();
-        ele.style.yoga_node.set_measure_func(label.state.clone(), |state, params| {
-            state.text_box.set_layout_width(params.width);
-            state.text_box.layout();
-            state.layout_calculated = true;
-            let width = state.text_box.max_intrinsic_width();
-            let height = state.text_box.height();
-            // log::debug!("text measure params:{}x{}", params.width, params.height);
-            // log::debug!("text measure result:{}x{}, {}", width, height, state.text_box.get_text());
-            return Size {
-                width,
-                height,
-            };
-        });
+        ele.style
+            .yoga_node
+            .set_measure_func(label.state.clone(), |state, params| {
+                state.text_box.set_layout_width(params.width);
+                state.text_box.layout();
+                state.layout_calculated = true;
+                let width = state.text_box.max_intrinsic_width();
+                let height = state.text_box.height();
+                // log::debug!("text measure params:{}x{}", params.width, params.height);
+                // log::debug!("text measure result:{}x{}, {}", width, height, state.text_box.get_text());
+                return Size { width, height };
+            });
         label
     }
 

@@ -14,8 +14,7 @@ pub struct Button {
 }
 
 #[js_methods]
-impl Button {
-}
+impl Button {}
 
 impl ElementBackend for Button {
     fn create(element: &mut Element) -> Self {
@@ -52,5 +51,4 @@ impl ElementBackend for Button {
     fn handle_origin_bounds_change(&mut self, bounds: &Rect) {
         self.base.handle_origin_bounds_change(bounds)
     }
-
 }

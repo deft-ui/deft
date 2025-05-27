@@ -1,12 +1,12 @@
-use std::any::Any;
 use crate as deft;
+use crate::base::EventContext;
+use crate::element::common::editable::Editable;
+use crate::element::{Element, ElementBackend, ElementWeak};
+use crate::style::length::{Length, LengthOrPercent};
+use crate::style::{FixedStyleProp, StylePropVal};
 use deft_macros::{element_backend, js_methods};
 use quick_js::JsValue;
-use crate::base::EventContext;
-use crate::element::{Element, ElementBackend, ElementWeak};
-use crate::element::common::editable::Editable;
-use crate::style::{FixedStyleProp, StylePropVal};
-use crate::style::length::{Length, LengthOrPercent};
+use std::any::Any;
 
 #[element_backend]
 pub struct TextEdit {
@@ -46,19 +46,20 @@ impl TextEdit {
     pub fn set_caret_by_char_offset(&mut self, char_offset: usize) {
         self.editable.set_caret_by_char_offset(char_offset);
     }
-
 }
 
 impl ElementBackend for TextEdit {
     fn create(element: &mut Element) -> Self
     where
-        Self: Sized
+        Self: Sized,
     {
         element.set_focusable(true);
         element.is_form_element = true;
         let mut editable = Element::create(Editable::create);
         editable.set_style_props(vec![
-            FixedStyleProp::MinHeight(StylePropVal::Custom(LengthOrPercent::Length(Length::EM(2.0)))),
+            FixedStyleProp::MinHeight(StylePropVal::Custom(LengthOrPercent::Length(Length::EM(
+                2.0,
+            )))),
             // FixedStyleProp::MinHeight(StylePropVal::Custom(LengthOrPercent::Percent(100.0))),
             // FixedStyleProp::BackgroundColor(StylePropVal::Custom(Color::from_argb(80, 80, 80, 80))),
         ]);
@@ -70,7 +71,8 @@ impl ElementBackend for TextEdit {
             editable_element: editable.clone(),
             editable: backend,
             element: element.as_weak(),
-        }.to_ref()
+        }
+        .to_ref()
     }
 
     fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend> {

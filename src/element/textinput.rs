@@ -1,13 +1,13 @@
-use std::any::Any;
 use crate as deft;
-use deft_macros::{element_backend, js_methods};
-use quick_js::JsValue;
-use yoga::FlexDirection;
 use crate::base::EventContext;
 use crate::element::common::editable::{Editable, InputType};
 use crate::element::{Element, ElementBackend, ElementWeak};
-use crate::style::{FixedStyleProp, StylePropVal};
 use crate::style::length::LengthOrPercent;
+use crate::style::{FixedStyleProp, StylePropVal};
+use deft_macros::{element_backend, js_methods};
+use quick_js::JsValue;
+use std::any::Any;
+use yoga::FlexDirection;
 
 #[element_backend]
 pub struct TextInput {
@@ -47,19 +47,18 @@ impl TextInput {
     pub fn get_type(&self) -> InputType {
         self.editable.get_type()
     }
-
 }
 
 impl ElementBackend for TextInput {
     fn create(element: &mut Element) -> Self
     where
-        Self: Sized
+        Self: Sized,
     {
         element.scrollable.vertical_bar.set_thickness(0.0);
         element.scrollable.horizontal_bar.set_thickness(0.0);
-        element.set_style_props(vec![
-            FixedStyleProp::FlexDirection(StylePropVal::Custom(FlexDirection::Row)),
-        ]);
+        element.set_style_props(vec![FixedStyleProp::FlexDirection(StylePropVal::Custom(
+            FlexDirection::Row,
+        ))]);
         let mut editable = Element::create(Editable::create);
         editable.set_style_props(vec![
             FixedStyleProp::MinWidth(StylePropVal::Custom(LengthOrPercent::Percent(100.0))),
@@ -77,7 +76,8 @@ impl ElementBackend for TextInput {
             element: element.as_weak(),
             editable_element: editable.clone(),
             editable: backend,
-        }.to_ref()
+        }
+        .to_ref()
     }
 
     fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend> {
@@ -96,4 +96,3 @@ impl ElementBackend for TextInput {
         self.editable.bind_js_listener(event_type, listener)
     }
 }
-

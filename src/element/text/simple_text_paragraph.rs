@@ -315,7 +315,12 @@ impl TextLayout {
         canvas.translate(line_offset);
         for i in start_offset..end_offset {
             if let Some(char_rect) = self.get_char_bounds(i) {
-                let select_rect = Rect::new(char_rect.left, char_rect.top, char_rect.right, char_rect.bottom);
+                let select_rect = Rect::new(
+                    char_rect.left,
+                    char_rect.top,
+                    char_rect.right,
+                    char_rect.bottom,
+                );
                 canvas.draw_rect(&select_rect, &bg_paint);
             }
         }
