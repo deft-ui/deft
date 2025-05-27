@@ -1,6 +1,7 @@
 use std::any::Any;
 use crate as deft;
 use deft_macros::{element_backend, js_methods};
+use quick_js::JsValue;
 use yoga::FlexDirection;
 use crate::base::EventContext;
 use crate::element::common::editable::{Editable, InputType};
@@ -89,6 +90,10 @@ impl ElementBackend for TextInput {
             let eb = self.editable_element.get_bounds();
             self.editable.handle_event(event, ctx, (-eb.x, -eb.y));
         }
+    }
+
+    fn bind_js_listener(&mut self, event_type: &str, listener: JsValue) -> Option<u32> {
+        self.editable.bind_js_listener(event_type, listener)
     }
 }
 

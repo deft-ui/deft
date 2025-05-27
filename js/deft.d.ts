@@ -608,6 +608,7 @@ declare class Element {
     get scrollWidth(): number;
     setAttribute(key: any, value: any): void;
     getAttribute(key: any): any;
+    removeAttribute(key: any): void;
     /**
      *
      * @param callback {(event: IBoundsChangeEvent) => void}
@@ -722,60 +723,29 @@ declare class LabelElement extends Element {
     constructor();
     /**
      *
-     * @param wrap {boolean}
-     */
-    set textWrap(wrap: boolean);
-    /**
-     *
      * @param text {string}
      */
     set text(text: string);
-    /**
-     *
-     * @param align {"left" | "right" | "center"}
-     */
-    set align(align: "left" | "right" | "center");
-    /**
-     *
-     * @param selection {number[]}
-     */
-    set selection(selection: number[]);
-    /**
-     *
-     * @param startCaretOffset {number}
-     * @param endCaretOffset {number}
-     */
-    selectByCaretOffset(startCaretOffset: number, endCaretOffset: number): void;
-    /**
-     *
-     * @param line {number}
-     * @returns {number}
-     */
-    getLineBeginOffset(line: number): number;
-    /**
-     *
-     * @param line {number}
-     * @param text {string}
-     */
-    insertLine(line: number, text: string): void;
-    /**
-     *
-     * @param line {number}
-     * @param newText {string}
-     */
-    updateLine(line: number, newText: string): void;
-    /**
-     *
-     * @param line {number}
-     */
-    deleteLine(line: number): void;
-    /**
-     *
-     * @param row {number}
-     * @param col {number}
-     * @return {number}
-     */
-    getCaretOffsetByCursor(row: number, col: number): number;
+}
+declare class CheckboxElement extends Element {
+    constructor();
+    set label(text: any);
+    get label(): any;
+    set checked(value: any);
+    get checked(): any;
+    set disabled(value: any);
+    get disabled(): any;
+    bindChange(callback: any): void;
+}
+declare class RadioElement extends Element {
+    constructor();
+    set label(text: any);
+    get label(): any;
+    set checked(value: any);
+    get checked(): any;
+    set disabled(value: any);
+    get disabled(): any;
+    bindChange(callback: any): void;
 }
 /**
  * @typedef {{
@@ -788,6 +758,8 @@ declare class LabelElement extends Element {
  *   color ?: string,
  *   backgroundColor ?: string
  * }} ParagraphUnit
+ *
+ * @deprecated
  */
 declare class ParagraphElement extends Element {
     constructor();
@@ -820,6 +792,55 @@ declare class ParagraphElement extends Element {
      * @return {[number, number]}
      */
     measureLine(units: ParagraphUnit[]): [number, number];
+    /**
+     *
+     * @returns {string | undefined}
+     */
+    get selectionText(): string | undefined;
+}
+/**
+ * @typedef {{
+ *   type: "text",
+ *   text: string,
+ *   weight ?: string,
+ *   textDecorationLine ?: string,
+ *   fontFamilies ?: string[],
+ *   fontSize ?: number,
+ *   color ?: string,
+ *   backgroundColor ?: string
+ * }} TextUnit
+ */
+declare class RichTextElement extends Element {
+    constructor();
+    /**
+     *
+     * @param units {TextUnit[]}
+     */
+    addLine(units: TextUnit[]): void;
+    /**
+     *
+     * @param index {number}
+     * @param units {TextUnit[]}
+     */
+    insertLine(index: number, units: TextUnit[]): void;
+    /**
+     *
+     * @param index {number}
+     */
+    deleteLine(index: number): void;
+    /**
+     *
+     * @param index {number}
+     * @param units {TextUnit[]}
+     */
+    updateLine(index: number, units: TextUnit[]): void;
+    clear(): void;
+    /**
+     *
+     * @param units {TextUnit[]}
+     * @return {[number, number]}
+     */
+    measureLine(units: TextUnit[]): [number, number];
     /**
      *
      * @returns {string | undefined}
@@ -899,16 +920,14 @@ declare class EntryElement extends Element {
      * @param rows {number}
      */
     set rows(rows: number);
+    set disabled(value: any);
+    get disabled(): any;
     bindTextChange(callback: any): void;
+    bindCaretChange(callback: any): void;
     
 }
-declare class TextEditElement extends Element {
+declare class TextInputElement extends Element {
     constructor();
-    /**
-     *
-     * @param align {"left"|"right"|"center"}
-     */
-    set align(align: "left" | "right" | "center");
     /**
      *
      * @param text {string}
@@ -921,24 +940,63 @@ declare class TextEditElement extends Element {
     get text(): string;
     /**
      *
-     * @param selection {[number, number]}
+     * @param placeholder {string}
      */
-    set selection(selection: [number, number]);
+    set placeholder(placeholder: string);
+    get placeholder(): string;
     /**
      *
-     * @param caret {number}
+     * @param type {"text"|"password"}
      */
-    set caret(caret: number);
+    set type(type: "text" | "password");
     /**
      *
-     * @param top {number}
+     * @returns {"text" | "password"}
      */
-    scrollToTop(top: number): void;
+    get type(): "text" | "password";
+    set disabled(value: any);
+    get disabled(): any;
+    bindTextChange(callback: any): void;
+    bindCaretChange(callback: any): void;
+}
+declare class TextEditElement extends Element {
+    constructor();
+    /**
+     *
+     * @param text {string}
+     */
+    set text(text: string);
+    /**
+     *
+     * @returns {string}
+     */
+    get text(): string;
+    /**
+     *
+     * @param placeholder {string}
+     */
+    set placeholder(placeholder: string);
+    get placeholder(): string;
+    /**
+     *
+     * @param start {number}
+     * @param end {number}
+     */
+    setSelectionByCharOffset(start: number, end: number): void;
+    /**
+     *
+     * @param charOffset {number}
+     */
+    setCaretByCharOffset(charOffset: number): void;
+    set disabled(value: any);
+    get disabled(): any;
     bindTextChange(callback: any): void;
     bindCaretChange(callback: any): void;
 }
 declare class ButtonElement extends ContainerBasedElement {
     constructor();
+    set disabled(value: any);
+    get disabled(): any;
 }
 declare class ContainerElement extends ContainerBasedElement {
     constructor();
@@ -1035,7 +1093,16 @@ declare type ParagraphUnit = {
     fontSize?: number;
     color?: string;
     backgroundColor?: string;
-    style ?: 'normal' | 'italic';
+};
+declare type TextUnit = {
+    type: "text";
+    text: string;
+    weight?: string;
+    textDecorationLine?: string;
+    fontFamilies?: string[];
+    fontSize?: number;
+    color?: string;
+    backgroundColor?: string;
 };
 /**
  * <T>
