@@ -211,18 +211,34 @@ export class Window {
         Window_drag(this.#windowHandle);
     }
 
+    /**
+     *
+     * @returns {boolean}
+     */
     get minimized() {
         return Window_is_minimized(this.#windowHandle);
     }
 
+    /**
+     *
+     * @param minimized {boolean}
+     */
     set minimized(minimized) {
         Window_set_minimized(this.#windowHandle, minimized);
     }
 
+    /**
+     *
+     * @returns {boolean}
+     */
     get maximized() {
         return Window_is_maximized(this.#windowHandle);
     }
 
+    /**
+     *
+     * @param maximized {boolean}
+     */
     set maximized(maximized) {
         Window_set_maximized(this.#windowHandle, maximized);
     }
@@ -247,6 +263,10 @@ export class Window {
         Window_set_visible(this.#windowHandle, visible);
     }
 
+    /**
+     *
+     * @returns {boolean}
+     */
     get visible() {
         return Window_is_visible(this.#windowHandle);
     }
@@ -1108,30 +1128,58 @@ export class CheckboxElement extends Element {
         super(VT_CHECKBOX);
     }
 
+    /**
+     *
+     * @param text {string}
+     */
     set label(text) {
         Checkbox_set_label(this.handle, text);
     }
 
+    /**
+     *
+     * @returns {string}
+     */
     get label() {
         return Checkbox_get_label(this.handle);
     }
 
+    /**
+     *
+     * @param value {boolean}
+     */
     set checked(value) {
         Checkbox_set_checked(this.handle, value);
     }
 
+    /**
+     *
+     * @returns {boolean}
+     */
     get checked() {
         return Checkbox_is_checked(this.handle);
     }
 
+    /**
+     *
+     * @returns {boolean}
+     */
     get disabled() {
         return Element_is_disabled(this.handle);
     }
 
+    /**
+     *
+     * @param value {boolean}
+     */
     set disabled(value) {
         Element_set_disabled(this.handle, value);
     }
 
+    /**
+     *
+     * @param callback {(e: IVoidEvent) => void}
+     */
     bindChange(callback) {
         this.bindEvent("change", callback);
     }
@@ -1143,30 +1191,58 @@ export class RadioElement extends Element {
         super(VT_RADIO);
     }
 
+    /**
+     *
+     * @param text {string}
+     */
     set label(text) {
         Radio_set_label(this.handle, text);
     }
 
+    /**
+     *
+     * @returns {string}
+     */
     get label() {
         return Radio_get_label(this.handle);
     }
 
+    /**
+     *
+     * @param value {boolean}
+     */
     set checked(value) {
         Radio_set_checked(this.handle, value);
     }
 
+    /**
+     *
+     * @returns {boolean}
+     */
     get checked() {
         return Radio_is_checked(this.handle);
     }
 
+    /**
+     *
+     * @returns {boolean}
+     */
     get disabled() {
         return Element_is_disabled(this.handle);
     }
 
+    /**
+     *
+     * @param value {boolean}
+     */
     set disabled(value) {
         Element_set_disabled(this.handle, value);
     }
 
+    /**
+     *
+     * @param callback {(e: IVoidEvent) => void}
+     */
     bindChange(callback) {
         this.bindEvent("change", callback);
     }
@@ -1523,19 +1599,35 @@ export class TextInputElement extends Element {
         return TextInput_get_text(this.handle);
     }
 
+    /**
+     *
+     * @returns {boolean}
+     */
     get disabled() {
         return Element_is_disabled(this.handle);
     }
 
+    /**
+     *
+     * @param value {boolean}
+     */
     set disabled(value) {
         Element_set_disabled(this.handle, value);
     }
 
 
+    /**
+     *
+     * @param callback {(e: ITextEvent) => void}
+     */
     bindTextChange(callback) {
         this.bindEvent("textchange", callback);
     }
 
+    /**
+     *
+     * @param callback {(e: ICaretEvent) => void}
+     */
     bindCaretChange(callback) {
         this.bindEvent("caretchange", callback);
     }
@@ -1592,19 +1684,35 @@ export class TextEditElement extends Element {
         return TextEdit_get_text(this.handle);
     }
 
+    /**
+     *
+     * @returns {boolean}
+     */
     get disabled() {
         return Element_is_disabled(this.handle);
     }
 
+    /**
+     *
+     * @param value {boolean}
+     */
     set disabled(value) {
         Element_set_disabled(this.handle, value);
     }
 
 
+    /**
+     *
+     * @param callback {(e: ITextEvent) => void}
+     */
     bindTextChange(callback) {
         this.bindEvent("textchange", callback);
     }
 
+    /**
+     *
+     * @param callback {(e: ICaretEvent) => void}
+     */
     bindCaretChange(callback) {
         this.bindEvent("caretchange", callback);
     }
@@ -1697,10 +1805,18 @@ export class ButtonElement extends ContainerBasedElement {
         super(VT_BUTTON);
     }
 
+    /**
+     *
+     * @returns {boolean}
+     */
     get disabled() {
         return Element_is_disabled(this.handle);
     }
 
+    /**
+     *
+     * @param value {boolean}
+     */
     set disabled(value) {
         Element_set_disabled(this.handle, value);
     }
@@ -1748,7 +1864,7 @@ export class ScrollElement extends ContainerBasedElement {
 
 }
 
-class RadioGroupElement extends ContainerBasedElement {
+export class RadioGroupElement extends ContainerBasedElement {
     constructor() {
         super(VT_RADIO_GROUP);
     }

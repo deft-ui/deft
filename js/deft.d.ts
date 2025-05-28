@@ -350,10 +350,26 @@ declare class Window {
      */
     resize(size: Size): void;
     drag(): void;
-    set minimized(minimized: any);
-    get minimized(): any;
-    set maximized(maximized: any);
-    get maximized(): any;
+    /**
+     *
+     * @param minimized {boolean}
+     */
+    set minimized(minimized: boolean);
+    /**
+     *
+     * @returns {boolean}
+     */
+    get minimized(): boolean;
+    /**
+     *
+     * @param maximized {boolean}
+     */
+    set maximized(maximized: boolean);
+    /**
+     *
+     * @returns {boolean}
+     */
+    get maximized(): boolean;
     /**
      *
      * @param owner {Window}
@@ -365,6 +381,10 @@ declare class Window {
      * @param visible {boolean}
      */
     set visible(visible: boolean);
+    /**
+     *
+     * @returns {boolean}
+     */
     get visible(): boolean;
     requestFullscreen(): void;
     exitFullscreen(): void;
@@ -729,23 +749,79 @@ declare class LabelElement extends Element {
 }
 declare class CheckboxElement extends Element {
     constructor();
-    set label(text: any);
-    get label(): any;
-    set checked(value: any);
-    get checked(): any;
-    set disabled(value: any);
-    get disabled(): any;
-    bindChange(callback: any): void;
+    /**
+     *
+     * @param text {string}
+     */
+    set label(text: string);
+    /**
+     *
+     * @returns {string}
+     */
+    get label(): string;
+    /**
+     *
+     * @param value {boolean}
+     */
+    set checked(value: boolean);
+    /**
+     *
+     * @returns {boolean}
+     */
+    get checked(): boolean;
+    /**
+     *
+     * @param value {boolean}
+     */
+    set disabled(value: boolean);
+    /**
+     *
+     * @returns {boolean}
+     */
+    get disabled(): boolean;
+    /**
+     *
+     * @param callback {(e: IVoidEvent) => void}
+     */
+    bindChange(callback: (e: IVoidEvent) => void): void;
 }
 declare class RadioElement extends Element {
     constructor();
-    set label(text: any);
-    get label(): any;
-    set checked(value: any);
-    get checked(): any;
-    set disabled(value: any);
-    get disabled(): any;
-    bindChange(callback: any): void;
+    /**
+     *
+     * @param text {string}
+     */
+    set label(text: string);
+    /**
+     *
+     * @returns {string}
+     */
+    get label(): string;
+    /**
+     *
+     * @param value {boolean}
+     */
+    set checked(value: boolean);
+    /**
+     *
+     * @returns {boolean}
+     */
+    get checked(): boolean;
+    /**
+     *
+     * @param value {boolean}
+     */
+    set disabled(value: boolean);
+    /**
+     *
+     * @returns {boolean}
+     */
+    get disabled(): boolean;
+    /**
+     *
+     * @param callback {(e: IVoidEvent) => void}
+     */
+    bindChange(callback: (e: IVoidEvent) => void): void;
 }
 /**
  * @typedef {{
@@ -954,10 +1030,26 @@ declare class TextInputElement extends Element {
      * @returns {"text" | "password"}
      */
     get type(): "text" | "password";
-    set disabled(value: any);
-    get disabled(): any;
-    bindTextChange(callback: any): void;
-    bindCaretChange(callback: any): void;
+    /**
+     *
+     * @param value {boolean}
+     */
+    set disabled(value: boolean);
+    /**
+     *
+     * @returns {boolean}
+     */
+    get disabled(): boolean;
+    /**
+     *
+     * @param callback {(e: ITextEvent) => void}
+     */
+    bindTextChange(callback: (e: ITextEvent) => void): void;
+    /**
+     *
+     * @param callback {(e: ICaretEvent) => void}
+     */
+    bindCaretChange(callback: (e: ICaretEvent) => void): void;
 }
 declare class TextEditElement extends Element {
     constructor();
@@ -988,15 +1080,39 @@ declare class TextEditElement extends Element {
      * @param charOffset {number}
      */
     setCaretByCharOffset(charOffset: number): void;
-    set disabled(value: any);
-    get disabled(): any;
-    bindTextChange(callback: any): void;
-    bindCaretChange(callback: any): void;
+    /**
+     *
+     * @param value {boolean}
+     */
+    set disabled(value: boolean);
+    /**
+     *
+     * @returns {boolean}
+     */
+    get disabled(): boolean;
+    /**
+     *
+     * @param callback {(e: ITextEvent) => void}
+     */
+    bindTextChange(callback: (e: ITextEvent) => void): void;
+    /**
+     *
+     * @param callback {(e: ICaretEvent) => void}
+     */
+    bindCaretChange(callback: (e: ICaretEvent) => void): void;
 }
 declare class ButtonElement extends ContainerBasedElement {
     constructor();
-    set disabled(value: any);
-    get disabled(): any;
+    /**
+     *
+     * @param value {boolean}
+     */
+    set disabled(value: boolean);
+    /**
+     *
+     * @returns {boolean}
+     */
+    get disabled(): boolean;
 }
 declare class ContainerElement extends ContainerBasedElement {
     constructor();
@@ -1017,6 +1133,9 @@ declare class ScrollElement extends ContainerBasedElement {
      */
     set scrollY(value: "auto" | "always" | "never");
     scrollBy(value: any): void;
+}
+declare class RadioGroupElement extends ContainerBasedElement {
+    constructor();
 }
 declare class WebSocket {
     constructor(url: any);
