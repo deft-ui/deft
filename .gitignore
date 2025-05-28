@@ -6,3 +6,4 @@ target
 local*
 dist/
 examples/debug-js
+Cargo.lock
