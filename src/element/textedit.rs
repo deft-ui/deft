@@ -53,6 +53,7 @@ impl ElementBackend for TextEdit {
     where
         Self: Sized,
     {
+        element.allow_ime = true;
         element.set_focusable(true);
         element.is_form_element = true;
         let mut editable = Element::create(Editable::create);

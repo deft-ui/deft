@@ -1324,6 +1324,7 @@ pub struct Element {
     pub scrollable: Scrollable,
     pub tag: String,
     is_form_element: bool,
+    pub allow_ime: bool,
 }
 
 // js_weak_value!(Element, ElementWeak);
@@ -1366,6 +1367,7 @@ impl ElementData {
             scrollable,
             tag: "".to_string(),
             is_form_element: false,
+            allow_ime: false,
         }
     }
 }

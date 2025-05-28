@@ -2,6 +2,7 @@ use crate as deft;
 use crate::base::EventContext;
 use crate::element::common::editable::{Editable, InputType};
 use crate::element::{Element, ElementBackend, ElementWeak};
+use crate::ok_or_return;
 use crate::style::length::LengthOrPercent;
 use crate::style::{FixedStyleProp, StylePropVal};
 use deft_macros::{element_backend, js_methods};
@@ -40,7 +41,12 @@ impl TextInput {
 
     #[js_func]
     pub fn set_type(&mut self, input_type: InputType) {
+        let mut el = ok_or_return!(self.element.upgrade());
         self.editable.set_type(input_type);
+        el.allow_ime = match input_type {
+            InputType::Text => true,
+            InputType::Password => false,
+        };
     }
 
     #[js_func]
@@ -54,6 +60,7 @@ impl ElementBackend for TextInput {
     where
         Self: Sized,
     {
+        element.allow_ime = true;
         element.scrollable.vertical_bar.set_thickness(0.0);
         element.scrollable.horizontal_bar.set_thickness(0.0);
         element.set_style_props(vec![FixedStyleProp::FlexDirection(StylePropVal::Custom(

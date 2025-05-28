@@ -847,7 +847,7 @@ fn test_measure() {
     // let result = font.measure_text(text.as_str(), None);
 }
 
-// #[test]
+#[cfg(test)]
 fn test_layout_performance() {
     let text_demo = include_str!("../../Cargo.lock");
     let params = ParagraphParams {

@@ -4,7 +4,7 @@ readme = "README.md"
 license = "MIT"
 description = "Cross platform ui framework"
 
-version = "0.8.0"
+version = "0.8.1"
 authors = ["KasonYang <me@kason.fun>"]
 edition = "2021"
 

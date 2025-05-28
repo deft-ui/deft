@@ -1055,6 +1055,7 @@ impl Window {
             }
             node.update_select_style_recurse();
             node.emit(FocusEvent);
+            self.window.set_ime_allowed(node.allow_ime);
         }
     }
 

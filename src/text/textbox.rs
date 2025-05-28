@@ -10,8 +10,8 @@ use crate::element::text::intersect_range;
 use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
 use crate::element::{ElementBackend, ElementWeak};
 use crate::event::{
-    ClickEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent,
-    MouseUpEvent, KEY_MOD_CTRL,
+    ClickEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
+    KEY_MOD_CTRL,
 };
 use crate::font::family::{FontFamilies, FontFamily};
 use crate::number::DeNan;
@@ -849,7 +849,7 @@ fn test_measure() {
     // let result = font.measure_text(text.as_str(), None);
 }
 
-// #[test]
+#[cfg(test)]
 fn test_layout_performance() {
     let text_demo = include_str!("../../Cargo.lock");
     let params = ParagraphParams {

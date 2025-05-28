@@ -621,6 +621,7 @@ impl Entry {
 
 impl ElementBackend for Entry {
     fn create(ele: &mut Element) -> Self {
+        ele.allow_ime = true;
         ele.set_focusable(true);
         // let mut base = Scroll::create(ele);
         let mut paragraph = TextBox::new();
