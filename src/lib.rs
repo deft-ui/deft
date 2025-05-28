@@ -88,7 +88,6 @@ fn run_event_loop(event_loop: EventLoop<AppEventPayload>, deft_app: App) {
 /// Boostrap for desktop apps
 pub fn bootstrap(deft_app: App) {
     init_console();
-    init_base_components();
     let event_loop: EventLoop<AppEventPayload> = EventLoop::with_user_event().build().unwrap();
     run_event_loop(event_loop, deft_app);
 }

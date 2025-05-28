@@ -20,7 +20,7 @@ use crate::element::richtext::RichText;
 use crate::element::scroll::Scroll;
 use crate::element::textedit::TextEdit;
 use crate::element::textinput::TextInput;
-use crate::element::{Element, CSS_MANAGER};
+use crate::element::{init_base_components, Element, CSS_MANAGER};
 use crate::event_loop::run_with_event_loop;
 use crate::ext::ext_animation::animation_create;
 use crate::ext::ext_appfs::appfs;
@@ -112,6 +112,7 @@ impl JsEngine {
             app: app.clone(),
         };
 
+        init_base_components();
         engine.add_global_functions(ExtConsole::create_js_apis());
         engine.add_global_functions(Element::create_js_apis());
         engine.add_global_functions(Scroll::create_js_apis());
