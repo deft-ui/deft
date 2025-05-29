@@ -259,6 +259,10 @@ export class Window {
         Window_exit_fullscreen(this.#windowHandle);
     }
 
+    get fullscreen() {
+        return Window_is_fullscreen(this.#windowHandle);
+    }
+
     /**
      *
      * @param callback {(event: IResizeEvent) => void}

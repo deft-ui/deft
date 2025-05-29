@@ -356,6 +356,11 @@ impl Window {
     }
 
     #[js_func]
+    fn is_fullscreen(&self) -> bool {
+        self.window.fullscreen().is_some()
+    }
+
+    #[js_func]
     fn drag(&mut self) {
         self.drag_window_called = true;
         let _ = self.window.drag_window();
