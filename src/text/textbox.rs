@@ -25,7 +25,6 @@ use crate::text::textbox::line::Line;
 use crate::text::textbox::util::{parse_optional_text_decoration, parse_optional_weight};
 use crate::text::{TextAlign, TextStyle};
 use crate::{base, js_deserialize, js_serialize, some_or_continue};
-use measure_time::print_time;
 use serde::{Deserialize, Serialize};
 use skia_safe::font_style::{Weight, Width};
 use skia_safe::{Color, Paint};
@@ -836,51 +835,62 @@ impl TextBox {
     }
 }
 
-#[test]
-fn test_measure() {
-    let text_demo = include_str!("../../Cargo.lock");
-    let mut text = String::new();
-    for _ in 0..200 {
-        text.push_str(text_demo);
-    }
-    // let font = DEFAULT_TYPE_FACE.with(|tf| Font::from_typeface(tf, 14.0));
-    // debug!("font {:?}", font.typeface().family_name());
-    // print_time!("measure time");
-    // let result = font.measure_text(text.as_str(), None);
-}
-
 #[cfg(test)]
-fn test_layout_performance() {
-    let text_demo = include_str!("../../Cargo.lock");
-    let params = ParagraphParams {
-        line_height: Some(20.0),
-        align: TextAlign::Left,
-        color: Default::default(),
-        font_size: 16.0,
-        font_families: FontFamilies::new(vec![FontFamily::new("monospace")]),
-        font_weight: Weight::NORMAL,
-        font_style: FontStyle::Normal,
-        text_wrap: Some(false),
-        mask_char: None,
-    };
-    let mut text = String::new();
-    for _ in 0..200 {
-        text.push_str(text_demo);
-    }
-    //let mut file = File::create("target/test.txt").unwrap();
-    // file.write_all(text.as_bytes()).unwrap();
+mod tests {
+    use crate::element::paragraph::ParagraphParams;
+    use crate::font::family::{FontFamilies, FontFamily};
+    use crate::style::font::FontStyle;
+    use crate::text::textbox::{TextBox, TextElement, TextUnit};
+    use crate::text::TextAlign;
+    use measure_time::print_time;
+    use skia_safe::font_style::Weight;
 
-    print_time!("build paragraph time");
-    let unit = TextElement::Text(TextUnit {
-        text: text.clone(),
-        font_families: None,
-        font_size: None,
-        color: None,
-        text_decoration_line: None,
-        weight: None,
-        background_color: None,
-        style: None,
-    });
-    let mut p = TextBox::build_paragraph(&params, &vec![unit]);
-    p.layout(600.0);
+    #[test]
+    fn test_measure() {
+        let text_demo = include_str!("../../Cargo.lock");
+        let mut text = String::new();
+        for _ in 0..200 {
+            text.push_str(text_demo);
+        }
+        // let font = DEFAULT_TYPE_FACE.with(|tf| Font::from_typeface(tf, 14.0));
+        // debug!("font {:?}", font.typeface().family_name());
+        // print_time!("measure time");
+        // let result = font.measure_text(text.as_str(), None);
+    }
+
+    #[cfg(test)]
+    fn test_layout_performance() {
+        let text_demo = include_str!("../../Cargo.lock");
+        let params = ParagraphParams {
+            line_height: Some(20.0),
+            align: TextAlign::Left,
+            color: Default::default(),
+            font_size: 16.0,
+            font_families: FontFamilies::new(vec![FontFamily::new("monospace")]),
+            font_weight: Weight::NORMAL,
+            font_style: FontStyle::Normal,
+            text_wrap: Some(false),
+            mask_char: None,
+        };
+        let mut text = String::new();
+        for _ in 0..200 {
+            text.push_str(text_demo);
+        }
+        //let mut file = File::create("target/test.txt").unwrap();
+        // file.write_all(text.as_bytes()).unwrap();
+
+        print_time!("build paragraph time");
+        let unit = TextElement::Text(TextUnit {
+            text: text.clone(),
+            font_families: None,
+            font_size: None,
+            color: None,
+            text_decoration_line: None,
+            weight: None,
+            background_color: None,
+            style: None,
+        });
+        let mut p = TextBox::build_paragraph(&params, &vec![unit]);
+        p.layout(600.0);
+    }
 }

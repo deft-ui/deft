@@ -80,6 +80,10 @@ checkbox[disabled]::box, checkbox[disabled]:hover::box {
     border: 1px #DADBDB;
 }
 
+radiogroup {
+    flex-direction: row;
+    gap: 10px;
+}
 
 radio {
     color: #232629;
@@ -147,4 +151,36 @@ text-edit::scrollbar, scroll::scrollbar {
 
 text-edit::scrollbar-thumb, scroll::scrollbar-thumb {
     background: #C1C1C1;
+}
+
+select {
+    background: #F9F9F9;
+    border: 1px #b0b1b2;
+    border-radius: 2px;
+    padding: 2px 6px;
+    height: 2em;
+}
+select:hover {
+    border: 1px #3DAEE9;
+}
+select::options {
+    background: #FFF;
+    color: #000;
+    border: 1px #ccc;
+    padding: 1px 0;
+    font-size: inherit;
+}
+select::option {
+    padding: 4px 6px;
+}
+select::option-hover {
+    background: #eee;
+}
+select::placeholder {
+    color: #666;
+}
+select[disabled], select[disabled]:hover {
+    background: #F3F3F3;
+    color: #A8A9AA;
+    border: 1px #DADBDB;
 }

@@ -18,6 +18,7 @@ use crate::element::paragraph::Paragraph;
 use crate::element::radio::Radio;
 use crate::element::richtext::RichText;
 use crate::element::scroll::Scroll;
+use crate::element::select::Select;
 use crate::element::textedit::TextEdit;
 use crate::element::textinput::TextInput;
 use crate::element::{init_base_components, Element, CSS_MANAGER};
@@ -48,6 +49,8 @@ use crate::js::ToJsCallResult;
 use crate::mrc::Mrc;
 use crate::stylesheet::{stylesheet_add, stylesheet_remove, stylesheet_update};
 use crate::typeface::typeface_create;
+use crate::window::page::Page;
+use crate::window::popup::Popup;
 use crate::window::{Window, WindowType};
 
 thread_local! {
@@ -113,6 +116,8 @@ impl JsEngine {
         };
 
         init_base_components();
+        engine.add_global_functions(Popup::create_js_apis());
+        engine.add_global_functions(Page::create_js_apis());
         engine.add_global_functions(ExtConsole::create_js_apis());
         engine.add_global_functions(Element::create_js_apis());
         engine.add_global_functions(Scroll::create_js_apis());
@@ -126,6 +131,7 @@ impl JsEngine {
         engine.add_global_functions(RichText::create_js_apis());
         engine.add_global_functions(Label::create_js_apis());
         engine.add_global_functions(Image::create_js_apis());
+        engine.add_global_functions(Select::create_js_apis());
         #[cfg(feature = "sqlite")]
         engine.add_global_functions(crate::ext::ext_sqlite::SqliteConn::create_js_apis());
         #[cfg(feature = "tray")]

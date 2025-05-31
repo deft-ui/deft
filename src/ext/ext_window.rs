@@ -4,8 +4,6 @@ use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use winit::event::WindowEvent;
-#[cfg(x11_platform)]
-use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::WindowId as WinitWindowId;
 
 use crate::element::Element;
@@ -15,7 +13,7 @@ use crate::{js_deserialize, js_weak_value};
 thread_local! {
     pub static WINDOWS: RefCell<HashMap<i32, Window>> = RefCell::new(HashMap::new());
     pub static WINIT_TO_WINDOW: RefCell<HashMap<WinitWindowId, WindowWeak>> = RefCell::new(HashMap::new());
-    pub static MODAL_TO_OWNERS: RefCell<HashMap<WinitWindowId, WinitWindowId>> = RefCell::new(HashMap::new());
+    pub static MODAL_TO_OWNERS: RefCell<HashMap<WinitWindowId, WindowWeak>> = RefCell::new(HashMap::new());
 }
 
 pub const WINDOW_TYPE_NORMAL: &str = "normal";
@@ -68,8 +66,17 @@ pub fn handle_window_event(window_id: WinitWindowId, event: WindowEvent) {
         WindowEvent::Occluded(_) => {}
         WindowEvent::RedrawRequested => {}
         _ => {
-            let has_modal = MODAL_TO_OWNERS
-                .with_borrow_mut(|m| m.iter().find(|(_, o)| o == &&window_id).is_some());
+            let has_modal = MODAL_TO_OWNERS.with_borrow_mut(|m| {
+                m.iter()
+                    .find(|(_, o)| {
+                        if let Ok(o) = o.upgrade() {
+                            o.get_window_id() == window_id
+                        } else {
+                            false
+                        }
+                    })
+                    .is_some()
+            });
             if has_modal {
                 debug!("modal window found");
                 return;

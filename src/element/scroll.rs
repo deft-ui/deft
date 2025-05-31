@@ -146,14 +146,18 @@ impl Scroll {
     }
 
     pub fn map_element_window_xy(
-        element: &Element,
+        _element: &Element,
         window_x: f32,
         window_y: f32,
     ) -> Option<(f32, f32)> {
+        //TODO fix or remove
+        /*
         let window = element.get_window()?.upgrade().ok()?;
         let node_matrix = window.render_tree.get_element_total_matrix(&element)?;
         let p = node_matrix.invert()?.map_xy(window_x, window_y);
         Some((p.x, p.y))
+         */
+        Some((window_x, window_y))
     }
 }
 

@@ -71,6 +71,10 @@ impl ImageObject {
         self.container_size = size;
     }
 
+    pub fn get_container_size(&self) -> (f32, f32) {
+        self.container_size
+    }
+
     pub fn set_color(&mut self, color: Color) -> bool {
         if let ImageSrc::Svg(_) = self.img {
             self.color = color;

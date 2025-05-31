@@ -150,7 +150,13 @@ impl ElementBackend for Label {
     }
 
     fn render(&mut self) -> RenderFn {
-        self.state.text_box.render()
+        let el = ok_or_return!(self.element.upgrade(), RenderFn::empty());
+        let (pt, _, _, pl) = el.get_padding();
+        let text_renderer = self.state.text_box.render();
+        RenderFn::new(move |painter| {
+            painter.canvas.translate((pl, pt));
+            text_renderer.run(painter);
+        })
     }
 
     fn before_layout(&mut self) {

@@ -1,3 +1,6 @@
+pub mod page;
+pub mod popup;
+
 use crate as deft;
 use crate::app::{exit_app, AppEvent, InsetType};
 use crate::base::MouseEventType::{MouseClick, MouseUp};
@@ -6,8 +9,9 @@ use crate::base::{
     MouseDetail, MouseEventType, ResultWaiter, Touch, TouchDetail,
 };
 use crate::cursor::search_cursor;
+use crate::element::body::Body;
 use crate::element::util::get_tree_level;
-use crate::element::Element;
+use crate::element::{Element, ElementBackend, ElementParent};
 use crate::event::{
     build_modifier, named_key_to_str, str_to_named_key, BlurEvent, ClickEvent, ContextMenuEvent,
     DragOverEvent, DragStartEvent, DropEvent, DroppedFileEvent, FocusEvent, FocusShiftEvent,
@@ -24,11 +28,17 @@ use crate::frame_rate::FrameRateController;
 use crate::js::JsError;
 use crate::mrc::{Mrc, MrcWeak};
 use crate::paint::{PaintContext, Painter, RenderTree};
+use crate::platform::support_multiple_windows;
 use crate::render::painter::ElementPainter;
 use crate::resource_table::ResourceTable;
 use crate::style::length::LengthContext;
 use crate::timer::{set_timeout_nanos, TimerHandle};
-use crate::{bind_js_event_listener, send_app_event, show_focus_hint, some_or_return, warn_time};
+use crate::window::page::Page;
+use crate::window::popup::Popup;
+use crate::{
+    base, bind_js_event_listener, ok_or_return, send_app_event, show_focus_hint, some_or_return,
+    warn_time,
+};
 use anyhow::Error;
 use deft_macros::{js_methods, mrc_object, window_event};
 use log::{debug, error};
@@ -47,9 +57,13 @@ use winit::event::{
     ElementState, Ime, Modifiers, MouseButton, MouseScrollDelta, TouchPhase, WindowEvent,
 };
 use winit::keyboard::{Key, KeyCode, NamedKey, PhysicalKey};
+#[cfg(windows)]
+use winit::platform::windows::WindowExtWindows;
 #[cfg(x11_platform)]
 use winit::platform::x11::WindowAttributesExtX11;
-use winit::window::{Cursor, CursorIcon, Fullscreen, ResizeDirection, WindowAttributes, WindowId};
+use winit::window::{
+    Cursor, CursorIcon, Fullscreen, ResizeDirection, WindowAttributes, WindowButtons, WindowId,
+};
 
 #[derive(Clone)]
 struct MouseDownInfo {
@@ -88,7 +102,8 @@ pub struct Window {
     cursor_position: LogicalPosition<f64>,
     pub(crate) window_type: WindowType,
     cursor_root_position: LogicalPosition<f64>,
-    pub body: Option<Element>,
+    pages: Vec<Page>,
+    layer_roots: Vec<(Element, f32, f32)>,
     focusing: Option<Element>,
     /// (element, button)
     pressing: Option<(Element, MouseDownInfo)>,
@@ -109,7 +124,7 @@ pub struct Window {
     renderer_idle: bool,
     next_frame_callbacks: Vec<Callback>,
     next_paint_callbacks: Vec<Callback>,
-    pub render_tree: RenderTree,
+    pub render_tree: HashMap<Element, RenderTree>,
     pub style_variables: Mrc<HashMap<String, String>>,
     frame_rate_controller: FrameRateController,
     next_frame_timer_handle: Option<TimerHandle>,
@@ -143,7 +158,14 @@ pub struct WindowBlurEvent;
 impl Window {
     #[js_func]
     pub fn create(attrs: WindowAttrs) -> Result<Self, Error> {
-        let mut window = Window::create_inner(attrs);
+        Self::create_with_raw_attrs(attrs, winit::window::Window::default_attributes())
+    }
+
+    pub fn create_with_raw_attrs(
+        attrs: WindowAttrs,
+        raw_attrs: WindowAttributes,
+    ) -> Result<Self, Error> {
+        let mut window = Window::create_inner(attrs, raw_attrs);
         send_app_event(AppEvent::BindWindow(window.get_id())).unwrap();
         window.update_inset(InsetType::Ime, Rect::new_empty());
         window.update_inset(InsetType::Navigation, Rect::new_empty());
@@ -154,11 +176,15 @@ impl Window {
         Ok(window)
     }
 
-    fn create_inner(attrs: WindowAttrs) -> Self {
+    #[js_func]
+    pub fn support_multiple_windows() -> bool {
+        support_multiple_windows()
+    }
+
+    fn create_inner(attrs: WindowAttrs, mut attributes: WindowAttributes) -> Self {
         let id = NEXT_WINDOW_ID.get();
         NEXT_WINDOW_ID.set(id + 1);
 
-        let mut attributes = winit::window::Window::default_attributes();
         if let Some(t) = &attrs.title {
             attributes.title = t.to_string();
         } else {
@@ -166,6 +192,9 @@ impl Window {
         }
         attributes.visible = attrs.visible.unwrap_or(true);
         attributes.resizable = attrs.resizable.unwrap_or(true);
+        if !attributes.resizable {
+            attributes.enabled_buttons.remove(WindowButtons::MAXIMIZE);
+        }
         attributes.decorations = attrs.decorations.unwrap_or(true);
         let (default_width, default_height) = if attributes.resizable {
             (800.0, 600.0)
@@ -211,12 +240,15 @@ impl Window {
             RenderBackendType::merge(&render_backend_types, &RenderBackendType::all());
         let window = Self::create_window(attributes.clone(), &render_backend_types);
         window.set_ime_allowed(true);
+        let body = Element::create(Body::create);
+        let mut render_tree = HashMap::new();
+        render_tree.insert(body.clone(), RenderTree::new(0));
         let state = WindowData {
             id,
             window,
             cursor_position: LogicalPosition { x: 0.0, y: 0.0 },
             cursor_root_position: LogicalPosition { x: 0.0, y: 0.0 },
-            body: None,
+            layer_roots: vec![(body, 0.0, 0.0)],
             pressing: None,
             focusing: None,
             hover: None,
@@ -242,7 +274,7 @@ impl Window {
             renderer_idle: true,
             next_frame_callbacks: Vec::new(),
             next_paint_callbacks: Vec::new(),
-            render_tree: RenderTree::new(0),
+            render_tree,
             style_variables: Mrc::new(HashMap::new()),
             frame_rate_controller: FrameRateController::new(),
             next_frame_timer_handle: None,
@@ -250,6 +282,7 @@ impl Window {
             drag_window_called: false,
             render_backend_types,
             layout_dirty_list: HashMap::new(),
+            pages: Vec::new(),
         };
         let mut handle = Window {
             inner: Mrc::new(state),
@@ -257,6 +290,12 @@ impl Window {
         // handle.body.set_window(Some(win.clone()));
         handle.on_resize();
         handle
+    }
+
+    pub fn inner_position(&self) -> (f32, f32) {
+        let pos = ok_or_return!(self.window.inner_position(), (0.0, 0.0));
+        let pos = pos.to_logical(self.window.scale_factor());
+        (pos.x, pos.y)
     }
 
     pub fn update_inset(&mut self, ty: InsetType, rect: Rect) {
@@ -269,8 +308,8 @@ impl Window {
         debug!("updating style variable: {} {}", name, height);
         self.style_variables
             .insert(name.to_string(), format!("{:.6}", height));
-        if let Some(mut body) = self.body.clone() {
-            body.refresh_style_variables(&self.style_variables.as_weak());
+        for (mut root, ..) in self.layer_roots.clone() {
+            root.refresh_style_variables(&self.style_variables.as_weak());
         }
     }
 
@@ -294,13 +333,6 @@ impl Window {
         self.notify_update();
     }
 
-    pub fn mark_dirty_and_update_immediate(&mut self, layout_dirty: bool) -> ResultWaiter<bool> {
-        if let Some(body) = &mut self.body {
-            body.mark_dirty(layout_dirty);
-        }
-        self.update()
-    }
-
     pub fn get_id(&self) -> i32 {
         self.id
     }
@@ -312,8 +344,10 @@ impl Window {
     #[js_func]
     pub fn set_modal(&mut self, owner: Window) -> Result<(), JsError> {
         self.window.set_modal(&owner.window);
+        #[cfg(windows)]
+        owner.window.set_enable(false);
         let window_id = self.get_window_id();
-        MODAL_TO_OWNERS.with_borrow_mut(|m| m.insert(window_id, owner.get_window_id()));
+        MODAL_TO_OWNERS.with_borrow_mut(|m| m.insert(window_id, owner.as_weak()));
         Ok(())
     }
 
@@ -322,7 +356,13 @@ impl Window {
         let window_id = self.get_window_id();
         if self.allow_close() {
             WINIT_TO_WINDOW.with_borrow_mut(|m| m.remove(&window_id));
-            MODAL_TO_OWNERS.with_borrow_mut(|m| m.remove(&window_id));
+            #[allow(unused)]
+            if let Some(modal_parent) = MODAL_TO_OWNERS.with_borrow_mut(|m| m.remove(&window_id)) {
+                #[cfg(windows_platform)]
+                if let Ok(p) = modal_parent.upgrade() {
+                    p.window.set_enable(true);
+                }
+            }
             WINDOWS.with_borrow_mut(|m| {
                 m.remove(&self.get_id());
                 if m.is_empty() {
@@ -399,6 +439,38 @@ impl Window {
             .map(|e| e.context.clone())
             .unwrap_or(JsValue::Undefined);
         Ok(e)
+    }
+
+    #[js_func]
+    pub fn set_outer_position(&mut self, x: f32, y: f32) {
+        self.window.set_outer_position(Logical(LogicalPosition {
+            x: x as f64,
+            y: y as f64,
+        }))
+    }
+
+    #[js_func]
+    pub fn get_outer_position(&self) -> Result<(f32, f32), JsError> {
+        let p: LogicalPosition<f32> = self
+            .window
+            .outer_position()?
+            .to_logical(self.window.scale_factor());
+        Ok((p.x, p.y))
+    }
+
+    #[js_func]
+    pub fn get_monitor_size(&self) -> (f32, f32) {
+        if let Some(monitor) = self.window.current_monitor() {
+            let size = monitor.size().to_logical(monitor.scale_factor());
+            (size.width, size.height)
+        } else {
+            (0.0, 0.0)
+        }
+    }
+
+    #[js_func]
+    pub fn popup(&self, content: Element, target: base::Rect) -> Popup {
+        Popup::new(content, target, &self)
     }
 
     pub fn allow_close(&mut self) -> bool {
@@ -663,18 +735,18 @@ impl Window {
     pub fn on_element_removed(&mut self, _element: &Element) {
         if let Some(f) = &self.focusing {
             if f.get_window().is_none() {
-                self.focusing = self.body.clone();
+                let (body, ..) = self.layer_roots.last().unwrap().clone();
+                self.focusing = Some(body);
             }
         }
     }
 
     fn handle_mouse_wheel(&mut self, delta: (f32, f32)) {
-        if let Some((mut target_node, _, _)) = self.get_node_by_point() {
-            target_node.emit(MouseWheelEvent {
-                cols: delta.0,
-                rows: delta.1,
-            });
-        }
+        let (mut target_node, _, _) = self.get_node_by_point();
+        target_node.emit(MouseWheelEvent {
+            cols: delta.0,
+            rows: delta.1,
+        });
     }
 
     fn handle_cursor_moved(&mut self) {
@@ -683,20 +755,21 @@ impl Window {
         let screen_x = self.cursor_root_position.x as f32;
         let screen_y = self.cursor_root_position.y as f32;
 
-        if let Some((_, icon)) = self.get_resize_direction() {
-            self.window.set_cursor(Cursor::Icon(icon));
-            return;
+        if self.attributes.resizable {
+            if let Some((_, icon)) = self.get_resize_direction() {
+                self.window.set_cursor(Cursor::Icon(icon));
+                return;
+            }
         }
 
         let mut target_node = self.get_node_by_point();
         let dragging = self.dragging;
         if let Some((pressing, down_info)) = &mut self.pressing.clone() {
             if dragging {
-                if let Some((target, _, _)) = &mut target_node {
-                    if target != pressing {
-                        target.emit(DragOverEvent {});
-                        self.last_drag_over = Some(target.clone());
-                    }
+                let (target, _, _) = &mut target_node;
+                if target != pressing {
+                    target.emit(DragOverEvent {});
+                    self.last_drag_over = Some(target.clone());
                 }
             } else {
                 if pressing.is_draggable()
@@ -721,7 +794,8 @@ impl Window {
                 }
             }
             //TODO should emit mouseenter|mouseleave?
-        } else if let Some((mut node, _, _)) = target_node {
+        } else {
+            let (mut node, _, _) = target_node;
             self.update_cursor(&node);
             if let Some(hover) = &mut self.hover.clone() {
                 if hover != &node {
@@ -830,63 +904,62 @@ impl Window {
         let screen_y = self.cursor_root_position.y as f32;
         //TODO impl
 
-        if let Some((mut node, _, _)) = self.get_node_by_point() {
-            let (_e_type, event_type) = match state {
-                ElementState::Pressed => ("mousedown", MouseEventType::MouseDown),
-                ElementState::Released => ("mouseup", MouseEventType::MouseUp),
-            };
-            let button = match mouse_button {
-                MouseButton::Left => 1,
-                MouseButton::Right => 2,
-                MouseButton::Middle => 3,
-                MouseButton::Back => 4,
-                MouseButton::Forward => 5,
-                MouseButton::Other(_) => 6,
-            };
-            match state {
-                ElementState::Pressed => {
-                    self.pressing = Some((
-                        node.clone(),
-                        MouseDownInfo {
-                            button,
-                            button_enum: mouse_button,
-                            window_x,
-                            window_y,
-                        },
-                    ));
+        let (mut node, _, _) = self.get_node_by_point();
+        let (_e_type, event_type) = match state {
+            ElementState::Pressed => ("mousedown", MouseEventType::MouseDown),
+            ElementState::Released => ("mouseup", MouseEventType::MouseUp),
+        };
+        let button = match mouse_button {
+            MouseButton::Left => 1,
+            MouseButton::Right => 2,
+            MouseButton::Middle => 3,
+            MouseButton::Back => 4,
+            MouseButton::Forward => 5,
+            MouseButton::Other(_) => 6,
+        };
+        match state {
+            ElementState::Pressed => {
+                self.pressing = Some((
+                    node.clone(),
+                    MouseDownInfo {
+                        button,
+                        button_enum: mouse_button,
+                        window_x,
+                        window_y,
+                    },
+                ));
+                self.emit_mouse_event(
+                    &mut node, event_type, button, window_x, window_y, screen_x, screen_y,
+                );
+            }
+            ElementState::Released => {
+                if let Some(mut pressing) = self.pressing.clone() {
                     self.emit_mouse_event(
-                        &mut node, event_type, button, window_x, window_y, screen_x, screen_y,
+                        &mut pressing.0,
+                        MouseUp,
+                        button,
+                        window_x,
+                        window_y,
+                        screen_x,
+                        screen_y,
                     );
-                }
-                ElementState::Released => {
-                    if let Some(mut pressing) = self.pressing.clone() {
-                        self.emit_mouse_event(
-                            &mut pressing.0,
-                            MouseUp,
-                            button,
-                            window_x,
-                            window_y,
-                            screen_x,
-                            screen_y,
-                        );
-                        if pressing.0 == node && pressing.1.button == button {
-                            let ty = match mouse_button {
-                                MouseButton::Left => Some(MouseEventType::MouseClick),
-                                MouseButton::Right => Some(MouseEventType::ContextMenu),
-                                _ => None,
-                            };
-                            if let Some(ty) = ty {
-                                self.emit_mouse_event(
-                                    &mut node, ty, button, window_x, window_y, screen_x, screen_y,
-                                );
-                            }
+                    if pressing.0 == node && pressing.1.button == button {
+                        let ty = match mouse_button {
+                            MouseButton::Left => Some(MouseEventType::MouseClick),
+                            MouseButton::Right => Some(MouseEventType::ContextMenu),
+                            _ => None,
+                        };
+                        if let Some(ty) = ty {
+                            self.emit_mouse_event(
+                                &mut node, ty, button, window_x, window_y, screen_x, screen_y,
+                            );
                         }
-                        self.release_press();
-                    } else {
-                        self.emit_mouse_event(
-                            &mut node, MouseUp, button, window_x, window_y, screen_x, screen_y,
-                        );
                     }
+                    self.release_press();
+                } else {
+                    self.emit_mouse_event(
+                        &mut node, MouseUp, button, window_x, window_y, screen_x, screen_y,
+                    );
                 }
             }
         }
@@ -1082,13 +1155,11 @@ impl Window {
         }
     }
 
+    #[js_func]
     pub fn get_inner_size(&self) -> (f32, f32) {
-        let size = self.window.inner_size();
-        let scale_factor = self.window.scale_factor() as f32;
-        (
-            size.width as f32 / scale_factor,
-            size.height as f32 / scale_factor,
-        )
+        let scale_factor = self.window.scale_factor();
+        let size = self.window.inner_size().to_logical(scale_factor);
+        (size.width, size.height)
     }
 
     fn update_layout(&mut self, mut roots: Vec<Element>) {
@@ -1111,20 +1182,22 @@ impl Window {
             level_a.cmp(&level_b)
         });
         for mut root in roots {
-            let mut w = width;
-            let mut h = height;
-            if let Some(p) = root.get_parent() {
-                let p_bounds = p.get_content_bounds();
-                w = p_bounds.width;
-                h = p_bounds.height;
-            }
+            let (w, h) = match &root.parent {
+                ElementParent::None => (f32::NAN, f32::NAN),
+                ElementParent::Element(p) => {
+                    let p_bounds = p.upgrade().unwrap().get_content_bounds();
+                    (p_bounds.width, p_bounds.height)
+                }
+                ElementParent::Window(_) => (width, height),
+                ElementParent::Page(_) => (f32::NAN, f32::NAN),
+            };
             //TODO skip if calculated
             root.calculate_layout(w, h);
         }
-        let body = some_or_return!(&mut self.body);
         if auto_size {
+            let (body, ..) = some_or_return!(self.layer_roots.first());
             let (final_width, final_height) = body.get_size();
-            if win_width as u32 != final_width as u32 && win_height as u32 != final_height as u32 {
+            if win_width as u32 != final_width as u32 || win_height as u32 != final_height as u32 {
                 self.resize(crate::base::Size {
                     width: final_width,
                     height: final_height,
@@ -1169,7 +1242,7 @@ impl Window {
         }
         let (viewport_width, viewport_height) = self.get_inner_size();
         warn_time!(16, "update window");
-        if let Some(body) = &mut self.body {
+        for (body, ..) in &mut self.layer_roots {
             let length_ctx = LengthContext {
                 root: body.style.font_size,
                 font_size: body.style.font_size,
@@ -1184,13 +1257,36 @@ impl Window {
         let layout_dirty = !dirty_roots.is_empty();
         if layout_dirty {
             self.update_layout(dirty_roots.values().cloned().collect());
+            //TODO should move to Popup?
+            let win_size = self
+                .window
+                .inner_size()
+                .to_logical(self.window.scale_factor());
+            for i in 1..self.layer_roots.len() {
+                let (root, x, y) = &mut self.layer_roots[i];
+                let bounds = root.get_bounds();
+                if x.is_nan() {
+                    *x = (win_size.width - bounds.width) / 2.0;
+                    *y = (win_size.height - bounds.height) / 2.0;
+                } else {
+                    if bounds.width + *x > win_size.width {
+                        *x = win_size.width - bounds.width;
+                    }
+                    if bounds.height + *y > win_size.height {
+                        *y = win_size.height - bounds.height;
+                    }
+                }
+            }
         }
         //TODO optimize performance
         // if layout_dirty {
-        if let Some(body) = &mut self.body {
+        self.render_tree.clear();
+        for (mut body, ..) in self.layer_roots.clone() {
             //TODO call before_renderer when layout is not dirty
             body.before_render_recurse();
-            self.render_tree = build_render_nodes(body);
+            let rt = build_render_nodes(&mut body);
+            let body = body.clone();
+            self.render_tree.insert(body, rt);
         }
         // }
         let r = self.paint();
@@ -1199,20 +1295,42 @@ impl Window {
     }
 
     #[js_func]
-    pub fn set_body(&mut self, mut body: Element) {
-        body.set_window(Some(self.as_weak()));
+    pub fn set_body(&mut self, body: Element) {
+        self.layer_roots[0] = (body.clone(), 0.0, 0.0);
+        self.init_element_root(body, ElementParent::Window(self.as_weak()));
+    }
+
+    #[js_func]
+    pub fn create_page(&mut self, element: Element, x: f32, y: f32) -> Page {
+        let page = Page::new(self.as_weak(), element.clone());
+        self.pages.push(page.clone());
+        self.layer_roots.push((element.clone(), x, y));
+        self.init_element_root(element, ElementParent::Page(self.as_weak()));
+        page
+    }
+
+    #[js_func]
+    pub fn close_page(&mut self, page: Page) {
+        self.pages.retain(|p| p != &page);
+        self.layer_roots.retain(|e| &e.0 != page.get_body());
+        self.notify_update();
+        //TODO emit close event?
+    }
+
+    fn init_element_root(&mut self, mut body: Element, parent: ElementParent) {
+        body.set_parent(parent);
         body.set_focusable(true);
-        if self.focusing.is_none() {
-            self.focusing = Some(body.clone());
-        }
+        // if self.focusing.is_none() {
+        // TODO move focusing to page?
+        self.focusing = Some(body.clone());
+        // }
         body.refresh_style_variables(&self.style_variables.as_weak());
-        self.body = Some(body.clone());
         self.invalid_layout(body);
     }
 
     #[js_func]
     pub fn get_body(&self) -> Option<Element> {
-        self.body.clone()
+        Some(self.layer_roots[0].0.clone())
     }
 
     #[js_func]
@@ -1286,7 +1404,6 @@ impl Window {
         }
         let scale_factor = self.window.scale_factor() as f32;
         let background_color = self.background_color;
-        let mut me = self.clone();
         let viewport = Rect::new(
             0.0,
             0.0,
@@ -1295,14 +1412,20 @@ impl Window {
         );
         //TODO support config
         let layer_cache_enabled = false;
-        let mut paint_tree = if let Some(body) = &mut me.body {
+        let mut paint_tree = Vec::new();
+        for (root, x, y) in &mut self.layer_roots.clone() {
             self.render_tree
-                .rebuild_render_tree(body, layer_cache_enabled);
+                .get_mut(root)
+                .unwrap()
+                .rebuild_render_tree(root, layer_cache_enabled);
+            let pt = self
+                .render_tree
+                .get_mut(root)
+                .unwrap()
+                .build_paint_tree(&viewport);
             //TODO notify absolute position change
-            self.render_tree.build_paint_tree(&viewport)
-        } else {
-            return ResultWaiter::new_finished(false);
-        };
+            paint_tree.push((pt, *x, *y));
+        }
         let waiter_finisher = waiter.clone();
         let window_id = self.get_id();
         self.renderer_idle = false;
@@ -1319,7 +1442,12 @@ impl Window {
                 element_painter.set_layer_cache(layer_cache_enabled);
                 let paint_context = PaintContext { scale_factor };
                 let painter = Painter::new(canvas, paint_context);
-                element_painter.draw_root(&painter, &mut paint_tree, ctx);
+                for (tree, x, y) in &mut paint_tree {
+                    painter.canvas.save();
+                    painter.canvas.translate((*x, *y));
+                    element_painter.draw_root(&painter, tree, ctx);
+                    painter.canvas.restore();
+                }
                 element_painter.put(ctx);
                 canvas.restore();
             }),
@@ -1336,10 +1464,13 @@ impl Window {
         physical_len * self.window.scale_factor() as f32
     }
 
-    fn get_node_by_point(&self) -> Option<(Element, f32, f32)> {
+    fn get_node_by_point(&self) -> (Element, f32, f32) {
         let x = self.cursor_position.x as f32;
         let y = self.cursor_position.y as f32;
-        self.get_node_by_pos(x, y)
+        self.get_node_by_pos(x, y).unwrap_or_else(|| {
+            let element = self.layer_roots.last().unwrap().0.clone();
+            (element, x, y)
+        })
     }
 
     fn get_element_by_id(&self, element: &Element, id: u32) -> Option<Element> {
@@ -1354,10 +1485,13 @@ impl Window {
         None
     }
 
-    fn get_node_by_pos(&self, x: f32, y: f32) -> Option<(Element, f32, f32)> {
-        // print_time!("search node time in layers");
-        let body = self.body.clone()?;
-        let (eo, x, y) = self.render_tree.get_element_object_by_pos(x, y)?;
+    fn get_node_by_pos(&self, window_x: f32, window_y: f32) -> Option<(Element, f32, f32)> {
+        // debug!("search node time in layers");
+        let (body, x, y) = self.layer_roots.last().clone()?;
+        let (eo, x, y) = self
+            .render_tree
+            .get(body)?
+            .get_element_object_by_pos(window_x - x, window_y - y)?;
         let element_id = eo.element_id;
         // debug!("found element id: {}", element_id);
         let element = self.get_element_by_id(&body, element_id)?;
@@ -1374,7 +1508,8 @@ impl Window {
         screen_x: f32,
         screen_y: f32,
     ) {
-        let render_tree = &self.render_tree;
+        let root = node.get_root_element();
+        let render_tree = some_or_return!(self.render_tree.get(&root));
         let node_matrix = some_or_return!(render_tree.get_element_total_matrix(node));
         let (border_top, _, _, border_left) = node.get_border_width();
 

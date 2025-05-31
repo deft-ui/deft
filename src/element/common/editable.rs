@@ -527,7 +527,7 @@ impl Editable {
         self.insert_text(input, self.paragraph.get_caret(), true);
     }
 
-    fn build_line(text: String) -> Vec<TextElement> {
+    pub fn build_line(text: String) -> Vec<TextElement> {
         let unit = TextElement::Text(TextUnit {
             text,
             font_families: None,

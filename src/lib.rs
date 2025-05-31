@@ -62,7 +62,6 @@ pub mod winit;
 
 use crate::base::ResultWaiter;
 use crate::console::init_console;
-use crate::element::init_base_components;
 use crate::event_loop::AppEventProxy;
 pub use deft_macros::*;
 

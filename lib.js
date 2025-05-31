@@ -14,6 +14,7 @@ const VT_CHECKBOX = "checkbox"
 const VT_RADIO = "radio"
 const VT_RADIO_GROUP = "radio-group"
 const VT_RICH_TEXT = "rich-text"
+const VT_SELECT = "select"
 
 
 class Clipboard {
@@ -129,6 +130,26 @@ export class FileDialog {
     }
 }
 
+export class Page {
+    handle
+    constructor(handle) {
+        this.handle = handle;
+    }
+    close() {
+        Page_close(this.handle);
+    }
+}
+
+export class Popup {
+    handle
+    constructor(handle) {
+        this.handle = handle;
+    }
+    close() {
+        Popup_close(this.handle);
+    }
+}
+
 /**
  * @typedef {IEvent<ResizeDetail>} IResizeEvent
  */
@@ -171,6 +192,10 @@ export class Window {
         return Window_get_js_context(windowHandle);
     }
 
+    static supportMultipleWindows() {
+        return Window_support_multiple_windows();
+    }
+
     get handle() {
         return this.#windowHandle
     }
@@ -181,6 +206,101 @@ export class Window {
      */
     get body() {
         return this.#body;
+    }
+
+
+    /**
+     *
+     * @returns {{width: number, height: number}}
+     */
+    get innerSize() {
+        const [width, height] = Window_get_inner_size(this.handle);
+        return {width, height}
+    }
+
+    /**
+     *
+     * @param content {Element}
+     * @param x {number}
+     * @param y {number}
+     * @return {Page}
+     */
+    createPage(content, x, y) {
+        x = x ?? Number.NaN;
+        y = y ?? Number.NaN;
+        const page = Window_create_page(this.#windowHandle, content.handle, x, y);
+        return new Page(page);
+    }
+
+    /**
+     *
+     * @param content {Element}
+     * @param target {{x: number, y: number, width?: number, height?: number}}
+     * @return {Popup}
+     */
+    popup(content, target) {
+        const rect = {
+            x: target.x,
+            y: target.y,
+            width: target.width || 0,
+            height: target.height || 0,
+        }
+        const handle = Window_popup(this.handle, content.handle, rect);
+        return new Popup(handle);
+    }
+
+    /**
+     *
+     * @param content {Element}
+     * @param title {string}
+     * @returns {{close(): void}}
+     */
+    showDialog(content, title) {
+        if (Window.supportMultipleWindows()) {
+            const window = new Window({
+                resizable: false,
+                preferredRenderers: "SoftBuffer",
+            });
+            window.title = title ?? this.title ?? "";
+            window.body.addChild(content);
+            window.setModal(this);
+            window.bindResize((e) => {
+                const parentPos = this.outerPosition;
+                const parentSize = this.innerSize;
+                const x = parentPos.x + (parentSize.width - e.detail.width) / 2.0;
+                const y = parentPos.y + (parentSize.height - e.detail.height) / 2.0;
+                window.outerPosition = {x, y};
+            });
+            return {
+                close() {
+                    window.close();
+                }
+            }
+        } else {
+            const wrapper = new ContainerElement();
+            wrapper.style = {
+                background: '#EBECED',
+                border: '1px #C4C7C8',
+            }
+            if (title) {
+                const titleEl = new LabelElement();
+                titleEl.text = title ?? window.title ?? "";
+                titleEl.style = {
+                    width: '100%',
+                    background: '#E1E3E4',
+                    borderBottom: '1px #C4C7C8',
+                    padding: '4px 10px',
+                }
+                wrapper.addChild(titleEl);
+            }
+            wrapper.addChild(content);
+            const page = this.createPage(wrapper, NaN, NaN);
+            return {
+                close() {
+                    page.close();
+                }
+            }
+        }
     }
 
     /**
@@ -197,6 +317,18 @@ export class Window {
      */
     get title() {
         return Window_get_title(this.#windowHandle);
+    }
+
+    /**
+     *
+     * @returns {{width: number, height: number}}
+     */
+    get monitorSize() {
+        const [width, height] = Window_get_monitor_size(this.#windowHandle);
+        return {
+            width,
+            height
+        }
     }
 
     /**
@@ -249,6 +381,23 @@ export class Window {
      */
     setModal(owner) {
         Window_set_modal(this.#windowHandle, owner.#windowHandle)
+    }
+
+    /**
+     *
+     * @param value {{x: number, y: number}}
+     */
+    set outerPosition(value) {
+        Window_set_outer_position(this.handle, value.x, value.y);
+    }
+
+    /**
+     *
+     * @returns {{x: number, y: number}}
+     */
+    get outerPosition() {
+        const [x, y] = Window_get_outer_position(this.handle);
+        return {x, y}
     }
 
     close() {
@@ -1243,6 +1392,82 @@ export class RadioElement extends Element {
      *
      * @param callback {(e: IVoidEvent) => void}
      */
+    bindChange(callback) {
+        this.bindEvent("change", callback);
+    }
+
+}
+
+export class SelectElement extends Element {
+    constructor() {
+        super(VT_SELECT);
+    }
+
+    /**
+     *
+     * @param value {string}
+     */
+    set value(value) {
+        Select_set_value(this.handle, value + "");
+    }
+
+
+    /**
+     *
+     * @returns {string}
+     */
+    get value() {
+        return Select_get_value(this.handle);
+    }
+
+    /**
+     *
+     * @param options {SelectOption[]}
+     */
+    set options(options) {
+        Select_set_options(this.handle, options);
+    }
+
+    /**
+     *
+     * @returns {SelectOption[]}
+     */
+    get options() {
+        return Select_get_options(this.handle);
+    }
+
+    /**
+     *
+     * @param placeholder {string}
+     */
+    set placeholder(placeholder) {
+        Select_set_placeholder(this.handle, placeholder);
+    }
+
+    /**
+     *
+     * @returns {string}
+     */
+    get placeholder() {
+        return Select_get_placeholder(this.handle);
+    }
+
+    /**
+     *
+     * @returns {boolean}
+     */
+    get disabled() {
+        return Element_is_disabled(this.handle);
+    }
+
+    /**
+     *
+     * @param value {boolean}
+     */
+    set disabled(value) {
+        Element_set_disabled(this.handle, value);
+    }
+
     bindChange(callback) {
         this.bindEvent("change", callback);
     }
@@ -2277,6 +2502,7 @@ globalThis.RichTextElement = RichTextElement;
 globalThis.CheckboxElement = CheckboxElement;
 globalThis.RadioElement = RadioElement;
 globalThis.RadioGroupElement = RadioGroupElement;
+globalThis.SelectElement = SelectElement;
 globalThis.Audio = Audio;
 globalThis.WebSocket = WebSocket;
 globalThis.Sqlite = Sqlite;

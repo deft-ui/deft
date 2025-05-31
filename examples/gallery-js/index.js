@@ -16,16 +16,14 @@ const stylesheet = `
 .element-wrapper {
     flex: 1;
     gap: 10px;
-} 
-radiogroup {
-    flex-direction: row;
-    gap: 10px;
 }
 `
+//TODO support :last selector
 
-function createLabel() {
+function createLabel(text, onClick = null) {
     const label = new LabelElement();
-    label.text = "Hello, Deft Gallery!";
+    label.text = text;
+    onClick && label.bindClick(onClick);
     return label;
 }
 
@@ -51,17 +49,24 @@ function createMultiLineEntry() {
     return textEdit;
 }
 
-function createButton() {
+/**
+ *
+ * @param title
+ * @param callback {(e: IMouseEvent) => void}
+ * @returns {ButtonElement}
+ */
+function createButton(title, callback) {
     const btn = new ButtonElement();
     const label = new LabelElement();
-    label.text = "Click Me";
+    label.text = title;
     btn.addChild(label);
     btn.style = {
         width: "8em",
         alignItems: 'center',
     }
     btn.bindClick((e) => {
-        console.log("clicked", e)
+        console.log("clicked", e);
+        callback && callback(e);
     })
     return btn;
 }
@@ -81,6 +86,10 @@ function createRadio(label) {
 
 function createRadioGroup(radioList) {
     const group = new RadioGroupElement();
+    group.style = {
+        flexDirection: 'row',
+        gap: '1em',
+    }
     for (const r of radioList) {
         group.addChild(r);
     }
@@ -129,6 +138,56 @@ function createRichText() {
     return richText;
 }
 
+function alert(window, message, title) {
+    if (!(message instanceof Element)) {
+        const label = new LabelElement();
+        label.text = message;
+        label.style = {
+            padding: '2em',
+        }
+        message = label;
+    }
+
+    const footer = new ContainerElement();
+    footer.style = {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        padding: '10px',
+    }
+    const btnLabel = new LabelElement();
+    btnLabel.text = "OK";
+    const btn = new ButtonElement();
+    btn.style = {
+        minWidth: '4em',
+        flexDirection: 'row',
+        justifyContent: 'center',
+    }
+    btn.addChild(btnLabel);
+    footer.addChild(btn);
+
+    const wrapper = new ContainerElement();
+    wrapper.style = {
+        minWidth: 200,
+        alignItems: 'center',
+    }
+    wrapper.addChild(message);
+    wrapper.addChild(footer);
+    const dialog = window.showDialog(wrapper, title);
+    btn.bindClick(() => {
+        dialog.close();
+    });
+}
+
+function createSelect() {
+    const el = new SelectElement();
+    el.options = ["JavaScript", "Rust", "C", "C++", "Java", "Delphi", "C#"].map(it => ({value: it, label: it}));
+    el.placeholder = "Select your language...";
+    el.bindChange(() => {
+        console.log("selected", el.value);
+    })
+    return el;
+}
+
 function main() {
     navigator.stylesheet.append(stylesheet);
     // saveStartTime();
@@ -141,7 +200,7 @@ function main() {
     scroll.className = "main";
     window.body.addChild(scroll);
 
-    function createElementRow(label, element) {
+    function createElementRow(label, element, flexDirection = "column") {
         const container = new ContainerElement();
         container.className = "element-row"
         const labelElement = new LabelElement();
@@ -152,6 +211,7 @@ function main() {
             element = element();
         }
         const elementWrapper = new ContainerElement();
+        elementWrapper.style = { flexDirection }
         element = [].concat(element);
         for (const e of element) {
             elementWrapper.addChild(e);
@@ -164,27 +224,39 @@ function main() {
     const entry = createTextInput();
     const password = createPassword();
     const multilineEntry = createMultiLineEntry();
-    const button = createButton();
+    const button = createButton("Alert", (e) => {
+        alert(window, "Clicked", window.title);
+    });
+    const buttonPopup = createButton("Popup", (e) => {
+        const label = new LabelElement();
+        label.text = "Hello, Deft Gallery!";
+        label.style = {
+            padding: "4em 2em",
+            background: '#ccc',
+        }
+        window.popup(label, {x: e.detail.windowX, y: e.detail.windowY});
+    });
     const checkbox = createCheckbox("Checkbox1");
     const disabledCheckbox = createCheckbox("Disabled");
     const radio1 = createRadio("Rust");
     const radio2 = createRadio("JavaScript");
     const radioGroup = createRadioGroup([radio1, radio2]);
+    const select = createSelect();
     disabledCheckbox.bindChange(() => {
         console.log("checked", disabledCheckbox.checked);
-        for (const el of [entry, password, multilineEntry, button, radio1, radio2, checkbox]) {
+        for (const el of [entry, password, multilineEntry, button, buttonPopup, radio1, radio2, checkbox, select]) {
             el.disabled = disabledCheckbox.checked;
         }
     })
 
-
-    createElementRow("Label", createLabel);
+    createElementRow("Label", createLabel("Hello, Deft Gallery!"));
     createElementRow("TextInput", entry);
     createElementRow("Password", password);
     createElementRow("TextEdit", multilineEntry);
-    createElementRow("Button", button);
+    createElementRow("Button", [button, buttonPopup], "row");
     createElementRow("Radio", radioGroup)
-    createElementRow("Checkbox", [checkbox, disabledCheckbox]);
+    createElementRow("Select", select);
+    createElementRow("Checkbox", [checkbox, disabledCheckbox], "row");
     createElementRow("Image", createImage());
     createElementRow("RichText", createRichText());
 }

@@ -2,13 +2,13 @@ use std::any::{Any, TypeId};
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
+use std::hash::{Hash, Hasher};
 use std::mem;
 use std::ops::{Deref, DerefMut};
 
 use anyhow::Error;
 use bitflags::bitflags;
 use deft_macros::{js_methods, mrc_object};
-use log::debug;
 use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
 use skia_safe::Rect;
@@ -56,6 +56,7 @@ pub mod paragraph;
 pub mod radio;
 pub mod richtext;
 pub mod scroll;
+pub mod select;
 pub mod text;
 pub mod textedit;
 pub mod textinput;
@@ -71,6 +72,7 @@ use crate::element::label::Label;
 use crate::element::paragraph::Paragraph;
 use crate::element::radio::{Radio, RadioGroup};
 use crate::element::richtext::RichText;
+use crate::element::select::Select;
 use crate::element::textedit::TextEdit;
 use crate::element::textinput::TextInput;
 use crate::element::util::is_form_event;
@@ -141,6 +143,7 @@ pub fn init_base_components() {
     register_component::<Body>("body");
     register_component::<RadioGroup>("radio-group");
     register_component::<RichText>("rich-text");
+    register_component::<Select>("select");
 }
 
 #[js_methods]
@@ -509,17 +512,8 @@ impl Element {
         self.backend.backend_type_id() == TypeId::of::<T>()
     }
 
-    fn set_parent_internal(&mut self, parent: Option<Element>) {
-        self.parent = match parent {
-            None => {
-                self.on_window_changed(&None);
-                None
-            }
-            Some(p) => {
-                self.on_window_changed(&p.get_window());
-                Some(p.as_weak())
-            }
-        };
+    fn set_parent_internal(&mut self, parent: ElementParent) {
+        self.parent = parent;
         self.applied_style = Styles::new();
         if let Some(win) = self.get_window() {
             if let Ok(win) = win.upgrade_mut() {
@@ -530,17 +524,9 @@ impl Element {
         self.mark_style_dirty();
     }
 
-    pub fn set_window(&mut self, window: Option<WindowWeak>) {
-        self.window = window.clone();
-        self.on_window_changed(&window);
+    pub fn set_parent(&mut self, parent: ElementParent) {
+        self.parent = parent;
         self.process_auto_focus();
-    }
-
-    pub fn on_window_changed(&mut self, window: &Option<WindowWeak>) {
-        //TODO remove?
-        for mut c in self.get_children() {
-            c.on_window_changed(window);
-        }
     }
 
     pub fn refresh_style_variables(&mut self, variables: &MrcWeak<HashMap<String, String>>) {
@@ -556,11 +542,17 @@ impl Element {
     }
 
     pub fn with_window<F: FnOnce(&mut Window)>(&self, callback: F) {
-        if let Some(p) = self.get_parent() {
-            p.with_window(callback);
-        } else if let Some(ww) = &self.window {
-            if let Ok(mut w) = ww.upgrade() {
-                callback(&mut w);
+        match &self.parent {
+            ElementParent::None => {}
+            ElementParent::Element(e) => {
+                if let Ok(p) = e.upgrade() {
+                    p.with_window(callback);
+                }
+            }
+            ElementParent::Window(w) | ElementParent::Page(w) => {
+                if let Ok(mut w) = w.upgrade() {
+                    callback(&mut w);
+                }
             }
         }
     }
@@ -569,7 +561,7 @@ impl Element {
     pub fn get_window(&self) -> Option<WindowWeak> {
         if let Some(p) = self.get_parent() {
             return p.get_window();
-        } else if let Some(ww) = &self.window {
+        } else if let ElementParent::Window(ww) = &self.parent {
             return Some(ww.clone());
         }
         None
@@ -585,15 +577,18 @@ impl Element {
 
     #[js_func]
     pub fn get_parent(&self) -> Option<Element> {
-        let p = match &self.parent {
-            None => return None,
-            Some(p) => p,
-        };
-        let p = match p.upgrade() {
-            Err(_e) => return None,
-            Ok(u) => u,
-        };
-        Some(p)
+        match &self.parent {
+            ElementParent::Element(e) => Some(e.upgrade().ok()?),
+            _ => None,
+        }
+    }
+
+    pub fn get_root_element(&self) -> Element {
+        if let Some(p) = self.get_parent() {
+            p.get_root_element()
+        } else {
+            self.clone()
+        }
     }
 
     #[js_func]
@@ -699,7 +694,7 @@ impl Element {
             pos
         };
         self.mark_dirty(true);
-        child.set_parent_internal(Some(self.clone()));
+        child.set_parent_internal(ElementParent::Element(self.as_weak()));
         self.children.insert(pos as usize, child.clone());
         child.process_auto_focus();
     }
@@ -726,7 +721,7 @@ impl Element {
 
     pub fn remove_child_view(&mut self, position: u32) {
         let mut c = self.children.remove(position as usize);
-        c.set_parent_internal(None);
+        c.set_parent_internal(ElementParent::None);
         let mut ele = self.clone();
         let layout = &mut ele.style;
         layout.remove_child(&mut c.style);
@@ -745,7 +740,7 @@ impl Element {
     pub fn calculate_layout(&mut self, available_width: f32, available_height: f32) {
         // mark all children dirty so that custom measure function could be call
         // self.mark_all_layout_dirty();
-        debug!("calculate layout: {} {}", self.id, self.style.has_shadow());
+        // debug!("calculate layout: {} {}", self.id, self.style.has_shadow());
         if self.style.has_shadow() {
             let mut me = self.clone();
             self.scrollable.update_layout(&mut me);
@@ -810,6 +805,13 @@ impl Element {
     #[js_func]
     pub fn set_hover_style(&mut self, style: JsValue) {
         self.style_list.set_hover_style(style);
+        if self.hover {
+            self.mark_style_dirty();
+        }
+    }
+
+    pub fn set_hover_styles(&mut self, styles: Vec<FixedStyleProp>) {
+        self.style_list.set_hover_styles(styles);
         if self.hover {
             self.mark_style_dirty();
         }
@@ -1036,7 +1038,7 @@ impl Element {
         if TypeId::of::<T>() == TypeId::of::<MouseEnterEvent>() {
             self.hover = true;
             //TODO optimize performance
-            if self.parent.is_none() {
+            if !self.parent.is_element() {
                 self.update_select_style_recurse();
             }
             if self.style_list.has_hover_style() {
@@ -1045,7 +1047,8 @@ impl Element {
         } else if TypeId::of::<T>() == TypeId::of::<MouseLeaveEvent>() {
             self.hover = false;
             //TODO optimize performance
-            if self.parent.is_none() {
+            //FIXME style may not be updated if event stop propagates?
+            if !self.parent.is_element() {
                 self.update_select_style_recurse();
             }
             if self.style_list.has_hover_style() {
@@ -1123,7 +1126,10 @@ impl Element {
             p.request_invalid(element);
         } else {
             self.with_window(|w| {
-                w.render_tree.invalid_element(element);
+                let root = element.get_root_element();
+                if let Some(tree) = w.render_tree.get_mut(&root) {
+                    tree.invalid_element(element);
+                }
                 w.notify_update();
             });
         }
@@ -1289,13 +1295,31 @@ pub enum ElementType {
     Inner,
 }
 
+#[derive(PartialEq, Clone)]
+pub enum ElementParent {
+    None,
+    Element(ElementWeak),
+    Window(WindowWeak),
+    Page(WindowWeak),
+}
+
+impl ElementParent {
+    pub fn is_element(&self) -> bool {
+        match self {
+            ElementParent::None => false,
+            ElementParent::Element(_) => true,
+            ElementParent::Window(_) => false,
+            ElementParent::Page(_) => false,
+        }
+    }
+}
+
 #[mrc_object]
 pub struct Element {
     id: u32,
     backend: Mrc<Box<dyn ElementBackend>>,
-    pub(crate) parent: Option<ElementWeak>,
+    pub(crate) parent: ElementParent,
     children: Vec<Element>,
-    window: Option<WindowWeak>,
     event_registration: EventRegistration<ElementWeak>,
     pub style: StyleNode,
     pub(crate) animation_style_props: HashMap<StylePropKey, FixedStyleProp>,
@@ -1331,6 +1355,14 @@ pub struct Element {
 js_value!(Element);
 js_auto_upgrade!(ElementWeak, Element);
 
+impl Hash for Element {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+
+impl Eq for Element {}
+
 impl ElementData {
     pub fn new<T: ElementBackend + 'static>(backend: T) -> Self {
         let id = NEXT_ELEMENT_ID.get();
@@ -1339,8 +1371,7 @@ impl ElementData {
         Self {
             id,
             backend: Mrc::new(Box::new(backend)),
-            parent: None,
-            window: None,
+            parent: ElementParent::None,
             event_registration: EventRegistration::new(),
             style: StyleNode::new(),
             animation_style_props: HashMap::new(),

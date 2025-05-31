@@ -21,7 +21,7 @@ gl = ["dep:gl", "glutin", "skia-safe/gl", "egl", "wgl"]
 
 [dependencies]
 log = "0.4"
-winit = { package = "deft-winit", version = "0.31.1", features = ["android-native-activity", "rwh_06"] }
+winit = { package = "deft-winit", version = "0.31.2", features = ["android-native-activity", "rwh_06"] }
 glutin = { version = "0.32.3", optional = true }
 measure_time = "0.8.3"
 raw-window-handle = "0.6.0"

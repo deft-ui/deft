@@ -212,6 +212,14 @@ impl StyleList {
         }
     }
 
+    pub fn set_hover_styles(&mut self, styles: Vec<FixedStyleProp>) {
+        self.hover_style_props.clear();
+        for st in styles {
+            self.hover_style_props
+                .insert(st.key().clone(), ParsedStyleProp::Fixed(st));
+        }
+    }
+
     pub fn set_selector_style(&mut self, styles: Vec<String>) -> bool {
         let mut new_style_props = HashMap::new();
         self.parse_style_vec(&styles, &mut new_style_props);

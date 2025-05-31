@@ -79,3 +79,7 @@ pub fn send_input(window_id: u32, input: String) {
         debug!("send app event error: {:?}", e);
     }
 }
+
+pub fn support_multiple_windows() -> bool {
+    false
+}

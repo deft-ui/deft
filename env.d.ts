@@ -103,6 +103,11 @@ declare type Align =
     | 'space-between'
     | 'space-around'
 
+declare interface SelectOption {
+    label: string,
+    value: string,
+}
+
 declare interface StyleProps extends Record<string, number | string>{
     color?: string,
     backgroundColor?: string;
