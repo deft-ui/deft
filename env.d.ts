@@ -10,6 +10,9 @@ declare interface WindowAttrs {
     position ?: [number, number],
     visible ?: boolean,
     windowType ?: WindowType,
+    minimizable ?: boolean,
+    maximizable ?: boolean,
+    closable ?: boolean,
     preferredRenderers ?: RenderBackend | RenderBackend[],
 }
 
@@ -106,6 +109,19 @@ declare type Align =
 declare interface SelectOption {
     label: string,
     value: string,
+}
+
+declare interface AlertOptions {
+    title ?: string;
+    confirmBtnText ?: string;
+    callback ?: () => void;
+}
+
+declare interface ConfirmOptions {
+    title ?: string;
+    confirmBtnText ?: string;
+    cancelBtnText ?: string;
+    hideCancel ?: boolean;
 }
 
 declare interface StyleProps extends Record<string, number | string>{

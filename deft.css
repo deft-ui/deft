@@ -1,83 +1,133 @@
 body {
-    color: #010101;
-    background: #EFF0F1;
+    --border-color: #BCBEBF;
+    --highlight-border-color: #3DAEE9;
+    --disabled-border-color: #DADBDB;
+
+    --default-color: #010101;
+    --disabled-color: #A8A9AA;
+    --placeholder-color: #666;
+
+    --disabled-placeholder-color: #A8A9AA;
+
+    --highlight-background: #3DAEE9;
+    --disabled-background: #f0f0f0;
+    --form-control-background: #FCFCFC;
+    --button-background: #FCFCFC;
+    --body-background: #EFF0F1;
+
+    --scrollbar-background: #E1E1E1;
+    --scrollbar-thumb-background: #C1C1C1;
+
+    --dialog-title-background: #E1E3E4;
+
+    color: var(--default-color);
+    background: var(--body-background);
     font-size: 14px;
 }
 
+body[theme="dark"] {
+    --border-color: #6E7175;
+    --highlight-border-color: #5993B2;
+    --disabled-border-color: #3A3D41;
+
+    --default-color: #f0f0f0;
+    --disabled-color: #727679;
+    --placeholder-color: #A1A9B1;
+
+    --disabled-placeholder-color: #5A5D63;
+
+    --highlight-background: #3DAEE9;
+    --disabled-background: #2F3338;
+    --form-control-background: #1B1E20;
+    --button-background: #31363B;
+    --body-background: #2A2E32;
+
+    --scrollbar-background: #1B1E20;
+    --scrollbar-thumb-background: #424546;
+
+    --dialog-title-background: #31363B;
+}
+
+dialog {
+    background: var(--body-background);
+    border: 1px var(--border-color);
+}
+
+dialog-title {
+    width: 100%;
+    background: var(--dialog-title-background);
+    border-bottom: 1px var(--border-color);
+    padding: 4px 10px;
+}
+
 button {
-    background: #FCFCFC;
-    color: #010101;
-    border: 1px #BCBEBF;
+    background: var(--button-background);
+    border: 1px var(--border-color);
     border-radius: 3px;
     padding: 4px 8px;
 }
 button:hover {
-    border: 1px #3DAEE9;
+    border: 1px var(--highlight-border-color);
 }
-button[disabled] {
-    color: #A8A9AA;
-    background: #f0f0f0;
-    border: 1px #DADBDB;
-}
-button[disabled]:hover {
-    border: 1px #DADBDB;
+button[disabled], button[disabled]:hover {
+    color: var(--disabled-color);
+    background: var(--disabled-background);
+    border: 1px var(--disabled-border-color);
 }
 
 entry {
-    background: #FFFFFF;
-    border: 1px #BCBEBF;
+    background: var(--form-control-background);
+    border: 1px var(--border-color);
     border-radius: 3px;
     min-height: 2em;
     padding: 4px;
 }
 
 entry:hover {
-    border: 1px #3DAEE9;
+    border: 1px var(--highlight-border-color);
 }
 entry:focus {
-    border: 1px #3DAEE9;
+    border: 1px var(--highlight-border-color);
 }
 entry::placeholder {
-    color: #666;
+    color: var(--placeholder-color);
 }
 entry[disabled], entry[disabled]:hover {
-    background: #F3F3F3;
-    border: 1px #E1E1E1;
-    color: #A8A9AA;
+    background: var(--disabled-background);
+    border: 1px var(--disabled-border-color);
+    color: var(--disabled-color);
 }
 entry::scrollbar, scroll::scrollbar {
-    background: #E1E1E1;
+    background: var(--scrollbar-background);
 }
 
 entry::scrollbar-thumb, scroll::scrollbar-thumb {
-    background: #C1C1C1;
+    background: var(--scrollbar-thumb-background);
 }
 
-checkbox {
-    color: #232629;
-}
+
 checkbox::box {
     width: 1.2em;
     height: 1.2em;
     margin-right: 2px;
-    border: 1px #b0b1b2;
+    border: 1px var(--border-color);
     border-radius: 2px;
 }
 
 checkbox:hover::box {
-    border: 1px #3DAEE9;
+    border: 1px var(--highlight-border-color);
 }
 checkbox[checked]::box {
-    background: #b8ddf1;
-    border: 1px #3DAEE9;
+    background: var(--form-control-background);
+    border: 1px var(--highlight-border-color);
 }
 
 checkbox[disabled], checkbox[disabled]:hover {
-    color: #A8A9AA;
+    color: var(--disabled-color);
 }
 
 checkbox[disabled]::box, checkbox[disabled]:hover::box {
-    border: 1px #DADBDB;
+    border: 1px var(--disabled-border-color);
 }
 
 radiogroup {
@@ -85,36 +135,34 @@ radiogroup {
     gap: 10px;
 }
 
-radio {
-    color: #232629;
-}
+
 radio::box {
     width: 1.2em;
     height: 1.2em;
     margin-right: 2px;
-    border: 1px #b0b1b2;
+    border: 1px var(--border-color);
     border-radius: 0.6em;
 }
 
 radio:hover::box {
-    border: 1px #3DAEE9;
+    border: 1px var(--highlight-border-color);
 }
 radio[checked]::box {
-    background: #b8ddf1;
-    border: 1px #3DAEE9;
+    background: var(--form-control-background);
+    border: 1px var(--highlight-border-color);
 }
 radio[disabled], radio[disabled]:hover {
-    color: #A8A9AA;
+    color: var(--disabled-color);
 }
 
 radio[disabled]::box, radio[disabled]:hover::box {
-    border: 1px #DADBDB;
+    border: 1px var(--disabled-border-color);
 }
 
 
 text-input, text-edit {
-    background: #FFFFFF;
-    border: 1px #BCBEBF;
+    background: var(--form-control-background);
+    border: 1px var(--border-color);
     border-radius: 3px;
     min-height: 2em;
     padding: 4px;
@@ -131,42 +179,45 @@ text-edit {
 }
 
 text-input:hover, text-edit:hover {
-    border: 1px #3DAEE9;
+    border: 1px var(--highlight-border-color);
 }
 text-input:focus, text-edit:focus {
-    border: 1px #3DAEE9;
+    border: 1px var(--highlight-border-color);
 }
 text-input::placeholder, text-edit::placeholder {
-    color: #666;
+    color: var(--placeholder-color);
 }
 text-input[disabled], text-edit[disabled], text-input[disabled]:hover, text-edit[disabled]:hover {
-    background: #F3F3F3;
-    border: 1px #E1E1E1;
-    color: #A8A9AA;
+    background: var(--disabled-background);
+    border: 1px var(--disabled-border-color);
+    color: var(--disabled-color);
+}
+text-input[disabled]::placeholder, text-edit[disabled]::placeholder {
+    color: var(--disabled-placeholder-color);
 }
 
 text-edit::scrollbar, scroll::scrollbar {
-    background: #E1E1E1;
+    background: var(--scrollbar-background);
 }
 
 text-edit::scrollbar-thumb, scroll::scrollbar-thumb {
-    background: #C1C1C1;
+    background: var(--scrollbar-thumb-background);
 }
 
 select {
-    background: #F9F9F9;
-    border: 1px #b0b1b2;
+    background: var(--form-control-background);
+    border: 1px var(--border-color);
     border-radius: 2px;
     padding: 2px 6px;
     height: 2em;
 }
 select:hover {
-    border: 1px #3DAEE9;
+    border: 1px var(--highlight-border-color);
 }
 select::options {
-    background: #FFF;
-    color: #000;
-    border: 1px #ccc;
+    background: var(--form-control-background);
+    color: inherit;
+    border: 1px var(--border-color);
     padding: 1px 0;
     font-size: inherit;
 }
@@ -174,13 +225,16 @@ select::option {
     padding: 4px 6px;
 }
 select::option-hover {
-    background: #eee;
+    background: var(--highlight-background);
 }
 select::placeholder {
-    color: #666;
+    color: var(--placeholder-color);
 }
 select[disabled], select[disabled]:hover {
-    background: #F3F3F3;
-    color: #A8A9AA;
-    border: 1px #DADBDB;
+    background: var(--disabled-background);
+    color: var(--disabled-color);
+    border: 1px var(--disabled-border-color);
+}
+select[disabled]::placeholder {
+    color: var(--disabled-placeholder-color);
 }

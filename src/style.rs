@@ -9,8 +9,10 @@ pub mod length;
 mod node_item;
 pub mod overflow;
 mod select;
+pub mod style_vars;
 pub mod styles;
 pub mod transform;
+pub mod var_expr;
 
 use crate as deft;
 use crate::animation::css_actor::CssAnimationActor;
@@ -28,6 +30,7 @@ use crate::style::font::{FontStyle, LineHeightVal};
 use crate::style::length::{Length, LengthContext, LengthOrPercent};
 use crate::style::node_item::NodeItem;
 use crate::style::overflow::Overflow;
+use crate::style::style_vars::StyleVars;
 use crate::style::transform::StyleTransform;
 use crate::style_list::ParsedStyleProp;
 use crate::{ok_or_return, some_or_return};
@@ -141,6 +144,13 @@ macro_rules! define_style_props {
                     }
                 )*
                 None
+            }
+            pub fn name(&self) -> &str {
+                match self {
+                    $(
+                        Self::$name => stringify!($name),
+                    )*
+                }
             }
         }
 
@@ -909,9 +919,9 @@ impl StyleNode {
     }
 }
 
-pub fn parse_style_obj(style: JsValue) -> Vec<ParsedStyleProp> {
-    let mut result = Vec::new();
+pub fn parse_style_obj(style: JsValue) -> (Vec<ParsedStyleProp>, StyleVars) {
     if let Some(obj) = style.get_properties() {
+        let mut list = Vec::new();
         //TODO use default style
         obj.into_iter().for_each(|(k, v)| {
             let v_str = match v {
@@ -920,11 +930,12 @@ pub fn parse_style_obj(style: JsValue) -> Vec<ParsedStyleProp> {
                 JsValue::Float(f) => f.to_string(),
                 _ => return,
             };
-            let mut list = ParsedStyleProp::parse(&k, &v_str);
-            result.append(&mut list);
+            list.push((k, v_str));
         });
+        ParsedStyleProp::parse_all(list)
+    } else {
+        (Vec::new(), StyleVars::new())
     }
-    result
 }
 
 fn parse_matrix(value: &str) -> Result<Matrix, Error> {

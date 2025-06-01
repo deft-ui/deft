@@ -1,6 +1,6 @@
 use crate::element::Element;
-use winit::window::CursorIcon::*;
 use winit::window::Cursor;
+use winit::window::CursorIcon::*;
 
 pub fn search_cursor(element: &Element) -> Cursor {
     let cursor = element.get_cursor();

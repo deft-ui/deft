@@ -1,6 +1,7 @@
 use crate as deft;
 use crate::base::Rect;
 use crate::element::Element;
+use crate::event::ClickEventListener;
 use crate::ext::ext_window::WindowAttrs;
 use crate::platform::support_multiple_windows;
 use crate::window::page::PageWeak;
@@ -41,6 +42,9 @@ impl Popup {
                 override_redirect: Some(true),
                 position: Some((pos_x, pos_y)),
                 visible: None,
+                closable: None,
+                minimizable: None,
+                maximizable: None,
                 window_type: Some("menu".to_string()),
                 preferred_renderers: Some(vec!["softbuffer".to_string()]),
             };
@@ -81,6 +85,14 @@ impl Popup {
             let page = owner
                 .clone()
                 .create_page(element, target.x, target.bottom());
+            let page_weak = page.as_weak();
+            page.get_body()
+                .clone()
+                .register_event_listener(ClickEventListener::new(move |_e, _ctx| {
+                    if let Ok(p) = page_weak.upgrade() {
+                        p.close();
+                    }
+                }));
             PopupData {
                 wrapper: PopupWrapper::Page(page.as_weak()),
             }

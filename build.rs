@@ -1,5 +1,4 @@
 use cfg_aliases::cfg_aliases;
-
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
 

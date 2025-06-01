@@ -32,7 +32,7 @@ use crate::event::{
     TouchStartEventListener,
 };
 use crate::event_loop::create_event_loop_callback;
-use crate::mrc::{Mrc, MrcWeak};
+use crate::mrc::Mrc;
 use crate::number::DeNan;
 use crate::resource_table::ResourceTable;
 use crate::style::{FixedStyleProp, ResolvedStyleProp, StyleNode, StylePropKey, StylePropVal};
@@ -82,6 +82,7 @@ use crate::render::RenderFn;
 use crate::style::border_path::BorderPath;
 use crate::style::css_manager::CssManager;
 use crate::style::length::LengthContext;
+use crate::style::style_vars::StyleVars;
 use crate::style::styles::Styles;
 use crate::style_list::StyleList;
 
@@ -144,6 +145,8 @@ pub fn init_base_components() {
     register_component::<RadioGroup>("radio-group");
     register_component::<RichText>("rich-text");
     register_component::<Select>("select");
+    register_component::<Container>("dialog");
+    register_component::<Container>("dialog-title");
 }
 
 #[js_methods]
@@ -516,11 +519,6 @@ impl Element {
     fn set_parent_internal(&mut self, parent: ElementParent) {
         self.parent = parent;
         self.applied_style = Styles::new();
-        if let Some(win) = self.get_window() {
-            if let Ok(win) = win.upgrade_mut() {
-                self.refresh_style_variables(&win.style_variables.as_weak());
-            }
-        }
         self.select_style_recurse();
         self.mark_style_dirty();
     }
@@ -528,14 +526,6 @@ impl Element {
     pub fn set_parent(&mut self, parent: ElementParent) {
         self.parent = parent;
         self.process_auto_focus();
-    }
-
-    pub fn refresh_style_variables(&mut self, variables: &MrcWeak<HashMap<String, String>>) {
-        self.style_list.set_variables(variables.clone());
-        self.sync_style();
-        for mut c in self.get_children() {
-            c.refresh_style_variables(variables);
-        }
     }
 
     fn sync_style(&mut self) {
@@ -875,6 +865,13 @@ impl Element {
             if let Some(mut p) = self.get_parent() {
                 p.mark_children_style_dirty();
             }
+        }
+    }
+
+    pub(crate) fn resolve_style_vars_recurse(&mut self, parent_vars: &StyleVars) {
+        let new_vars = self.style_list.resolve_variables(&parent_vars);
+        for mut c in self.get_children() {
+            c.resolve_style_vars_recurse(&new_vars);
         }
     }
 

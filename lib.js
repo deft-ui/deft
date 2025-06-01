@@ -15,6 +15,8 @@ const VT_RADIO = "radio"
 const VT_RADIO_GROUP = "radio-group"
 const VT_RICH_TEXT = "rich-text"
 const VT_SELECT = "select"
+const VT_DIALOG = "dialog";
+const VT_DIALOG_TITLE = "dialog-title";
 
 
 class Clipboard {
@@ -251,6 +253,84 @@ export class Window {
 
     /**
      *
+     * @param message {string | Element}
+     * @param options {AlertOptions}
+     */
+    showAlert(message, options) {
+        this.showConfirm(message, {
+            ...options,
+            hideCancel: true,
+        }).finally(() => {
+            options?.callback && options.callback();
+        });
+    }
+
+    /**
+     *
+     * @param message {string | Element}
+     * @param options {ConfirmOptions}
+     * @returns {Promise<boolean>}
+     */
+    showConfirm(message, options) {
+        function createBtn(label) {
+            const btnLabel = new LabelElement();
+            btnLabel.text = label;
+            const btn = new ButtonElement();
+            btn.style = {
+                minWidth: '4em',
+                flexDirection: 'row',
+                justifyContent: 'center',
+            }
+            btn.addChild(btnLabel);
+            return btn;
+        }
+        return new Promise((resolve) => {
+            if (!(message instanceof Element)) {
+                const label = new LabelElement();
+                label.text = message;
+                label.style = {
+                    padding: '2em',
+                }
+                message = label;
+            }
+
+            const footer = new ContainerElement();
+            footer.style = {
+                flexDirection: 'row',
+                justifyContent: 'center',
+                padding: '10px',
+                gap: '2em',
+            }
+            const btn = createBtn(options?.confirmBtnText ?? "OK");
+            footer.addChild(btn);
+
+            let cancelBtn;
+            if (!options.hideCancel) {
+                cancelBtn = createBtn(options?.cancelBtnText ?? "Cancel");
+                footer.addChild(cancelBtn);
+            }
+
+            const wrapper = new ContainerElement();
+            wrapper.style = {
+                minWidth: 200,
+                alignItems: 'center',
+            }
+            wrapper.addChild(message);
+            wrapper.addChild(footer);
+            const dialog = this.showDialog(wrapper, options?.title);
+            btn.bindClick(() => {
+                resolve(true);
+                dialog.close();
+            });
+            cancelBtn?.bindClick(() => {
+                resolve(false);
+                dialog.close();
+            });
+        })
+    }
+
+    /**
+     *
      * @param content {Element}
      * @param title {string}
      * @returns {{close(): void}}
@@ -260,6 +340,8 @@ export class Window {
             const window = new Window({
                 resizable: false,
                 preferredRenderers: "SoftBuffer",
+                minimizable: false,
+                closable: false,
             });
             window.title = title ?? this.title ?? "";
             window.body.addChild(content);
@@ -277,20 +359,12 @@ export class Window {
                 }
             }
         } else {
-            const wrapper = new ContainerElement();
-            wrapper.style = {
-                background: '#EBECED',
-                border: '1px #C4C7C8',
-            }
+            const wrapper = new DialogElement();
             if (title) {
-                const titleEl = new LabelElement();
-                titleEl.text = title ?? window.title ?? "";
-                titleEl.style = {
-                    width: '100%',
-                    background: '#E1E3E4',
-                    borderBottom: '1px #C4C7C8',
-                    padding: '4px 10px',
-                }
+                const titleEl = new DialogTitleElement();
+                const titleLabelEl = new LabelElement();
+                titleLabelEl.text = title ?? window.title ?? "";
+                titleEl.addChild(titleLabelEl);
                 wrapper.addChild(titleEl);
             }
             wrapper.addChild(content);
@@ -2051,6 +2125,18 @@ export class ButtonElement extends ContainerBasedElement {
 export class ContainerElement extends ContainerBasedElement {
     constructor() {
         super(VT_CONTAINER);
+    }
+}
+
+export class DialogElement extends ContainerBasedElement {
+    constructor() {
+        super(VT_DIALOG);
+    }
+}
+
+export class DialogTitleElement extends ContainerBasedElement {
+    constructor() {
+        super(VT_DIALOG_TITLE);
     }
 }
 

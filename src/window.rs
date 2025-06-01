@@ -11,7 +11,7 @@ use crate::base::{
 use crate::cursor::search_cursor;
 use crate::element::body::Body;
 use crate::element::util::get_tree_level;
-use crate::element::{Element, ElementBackend, ElementParent};
+use crate::element::{Element, ElementBackend, ElementParent, ElementType};
 use crate::event::{
     build_modifier, named_key_to_str, str_to_named_key, BlurEvent, ClickEvent, ContextMenuEvent,
     DragOverEvent, DragStartEvent, DropEvent, DroppedFileEvent, FocusEvent, FocusShiftEvent,
@@ -32,6 +32,7 @@ use crate::platform::support_multiple_windows;
 use crate::render::painter::ElementPainter;
 use crate::resource_table::ResourceTable;
 use crate::style::length::LengthContext;
+use crate::style::style_vars::StyleVars;
 use crate::timer::{set_timeout_nanos, TimerHandle};
 use crate::window::page::Page;
 use crate::window::popup::Popup;
@@ -62,7 +63,8 @@ use winit::platform::windows::WindowExtWindows;
 #[cfg(x11_platform)]
 use winit::platform::x11::WindowAttributesExtX11;
 use winit::window::{
-    Cursor, CursorIcon, Fullscreen, ResizeDirection, WindowAttributes, WindowButtons, WindowId,
+    Cursor, CursorIcon, Fullscreen, ResizeDirection, Theme, WindowAttributes, WindowButtons,
+    WindowId,
 };
 
 #[derive(Clone)]
@@ -125,7 +127,7 @@ pub struct Window {
     next_frame_callbacks: Vec<Callback>,
     next_paint_callbacks: Vec<Callback>,
     pub render_tree: HashMap<Element, RenderTree>,
-    pub style_variables: Mrc<HashMap<String, String>>,
+    pub style_vars: StyleVars,
     frame_rate_controller: FrameRateController,
     next_frame_timer_handle: Option<TimerHandle>,
     resource_table: ResourceTable,
@@ -190,6 +192,22 @@ impl Window {
         } else {
             attributes.title = "".to_string();
         }
+        if let Some(closable) = attrs.closable {
+            attributes
+                .enabled_buttons
+                .set(WindowButtons::CLOSE, closable);
+        }
+        if let Some(minimizable) = attrs.minimizable {
+            attributes
+                .enabled_buttons
+                .set(WindowButtons::MINIMIZE, minimizable);
+        }
+        if let Some(maximizable) = attrs.maximizable {
+            attributes
+                .enabled_buttons
+                .set(WindowButtons::MAXIMIZE, maximizable);
+        }
+
         attributes.visible = attrs.visible.unwrap_or(true);
         attributes.resizable = attrs.resizable.unwrap_or(true);
         if !attributes.resizable {
@@ -275,7 +293,7 @@ impl Window {
             next_frame_callbacks: Vec::new(),
             next_paint_callbacks: Vec::new(),
             render_tree,
-            style_variables: Mrc::new(HashMap::new()),
+            style_vars: StyleVars::new(),
             frame_rate_controller: FrameRateController::new(),
             next_frame_timer_handle: None,
             resource_table: ResourceTable::new(),
@@ -306,10 +324,9 @@ impl Window {
         };
         let height = rect.height() / self.window.scale_factor() as f32;
         debug!("updating style variable: {} {}", name, height);
-        self.style_variables
-            .insert(name.to_string(), format!("{:.6}", height));
+        self.style_vars.set(name, &format!("{:.6}", height));
         for (mut root, ..) in self.layer_roots.clone() {
-            root.refresh_style_variables(&self.style_variables.as_weak());
+            root.mark_style_dirty();
         }
     }
 
@@ -1246,7 +1263,7 @@ impl Window {
         }
         let (viewport_width, viewport_height) = self.get_inner_size();
         warn_time!(16, "update window");
-        for (body, ..) in &mut self.layer_roots {
+        for (body, ..) in &mut self.layer_roots.clone() {
             let length_ctx = LengthContext {
                 root: body.style.font_size,
                 font_size: body.style.font_size,
@@ -1254,6 +1271,7 @@ impl Window {
                 viewport_height,
             };
             //TODO compute font size only when any font size changed
+            body.resolve_style_vars_recurse(&self.style_vars);
             body.compute_font_size_recurse(&length_ctx);
             body.apply_style_update(false, &length_ctx);
         }
@@ -1307,9 +1325,10 @@ impl Window {
     #[js_func]
     pub fn create_page(&mut self, element: Element, x: f32, y: f32) -> Page {
         let page = Page::new(self.as_weak(), element.clone());
+        let body = page.get_body().clone();
         self.pages.push(page.clone());
-        self.layer_roots.push((element.clone(), x, y));
-        self.init_element_root(element, ElementParent::Page(self.as_weak()));
+        self.layer_roots.push((body.clone(), x, y));
+        self.init_element_root(body, ElementParent::Page(self.as_weak()));
         page
     }
 
@@ -1324,11 +1343,18 @@ impl Window {
     fn init_element_root(&mut self, mut body: Element, parent: ElementParent) {
         body.set_parent(parent);
         body.set_focusable(true);
+        let theme = self.window.theme();
+        if let Some(theme) = theme {
+            let theme = match theme {
+                Theme::Light => "light",
+                Theme::Dark => "dark",
+            };
+            body.set_attribute("theme".to_string(), theme.to_string());
+        }
         // if self.focusing.is_none() {
         // TODO move focusing to page?
         self.focusing = Some(body.clone());
         // }
-        body.refresh_style_variables(&self.style_variables.as_weak());
         self.invalid_layout(body);
     }
 

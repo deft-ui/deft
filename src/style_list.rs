@@ -1,6 +1,7 @@
 use crate as deft;
-use crate::mrc::MrcWeak;
 use crate::style::border::parse_border;
+use crate::style::style_vars::StyleVars;
+use crate::style::var_expr::StyleExpr;
 use crate::style::{parse_style_obj, FixedStyleProp, PropValueParse, StylePropKey, StylePropVal};
 use deft_macros::mrc_object;
 use quick_js::JsValue;
@@ -11,7 +12,7 @@ type CssValueResolver = Box<dyn Fn(&HashMap<String, String>) -> String>;
 
 pub enum ParsedStyleProp {
     Fixed(FixedStyleProp),
-    Var(String, String, CssValueResolver, Option<FixedStyleProp>),
+    Var(String, String, StyleExpr, Vec<FixedStyleProp>),
 }
 
 impl PartialEq for ParsedStyleProp {
@@ -30,18 +31,35 @@ impl PartialEq for ParsedStyleProp {
 }
 
 impl ParsedStyleProp {
-    pub fn parse(key: &str, value: &str) -> Vec<Self> {
-        let mut result = Vec::new();
-        let list = StyleList::expand_style(key, value);
+    pub fn parse_all<T: AsRef<str>>(list: Vec<(T, T)>) -> (Vec<Self>, StyleVars) {
+        let mut vars = StyleVars::new();
+        let mut styles = Vec::new();
         for (k, v) in list {
-            if let Some(compute_fn) = StyleList::parse_variables(&v) {
-                result.push(ParsedStyleProp::Var(
-                    k.to_string(),
-                    v,
-                    Box::new(compute_fn),
-                    None,
-                ));
+            let k = k.as_ref();
+            let v = v.as_ref();
+            if k.starts_with("--") {
+                vars.set(&k[2..].to_string(), v);
             } else {
+                for e in Self::parse(k, v) {
+                    styles.push(e);
+                }
+            }
+        }
+        (styles, vars)
+    }
+
+    fn parse(key: &str, value: &str) -> Vec<Self> {
+        let mut result = Vec::new();
+        if let Some(style_expr) = StyleExpr::parse(&value) {
+            result.push(ParsedStyleProp::Var(
+                key.to_string(),
+                value.to_string(),
+                style_expr,
+                Vec::new(),
+            ));
+        } else {
+            let list = StyleList::expand_style(key, value);
+            for (k, v) in list {
                 StyleList::str_to_style_prop(k, &v, &mut |p| {
                     result.push(ParsedStyleProp::Fixed(p));
                 });
@@ -50,43 +68,40 @@ impl ParsedStyleProp {
         result
     }
 
-    pub fn fix(&mut self, vars: &MrcWeak<HashMap<String, String>>) {
+    pub fn fix_var(&mut self, vars: &StyleVars) {
         match self {
             ParsedStyleProp::Fixed(_v) => {}
             ParsedStyleProp::Var(key, _v, resolver, fixed) => {
-                *fixed = None;
-                if let Ok(vars) = vars.upgrade() {
-                    let v = resolver(&vars);
-                    StyleList::str_to_style_prop(&key, &v, &mut |c| *fixed = Some(c));
+                fixed.clear();
+                if let Some(v) = resolver.resolve(&vars) {
+                    StyleList::str_to_style_prop(&key, &v, &mut |c| fixed.push(c));
                 }
             }
         }
     }
-    pub fn fixed(&self) -> Option<FixedStyleProp> {
+
+    pub fn fixed(&self) -> Vec<FixedStyleProp> {
         match self {
-            ParsedStyleProp::Fixed(v) => Some(v.clone()),
+            ParsedStyleProp::Fixed(v) => vec![v.clone()],
             ParsedStyleProp::Var(_, _, _, v) => v.clone(),
         }
     }
-    pub fn key(&self) -> StylePropKey {
+    pub fn key(&self) -> String {
         match self {
-            ParsedStyleProp::Fixed(p) => p.key(),
-            ParsedStyleProp::Var(k, _v, _, _) => {
-                //TODO no unwrap
-                StylePropKey::parse(k).unwrap()
-            }
+            ParsedStyleProp::Fixed(p) => p.key().name().to_lowercase(),
+            ParsedStyleProp::Var(k, _v, _, _) => k.to_lowercase(),
         }
     }
 }
 
 #[mrc_object]
 pub struct StyleList {
-    default_style_props: HashMap<StylePropKey, ParsedStyleProp>,
-    values: HashMap<StylePropKey, ParsedStyleProp>,
-    hover_style_props: HashMap<StylePropKey, ParsedStyleProp>,
-    selector_style_props: HashMap<StylePropKey, ParsedStyleProp>,
-    pseudo_element_style_props: HashMap<String, HashMap<StylePropKey, ParsedStyleProp>>,
-    pub(crate) variables: MrcWeak<HashMap<String, String>>,
+    vars: StyleVars,
+    default_style_props: HashMap<String, ParsedStyleProp>,
+    values: HashMap<String, ParsedStyleProp>,
+    hover_style_props: HashMap<String, ParsedStyleProp>,
+    selector_style_props: HashMap<String, ParsedStyleProp>,
+    pseudo_element_style_props: HashMap<String, HashMap<String, ParsedStyleProp>>,
 }
 
 impl StyleList {
@@ -102,42 +117,44 @@ impl StyleList {
             FixedStyleProp::FontStyle(StylePropVal::Inherit),
         ];
         for d in default_styles {
-            default_style_props.insert(d.key(), ParsedStyleProp::Fixed(d));
+            default_style_props.insert(d.key().name().to_lowercase(), ParsedStyleProp::Fixed(d));
         }
         StyleListData {
             default_style_props,
             values: HashMap::new(),
             hover_style_props: HashMap::new(),
             selector_style_props: HashMap::new(),
-            variables: MrcWeak::new(),
             pseudo_element_style_props: HashMap::new(),
+            vars: StyleVars::new(),
         }
         .to_ref()
     }
 
-    pub fn set_variables(&mut self, variables: MrcWeak<HashMap<String, String>>) {
-        StyleList::fix_variables(&mut self.values, &variables);
-        StyleList::fix_variables(&mut self.hover_style_props, &variables);
-        StyleList::fix_variables(&mut self.selector_style_props, &variables);
-        self.variables = variables;
+    pub fn resolve_variables(&mut self, parent_vars: &StyleVars) -> StyleVars {
+        let mut vars = parent_vars.clone();
+        vars.merge(self.vars.clone());
+        StyleList::fix_style_vars(&mut self.values, &vars);
+        StyleList::fix_style_vars(&mut self.hover_style_props, &vars);
+        StyleList::fix_style_vars(&mut self.selector_style_props, &vars);
+        for (_, v) in &mut self.pseudo_element_style_props {
+            StyleList::fix_style_vars(v, &vars);
+        }
+        vars
     }
 
-    fn fix_variables(
-        table: &mut HashMap<StylePropKey, ParsedStyleProp>,
-        variables: &MrcWeak<HashMap<String, String>>,
-    ) {
+    fn fix_style_vars(table: &mut HashMap<String, ParsedStyleProp>, vars: &StyleVars) {
         for (_k, v) in table {
-            v.fix(variables);
+            v.fix_var(vars);
         }
     }
 
     fn collect_fixed_props(
-        table: &HashMap<StylePropKey, ParsedStyleProp>,
+        table: &HashMap<String, ParsedStyleProp>,
         result: &mut HashMap<StylePropKey, FixedStyleProp>,
     ) {
         for (_, v) in table {
-            if let Some(v) = v.fixed() {
-                result.insert(v.key(), v);
+            for p in v.fixed() {
+                result.insert(p.key(), p);
             }
         }
     }
@@ -148,8 +165,10 @@ impl StyleList {
 
     pub fn set_style_props(&mut self, styles: Vec<FixedStyleProp>) {
         for style_prop in &styles {
-            self.values
-                .insert(style_prop.key(), ParsedStyleProp::Fixed(style_prop.clone()));
+            self.values.insert(
+                style_prop.key().name().to_lowercase(),
+                ParsedStyleProp::Fixed(style_prop.clone()),
+            );
         }
     }
 
@@ -175,8 +194,7 @@ impl StyleList {
 
     pub fn set_style_str(&mut self, k: &str, v_str: &str) {
         let list = ParsedStyleProp::parse(k, v_str);
-        for mut p in list {
-            p.fix(&self.variables);
+        for p in list {
             self.values.insert(p.key(), p);
         }
     }
@@ -205,7 +223,8 @@ impl StyleList {
     }
 
     pub fn set_hover_style(&mut self, style: JsValue) {
-        let styles = parse_style_obj(style);
+        //NOTE: Does not support variables in inline hover-style
+        let (styles, _vars) = parse_style_obj(style);
         self.hover_style_props.clear();
         for st in styles {
             self.hover_style_props.insert(st.key().clone(), st);
@@ -216,15 +235,15 @@ impl StyleList {
         self.hover_style_props.clear();
         for st in styles {
             self.hover_style_props
-                .insert(st.key().clone(), ParsedStyleProp::Fixed(st));
+                .insert(st.key().name().to_lowercase(), ParsedStyleProp::Fixed(st));
         }
     }
 
     pub fn set_selector_style(&mut self, styles: Vec<String>) -> bool {
-        let mut new_style_props = HashMap::new();
-        self.parse_style_vec(&styles, &mut new_style_props);
-        if new_style_props != self.selector_style_props {
+        let (new_style_props, new_vars) = self.parse_style_vec(&styles);
+        if new_style_props != self.selector_style_props || new_vars != self.vars {
             self.selector_style_props = new_style_props;
+            self.vars = new_vars;
             true
         } else {
             false
@@ -234,8 +253,7 @@ impl StyleList {
     pub fn set_pseudo_element_style(&mut self, styles_map: HashMap<String, Vec<String>>) -> bool {
         let mut pseudo_element_props = HashMap::new();
         for (k, styles) in styles_map {
-            let mut parsed_styles = HashMap::new();
-            self.parse_style_vec(&styles, &mut parsed_styles);
+            let (parsed_styles, _) = self.parse_style_vec(&styles);
             pseudo_element_props.insert(k, parsed_styles);
         }
         if pseudo_element_props != self.pseudo_element_style_props {
@@ -249,25 +267,22 @@ impl StyleList {
     fn parse_style_vec(
         &self,
         styles: &Vec<String>,
-        result: &mut HashMap<StylePropKey, ParsedStyleProp>,
-    ) {
+    ) -> (HashMap<String, ParsedStyleProp>, StyleVars) {
+        let mut result = HashMap::new();
+        let mut vars = StyleVars::new();
         for s in styles {
-            let list = Self::parse_style(s);
-            for mut p in list {
-                p.fix(&self.variables);
+            let (list, s_vars) = Self::parse_style(s);
+            for p in list {
                 result.insert(p.key(), p);
             }
+            vars.merge(s_vars);
         }
+        (result, vars)
     }
 
-    pub fn parse_style(style: &str) -> Vec<ParsedStyleProp> {
+    pub fn parse_style(style: &str) -> (Vec<ParsedStyleProp>, StyleVars) {
         let list = Self::parse_style_list(style);
-        let mut result = Vec::new();
-        for (k, v) in list {
-            let mut props = ParsedStyleProp::parse(k, v);
-            result.append(&mut props);
-        }
-        result
+        ParsedStyleProp::parse_all(list)
     }
 
     pub fn has_hover_style(&self) -> bool {
@@ -285,6 +300,9 @@ impl StyleList {
     }
 
     pub fn expand_style<'a>(k: &'a str, v_str: &str) -> Vec<(&'a str, String)> {
+        if k.starts_with("--") {
+            return vec![(&k[2..], v_str.to_string())];
+        }
         let key = k.to_lowercase().replace("-", "");
         match key.as_str() {
             "background" => {
@@ -371,8 +389,11 @@ impl StyleList {
 
     fn str_to_style_prop<C: FnMut(FixedStyleProp)>(k: &str, v_str: &str, c: &mut C) {
         let k = k.to_lowercase().replace("-", "");
-        if let Some(sp) = FixedStyleProp::parse(&k, v_str) {
-            c(sp);
+        let list = StyleList::expand_style(&k, v_str);
+        for (k, v) in list {
+            if let Some(sp) = FixedStyleProp::parse(&k, &v) {
+                c(sp);
+            }
         }
     }
 
@@ -382,52 +403,6 @@ impl StyleList {
 
     fn is_variable_name_continue(char: char) -> bool {
         char.is_ascii_alphanumeric() || char == '_' || char == '-'
-    }
-
-    fn parse_variables(value: &str) -> Option<Box<dyn Fn(&HashMap<String, String>) -> String>> {
-        let mut keys = Vec::new();
-        let chars = value.chars().collect::<Vec<_>>();
-        if chars.len() < 2 {
-            return None;
-        }
-        let mut i = 0;
-        while i < chars.len() - 1 {
-            if chars[i] == '$' && Self::is_variable_name_start(chars[i + 1]) {
-                let key_start = i;
-                i += 2;
-                while i < chars.len() && Self::is_variable_name_continue(chars[i]) {
-                    i += 1;
-                }
-                let key = String::from_iter(&chars[key_start..i]);
-                keys.push((key, key_start));
-            } else {
-                i += 1;
-            }
-        }
-        if !keys.is_empty() {
-            let value = value.to_string();
-            let compute = Box::new(move |variables: &HashMap<String, String>| {
-                let mut result = String::new();
-                let str = value.as_str();
-                let mut consumed = 0;
-                let empty = String::from("");
-                for (k, start) in &keys {
-                    if *start - consumed > 0 {
-                        result.push_str(&str[consumed..*start]);
-                    }
-                    let var_value = variables.get(&k[1..]).unwrap_or(&empty);
-                    result.push_str(&var_value);
-                    consumed = start + k.len();
-                }
-                if str.len() > consumed {
-                    result.push_str(&str[consumed..]);
-                }
-                result
-            });
-            Some(compute)
-        } else {
-            None
-        }
     }
 }
 

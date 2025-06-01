@@ -183,12 +183,7 @@ impl ElementBackend for Select {
             options_el.set_style_props(vec![FixedStyleProp::MinWidth(StylePropVal::Custom(
                 LengthOrPercent::Length(Length::PX(bounds.width)),
             ))]);
-            let mut popup = Some(Popup::new(options_el.clone(), bounds, &window));
-            options_el.register_event_listener(ClickEventListener::new(move |_e, _ctx| {
-                if let Some(popup) = popup.take() {
-                    popup.close();
-                }
-            }));
+            Popup::new(options_el, bounds, &window);
         }
     }
     fn accept_pseudo_element_styles(&mut self, styles: HashMap<String, Vec<ResolvedStyleProp>>) {

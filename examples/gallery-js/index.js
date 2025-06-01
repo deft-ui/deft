@@ -61,7 +61,7 @@ function createButton(title, callback) {
     label.text = title;
     btn.addChild(label);
     btn.style = {
-        width: "8em",
+        width: "6em",
         alignItems: 'center',
     }
     btn.bindClick((e) => {
@@ -138,46 +138,6 @@ function createRichText() {
     return richText;
 }
 
-function alert(window, message, title) {
-    if (!(message instanceof Element)) {
-        const label = new LabelElement();
-        label.text = message;
-        label.style = {
-            padding: '2em',
-        }
-        message = label;
-    }
-
-    const footer = new ContainerElement();
-    footer.style = {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        padding: '10px',
-    }
-    const btnLabel = new LabelElement();
-    btnLabel.text = "OK";
-    const btn = new ButtonElement();
-    btn.style = {
-        minWidth: '4em',
-        flexDirection: 'row',
-        justifyContent: 'center',
-    }
-    btn.addChild(btnLabel);
-    footer.addChild(btn);
-
-    const wrapper = new ContainerElement();
-    wrapper.style = {
-        minWidth: 200,
-        alignItems: 'center',
-    }
-    wrapper.addChild(message);
-    wrapper.addChild(footer);
-    const dialog = window.showDialog(wrapper, title);
-    btn.bindClick(() => {
-        dialog.close();
-    });
-}
-
 function createSelect() {
     const el = new SelectElement();
     el.options = ["JavaScript", "Rust", "C", "C++", "Java", "Delphi", "C#"].map(it => ({value: it, label: it}));
@@ -225,8 +185,18 @@ function main() {
     const password = createPassword();
     const multilineEntry = createMultiLineEntry();
     const button = createButton("Alert", (e) => {
-        alert(window, "Clicked", window.title);
+        window.showAlert("Clicked", {
+            title: window.title
+        });
     });
+    const confirmBtn = createButton("Confirm", async () => {
+        const result = await window.showConfirm("Are you ok?", {
+            confirmBtnText: "Yes",
+            cancelBtnText: "No",
+        });
+        console.log("confirm result:", result);
+    })
+
     const buttonPopup = createButton("Popup", (e) => {
         const label = new LabelElement();
         label.text = "Hello, Deft Gallery!";
@@ -244,7 +214,7 @@ function main() {
     const select = createSelect();
     disabledCheckbox.bindChange(() => {
         console.log("checked", disabledCheckbox.checked);
-        for (const el of [entry, password, multilineEntry, button, buttonPopup, radio1, radio2, checkbox, select]) {
+        for (const el of [entry, password, multilineEntry, button, confirmBtn, buttonPopup, radio1, radio2, checkbox, select]) {
             el.disabled = disabledCheckbox.checked;
         }
     })
@@ -253,7 +223,7 @@ function main() {
     createElementRow("TextInput", entry);
     createElementRow("Password", password);
     createElementRow("TextEdit", multilineEntry);
-    createElementRow("Button", [button, buttonPopup], "row");
+    createElementRow("Button", [button, confirmBtn, buttonPopup], "row");
     createElementRow("Radio", radioGroup)
     createElementRow("Select", select);
     createElementRow("Checkbox", [checkbox, disabledCheckbox], "row");
