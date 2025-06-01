@@ -30,7 +30,7 @@ use std::cell::Cell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use winit::keyboard::NamedKey;
-use winit::window::CursorIcon;
+use winit::window::{Cursor, CursorIcon};
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -598,7 +598,7 @@ impl Editable {
             let _ = self.update_ime();
         } else if let Some(_e) = event.downcast_ref::<MouseLeaveEvent>() {
             let mut el = ok_or_return!(self.element.upgrade());
-            el.set_cursor(CursorIcon::Default);
+            el.set_cursor(Cursor::Icon(CursorIcon::Default));
         } else if let Some(e) = event.downcast_ref::<KeyDownEvent>() {
             self.handle_key_down(&e.0);
         }

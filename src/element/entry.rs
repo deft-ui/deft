@@ -33,7 +33,7 @@ use std::rc::Rc;
 use std::string::ToString;
 use winit::dpi::{LogicalPosition, LogicalSize, Size};
 use winit::keyboard::NamedKey;
-use winit::window::CursorIcon;
+use winit::window::{Cursor, CursorIcon};
 
 const COPY_KEY: &str = "\x03";
 const PASTE_KEY: &str = "\x16";
@@ -842,13 +842,13 @@ impl ElementBackend for Entry {
             let is_over_vb = self.vertical_bar.is_mouse_over(d.offset_x, d.offset_y);
             let mut el = ok_or_return!(self.element.upgrade());
             if is_over_vb {
-                el.set_cursor(CursorIcon::Default);
+                el.set_cursor(Cursor::Icon(CursorIcon::Default));
             } else {
-                el.set_cursor(CursorIcon::Text);
+                el.set_cursor(Cursor::Icon(CursorIcon::Text));
             }
         } else if let Some(_e) = event.downcast_ref::<MouseLeaveEvent>() {
             let mut el = ok_or_return!(self.element.upgrade());
-            el.set_cursor(CursorIcon::Default);
+            el.set_cursor(Cursor::Icon(CursorIcon::Default));
         } else if let Some(e) = event.downcast_ref::<KeyDownEvent>() {
             self.handle_key_down(&e.0);
         }

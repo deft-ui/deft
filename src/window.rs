@@ -441,6 +441,10 @@ impl Window {
         Ok(e)
     }
 
+    pub fn set_cursor_visible(&mut self, visible: bool) {
+        self.window.set_cursor_visible(visible);
+    }
+
     #[js_func]
     pub fn set_outer_position(&mut self, x: f32, y: f32) {
         self.window.set_outer_position(Logical(LogicalPosition {
@@ -866,7 +870,7 @@ impl Window {
     fn update_cursor(&mut self, node: &Element) {
         let cursor = search_cursor(node);
         //TODO cache?
-        self.window.set_cursor(Cursor::Icon(cursor))
+        self.window.set_cursor(cursor)
     }
 
     fn mouse_enter_node(

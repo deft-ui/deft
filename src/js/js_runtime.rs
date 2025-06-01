@@ -1,14 +1,14 @@
 use crate::base::UnsafeFnOnce;
 use crate::js::js_event_loop::{js_create_event_loop_proxy, JsEventLoopProxy};
 use crate::js::js_value_util::JsValueHelper;
-use crate::js::ToJsCallResult;
+use crate::js::{FromJsValue, ToJsCallResult, ToJsValue};
 use quick_js::{Context, ExecutionError, JsPromise, JsValue, ValueError};
 use std::env;
 use std::future::Future;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use tokio::runtime::Runtime;
-use winit::window::CursorIcon;
+use winit::window::{Cursor, CursorIcon};
 
 pub struct JsContext {
     context: Context,
@@ -178,5 +178,24 @@ impl crate::js::js_binding::FromJsValue for CursorIcon {
 impl crate::js::js_binding::ToJsValue for CursorIcon {
     fn to_js_value(self) -> Result<JsValue, ValueError> {
         Ok(JsValue::String(self.name().to_string()))
+    }
+}
+
+impl ToJsValue for Cursor {
+    fn to_js_value(self) -> Result<JsValue, ValueError> {
+        match self {
+            Cursor::Icon(icon) => icon.to_js_value(),
+            Cursor::Custom(_) => Ok(JsValue::Null),
+        }
+    }
+}
+
+impl FromJsValue for Cursor {
+    fn from_js_value(value: JsValue) -> Result<Self, ValueError> {
+        if let Ok(icon) = CursorIcon::from_js_value(value) {
+            Ok(Cursor::Icon(icon))
+        } else {
+            Err(ValueError::UnexpectedType)
+        }
     }
 }

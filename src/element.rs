@@ -12,7 +12,7 @@ use deft_macros::{js_methods, mrc_object};
 use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
 use skia_safe::Rect;
-use winit::window::CursorIcon;
+use winit::window::{Cursor, CursorIcon};
 use yoga::{Direction, StyleUnit};
 
 use crate::base::{EventContext, EventListener, EventRegistration};
@@ -417,14 +417,15 @@ impl Element {
     }
 
     #[js_func]
-    pub fn set_cursor(&mut self, cursor: CursorIcon) {
+    pub fn set_cursor(&mut self, cursor: Cursor) {
         self.cursor = cursor;
+        //TODO remove
         self.mark_dirty(false);
     }
 
     #[js_func]
-    pub fn get_cursor(&self) -> CursorIcon {
-        self.cursor
+    pub fn get_cursor(&self) -> Cursor {
+        self.cursor.clone()
     }
 
     #[js_func]
@@ -1332,7 +1333,7 @@ pub struct Element {
     applied_pseudo_element_styles: HashMap<String, Styles>,
     // animation_instance: Option<AnimationInstance>,
     draggable: bool,
-    cursor: CursorIcon,
+    cursor: Cursor,
     rect: base::Rect,
     resource_table: ResourceTable,
     children_decoration: (f32, f32, f32, f32),
@@ -1380,7 +1381,7 @@ impl ElementData {
             element_type: ElementType::Inner,
 
             draggable: false,
-            cursor: CursorIcon::Default,
+            cursor: Cursor::Icon(CursorIcon::Default),
             rect: base::Rect::empty(),
             resource_table: ResourceTable::new(),
             children_decoration: (0.0, 0.0, 0.0, 0.0),
