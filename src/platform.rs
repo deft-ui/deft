@@ -22,3 +22,8 @@ pub use windows::*;
 mod macos;
 #[cfg(macos_platform)]
 pub use macos::*;
+
+#[cfg(ios_platform)]
+mod ios;
+#[cfg(ios_platform)]
+pub use ios::*;
