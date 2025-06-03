@@ -31,9 +31,13 @@ impl RenderTask {
             .surface
             .buffer_mut()
             .expect("Failed to get the softbuffer buffer");
+        #[cfg(target_os = "android")]
+        let color_type = ColorType::RGBA8888;
+        #[cfg(not(target_os = "android"))]
+        let color_type = ColorType::BGRA8888;
         let img_info = ImageInfo::new(
             (width as i32, height as i32),
-            ColorType::BGRA8888,
+            color_type,
             AlphaType::Premul,
             Some(ColorSpace::new_srgb()),
         );

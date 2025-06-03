@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 use std::ops::Deref;
 
-use winit::event_loop::ActiveEventLoop;
-use winit::window::{Window, WindowAttributes};
 use crate::renderer::Renderer;
 use crate::soft::SoftSurface;
 use crate::surface::RenderBackend;
+use winit::event_loop::ActiveEventLoop;
+use winit::window::{Window, WindowAttributes};
 
 pub struct SkiaWindow {
     surface_state: Box<dyn RenderBackend>,
@@ -21,7 +21,6 @@ pub enum RenderBackendType {
 }
 
 impl RenderBackendType {
-
     pub fn all() -> Vec<Self> {
         let mut list = Vec::new();
         list.push(Self::SoftBuffer);
@@ -57,7 +56,10 @@ impl RenderBackendType {
         backend_types
     }
 
-    pub fn merge(list1: &Vec<RenderBackendType>, list2: &Vec<RenderBackendType>) -> Vec<RenderBackendType> {
+    pub fn merge(
+        list1: &Vec<RenderBackendType>,
+        list2: &Vec<RenderBackendType>,
+    ) -> Vec<RenderBackendType> {
         let mut result = Vec::new();
         let mut added = HashSet::new();
         for list in [list1, list2] {
@@ -69,29 +71,29 @@ impl RenderBackendType {
         }
         result
     }
-
 }
 
 impl SkiaWindow {
-
     #[allow(unreachable_code)]
-    pub fn new(event_loop: &ActiveEventLoop, attributes: WindowAttributes, backend: RenderBackendType) -> Option<Self> {
+    pub fn new(
+        event_loop: &ActiveEventLoop,
+        attributes: WindowAttributes,
+        backend: RenderBackendType,
+    ) -> Option<Self> {
         let window = event_loop.create_window(attributes).unwrap();
         let surface_state: Box<dyn RenderBackend> = match backend {
             RenderBackendType::SoftBuffer => {
-                #[cfg(any(target_os = "android", target_env = "ohos"))]
-                return None;
-                #[cfg(not(any(target_os = "android", target_env = "ohos")))]
-                {
-                    use crate::soft::softbuffer_surface_presenter::SoftBufferSurfacePresenter;
-                    let presenter = SoftBufferSurfacePresenter::new(window);
-                    let soft_surface = SoftSurface::new(event_loop, presenter);
-                    Box::new(soft_surface)
-                }
+                use crate::soft::softbuffer_surface_presenter::SoftBufferSurfacePresenter;
+                let presenter = SoftBufferSurfacePresenter::new(window);
+                let soft_surface = SoftSurface::new(event_loop, presenter);
+                Box::new(soft_surface)
             }
             #[cfg(feature = "gl")]
             RenderBackendType::SoftGL => {
-                let soft_surface = SoftSurface::new(event_loop, crate::soft::gl_presenter::GlPresenter::new(event_loop, window)?);
+                let soft_surface = SoftSurface::new(
+                    event_loop,
+                    crate::soft::gl_presenter::GlPresenter::new(event_loop, window)?,
+                );
                 Box::new(soft_surface)
             }
             #[cfg(feature = "gl")]
@@ -112,7 +114,6 @@ impl SkiaWindow {
     pub fn scale_factor(&self) -> f64 {
         self.winit_window().scale_factor()
     }
-
 }
 
 impl Deref for SkiaWindow {
@@ -125,12 +126,15 @@ impl Deref for SkiaWindow {
 }
 
 impl SkiaWindow {
-
     pub fn winit_window(&self) -> &Window {
         &self.surface_state.window()
     }
 
-    pub fn render_with_result<C: FnOnce(bool) + Send + 'static>(&mut self, renderer: Renderer, callback: C) {
+    pub fn render_with_result<C: FnOnce(bool) + Send + 'static>(
+        &mut self,
+        renderer: Renderer,
+        callback: C,
+    ) {
         // self.surface_state.render.draw(renderer);
         self.surface_state.render(renderer, Box::new(callback));
     }

@@ -76,7 +76,7 @@ skia-window = { path = "skia-window", version = "0.6.0", features = ["x11", "way
 
 [target.'cfg(target_env = "ohos")'.dependencies]
 skia-safe = { package = "deft-skia-safe", version = "0.83.0", features = ["binary-cache", "egl"], default-features = false }
-skia-window = { path = "skia-window", version = "0.6.0" }
+skia-window = { path = "skia-window", version = "0.6.0", features = ["gl"] }
 napi-ohos = "1.0.4"
 napi-derive-ohos = "1.0.4"
 ohos-hilog-binding = "0.1.0"
