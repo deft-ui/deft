@@ -50,7 +50,7 @@ memmap2 = "0.9.5"
 simplecss = { version = "0.3.1", package = "deft-simplecss" }
 
 [features]
-default = ["gl", "websocket", "http", "tray", "clipboard"]
+default = ["websocket", "http", "tray", "clipboard"]
 tray = ["deft-tray"]
 sqlite = ["rusqlite"]
 http = ["reqwest"]

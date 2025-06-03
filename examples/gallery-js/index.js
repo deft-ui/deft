@@ -153,7 +153,7 @@ function main() {
     // saveStartTime();
     const window = new Window({
         width: 400,
-        height: 400,
+        height: 360,
     });
     window.title = "Deft Gallery";
     const scroll = new ContainerElement();

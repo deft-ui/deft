@@ -51,6 +51,22 @@ jobs:
       - name: Tests
         run: cargo test
 
+  ci-ios:
+    name: iOS
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install Target For iOS
+        run: rustup target add aarch64-apple-ios
+      - name: Build
+        run: cargo build --target aarch64-apple-ios
+      - name: Tests
+        run: cargo test
+
   ci-win:
     name: Windows
     runs-on: windows-2022
