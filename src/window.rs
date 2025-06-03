@@ -318,9 +318,9 @@ impl Window {
 
     pub fn update_inset(&mut self, ty: InsetType, rect: Rect) {
         let name = match ty {
-            InsetType::Ime => "ime-height",
-            InsetType::StatusBar => "status-height",
-            InsetType::Navigation => "navigation-height",
+            InsetType::Ime => "deft-ime-height",
+            InsetType::StatusBar => "deft-status-height",
+            InsetType::Navigation => "deft-navigation-height",
         };
         let height = rect.height() / self.window.scale_factor() as f32;
         debug!("updating style variable: {} {}", name, height);

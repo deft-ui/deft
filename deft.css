@@ -1,108 +1,108 @@
 body {
-    --border-color: #BCBEBF;
-    --highlight-border-color: #3DAEE9;
-    --disabled-border-color: #DADBDB;
+    --deft-border-color: #BCBEBF;
+    --deft-highlight-border-color: #3DAEE9;
+    --deft-disabled-border-color: #DADBDB;
 
-    --default-color: #010101;
-    --disabled-color: #A8A9AA;
-    --placeholder-color: #666;
+    --deft-default-color: #010101;
+    --deft-disabled-color: #A8A9AA;
+    --deft-placeholder-color: #666;
 
-    --disabled-placeholder-color: #A8A9AA;
+    --deft-disabled-placeholder-color: #A8A9AA;
 
-    --highlight-background: #3DAEE9;
-    --disabled-background: #f0f0f0;
-    --form-control-background: #FCFCFC;
-    --button-background: #FCFCFC;
-    --body-background: #EFF0F1;
+    --deft-highlight-background: #3DAEE9;
+    --deft-disabled-background: #f0f0f0;
+    --deft-form-control-background: #FCFCFC;
+    --deft-button-background: #FCFCFC;
+    --deft-body-background: #EFF0F1;
 
-    --scrollbar-background: #E1E1E1;
-    --scrollbar-thumb-background: #C1C1C1;
+    --deft-scrollbar-background: #E1E1E1;
+    --deft-scrollbar-thumb-background: #C1C1C1;
 
-    --dialog-title-background: #E1E3E4;
+    --deft-dialog-title-background: #E1E3E4;
 
-    color: var(--default-color);
-    background: var(--body-background);
+    color: var(--deft-default-color);
+    background: var(--deft-body-background);
     font-size: 14px;
 }
 
 body[theme="dark"] {
-    --border-color: #6E7175;
-    --highlight-border-color: #5993B2;
-    --disabled-border-color: #3A3D41;
+    --deft-border-color: #6E7175;
+    --deft-highlight-border-color: #5993B2;
+    --deft-disabled-border-color: #3A3D41;
 
-    --default-color: #f0f0f0;
-    --disabled-color: #727679;
-    --placeholder-color: #A1A9B1;
+    --deft-default-color: #f0f0f0;
+    --deft-disabled-color: #727679;
+    --deft-placeholder-color: #A1A9B1;
 
-    --disabled-placeholder-color: #5A5D63;
+    --deft-disabled-placeholder-color: #5A5D63;
 
-    --highlight-background: #3DAEE9;
-    --disabled-background: #2F3338;
-    --form-control-background: #1B1E20;
-    --button-background: #31363B;
-    --body-background: #2A2E32;
+    --deft-highlight-background: #3DAEE9;
+    --deft-disabled-background: #2F3338;
+    --deft-form-control-background: #1B1E20;
+    --deft-button-background: #31363B;
+    --deft-body-background: #2A2E32;
 
-    --scrollbar-background: #1B1E20;
-    --scrollbar-thumb-background: #424546;
+    --deft-scrollbar-background: #1B1E20;
+    --deft-scrollbar-thumb-background: #424546;
 
-    --dialog-title-background: #31363B;
+    --deft-dialog-title-background: #31363B;
 }
 
 dialog {
-    background: var(--body-background);
-    border: 1px var(--border-color);
+    background: var(--deft-body-background);
+    border: 1px var(--deft-border-color);
 }
 
 dialog-title {
     width: 100%;
-    background: var(--dialog-title-background);
-    border-bottom: 1px var(--border-color);
+    background: var(--deft-dialog-title-background);
+    border-bottom: 1px var(--deft-border-color);
     padding: 4px 10px;
 }
 
 button {
-    background: var(--button-background);
-    border: 1px var(--border-color);
+    background: var(--deft-button-background);
+    border: 1px var(--deft-border-color);
     border-radius: 3px;
     padding: 4px 8px;
 }
 button:hover {
-    border: 1px var(--highlight-border-color);
+    border: 1px var(--deft-highlight-border-color);
 }
 button[disabled], button[disabled]:hover {
-    color: var(--disabled-color);
-    background: var(--disabled-background);
-    border: 1px var(--disabled-border-color);
+    color: var(--deft-disabled-color);
+    background: var(--deft-disabled-background);
+    border: 1px var(--deft-disabled-border-color);
 }
 
 entry {
-    background: var(--form-control-background);
-    border: 1px var(--border-color);
+    background: var(--deft-form-control-background);
+    border: 1px var(--deft-border-color);
     border-radius: 3px;
     min-height: 2em;
     padding: 4px;
 }
 
 entry:hover {
-    border: 1px var(--highlight-border-color);
+    border: 1px var(--deft-highlight-border-color);
 }
 entry:focus {
-    border: 1px var(--highlight-border-color);
+    border: 1px var(--deft-highlight-border-color);
 }
 entry::placeholder {
-    color: var(--placeholder-color);
+    color: var(--deft-placeholder-color);
 }
 entry[disabled], entry[disabled]:hover {
-    background: var(--disabled-background);
-    border: 1px var(--disabled-border-color);
-    color: var(--disabled-color);
+    background: var(--deft-disabled-background);
+    border: 1px var(--deft-disabled-border-color);
+    color: var(--deft-disabled-color);
 }
 entry::scrollbar, scroll::scrollbar {
-    background: var(--scrollbar-background);
+    background: var(--deft-scrollbar-background);
 }
 
 entry::scrollbar-thumb, scroll::scrollbar-thumb {
-    background: var(--scrollbar-thumb-background);
+    background: var(--deft-scrollbar-thumb-background);
 }
 
 
@@ -110,24 +110,24 @@ checkbox::box {
     width: 1.2em;
     height: 1.2em;
     margin-right: 2px;
-    border: 1px var(--border-color);
+    border: 1px var(--deft-border-color);
     border-radius: 2px;
 }
 
 checkbox:hover::box {
-    border: 1px var(--highlight-border-color);
+    border: 1px var(--deft-highlight-border-color);
 }
 checkbox[checked]::box {
-    background: var(--form-control-background);
-    border: 1px var(--highlight-border-color);
+    background: var(--deft-form-control-background);
+    border: 1px var(--deft-highlight-border-color);
 }
 
 checkbox[disabled], checkbox[disabled]:hover {
-    color: var(--disabled-color);
+    color: var(--deft-disabled-color);
 }
 
 checkbox[disabled]::box, checkbox[disabled]:hover::box {
-    border: 1px var(--disabled-border-color);
+    border: 1px var(--deft-disabled-border-color);
 }
 
 radiogroup {
@@ -140,29 +140,29 @@ radio::box {
     width: 1.2em;
     height: 1.2em;
     margin-right: 2px;
-    border: 1px var(--border-color);
+    border: 1px var(--deft-border-color);
     border-radius: 0.6em;
 }
 
 radio:hover::box {
-    border: 1px var(--highlight-border-color);
+    border: 1px var(--deft-highlight-border-color);
 }
 radio[checked]::box {
-    background: var(--form-control-background);
-    border: 1px var(--highlight-border-color);
+    background: var(--deft-form-control-background);
+    border: 1px var(--deft-highlight-border-color);
 }
 radio[disabled], radio[disabled]:hover {
-    color: var(--disabled-color);
+    color: var(--deft-disabled-color);
 }
 
 radio[disabled]::box, radio[disabled]:hover::box {
-    border: 1px var(--disabled-border-color);
+    border: 1px var(--deft-disabled-border-color);
 }
 
 
 text-input, text-edit {
-    background: var(--form-control-background);
-    border: 1px var(--border-color);
+    background: var(--deft-form-control-background);
+    border: 1px var(--deft-border-color);
     border-radius: 3px;
     min-height: 2em;
     padding: 4px;
@@ -179,45 +179,45 @@ text-edit {
 }
 
 text-input:hover, text-edit:hover {
-    border: 1px var(--highlight-border-color);
+    border: 1px var(--deft-highlight-border-color);
 }
 text-input:focus, text-edit:focus {
-    border: 1px var(--highlight-border-color);
+    border: 1px var(--deft-highlight-border-color);
 }
 text-input::placeholder, text-edit::placeholder {
-    color: var(--placeholder-color);
+    color: var(--deft-placeholder-color);
 }
 text-input[disabled], text-edit[disabled], text-input[disabled]:hover, text-edit[disabled]:hover {
-    background: var(--disabled-background);
-    border: 1px var(--disabled-border-color);
-    color: var(--disabled-color);
+    background: var(--deft-disabled-background);
+    border: 1px var(--deft-disabled-border-color);
+    color: var(--deft-disabled-color);
 }
 text-input[disabled]::placeholder, text-edit[disabled]::placeholder {
-    color: var(--disabled-placeholder-color);
+    color: var(--deft-disabled-placeholder-color);
 }
 
 text-edit::scrollbar, scroll::scrollbar {
-    background: var(--scrollbar-background);
+    background: var(--deft-scrollbar-background);
 }
 
 text-edit::scrollbar-thumb, scroll::scrollbar-thumb {
-    background: var(--scrollbar-thumb-background);
+    background: var(--deft-scrollbar-thumb-background);
 }
 
 select {
-    background: var(--form-control-background);
-    border: 1px var(--border-color);
+    background: var(--deft-form-control-background);
+    border: 1px var(--deft-border-color);
     border-radius: 2px;
     padding: 2px 6px;
     height: 2em;
 }
 select:hover {
-    border: 1px var(--highlight-border-color);
+    border: 1px var(--deft-highlight-border-color);
 }
 select::options {
-    background: var(--form-control-background);
+    background: var(--deft-form-control-background);
     color: inherit;
-    border: 1px var(--border-color);
+    border: 1px var(--deft-border-color);
     padding: 1px 0;
     font-size: inherit;
 }
@@ -225,16 +225,16 @@ select::option {
     padding: 4px 6px;
 }
 select::option-hover {
-    background: var(--highlight-background);
+    background: var(--deft-highlight-background);
 }
 select::placeholder {
-    color: var(--placeholder-color);
+    color: var(--deft-placeholder-color);
 }
 select[disabled], select[disabled]:hover {
-    background: var(--disabled-background);
-    color: var(--disabled-color);
-    border: 1px var(--disabled-border-color);
+    background: var(--deft-disabled-background);
+    color: var(--deft-disabled-color);
+    border: 1px var(--deft-disabled-border-color);
 }
 select[disabled]::placeholder {
-    color: var(--disabled-placeholder-color);
+    color: var(--deft-disabled-placeholder-color);
 }
