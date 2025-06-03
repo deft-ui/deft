@@ -10,6 +10,9 @@ declare interface WindowAttrs {
     position ?: [number, number],
     visible ?: boolean,
     windowType ?: WindowType,
+    minimizable ?: boolean,
+    maximizable ?: boolean,
+    closable ?: boolean,
     preferredRenderers ?: RenderBackend | RenderBackend[],
 }
 
@@ -102,6 +105,24 @@ declare type Align =
     | 'baseline'
     | 'space-between'
     | 'space-around'
+
+declare interface SelectOption {
+    label: string,
+    value: string,
+}
+
+declare interface AlertOptions {
+    title ?: string;
+    confirmBtnText ?: string;
+    callback ?: () => void;
+}
+
+declare interface ConfirmOptions {
+    title ?: string;
+    confirmBtnText ?: string;
+    cancelBtnText ?: string;
+    hideCancel ?: boolean;
+}
 
 declare interface StyleProps extends Record<string, number | string>{
     color?: string,
@@ -313,6 +334,16 @@ declare class FileDialog {
      */
     show(options: ShowFileDialogOptions): Promise<string[]>;
 }
+declare class Page {
+    constructor(handle: any);
+    handle: any;
+    close(): void;
+}
+declare class Popup {
+    constructor(handle: any);
+    handle: any;
+    close(): void;
+}
 /**
  * @typedef {IEvent<ResizeDetail>} IResizeEvent
  */
@@ -323,6 +354,7 @@ declare class Window {
      * @returns {Window}
      */
     static fromHandle(windowHandle: any): Window;
+    static supportMultipleWindows(): any;
     /**
      *
      * @param attrs {WindowAttrs}
@@ -336,6 +368,56 @@ declare class Window {
     get body(): BodyElement;
     /**
      *
+     * @returns {{width: number, height: number}}
+     */
+    get innerSize(): {
+        width: number;
+        height: number;
+    };
+    /**
+     *
+     * @param content {Element}
+     * @param x {number}
+     * @param y {number}
+     * @return {Page}
+     */
+    createPage(content: Element, x: number, y: number): Page;
+    /**
+     *
+     * @param content {Element}
+     * @param target {{x: number, y: number, width?: number, height?: number}}
+     * @return {Popup}
+     */
+    popup(content: Element, target: {
+        x: number;
+        y: number;
+        width?: number;
+        height?: number;
+    }): Popup;
+    /**
+     *
+     * @param message {string | Element}
+     * @param options {AlertOptions}
+     */
+    showAlert(message: string | Element, options: AlertOptions): void;
+    /**
+     *
+     * @param message {string | Element}
+     * @param options {ConfirmOptions}
+     * @returns {Promise<boolean>}
+     */
+    showConfirm(message: string | Element, options: ConfirmOptions): Promise<boolean>;
+    /**
+     *
+     * @param content {Element}
+     * @param title {string}
+     * @returns {{close(): void}}
+     */
+    showDialog(content: Element, title: string): {
+        close(): void;
+    };
+    /**
+     *
      * @param title {string}
      */
     set title(title: string);
@@ -344,6 +426,14 @@ declare class Window {
      * @returns {string}
      */
     get title(): string;
+    /**
+     *
+     * @returns {{width: number, height: number}}
+     */
+    get monitorSize(): {
+        width: number;
+        height: number;
+    };
     /**
      *
      * @param size {Size}
@@ -375,6 +465,22 @@ declare class Window {
      * @param owner {Window}
      */
     setModal(owner: Window): void;
+    /**
+     *
+     * @param value {{x: number, y: number}}
+     */
+    set outerPosition(value: {
+        x: number;
+        y: number;
+    });
+    /**
+     *
+     * @returns {{x: number, y: number}}
+     */
+    get outerPosition(): {
+        x: number;
+        y: number;
+    };
     close(): void;
     /**
      *
@@ -388,6 +494,7 @@ declare class Window {
     get visible(): boolean;
     requestFullscreen(): void;
     exitFullscreen(): void;
+    get fullscreen(): any;
     /**
      *
      * @param callback {(event: IResizeEvent) => void}
@@ -823,6 +930,50 @@ declare class RadioElement extends Element {
      */
     bindChange(callback: (e: IVoidEvent) => void): void;
 }
+declare class SelectElement extends Element {
+    constructor();
+    /**
+     *
+     * @param value {string}
+     */
+    set value(value: string);
+    /**
+     *
+     * @returns {string}
+     */
+    get value(): string;
+    /**
+     *
+     * @param options {SelectOption[]}
+     */
+    set options(options: SelectOption[]);
+    /**
+     *
+     * @returns {SelectOption[]}
+     */
+    get options(): SelectOption[];
+    /**
+     *
+     * @param placeholder {string}
+     */
+    set placeholder(placeholder: string);
+    /**
+     *
+     * @returns {string}
+     */
+    get placeholder(): string;
+    /**
+     *
+     * @param value {boolean}
+     */
+    set disabled(value: boolean);
+    /**
+     *
+     * @returns {boolean}
+     */
+    get disabled(): boolean;
+    bindChange(callback: any): void;
+}
 /**
  * @typedef {{
  *   type: "text",
@@ -1115,6 +1266,12 @@ declare class ButtonElement extends ContainerBasedElement {
     get disabled(): boolean;
 }
 declare class ContainerElement extends ContainerBasedElement {
+    constructor();
+}
+declare class DialogElement extends ContainerBasedElement {
+    constructor();
+}
+declare class DialogTitleElement extends ContainerBasedElement {
     constructor();
 }
 declare class BodyElement extends ContainerBasedElement {
