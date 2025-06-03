@@ -10,6 +10,7 @@ Deft is a framework for building desktop and mobile applications with Rust and J
 * Hybrid programming with Rust and JavaScript
 * Non-webview core
 * Unified JavaScript engine and rendering engine
+* Themes support
 * Support React/Vue/Solid or any framework that supports custom render
 
 # Limits
@@ -20,7 +21,8 @@ Deft is a framework for building desktop and mobile applications with Rust and J
 
 # Component Gallery
 
-<img width="400" src="https://github.com/deft-ui/deft/blob/main/snapshots/gallery.png?raw=true" />
+<img width="360" src="https://github.com/deft-ui/deft/blob/main/snapshots/gallery.png?raw=true" />
+<img width="360" src="https://github.com/deft-ui/deft/blob/main/snapshots/gallery-dark.png?raw=true" />
 
 
 # Quick Start
@@ -38,15 +40,15 @@ npm run dev
 
 # Platforms
 
-| Platform   | Versions      | Supported     |
-|------------|---------------|---------------|
-| Windows    | 10+           | ✅             |
-| Linux      | X11 & Wayland | ✅             |
-| MacOS      | 10.12+        | ✅             |
-| HarmonyOS  | 5+            | ✅experimental |
-| Android    | 6+            | ✅experimental |
-| iOS        | -             | ❔             |
-| Web        | -             | ❌             |
+| Platform   | Versions      | Supported      |
+|------------|---------------|----------------|
+| Windows    | 10+           | ✅              |
+| Linux      | X11 & Wayland | ✅              |
+| MacOS      | 10.12+        | ✅              |
+| HarmonyOS  | 5+            | ✅experimental  |
+| Android    | 6+            | ✅experimental  |
+| iOS        | -             | ✅experimental  |
+| Web        | -             | ❌              |
 
 # Develop
 
