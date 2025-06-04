@@ -398,6 +398,15 @@ impl CaretDetail {
 
 pub type EventHandler<E> = dyn FnMut(&mut Event<E>);
 
+pub type BoxEventListener<E> = Box<dyn FnMut(&mut Box<&mut dyn Any>, &mut EventContext<E>)>;
+
+pub type BoxJsEventListenerFactory<T> =
+    Box<dyn FnMut(JsValue) -> Option<(TypeId, BoxEventListener<T>)>>;
+
+pub trait JsEvent<T> {
+    fn create_listener_factory() -> BoxJsEventListenerFactory<T>;
+}
+
 pub trait EventListener<T, E> {
     fn handle_event(&mut self, event: &mut T, ctx: &mut EventContext<E>);
 }
@@ -429,14 +438,7 @@ impl<E> EventRegistration<E> {
         &mut self,
         mut listener: H,
     ) -> u32 {
-        let id = self.next_listener_id;
-        self.next_listener_id += 1;
         let event_type_id = TypeId::of::<T>();
-        if !self.typed_listeners.contains_key(&event_type_id) {
-            let lst = Vec::new();
-            self.typed_listeners.insert(event_type_id, lst);
-        }
-        let listeners = self.typed_listeners.get_mut(&event_type_id).unwrap();
         let wrapper_listener = Box::new(
             move |d: &mut Box<&mut dyn Any>, ctx: &mut EventContext<E>| {
                 if let Some(t) = d.downcast_mut::<T>() {
@@ -444,7 +446,21 @@ impl<E> EventRegistration<E> {
                 }
             },
         );
-        listeners.push((id, wrapper_listener));
+        self.register_raw_event_listener(event_type_id, wrapper_listener)
+    }
+
+    pub fn register_raw_event_listener(
+        &mut self,
+        event_type_id: TypeId,
+        listener: BoxEventListener<E>,
+    ) -> u32 {
+        let id = self.next_listener_id;
+        self.next_listener_id += 1;
+        let listeners = self
+            .typed_listeners
+            .entry(event_type_id)
+            .or_insert_with(|| Vec::new());
+        listeners.push((id, listener));
         self.listener_types.insert(id, event_type_id);
         id
     }

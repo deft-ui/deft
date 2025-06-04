@@ -228,6 +228,24 @@ fn create_event(_attr: TokenStream, struct_def: TokenStream, target_type: TokenS
             }
         }
 
+        impl deft::base::JsEvent<#target_type> for #event_name {
+            fn create_listener_factory() -> deft::base::BoxJsEventListenerFactory<#target_type> {
+                use deft::base::EventListener;
+                use deft::js::js_binding::FromJsValue;
+                Box::new(move |listener| {
+                    let mut listener = <#listener_name>::from_js_value(listener).ok()?;
+                    Some((
+                        std::any::TypeId::of::<#event_name>(),
+                        Box::new(move |e, ctx| {
+                            if let Some(e) = e.downcast_mut::<#event_name>() {
+                                listener.handle_event(e, ctx);
+                            }
+                        }),
+                    ))
+                })
+            }
+        }
+
     };
     expanded.into()
 }

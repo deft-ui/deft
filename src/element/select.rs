@@ -7,7 +7,6 @@ use crate::element::container::Container;
 use crate::element::label::Label;
 use crate::element::{Element, ElementBackend, ElementWeak};
 use crate::event::{ClickEvent, ClickEventListener};
-use crate::js::FromJsValue;
 use crate::mrc::Mrc;
 use crate::render::RenderFn;
 use crate::style::length::{Length, LengthOrPercent};
@@ -16,7 +15,6 @@ use crate::text::textbox::TextBox;
 use crate::window::popup::Popup;
 use crate::{js_deserialize, js_serialize, ok_or_return, some_or_return};
 use deft_macros::{element_backend, event, js_methods};
-use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::collections::HashMap;
@@ -120,6 +118,7 @@ impl Select {
 impl ElementBackend for Select {
     fn create(element: &mut Element) -> Self {
         element.is_form_element = true;
+        element.register_js_event::<ChangeEvent>("change");
         let label_el = Element::create(Label::create);
         let label = label_el.get_backend_as::<Label>().clone();
         element.add_child(label_el.clone(), 0).unwrap();
@@ -238,16 +237,5 @@ impl ElementBackend for Select {
             }
             _ => {}
         }
-    }
-
-    fn bind_js_listener(&mut self, event_type: &str, listener: JsValue) -> Option<u32> {
-        let mut element = self.element_weak.upgrade().ok()?;
-        let id = match event_type {
-            "change" => {
-                element.register_event_listener(ChangeEventListener::from_js_value(listener).ok()?)
-            }
-            _ => return None,
-        };
-        Some(id)
     }
 }

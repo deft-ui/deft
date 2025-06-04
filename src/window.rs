@@ -11,7 +11,7 @@ use crate::base::{
 use crate::cursor::search_cursor;
 use crate::element::body::Body;
 use crate::element::util::get_tree_level;
-use crate::element::{Element, ElementBackend, ElementParent, ElementType};
+use crate::element::{Element, ElementBackend, ElementParent};
 use crate::event::{
     build_modifier, named_key_to_str, str_to_named_key, BlurEvent, ClickEvent, ContextMenuEvent,
     DragOverEvent, DragStartEvent, DropEvent, DroppedFileEvent, FocusEvent, FocusShiftEvent,

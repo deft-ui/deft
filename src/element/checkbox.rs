@@ -5,12 +5,10 @@ use crate::element::image::Image;
 use crate::element::label::Label;
 use crate::element::{Element, ElementBackend, ElementWeak};
 use crate::event::ClickEvent;
-use crate::js::FromJsValue;
 use crate::ok_or_return;
 use crate::style::length::LengthOrPercent;
 use crate::style::{FixedStyleProp, ResolvedStyleProp, StylePropVal};
 use deft_macros::{element_backend, event, js_methods};
-use quick_js::JsValue;
 use std::any::Any;
 use std::collections::HashMap;
 use yoga::{Align, Display, FlexDirection};
@@ -83,6 +81,7 @@ impl ElementBackend for Checkbox {
         Self: Sized,
     {
         element.is_form_element = true;
+        element.register_js_event::<ChangeEvent>("change");
         let base = Container::create(element);
         let mut wrapper_element = Element::create(Container::create);
         let mut box_element = Element::create(Container::create);
@@ -143,16 +142,5 @@ impl ElementBackend for Checkbox {
             "checked" => self.update_checked(value.is_some()),
             _ => self.base.on_attribute_changed(key, value),
         }
-    }
-
-    fn bind_js_listener(&mut self, event_type: &str, listener: JsValue) -> Option<u32> {
-        let mut element = self.element.upgrade().ok()?;
-        let id = match event_type {
-            "change" => {
-                element.register_event_listener(ChangeEventListener::from_js_value(listener).ok()?)
-            }
-            _ => return None,
-        };
-        Some(id)
     }
 }

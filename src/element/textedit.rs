@@ -5,7 +5,6 @@ use crate::element::{Element, ElementBackend, ElementWeak};
 use crate::style::length::{Length, LengthOrPercent};
 use crate::style::{FixedStyleProp, ResolvedStyleProp, StylePropVal};
 use deft_macros::{element_backend, js_methods};
-use quick_js::JsValue;
 use std::any::Any;
 use std::collections::HashMap;
 
@@ -91,9 +90,5 @@ impl ElementBackend for TextEdit {
 
     fn accept_pseudo_element_styles(&mut self, styles: HashMap<String, Vec<ResolvedStyleProp>>) {
         self.editable.accept_pseudo_element_styles(styles);
-    }
-
-    fn bind_js_listener(&mut self, event_type: &str, listener: JsValue) -> Option<u32> {
-        self.editable.bind_js_listener(event_type, listener)
     }
 }

@@ -6,9 +6,9 @@ use crate::element::edit_history::{EditHistory, EditOpType};
 use crate::element::util::is_form_event;
 use crate::element::{Element, ElementBackend, ElementWeak};
 use crate::event::{
-    BlurEvent, BoundsChangeEvent, CaretChangeEvent, CaretChangeEventListener, FocusEvent,
-    KeyDownEvent, KeyEventDetail, MouseLeaveEvent, ScrollEvent, TextChangeEvent, TextInputEvent,
-    TextUpdateEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT,
+    BlurEvent, BoundsChangeEvent, CaretChangeEvent, FocusEvent, KeyDownEvent, KeyEventDetail,
+    MouseLeaveEvent, ScrollEvent, TextChangeEvent, TextInputEvent, TextUpdateEvent, KEY_MOD_CTRL,
+    KEY_MOD_SHIFT,
 };
 use crate::event_loop::create_event_loop_proxy;
 use crate::js::{FromJsValue, ToJsValue};
@@ -607,6 +607,8 @@ impl Editable {
 
 impl ElementBackend for Editable {
     fn create(ele: &mut Element) -> Self {
+        //TODO register and emit in parent element?
+        ele.register_js_event::<CaretChangeEvent>("caretchange");
         ele.set_focusable(true);
         // let mut base = Scroll::create(ele);
         let mut paragraph = TextBox::new();
@@ -786,16 +788,6 @@ impl ElementBackend for Editable {
             "disabled" => self.disabled = value.is_some(),
             _ => {}
         }
-    }
-
-    fn bind_js_listener(&mut self, event_type: &str, listener: JsValue) -> Option<u32> {
-        let mut element = self.element.upgrade().ok()?;
-        let id = match event_type {
-            "caretchange" => element
-                .register_event_listener(CaretChangeEventListener::from_js_value(listener).ok()?),
-            _ => return None,
-        };
-        Some(id)
     }
 }
 

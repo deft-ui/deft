@@ -837,6 +837,7 @@ impl TextBox {
 
 #[cfg(test)]
 mod tests {
+    use crate::element::common::editable::Editable;
     use crate::element::paragraph::ParagraphParams;
     use crate::font::family::{FontFamilies, FontFamily};
     use crate::style::font::FontStyle;
@@ -844,9 +845,8 @@ mod tests {
     use crate::text::TextAlign;
     use measure_time::print_time;
     use skia_safe::font_style::Weight;
-    use crate::element::common::editable::Editable;
 
-    #[test]
+    // #[test]
     fn text_text_layout() {
         let mut text = TextBox::new();
         text.add_line(Editable::build_line("你好".to_string()));

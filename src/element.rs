@@ -15,7 +15,9 @@ use skia_safe::Rect;
 use winit::window::{Cursor, CursorIcon};
 use yoga::{Direction, StyleUnit};
 
-use crate::base::{EventContext, EventListener, EventRegistration};
+use crate::base::{
+    BoxJsEventListenerFactory, EventContext, EventListener, EventRegistration, JsEvent,
+};
 use crate::element::button::Button;
 use crate::element::container::Container;
 use crate::element::image::Image;
@@ -376,7 +378,7 @@ impl Element {
         event_type: String,
         listener: JsValue,
     ) -> Result<u32, JsError> {
-        let mut id = bind_js_event_listener!(
+        let id = bind_js_event_listener!(
             self, event_type.as_str(), listener.clone();
             "click" => ClickEventListener,
             "contextmenu" => ContextMenuEventListener,
@@ -406,7 +408,13 @@ impl Element {
             "hoveredfile" => HoveredFileEventListener,
         );
         if id.is_none() {
-            id = self.backend.bind_js_listener(&event_type, listener);
+            if let Some(factory) = self.js_event_listener_factory.get_mut(&event_type) {
+                if let Some((type_id, raw_listener)) = factory(listener.clone()) {
+                    return Ok(self
+                        .event_registration
+                        .register_raw_event_listener(type_id, raw_listener));
+                }
+            }
         }
         let id = id.ok_or_else(|| JsError::new(format!("unknown event_type:{}", event_type)))?;
         Ok(id)
@@ -1006,6 +1014,11 @@ impl Element {
         self.event_registration.unregister_event_listener(id)
     }
 
+    pub fn register_js_event<T: JsEvent<ElementWeak>>(&mut self, name: &str) {
+        self.js_event_listener_factory
+            .insert(name.to_string(), T::create_listener_factory());
+    }
+
     #[js_func]
     pub fn remove_js_event_listener(&mut self, id: u32) {
         self.unregister_event_listener(id);
@@ -1347,6 +1360,7 @@ pub struct Element {
     pub tag: String,
     is_form_element: bool,
     pub allow_ime: bool,
+    js_event_listener_factory: HashMap<String, BoxJsEventListenerFactory<ElementWeak>>,
 }
 
 // js_weak_value!(Element, ElementWeak);
@@ -1397,6 +1411,7 @@ impl ElementData {
             tag: "".to_string(),
             is_form_element: false,
             allow_ime: false,
+            js_event_listener_factory: HashMap::new(),
         }
     }
 }
@@ -1473,14 +1488,6 @@ pub trait ElementBackend: 'static {
     fn on_attribute_changed(&mut self, key: &str, value: Option<&str>) {
         if let Some(base) = self.get_base_mut() {
             base.on_attribute_changed(key, value);
-        }
-    }
-
-    fn bind_js_listener(&mut self, event_type: &str, listener: JsValue) -> Option<u32> {
-        if let Some(base) = self.get_base_mut() {
-            base.bind_js_listener(event_type, listener)
-        } else {
-            None
         }
     }
 
