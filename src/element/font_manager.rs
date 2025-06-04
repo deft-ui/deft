@@ -1,5 +1,6 @@
 use crate as deft;
 use crate::element::paragraph::DEFAULT_FALLBACK_FONTS;
+use crate::font::family::{FontFamilies, FontFamily};
 use crate::font::Font;
 use crate::style::font::FontStyle;
 use deft_macros::mrc_object;
@@ -51,6 +52,15 @@ impl FontManager {
             }
         }
         result
+    }
+
+    pub fn all_font_families(&self) -> FontFamilies {
+        if let Ok(fonts) = self.source.all_families() {
+            let list = fonts.iter().map(|it| FontFamily::new(it)).collect();
+            FontFamilies::new(list)
+        } else {
+            FontFamilies::new(vec![])
+        }
     }
 
     fn get_by_family_name(
@@ -155,13 +165,28 @@ impl FontManager {
     }
 }
 
-#[test]
-fn test_font_weight() {
-    let fm = FontManager::new();
-    let font_style = skia_safe::FontStyle::bold();
-    let fonts = fm.match_best(&["fangsong"], &font_style);
-    println!("fonts count: {}", fonts.len());
-    for font in fonts {
-        println!("{}", font.attributes().weight().0);
+#[cfg(test)]
+mod tests {
+    use crate::element::font_manager::FontManager;
+
+    #[test]
+    fn test_all_font_families() {
+        let fm = FontManager::new();
+        let families = fm.all_font_families();
+        println!("All font families");
+        for fm in families.as_slice() {
+            println!("{}", fm.name());
+        }
+    }
+
+    #[test]
+    fn test_font_weight() {
+        let fm = FontManager::new();
+        let font_style = skia_safe::FontStyle::bold();
+        let fonts = fm.match_best(&["fangsong"], &font_style);
+        println!("fonts count: {}", fonts.len());
+        for font in fonts {
+            println!("{}", font.attributes().weight().0);
+        }
     }
 }
