@@ -35,7 +35,7 @@ pub const DEFAULT_FALLBACK_FONTS: &str = "sans-serif,Microsoft YaHei,Segoe UI Em
 #[cfg(target_os = "linux")]
 pub const DEFAULT_FALLBACK_FONTS: &str = "sans-serif,Noto Sans CJK SC,Noto Sans CJK TC,Noto Sans CJK HK,Noto Sans CJK KR,Noto Sans CJK JP,Noto Color Emoji";
 #[cfg(target_os = "macos")]
-pub const DEFAULT_FALLBACK_FONTS: &str = "sans-serif,PingFang SC,Apple Color Emoji";
+pub const DEFAULT_FALLBACK_FONTS: &str = "PingFang SC,Heiti SC,sans-serif,Apple Color Emoji";
 #[cfg(target_os = "android")]
 pub const DEFAULT_FALLBACK_FONTS: &str = "Roboto,Noto Sans CJK SC,Noto Sans CJK TC,Noto Sans CJK HK,Noto Sans CJK KR,Noto Sans CJK JP,Noto Color Emoji";
 #[cfg(not(any(
@@ -844,6 +844,15 @@ mod tests {
     use crate::text::TextAlign;
     use measure_time::print_time;
     use skia_safe::font_style::Weight;
+    use crate::element::common::editable::Editable;
+
+    #[test]
+    fn text_text_layout() {
+        let mut text = TextBox::new();
+        text.add_line(Editable::build_line("你好".to_string()));
+        text.layout();
+        assert_ne!(0.0, text.max_intrinsic_width());
+    }
 
     #[test]
     fn test_measure() {

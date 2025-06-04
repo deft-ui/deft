@@ -45,7 +45,7 @@ use crate::{
 pub mod body;
 pub mod button;
 pub mod checkbox;
-mod common;
+pub mod common;
 pub mod container;
 mod edit_history;
 pub mod entry;

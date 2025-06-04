@@ -168,6 +168,17 @@ impl FontManager {
 #[cfg(test)]
 mod tests {
     use crate::element::font_manager::FontManager;
+    use crate::text::textbox::DEFAULT_FALLBACK_FONTS;
+
+    // #[test]
+    fn test_default_fonts() {
+        let fm = FontManager::new();
+        let names = DEFAULT_FALLBACK_FONTS.split(",");
+        for name in names {
+            let fonts = fm.get_by_family_name(name, &skia_safe::FontStyle::normal());
+            assert!(fonts.is_some(), "Fail to load font: {:?}", name);
+        }
+    }
 
     #[test]
     fn test_all_font_families() {

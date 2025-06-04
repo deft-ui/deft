@@ -39,7 +39,7 @@ pub const DEFAULT_FALLBACK_FONTS: &str = "sans-serif,Microsoft YaHei,Segoe UI Em
 #[cfg(target_os = "linux")]
 pub const DEFAULT_FALLBACK_FONTS: &str = "sans-serif,Noto Sans CJK SC,Noto Sans CJK TC,Noto Sans CJK HK,Noto Sans CJK KR,Noto Sans CJK JP,Noto Color Emoji";
 #[cfg(target_os = "macos")]
-pub const DEFAULT_FALLBACK_FONTS: &str = "sans-serif,PingFang SC,Apple Color Emoji";
+pub const DEFAULT_FALLBACK_FONTS: &str = "PingFang SC,Heiti SC,sans-serif,Apple Color Emoji";
 #[cfg(target_os = "android")]
 pub const DEFAULT_FALLBACK_FONTS: &str = "Roboto,Noto Sans CJK SC,Noto Sans CJK TC,Noto Sans CJK HK,Noto Sans CJK KR,Noto Sans CJK JP,Noto Color Emoji";
 #[cfg(not(any(
