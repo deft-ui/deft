@@ -257,7 +257,7 @@ impl Window {
         let render_backend_types =
             RenderBackendType::merge(&render_backend_types, &RenderBackendType::all());
         let window = Self::create_window(attributes.clone(), &render_backend_types);
-        window.set_ime_allowed(true);
+        // window.set_ime_allowed(true);
         let body = Element::create(Body::create);
         let mut render_tree = HashMap::new();
         render_tree.insert(body.clone(), RenderTree::new(0));

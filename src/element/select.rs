@@ -8,6 +8,7 @@ use crate::element::label::Label;
 use crate::element::{Element, ElementBackend, ElementWeak};
 use crate::event::{ClickEvent, ClickEventListener};
 use crate::js::FromJsValue;
+use crate::mrc::Mrc;
 use crate::render::RenderFn;
 use crate::style::length::{Length, LengthOrPercent};
 use crate::style::{FixedStyleProp, ResolvedStyleProp, StylePropKey, StylePropVal};
@@ -19,6 +20,7 @@ use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::collections::HashMap;
+use std::ops::DerefMut;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct SelectOption {
@@ -174,16 +176,21 @@ impl ElementBackend for Select {
         let window = ok_or_return!(window.upgrade());
         let bounds = el.get_origin_bounds();
         if let Some(_) = event.downcast_ref::<ClickEvent>() {
+            let mut popup: Mrc<Option<Popup>> = Mrc::new(None);
+            let mut popup_mrc = popup.clone();
             let weak = self.as_weak();
             let value_setter = move |v| {
                 let mut select = ok_or_return!(weak.upgrade());
                 select.set_value(v);
+                if let Some(p) = popup_mrc.deref_mut() {
+                    let _ = p.clone().close();
+                }
             };
             let mut options_el = self.build_options_element(value_setter);
             options_el.set_style_props(vec![FixedStyleProp::MinWidth(StylePropVal::Custom(
                 LengthOrPercent::Length(Length::PX(bounds.width)),
             ))]);
-            Popup::new(options_el, bounds, &window);
+            *popup = Some(Popup::new(options_el, bounds, &window));
         }
     }
     fn accept_pseudo_element_styles(&mut self, styles: HashMap<String, Vec<ResolvedStyleProp>>) {
