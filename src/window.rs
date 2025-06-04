@@ -214,16 +214,19 @@ impl Window {
             attributes.enabled_buttons.remove(WindowButtons::MAXIMIZE);
         }
         attributes.decorations = attrs.decorations.unwrap_or(true);
-        let (default_width, default_height) = if attributes.resizable {
-            (800.0, 600.0)
-        } else {
-            (50.0, 50.0)
-        };
-        let size = LogicalSize {
-            width: attrs.width.unwrap_or(default_width) as f64,
-            height: attrs.height.unwrap_or(default_height) as f64,
-        };
-        attributes.inner_size = Some(Size::Logical(size));
+        #[cfg(desktop_platform)]
+        if attrs.width.is_some() || attrs.height.is_some() {
+            let (default_width, default_height) = if attributes.resizable {
+                (800.0, 600.0)
+            } else {
+                (50.0, 50.0)
+            };
+            let size = LogicalSize {
+                width: attrs.width.unwrap_or(default_width) as f64,
+                height: attrs.height.unwrap_or(default_height) as f64,
+            };
+            attributes.inner_size = Some(Size::Logical(size));
+        }
         #[cfg(x11_platform)]
         {
             attributes =

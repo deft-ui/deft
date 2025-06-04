@@ -226,6 +226,8 @@ function main() {
     createSystemTray();
     console.log("begin create window");
     const window = new Window({
+        width: 800,
+        height: 600,
         // decorations: false,
     });
     testWindowHandle(window);
