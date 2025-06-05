@@ -239,6 +239,8 @@ fn create_event(_attr: TokenStream, struct_def: TokenStream, target_type: TokenS
                         Box::new(move |e, ctx| {
                             if let Some(e) = e.downcast_mut::<#event_name>() {
                                 listener.handle_event(e, ctx);
+                            } else {
+                                // log::error!("invalid event type, expected type id = {:?}, actual type id = {:?}", std::any::TypeId::of::<#event_name>(), e.event_type_id());
                             }
                         }),
                     ))

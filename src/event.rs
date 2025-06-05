@@ -5,7 +5,7 @@ use crate::base;
 use crate::base::{MouseDetail, Rect, TouchDetail};
 use deft_macros::event;
 use serde::{Deserialize, Serialize};
-use std::any::Any;
+use std::any::{Any, TypeId};
 use winit::keyboard::{ModifiersState, NamedKey};
 
 pub struct Event {
@@ -23,6 +23,10 @@ impl Event {
 
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
         self.raw.downcast_ref::<T>()
+    }
+    
+    pub fn event_type_id(&self) -> TypeId {
+        self.raw.type_id()
     }
 }
 
