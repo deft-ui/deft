@@ -5,7 +5,7 @@ use crate::base::{EventContext, Rect};
 use crate::element::common::ScrollBar;
 use crate::element::scroll::Scroll;
 use crate::element::{Element, ElementWeak};
-use crate::event::{TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent};
+use crate::event::{Event, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent};
 use crate::number::DeNan;
 use crate::render::RenderFn;
 use crate::style::ResolvedStyleProp;
@@ -13,7 +13,6 @@ use crate::{is_mobile_platform, some_or_return};
 use bezier_rs::{Bezier, TValue};
 use deft_macros::mrc_object;
 use log::debug;
-use std::any::Any;
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::time::Instant;
@@ -92,7 +91,7 @@ impl Scrollable {
 
     pub fn on_event(
         &mut self,
-        event: &Box<&mut dyn Any>,
+        event: &Event,
         ctx: &mut EventContext<ElementWeak>,
         element: &Element,
     ) -> bool {

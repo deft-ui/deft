@@ -10,7 +10,7 @@ use crate::element::text::intersect_range;
 use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
 use crate::element::{ElementBackend, ElementWeak};
 use crate::event::{
-    ClickEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
+    ClickEvent, Event, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
     KEY_MOD_CTRL,
 };
 use crate::font::family::{FontFamilies, FontFamily};
@@ -28,7 +28,6 @@ use crate::{base, js_deserialize, js_serialize, some_or_continue};
 use serde::{Deserialize, Serialize};
 use skia_safe::font_style::{Weight, Width};
 use skia_safe::{Color, Paint};
-use std::any::Any;
 
 #[cfg(target_os = "windows")]
 pub const DEFAULT_FALLBACK_FONTS: &str = "sans-serif,Microsoft YaHei,Segoe UI Emoji";
@@ -440,7 +439,7 @@ impl TextBox {
 
     pub fn on_event(
         &mut self,
-        event: &Box<&mut dyn Any>,
+        event: &Event,
         _ctx: &mut EventContext<ElementWeak>,
         scroll_x: f32,
         scroll_y: f32,

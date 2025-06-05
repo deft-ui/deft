@@ -6,7 +6,7 @@ use crate::element::common::image_object::ImageObject;
 use crate::element::container::Container;
 use crate::element::label::Label;
 use crate::element::{Element, ElementBackend, ElementWeak};
-use crate::event::{ClickEvent, ClickEventListener};
+use crate::event::{ClickEvent, ClickEventListener, Event};
 use crate::mrc::Mrc;
 use crate::render::RenderFn;
 use crate::style::length::{Length, LengthOrPercent};
@@ -16,7 +16,6 @@ use crate::window::popup::Popup;
 use crate::{js_deserialize, js_serialize, ok_or_return, some_or_return};
 use deft_macros::{element_backend, event, js_methods};
 use serde::{Deserialize, Serialize};
-use std::any::Any;
 use std::collections::HashMap;
 use std::ops::DerefMut;
 
@@ -169,7 +168,7 @@ impl ElementBackend for Select {
         })
     }
 
-    fn on_event(&mut self, event: &mut Box<&mut dyn Any>, _ctx: &mut EventContext<ElementWeak>) {
+    fn on_event(&mut self, event: &mut Event, _ctx: &mut EventContext<ElementWeak>) {
         let el = ok_or_return!(self.element_weak.upgrade());
         let window = some_or_return!(el.get_window());
         let window = ok_or_return!(window.upgrade());

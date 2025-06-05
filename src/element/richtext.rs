@@ -1,13 +1,14 @@
 use crate as deft;
 use crate::base::EventContext;
 use crate::element::{Element, ElementBackend, ElementWeak};
+use crate::event::Event;
 use crate::ok_or_return;
 use crate::render::RenderFn;
 use crate::style::StylePropKey;
 use crate::text::textbox::{TextBox, TextCoord, TextElement};
 use deft_macros::{element_backend, js_methods};
-use std::any::Any;
 use yoga::Size;
+
 #[element_backend]
 pub struct RichText {
     element: ElementWeak,
@@ -135,7 +136,7 @@ impl ElementBackend for RichText {
         self.text_box.render()
     }
 
-    fn on_event(&mut self, event: &mut Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
+    fn on_event(&mut self, event: &mut Event, ctx: &mut EventContext<ElementWeak>) {
         self.text_box.on_event(&event, ctx, 0.0, 0.0);
     }
 }

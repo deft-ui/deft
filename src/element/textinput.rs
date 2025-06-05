@@ -2,11 +2,11 @@ use crate as deft;
 use crate::base::EventContext;
 use crate::element::common::editable::{Editable, InputType};
 use crate::element::{Element, ElementBackend, ElementWeak};
+use crate::event::Event;
 use crate::ok_or_return;
 use crate::style::length::LengthOrPercent;
 use crate::style::{FixedStyleProp, ResolvedStyleProp, StylePropVal};
 use deft_macros::{element_backend, js_methods};
-use std::any::Any;
 use std::collections::HashMap;
 use yoga::FlexDirection;
 
@@ -91,7 +91,7 @@ impl ElementBackend for TextInput {
         None
     }
 
-    fn on_event(&mut self, event: &mut Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
+    fn on_event(&mut self, event: &mut Event, ctx: &mut EventContext<ElementWeak>) {
         // let el = ok_or_return!(self.element.upgrade());
         if ctx.target == self.element {
             let eb = self.editable_element.get_bounds();

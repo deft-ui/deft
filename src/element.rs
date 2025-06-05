@@ -25,7 +25,7 @@ use crate::element::scroll::{Scroll, ScrollBarStrategy};
 use crate::event::{
     BlurEventListener, BoundsChangeEvent, BoundsChangeEventListener, ClickEventListener,
     ContextMenuEventListener, DragOverEventListener, DragStartEventListener, DropEventListener,
-    DroppedFileEventListener, FocusEventListener, FocusShiftEventListener,
+    DroppedFileEventListener, Event, FocusEventListener, FocusShiftEventListener,
     HoveredFileEventListener, KeyDownEventListener, KeyUpEventListener, MouseDownEvent,
     MouseDownEventListener, MouseEnterEvent, MouseEnterEventListener, MouseLeaveEvent,
     MouseLeaveEventListener, MouseMoveEventListener, MouseUpEventListener, MouseWheelEventListener,
@@ -1025,19 +1025,18 @@ impl Element {
         self.unregister_event_listener(id);
     }
 
-    pub fn emit<T: ViewEvent + 'static>(&mut self, event: T) {
+    pub fn emit<T: ViewEvent + 'static>(&self, event: T) {
         let event_type_id = TypeId::of::<T>();
-        self.emit_raw(event_type_id, Box::new(event));
+        self.emit_raw(event_type_id, Event::new(event));
     }
 
-    pub fn emit_raw(&mut self, event_type_id: TypeId, mut event: Box<dyn Any>) {
+    pub fn emit_raw(&self, event_type_id: TypeId, mut event: Event) {
         let mut me = self.clone();
         let callback = create_event_loop_callback(move || {
             let mut ctx = EventContext::new(me.as_weak());
-            let e = event.deref_mut();
-            me.handle_event(event_type_id, &mut Box::new(e), &mut ctx);
+            me.handle_event(event_type_id, &mut event, &mut ctx);
             if !ctx.prevent_default {
-                me.handle_default_behavior(&mut Box::new(e), &mut ctx);
+                me.handle_default_behavior(&mut event, &mut ctx);
             }
         });
         callback.call();
@@ -1050,7 +1049,7 @@ impl Element {
     fn handle_event(
         &mut self,
         event_type_id: TypeId,
-        event: &mut Box<&mut (dyn Any)>,
+        event: &mut Event,
         ctx: &mut EventContext<ElementWeak>,
     ) {
         if self.is_form_element && is_form_event(&event) && self.is_disabled() {
@@ -1092,11 +1091,7 @@ impl Element {
         }
     }
 
-    fn handle_default_behavior(
-        &mut self,
-        event: &mut Box<&mut dyn Any>,
-        ctx: &mut EventContext<ElementWeak>,
-    ) {
+    fn handle_default_behavior(&mut self, event: &mut Event, ctx: &mut EventContext<ElementWeak>) {
         if event.downcast_ref::<MouseDownEvent>().is_some()
             || event.downcast_ref::<TouchStartEvent>().is_some()
         {
@@ -1201,10 +1196,10 @@ impl Element {
             // Disable bubble
             let mut ctx = EventContext::new(self.as_weak());
             ctx.propagation_cancelled = true;
-            let mut event = BoundsChangeEvent {
+            let event = BoundsChangeEvent {
                 origin_bounds: origin_bounds.clone(),
             };
-            self.event_registration.emit(&mut event, &mut ctx);
+            self.event_registration.emit(event, &mut ctx);
         }
         //TODO performance: maybe not changed?
         //TODO change is_visible?
@@ -1293,7 +1288,7 @@ impl Element {
 
 impl ElementWeak {
     pub fn emit<T: ViewEvent + 'static>(&self, event: T) {
-        if let Ok(mut el) = self.upgrade() {
+        if let Ok(el) = self.upgrade() {
             el.emit(event);
         }
     }
@@ -1459,7 +1454,7 @@ pub trait ElementBackend: 'static {
         }
     }
 
-    fn on_event(&mut self, event: &mut Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
+    fn on_event(&mut self, event: &mut Event, ctx: &mut EventContext<ElementWeak>) {
         if let Some(base) = self.get_base_mut() {
             base.on_event(event, ctx);
         }
@@ -1467,7 +1462,7 @@ pub trait ElementBackend: 'static {
 
     fn execute_default_behavior(
         &mut self,
-        event: &mut Box<&mut dyn Any>,
+        event: &mut Event,
         ctx: &mut EventContext<ElementWeak>,
     ) -> bool {
         if let Some(base) = self.get_base_mut() {

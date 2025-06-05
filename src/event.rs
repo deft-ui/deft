@@ -5,7 +5,26 @@ use crate::base;
 use crate::base::{MouseDetail, Rect, TouchDetail};
 use deft_macros::event;
 use serde::{Deserialize, Serialize};
+use std::any::Any;
 use winit::keyboard::{ModifiersState, NamedKey};
+
+pub struct Event {
+    raw: Box<dyn Any>,
+}
+
+impl Event {
+    pub fn new<T: 'static>(raw: T) -> Self {
+        Self { raw: Box::new(raw) }
+    }
+
+    pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        self.raw.downcast_mut::<T>()
+    }
+
+    pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
+        self.raw.downcast_ref::<T>()
+    }
+}
 
 pub const KEY_MOD_CTRL: u32 = 0x1;
 pub const KEY_MOD_ALT: u32 = 0x1 << 1;

@@ -4,7 +4,7 @@ use crate::ext::common::create_event_handler;
 use crate::js::js_serde::JsValueSerializer;
 use crate::js::{FromJsValue, ToJsValue};
 use crate::number::DeNan;
-use crate::{js_deserialize, js_serialize, some_or_return};
+use crate::{event, js_deserialize, js_serialize, some_or_return};
 use anyhow::Error;
 use log::error;
 use quick_js::{JsValue, ValueError};
@@ -339,6 +339,7 @@ impl<T> EventContext<T> {
     }
 }
 
+#[deprecated]
 pub struct Event<T> {
     pub event_type: String,
     pub detail: Box<dyn EventDetail>,
@@ -400,7 +401,7 @@ impl CaretDetail {
 
 pub type EventHandler<E> = dyn FnMut(&mut Event<E>);
 
-pub type BoxEventListener<E> = Box<dyn FnMut(&mut Box<&mut dyn Any>, &mut EventContext<E>)>;
+pub type BoxEventListener<E> = Box<dyn FnMut(&mut event::Event, &mut EventContext<E>)>;
 
 pub type BoxJsEventListenerFactory<T> =
     Box<dyn FnMut(JsValue) -> Option<(TypeId, BoxEventListener<T>)>>;
@@ -416,13 +417,8 @@ pub trait EventListener<T, E> {
 pub struct EventRegistration<E> {
     listeners: HashMap<String, Vec<(u32, Box<EventHandler<E>>)>>,
     next_listener_id: u32,
-    typed_listeners: HashMap<
-        TypeId,
-        Vec<(
-            u32,
-            Box<dyn FnMut(&mut Box<&mut dyn Any>, &mut EventContext<E>)>,
-        )>,
-    >,
+    typed_listeners:
+        HashMap<TypeId, Vec<(u32, Box<dyn FnMut(&mut event::Event, &mut EventContext<E>)>)>>,
     listener_types: HashMap<u32, TypeId>,
 }
 
@@ -441,13 +437,11 @@ impl<E> EventRegistration<E> {
         mut listener: H,
     ) -> u32 {
         let event_type_id = TypeId::of::<T>();
-        let wrapper_listener = Box::new(
-            move |d: &mut Box<&mut dyn Any>, ctx: &mut EventContext<E>| {
-                if let Some(t) = d.downcast_mut::<T>() {
-                    listener.handle_event(t, ctx);
-                }
-            },
-        );
+        let wrapper_listener = Box::new(move |d: &mut event::Event, ctx: &mut EventContext<E>| {
+            if let Some(t) = d.downcast_mut::<T>() {
+                listener.handle_event(t, ctx);
+            }
+        });
         self.register_raw_event_listener(event_type_id, wrapper_listener)
     }
 
@@ -474,15 +468,15 @@ impl<E> EventRegistration<E> {
         }
     }
 
-    pub fn emit<T: 'static>(&mut self, event: &mut T, ctx: &mut EventContext<E>) {
+    pub fn emit<T: 'static>(&mut self, event: T, ctx: &mut EventContext<E>) {
         let event_type_id = TypeId::of::<T>();
-        self.emit_raw(event_type_id, &mut Box::new(event), ctx);
+        self.emit_raw(event_type_id, &mut event::Event::new(event), ctx);
     }
 
     pub fn emit_raw(
         &mut self,
         event_type_id: TypeId,
-        event: &mut Box<&mut dyn Any>,
+        event: &mut event::Event,
         ctx: &mut EventContext<E>,
     ) {
         if let Some(listeners) = self.typed_listeners.get_mut(&event_type_id) {
@@ -718,7 +712,7 @@ mod tests {
         let mut er: EventRegistration<()> = EventRegistration::new();
         er.register_event_listener(MyEventListener {});
         er.emit(
-            &mut MyEvent {
+            MyEvent {
                 value: Rc::clone(&value),
             },
             &mut EventContext::new(()),

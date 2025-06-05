@@ -10,8 +10,8 @@ use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
 use crate::element::text::{intersect_range, ColOffset};
 use crate::element::{Element, ElementBackend, ElementWeak};
 use crate::event::{
-    FocusShiftEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
-    SelectEndEvent, SelectMoveEvent, SelectStartEvent, KEY_MOD_CTRL,
+    Event, FocusShiftEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent,
+    MouseUpEvent, SelectEndEvent, SelectMoveEvent, SelectStartEvent, KEY_MOD_CTRL,
 };
 use crate::font::family::{FontFamilies, FontFamily};
 use crate::number::DeNan;
@@ -761,7 +761,7 @@ impl ElementBackend for Paragraph {
 
     fn execute_default_behavior(
         &mut self,
-        event: &mut Box<&mut dyn Any>,
+        event: &mut Event,
         ctx: &mut EventContext<ElementWeak>,
     ) -> bool {
         if let Some(d) = event.downcast_ref::<KeyDownEvent>() {

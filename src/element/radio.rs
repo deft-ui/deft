@@ -4,12 +4,11 @@ use crate::element::container::Container;
 use crate::element::image::Image;
 use crate::element::label::Label;
 use crate::element::{Element, ElementBackend, ElementWeak};
-use crate::event::ClickEvent;
+use crate::event::{ClickEvent, Event};
 use crate::style::length::LengthOrPercent;
 use crate::style::{FixedStyleProp, ResolvedStyleProp, StylePropVal};
 use crate::{ok_or_return, some_or_return};
 use deft_macros::{element_backend, event, js_methods};
-use std::any::Any;
 use std::collections::HashMap;
 use yoga::{Align, Display, FlexDirection};
 
@@ -150,7 +149,7 @@ impl ElementBackend for Radio {
         Some(&mut self.base)
     }
 
-    fn on_event(&mut self, event: &mut Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
+    fn on_event(&mut self, event: &mut Event, ctx: &mut EventContext<ElementWeak>) {
         if event.downcast_ref::<ClickEvent>().is_some() {
             self.update_checked(true);
         } else {

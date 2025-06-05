@@ -7,12 +7,11 @@ use crate::base::{EventContext, Rect};
 use crate::canvas_util::CanvasHelper;
 use crate::element::scroll::ScrollBarStrategy;
 use crate::element::ElementWeak;
-use crate::event::{MouseDownEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent};
+use crate::event::{Event, MouseDownEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent};
 use crate::render::RenderFn;
 use crate::timer::{set_interval, set_timeout, TimerHandle};
 use deft_macros::mrc_object;
 use skia_safe::{Color, Paint, PaintStyle};
-use std::any::Any;
 
 pub enum ScrollBarDirection {
     Horizontal,
@@ -164,11 +163,7 @@ impl ScrollBar {
         self.track_rect.contains_point(x, y)
     }
 
-    pub fn on_event(
-        &mut self,
-        event: &Box<&mut dyn Any>,
-        _ctx: &mut EventContext<ElementWeak>,
-    ) -> bool {
+    pub fn on_event(&mut self, event: &Event, _ctx: &mut EventContext<ElementWeak>) -> bool {
         if let Some(e) = event.downcast_ref::<MouseDownEvent>() {
             let d = e.0;
             self.on_mouse_down(d.offset_x, d.offset_y)

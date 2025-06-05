@@ -4,7 +4,7 @@ use crate::base::EventContext;
 use crate::element::container::Container;
 use crate::element::scroll::ScrollBarStrategy::{Always, Auto, Never};
 use crate::element::{Element, ElementBackend, ElementWeak};
-use crate::event::CaretChangeEvent;
+use crate::event::{CaretChangeEvent, Event};
 use crate::js::FromJsValue;
 use crate::render::RenderFn;
 use crate::style::ResolvedStyleProp;
@@ -14,7 +14,6 @@ use deft_macros::{element_backend, js_methods};
 use log::debug;
 use quick_js::{JsValue, ValueError};
 use serde::{Deserialize, Serialize};
-use std::any::Any;
 use std::collections::HashMap;
 use std::time::Instant;
 use yoga::{MeasureMode, NodeRef, Size};
@@ -352,7 +351,7 @@ impl ElementBackend for Scroll {
          */
     }
 
-    fn on_event(&mut self, event: &mut Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
+    fn on_event(&mut self, event: &mut Event, ctx: &mut EventContext<ElementWeak>) {
         let element = ok_or_return!(self.element.upgrade());
         element.clone().scrollable.on_event(&event, ctx, &element);
     }

@@ -7,9 +7,9 @@ use crate::element::scroll::ScrollBarStrategy;
 use crate::element::util::is_form_event;
 use crate::element::{Element, ElementBackend, ElementWeak};
 use crate::event::{
-    BlurEvent, BoundsChangeEvent, CaretChangeEvent, FocusEvent, KeyDownEvent, KeyEventDetail,
-    MouseLeaveEvent, MouseMoveEvent, ScrollEvent, TextChangeEvent, TextInputEvent, TextUpdateEvent,
-    KEY_MOD_CTRL, KEY_MOD_SHIFT,
+    BlurEvent, BoundsChangeEvent, CaretChangeEvent, Event, FocusEvent, KeyDownEvent,
+    KeyEventDetail, MouseLeaveEvent, MouseMoveEvent, ScrollEvent, TextChangeEvent, TextInputEvent,
+    TextUpdateEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT,
 };
 use crate::event_loop::create_event_loop_proxy;
 use crate::js::{FromJsValue, ToJsValue};
@@ -26,7 +26,6 @@ use deft_macros::{element_backend, js_methods};
 use quick_js::{JsValue, ValueError};
 use serde::{Deserialize, Serialize};
 use skia_safe::{Color, Paint};
-use std::any::Any;
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -303,7 +302,7 @@ impl Entry {
         let origin_bounds =
             bounds.translate(origin_bounds.x + border_left, origin_bounds.y + border_top);
 
-        let mut element = ok_or_return!(self.element.upgrade_mut());
+        let element = ok_or_return!(self.element.upgrade_mut());
         element.emit(CaretChangeEvent {
             row: caret.0,
             col: caret.1,
@@ -811,7 +810,7 @@ impl ElementBackend for Entry {
         })
     }
 
-    fn on_event(&mut self, event: &mut Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
+    fn on_event(&mut self, event: &mut Event, ctx: &mut EventContext<ElementWeak>) {
         if self.disabled && is_form_event(&event) {
             ctx.propagation_cancelled = true;
             return;

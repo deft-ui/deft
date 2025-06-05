@@ -2,10 +2,10 @@ use crate as deft;
 use crate::base::{EventContext, Rect};
 use crate::element::container::Container;
 use crate::element::{Element, ElementBackend, ElementWeak};
+use crate::event::Event;
 use crate::render::RenderFn;
 use crate::style::StylePropKey;
 use deft_macros::{element_backend, js_methods};
-use std::any::Any;
 
 #[element_backend]
 pub struct Button {
@@ -42,7 +42,7 @@ impl ElementBackend for Button {
 
     fn execute_default_behavior(
         &mut self,
-        event: &mut Box<&mut dyn Any>,
+        event: &mut Event,
         ctx: &mut EventContext<ElementWeak>,
     ) -> bool {
         self.base.execute_default_behavior(event, ctx)

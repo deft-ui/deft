@@ -766,7 +766,7 @@ impl Window {
     }
 
     fn handle_mouse_wheel(&mut self, delta: (f32, f32)) {
-        let (mut target_node, _, _) = self.get_node_by_point();
+        let (target_node, _, _) = self.get_node_by_point();
         target_node.emit(MouseWheelEvent {
             cols: delta.0,
             rows: delta.1,
@@ -1009,7 +1009,7 @@ impl Window {
         window_y: f64,
         path: String,
     ) -> Option<()> {
-        let (mut node, _relative_x, _relative_y) =
+        let (node, _relative_x, _relative_y) =
             self.get_node_by_pos(window_x as f32, window_y as f32)?;
         node.emit(DroppedFileEvent(path));
         Some(())
@@ -1021,7 +1021,7 @@ impl Window {
         window_y: f64,
         path: String,
     ) -> Option<()> {
-        let (mut node, _relative_x, _relative_y) =
+        let (node, _relative_x, _relative_y) =
             self.get_node_by_pos(window_x as f32, window_y as f32)?;
         node.emit(HoveredFileEvent(path));
         Some(())
@@ -1034,7 +1034,7 @@ impl Window {
         window_x: f32,
         window_y: f32,
     ) -> Option<()> {
-        if let Some((mut node, relative_x, relative_y)) = self.get_node_by_pos(window_x, window_y) {
+        if let Some((node, relative_x, relative_y)) = self.get_node_by_pos(window_x, window_y) {
             let _e_type = match phase {
                 TouchPhase::Started => "touchstart",
                 TouchPhase::Ended => "touchend",
@@ -1401,9 +1401,9 @@ impl Window {
         });
     }
 
-    pub fn emit<T: 'static>(&mut self, mut event: T) -> EventContext<WindowWeak> {
+    pub fn emit<T: 'static>(&mut self, event: T) -> EventContext<WindowWeak> {
         let mut ctx = EventContext::new(self.as_weak());
-        self.event_registration.emit(&mut event, &mut ctx);
+        self.event_registration.emit(event, &mut ctx);
         ctx
     }
 
