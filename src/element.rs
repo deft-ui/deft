@@ -1436,7 +1436,9 @@ pub trait ElementBackend: 'static {
     where
         Self: Sized;
 
-    fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend>;
+    fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend> {
+        None
+    }
 
     fn handle_style_changed(&mut self, key: StylePropKey) {
         if let Some(base) = self.get_base_mut() {
