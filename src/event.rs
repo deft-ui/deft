@@ -9,12 +9,16 @@ use std::any::{Any, TypeId};
 use winit::keyboard::{ModifiersState, NamedKey};
 
 pub struct Event {
+    event_type_id: TypeId,
     raw: Box<dyn Any>,
 }
 
 impl Event {
     pub fn new<T: 'static>(raw: T) -> Self {
-        Self { raw: Box::new(raw) }
+        Self {
+            raw: Box::new(raw),
+            event_type_id: TypeId::of::<T>(),
+        }
     }
 
     pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
@@ -26,7 +30,7 @@ impl Event {
     }
     
     pub fn event_type_id(&self) -> TypeId {
-        self.raw.type_id()
+        self.event_type_id
     }
 }
 
