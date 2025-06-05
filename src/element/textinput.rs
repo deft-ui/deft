@@ -91,7 +91,7 @@ impl ElementBackend for TextInput {
         None
     }
 
-    fn on_event(&mut self, event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
+    fn on_event(&mut self, event: &mut Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
         // let el = ok_or_return!(self.element.upgrade());
         if ctx.target == self.element {
             let eb = self.editable_element.get_bounds();

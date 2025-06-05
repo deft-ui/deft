@@ -169,7 +169,7 @@ impl ElementBackend for Select {
         })
     }
 
-    fn on_event(&mut self, event: Box<&mut dyn Any>, _ctx: &mut EventContext<ElementWeak>) {
+    fn on_event(&mut self, event: &mut Box<&mut dyn Any>, _ctx: &mut EventContext<ElementWeak>) {
         let el = ok_or_return!(self.element_weak.upgrade());
         let window = some_or_return!(el.get_window());
         let window = ok_or_return!(window.upgrade());

@@ -49,10 +49,18 @@ impl EventLoopCallback {
     }
 }
 
-#[derive(Clone)]
 pub struct EventLoopFnMutCallback<P> {
     event_loop_proxy: AppEventProxy,
     callback: Arc<Mutex<UnsafeFnMut<P>>>,
+}
+
+impl<P> Clone for EventLoopFnMutCallback<P> {
+    fn clone(&self) -> Self {
+        Self {
+            event_loop_proxy: self.event_loop_proxy.clone(),
+            callback: self.callback.clone(),
+        }
+    }
 }
 
 impl<P: Send + Sync + 'static> EventLoopFnMutCallback<P> {

@@ -571,7 +571,7 @@ impl Editable {
 
     pub fn handle_event(
         &mut self,
-        event: Box<&mut dyn Any>,
+        event: &mut Box<&mut dyn Any>,
         ctx: &mut EventContext<ElementWeak>,
         scroll_offset: (f32, f32),
     ) {
@@ -756,7 +756,7 @@ impl ElementBackend for Editable {
         })
     }
 
-    fn on_event(&mut self, event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
+    fn on_event(&mut self, event: &mut Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
         self.handle_event(event, ctx, (0.0, 0.0));
     }
 

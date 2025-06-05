@@ -761,7 +761,7 @@ impl ElementBackend for Paragraph {
 
     fn execute_default_behavior(
         &mut self,
-        event: &mut Box<dyn Any>,
+        event: &mut Box<&mut dyn Any>,
         ctx: &mut EventContext<ElementWeak>,
     ) -> bool {
         if let Some(d) = event.downcast_ref::<KeyDownEvent>() {

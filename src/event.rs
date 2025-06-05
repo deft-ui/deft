@@ -1,3 +1,5 @@
+pub mod event_emitter;
+
 use crate as deft;
 use crate::base;
 use crate::base::{MouseDetail, Rect, TouchDetail};

@@ -318,6 +318,7 @@ pub struct EventContext<T> {
     pub target: T,
     pub propagation_cancelled: bool,
     pub prevent_default: bool,
+    pub allow_bubbles: bool,
 }
 
 impl<T> EventContext<T> {
@@ -329,6 +330,7 @@ impl<T> EventContext<T> {
             target,
             propagation_cancelled: false,
             prevent_default: false,
+            allow_bubbles: true,
         }
     }
 
@@ -474,10 +476,18 @@ impl<E> EventRegistration<E> {
 
     pub fn emit<T: 'static>(&mut self, event: &mut T, ctx: &mut EventContext<E>) {
         let event_type_id = TypeId::of::<T>();
+        self.emit_raw(event_type_id, &mut Box::new(event), ctx);
+    }
+
+    pub fn emit_raw(
+        &mut self,
+        event_type_id: TypeId,
+        event: &mut Box<&mut dyn Any>,
+        ctx: &mut EventContext<E>,
+    ) {
         if let Some(listeners) = self.typed_listeners.get_mut(&event_type_id) {
-            let mut event = Box::new(event as &mut dyn Any);
             for it in listeners {
-                (it.1)(&mut event, ctx);
+                (it.1)(event, ctx);
             }
         }
     }

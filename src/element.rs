@@ -78,6 +78,7 @@ use crate::element::select::Select;
 use crate::element::textedit::TextEdit;
 use crate::element::textinput::TextInput;
 use crate::element::util::is_form_event;
+use crate::event::event_emitter::EventEmitter;
 use crate::js::JsError;
 use crate::paint::MatrixCalculator;
 use crate::render::RenderFn;
@@ -1024,29 +1025,39 @@ impl Element {
         self.unregister_event_listener(id);
     }
 
-    pub fn emit<T: ViewEvent + 'static>(&mut self, mut event: T) {
+    pub fn emit<T: ViewEvent + 'static>(&mut self, event: T) {
+        let event_type_id = TypeId::of::<T>();
+        self.emit_raw(event_type_id, Box::new(event));
+    }
+
+    pub fn emit_raw(&mut self, event_type_id: TypeId, mut event: Box<dyn Any>) {
         let mut me = self.clone();
         let callback = create_event_loop_callback(move || {
             let mut ctx = EventContext::new(me.as_weak());
-            me.handle_event(&mut event, &mut ctx);
+            let e = event.deref_mut();
+            me.handle_event(event_type_id, &mut Box::new(e), &mut ctx);
             if !ctx.prevent_default {
-                let mut e: Box<dyn Any> = Box::new(event);
-                me.handle_default_behavior(&mut e, &mut ctx);
+                me.handle_default_behavior(&mut Box::new(e), &mut ctx);
             }
         });
         callback.call();
     }
 
-    fn handle_event<T: ViewEvent + 'static>(
+    pub fn create_event_emitter(&mut self) -> EventEmitter {
+        EventEmitter::new(&self)
+    }
+
+    fn handle_event(
         &mut self,
-        event: &mut T,
+        event_type_id: TypeId,
+        event: &mut Box<&mut (dyn Any)>,
         ctx: &mut EventContext<ElementWeak>,
     ) {
-        if self.is_form_element && is_form_event(&Box::new(event)) && self.is_disabled() {
+        if self.is_form_element && is_form_event(&event) && self.is_disabled() {
             ctx.propagation_cancelled = true;
             return;
         }
-        if TypeId::of::<T>() == TypeId::of::<MouseEnterEvent>() {
+        if event_type_id == TypeId::of::<MouseEnterEvent>() {
             self.hover = true;
             //TODO optimize performance
             if !self.parent.is_element() {
@@ -1055,7 +1066,7 @@ impl Element {
             if self.style_list.has_hover_style() {
                 self.mark_style_dirty();
             }
-        } else if TypeId::of::<T>() == TypeId::of::<MouseLeaveEvent>() {
+        } else if event_type_id == TypeId::of::<MouseLeaveEvent>() {
             self.hover = false;
             //TODO optimize performance
             //FIXME style may not be updated if event stop propagates?
@@ -1066,17 +1077,16 @@ impl Element {
                 self.mark_style_dirty();
             }
         }
-        let e: Box<&mut dyn Any> = Box::new(event);
         let me = self.clone();
-        if !self.scrollable.on_event(&e, ctx, &me) {
+        if !self.scrollable.on_event(&event, ctx, &me) {
             let backend = self.get_backend_mut();
-            backend.on_event(e, ctx);
+            backend.on_event(event, ctx);
         }
         if !ctx.propagation_cancelled {
-            self.event_registration.emit(event, ctx);
-            if event.allow_bubbles() && !ctx.propagation_cancelled {
+            self.event_registration.emit_raw(event_type_id, event, ctx);
+            if ctx.allow_bubbles && !ctx.propagation_cancelled {
                 if let Some(mut p) = self.get_parent() {
-                    p.handle_event(event, ctx);
+                    p.handle_event(event_type_id, event, ctx);
                 }
             }
         }
@@ -1084,7 +1094,7 @@ impl Element {
 
     fn handle_default_behavior(
         &mut self,
-        event: &mut Box<dyn Any>,
+        event: &mut Box<&mut dyn Any>,
         ctx: &mut EventContext<ElementWeak>,
     ) {
         if event.downcast_ref::<MouseDownEvent>().is_some()
@@ -1449,7 +1459,7 @@ pub trait ElementBackend: 'static {
         }
     }
 
-    fn on_event(&mut self, event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
+    fn on_event(&mut self, event: &mut Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
         if let Some(base) = self.get_base_mut() {
             base.on_event(event, ctx);
         }
@@ -1457,7 +1467,7 @@ pub trait ElementBackend: 'static {
 
     fn execute_default_behavior(
         &mut self,
-        event: &mut Box<dyn Any>,
+        event: &mut Box<&mut dyn Any>,
         ctx: &mut EventContext<ElementWeak>,
     ) -> bool {
         if let Some(base) = self.get_base_mut() {

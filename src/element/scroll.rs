@@ -183,7 +183,7 @@ impl ElementBackend for Scroll {
     /*
     fn execute_default_behavior(
         &mut self,
-        event: &mut Box<dyn Any>,
+        event: &mut Box<&mut dyn Any>
         ctx: &mut EventContext<ElementWeak>,
     ) -> bool {
         let is_target_self = ctx.target == self.element;
@@ -352,7 +352,7 @@ impl ElementBackend for Scroll {
          */
     }
 
-    fn on_event(&mut self, event: Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
+    fn on_event(&mut self, event: &mut Box<&mut dyn Any>, ctx: &mut EventContext<ElementWeak>) {
         let element = ok_or_return!(self.element.upgrade());
         element.clone().scrollable.on_event(&event, ctx, &element);
     }
