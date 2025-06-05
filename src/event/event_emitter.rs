@@ -32,7 +32,9 @@ impl EventEmitter {
     pub fn emit<T: ViewEvent + Send + Sync + 'static>(&self, event: T) {
         let type_id = TypeId::of::<T>();
         let mut emitter = self.emitter.lock().unwrap();
-        let event_wrapper = EventWrapper { event: Event::new(event) };
+        let event_wrapper = EventWrapper {
+            event: Event::new(event),
+        };
         emitter.call((type_id, event_wrapper));
     }
 }

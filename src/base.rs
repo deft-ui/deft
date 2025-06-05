@@ -481,7 +481,11 @@ impl<E> EventRegistration<E> {
     ) {
         if let Some(listeners) = self.typed_listeners.get_mut(&event_type_id) {
             if event_type_id != event.event_type_id() {
-                log::error!("invalid event detected, expected type id = {:?}, actual type id = {:?}", event_type_id, event.event_type_id());                
+                log::error!(
+                    "invalid event detected, expected type id = {:?}, actual type id = {:?}",
+                    event_type_id,
+                    event.event_type_id()
+                );
             }
             for it in listeners {
                 (it.1)(event, ctx);

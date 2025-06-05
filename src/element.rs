@@ -411,7 +411,11 @@ impl Element {
         if id.is_none() {
             if let Some(factory) = self.js_event_listener_factory.get_mut(&event_type) {
                 if let Some((type_id, raw_listener)) = factory(listener.clone()) {
-                    log::debug!("event listener added: name = {}, type_id = {:?}", &event_type, type_id);
+                    log::debug!(
+                        "event listener added: name = {}, type_id = {:?}",
+                        &event_type,
+                        type_id
+                    );
                     return Ok(self
                         .event_registration
                         .register_raw_event_listener(type_id, raw_listener));

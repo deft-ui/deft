@@ -28,7 +28,7 @@ impl Event {
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
         self.raw.downcast_ref::<T>()
     }
-    
+
     pub fn event_type_id(&self) -> TypeId {
         self.event_type_id
     }
