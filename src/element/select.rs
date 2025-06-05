@@ -173,7 +173,7 @@ impl ElementBackend for Select {
         let window = some_or_return!(el.get_window());
         let window = ok_or_return!(window.upgrade());
         let bounds = el.get_origin_bounds();
-        if let Some(_) = event.downcast_ref::<ClickEvent>() {
+        if let Some(_) = ClickEvent::cast(event) {
             let mut popup: Mrc<Option<Popup>> = Mrc::new(None);
             let mut popup_mrc = popup.clone();
             let weak = self.as_weak();

@@ -150,7 +150,7 @@ impl ElementBackend for Radio {
     }
 
     fn on_event(&mut self, event: &mut Event, ctx: &mut EventContext<ElementWeak>) {
-        if event.downcast_ref::<ClickEvent>().is_some() {
+        if ClickEvent::is(event) {
             self.update_checked(true);
         } else {
             self.base.on_event(event, ctx);

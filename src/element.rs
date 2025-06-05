@@ -1092,9 +1092,7 @@ impl Element {
     }
 
     fn handle_default_behavior(&mut self, event: &mut Event, ctx: &mut EventContext<ElementWeak>) {
-        if event.downcast_ref::<MouseDownEvent>().is_some()
-            || event.downcast_ref::<TouchStartEvent>().is_some()
-        {
+        if MouseDownEvent::is(event) || TouchStartEvent::is(event) {
             if self.as_weak() == ctx.target {
                 if let Some(win) = self.get_window() {
                     if let Ok(mut win) = win.upgrade_mut() {

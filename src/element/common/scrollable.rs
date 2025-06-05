@@ -104,7 +104,7 @@ impl Scrollable {
         if accepted {
             CONSUMED_EVENT_ID.set(event_id);
         } else if event_id != CONSUMED_EVENT_ID.get() {
-            if let Some(e) = event.downcast_ref::<TouchStartEvent>() {
+            if let Some(e) = TouchStartEvent::cast(event) {
                 // debug!("touch start: {:?}", e.0);
                 let d = &e.0;
                 let touch = unsafe { d.touches.get_unchecked(0) };
@@ -124,7 +124,7 @@ impl Scrollable {
                 self.momentum_animation_instance = None;
                 CONSUMED_EVENT_ID.set(event_id);
                 return false;
-            } else if let Some(e) = event.downcast_ref::<TouchMoveEvent>() {
+            } else if let Some(e) = TouchMoveEvent::cast(event) {
                 // debug!("touch move: {:?}", e.0);
                 let d = &e.0;
                 let touch = unsafe { d.touches.get_unchecked(0) };
@@ -149,7 +149,7 @@ impl Scrollable {
                 }
                 CONSUMED_EVENT_ID.set(event_id);
                 return false;
-            } else if let Some(e) = event.downcast_ref::<TouchEndEvent>() {
+            } else if let Some(e) = TouchEndEvent::cast(event) {
                 debug!("touch end: {:?} {}", e.0, self.momentum_info.is_some());
                 if let Some(momentum_info) = &self.momentum_info {
                     let duration =
@@ -192,7 +192,7 @@ impl Scrollable {
                 self.end_scroll();
                 CONSUMED_EVENT_ID.set(event_id);
                 return false;
-            } else if let Some(_e) = event.downcast_ref::<TouchCancelEvent>() {
+            } else if let Some(_e) = TouchCancelEvent::cast(event) {
                 self.end_scroll();
                 self.momentum_info = None;
                 return false;

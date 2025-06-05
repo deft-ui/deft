@@ -164,16 +164,16 @@ impl ScrollBar {
     }
 
     pub fn on_event(&mut self, event: &Event, _ctx: &mut EventContext<ElementWeak>) -> bool {
-        if let Some(e) = event.downcast_ref::<MouseDownEvent>() {
+        if let Some(e) = MouseDownEvent::cast(event) {
             let d = e.0;
             self.on_mouse_down(d.offset_x, d.offset_y)
-        } else if let Some(e) = event.downcast_ref::<MouseUpEvent>() {
+        } else if let Some(e) = MouseUpEvent::cast(event) {
             let d = e.0;
             self.on_mouse_up(d.offset_x, d.offset_y)
-        } else if let Some(e) = event.downcast_ref::<MouseMoveEvent>() {
+        } else if let Some(e) = MouseMoveEvent::cast(event) {
             let d = e.0;
             self.on_mouse_move(d.offset_x, d.offset_y)
-        } else if let Some(e) = event.downcast_ref::<MouseWheelEvent>() {
+        } else if let Some(e) = MouseWheelEvent::cast(event) {
             if self.is_scrollable() {
                 let new_scroll_top = self.scroll_offset - 40.0 * e.rows;
                 self.update_scroll_offset(new_scroll_top);

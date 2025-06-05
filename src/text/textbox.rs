@@ -444,9 +444,9 @@ impl TextBox {
         scroll_x: f32,
         scroll_y: f32,
     ) -> bool {
-        if let Some(d) = event.downcast_ref::<KeyDownEvent>() {
+        if let Some(d) = KeyDownEvent::cast(event) {
             return self.on_key_down(&d.0);
-        } else if let Some(e) = event.downcast_ref::<MouseDownEvent>() {
+        } else if let Some(e) = MouseDownEvent::cast(event) {
             if e.0.button == 1 {
                 let event = e.0;
                 let begin_coord = self.get_text_coord_by_pixel_coord((
@@ -457,7 +457,7 @@ impl TextBox {
                 self.selection_start(begin_coord);
                 return true;
             }
-        } else if let Some(e) = event.downcast_ref::<MouseMoveEvent>() {
+        } else if let Some(e) = MouseMoveEvent::cast(event) {
             if self.selecting_begin.is_some() {
                 let event = e.0;
                 let caret = self.get_text_coord_by_pixel_coord((
@@ -467,11 +467,11 @@ impl TextBox {
                 self.update_caret(caret);
                 return self.selection_update(caret);
             }
-        } else if let Some(e) = event.downcast_ref::<MouseUpEvent>() {
+        } else if let Some(e) = MouseUpEvent::cast(event) {
             if e.0.button == 1 {
                 return self.selection_end();
             }
-        } else if let Some(e) = event.downcast_ref::<ClickEvent>() {
+        } else if let Some(e) = ClickEvent::cast(event) {
             let caret = self
                 .get_text_coord_by_pixel_coord((e.0.offset_x + scroll_x, e.0.offset_y + scroll_y));
             self.update_caret(caret);

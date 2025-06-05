@@ -764,19 +764,19 @@ impl ElementBackend for Paragraph {
         event: &mut Event,
         ctx: &mut EventContext<ElementWeak>,
     ) -> bool {
-        if let Some(d) = event.downcast_ref::<KeyDownEvent>() {
+        if let Some(d) = KeyDownEvent::cast(event) {
             self.handle_key_down(&d.0);
         } else {
-            if let Some(e) = event.downcast_ref::<MouseDownEvent>() {
+            if let Some(e) = MouseDownEvent::cast(event) {
                 if e.0.button == 1 {
                     let event = e.0;
                     self.selection_start((event.offset_x, event.offset_y));
                     return true;
                 }
-            } else if let Some(e) = event.downcast_ref::<MouseMoveEvent>() {
+            } else if let Some(e) = MouseMoveEvent::cast(event) {
                 let event = e.0;
                 return self.selection_update((event.offset_x, event.offset_y));
-            } else if let Some(e) = event.downcast_ref::<MouseUpEvent>() {
+            } else if let Some(e) = MouseUpEvent::cast(event) {
                 if e.0.button == 1 {
                     return self.selection_end();
                 }

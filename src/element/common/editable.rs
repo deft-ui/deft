@@ -583,22 +583,22 @@ impl Editable {
         if self.paragraph.on_event(&event, ctx, offset_x, offset_y) {
             return;
         }
-        if let Some(_e) = event.downcast_ref::<FocusEvent>() {
+        if let Some(_e) = FocusEvent::cast(event) {
             self.handle_focus();
-        } else if let Some(_e) = event.downcast_ref::<BlurEvent>() {
+        } else if let Some(_e) = BlurEvent::cast(event) {
             self.handle_blur();
-        } else if let Some(e) = event.downcast_ref::<TextInputEvent>() {
+        } else if let Some(e) = TextInputEvent::cast(event) {
             self.insert_text(e.0.as_str(), self.paragraph.get_caret(), true);
-        } else if let Some(_e) = event.downcast_ref::<ScrollEvent>() {
+        } else if let Some(_e) = ScrollEvent::cast(event) {
             //TODO update later?
             let _ = self.update_ime();
-        } else if let Some(_e) = event.downcast_ref::<BoundsChangeEvent>() {
+        } else if let Some(_e) = BoundsChangeEvent::cast(event) {
             //TODO update later?
             let _ = self.update_ime();
-        } else if let Some(_e) = event.downcast_ref::<MouseLeaveEvent>() {
+        } else if let Some(_e) = MouseLeaveEvent::cast(event) {
             let mut el = ok_or_return!(self.element.upgrade());
             el.set_cursor(Cursor::Icon(CursorIcon::Default));
-        } else if let Some(e) = event.downcast_ref::<KeyDownEvent>() {
+        } else if let Some(e) = KeyDownEvent::cast(event) {
             self.handle_key_down(&e.0);
         }
     }

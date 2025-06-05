@@ -1,8 +1,6 @@
 use crate::element::{Element, ViewEvent};
 use crate::event::Event;
-use crate::event_loop::{
-    create_event_loop_fn_mut, EventLoopFnMutCallback,
-};
+use crate::event_loop::{create_event_loop_fn_mut, EventLoopFnMutCallback};
 use std::any::{Any, TypeId};
 use std::sync::{Arc, Mutex};
 

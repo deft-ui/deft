@@ -246,6 +246,17 @@ fn create_event(_attr: TokenStream, struct_def: TokenStream, target_type: TokenS
             }
         }
 
+        impl #event_name {
+            pub fn cast(event: &deft::event::Event) -> Option<&Self> {
+                event.downcast_ref::<Self>()
+            }
+
+            pub fn is(event: &deft::event::Event) -> bool {
+                Self::cast(event).is_some()
+            }
+
+        }
+
     };
     expanded.into()
 }
