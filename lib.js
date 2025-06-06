@@ -256,7 +256,8 @@ export class Window {
      * @param message {string | Element}
      * @param options {AlertOptions}
      */
-    showAlert(message, options) {
+    showAlert(message, options = {}) {
+        options = options || {};
         this.showConfirm(message, {
             ...options,
             hideCancel: true,
@@ -271,7 +272,8 @@ export class Window {
      * @param options {ConfirmOptions}
      * @returns {Promise<boolean>}
      */
-    showConfirm(message, options) {
+    showConfirm(message, options = {}) {
+        options = options || {};
         function createBtn(label) {
             const btnLabel = new LabelElement();
             btnLabel.text = label;

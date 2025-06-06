@@ -399,14 +399,14 @@ declare class Window {
      * @param message {string | Element}
      * @param options {AlertOptions}
      */
-    showAlert(message: string | Element, options: AlertOptions): void;
+    showAlert(message: string | Element, options?: AlertOptions): void;
     /**
      *
      * @param message {string | Element}
      * @param options {ConfirmOptions}
      * @returns {Promise<boolean>}
      */
-    showConfirm(message: string | Element, options: ConfirmOptions): Promise<boolean>;
+    showConfirm(message: string | Element, options?: ConfirmOptions): Promise<boolean>;
     /**
      *
      * @param content {Element}
