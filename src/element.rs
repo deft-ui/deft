@@ -38,7 +38,7 @@ use crate::mrc::Mrc;
 use crate::number::DeNan;
 use crate::resource_table::ResourceTable;
 use crate::style::{FixedStyleProp, ResolvedStyleProp, StyleNode, StylePropKey, StylePropVal};
-use crate::window::{Window, WindowWeak};
+use crate::window::{WindowHandle, Window};
 use crate::{
     base, bind_js_event_listener, js_auto_upgrade, js_deserialize, js_serialize, js_value,
     ok_or_return,
@@ -82,6 +82,7 @@ use crate::event::event_emitter::EventEmitter;
 use crate::js::JsError;
 use crate::paint::MatrixCalculator;
 use crate::render::RenderFn;
+use crate::state::StateMutRef;
 use crate::style::border_path::BorderPath;
 use crate::style::css_manager::CssManager;
 use crate::style::length::LengthContext;
@@ -428,9 +429,9 @@ impl Element {
 
     #[js_func]
     pub fn focus(&mut self) {
-        if let Some(mut window) = self.upgrade_window() {
-            window.focus(self.clone());
-        }
+        self.with_window(|mut w| {
+            w.focus(self.clone());
+        });
     }
 
     #[js_func]
@@ -546,7 +547,7 @@ impl Element {
         self.mark_style_dirty();
     }
 
-    pub fn with_window<F: FnOnce(&mut Window)>(&self, callback: F) {
+    pub fn with_window<F: FnOnce(StateMutRef<Window>)>(&self, callback: F) {
         match &self.parent {
             ElementParent::None => {}
             ElementParent::Element(e) => {
@@ -555,29 +556,21 @@ impl Element {
                 }
             }
             ElementParent::Window(w) | ElementParent::Page(w) => {
-                if let Ok(mut w) = w.upgrade() {
-                    callback(&mut w);
+                if let Ok(w) = w.upgrade_mut() {
+                    callback(w);
                 }
             }
         }
     }
 
     #[js_func]
-    pub fn get_window(&self) -> Option<WindowWeak> {
+    pub fn get_window(&self) -> Option<WindowHandle> {
         if let Some(p) = self.get_parent() {
             return p.get_window();
         } else if let ElementParent::Window(ww) = &self.parent {
             return Some(ww.clone());
         }
         None
-    }
-
-    pub fn upgrade_window(&self) -> Option<Window> {
-        if let Some(f) = self.get_window() {
-            f.upgrade().ok()
-        } else {
-            None
-        }
     }
 
     #[js_func]
@@ -1124,14 +1117,14 @@ impl Element {
         if layout_dirty {
             if let Some(mut p) = self.get_parent() {
                 if p.style.has_shadow() {
-                    self.with_window(|win| {
+                    self.with_window(|mut win| {
                         win.invalid_layout(p);
                     });
                 } else {
                     p.mark_dirty(layout_dirty);
                 }
             } else {
-                self.with_window(|win| {
+                self.with_window(|mut win| {
                     win.invalid_layout(self.clone());
                 });
             }
@@ -1145,7 +1138,7 @@ impl Element {
         if let Some(mut p) = self.get_parent() {
             p.request_invalid(element);
         } else {
-            self.with_window(|w| {
+            self.with_window(|mut w| {
                 let root = element.get_root_element();
                 if let Some(tree) = w.render_tree.get_mut(&root) {
                     tree.invalid_element(element);
@@ -1319,8 +1312,8 @@ pub enum ElementType {
 pub enum ElementParent {
     None,
     Element(ElementWeak),
-    Window(WindowWeak),
-    Page(WindowWeak),
+    Window(WindowHandle),
+    Page(WindowHandle),
 }
 
 impl ElementParent {

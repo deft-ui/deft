@@ -7,13 +7,14 @@ use winit::event::WindowEvent;
 use winit::window::WindowId as WinitWindowId;
 
 use crate::element::Element;
-use crate::window::{Window, WindowWeak};
-use crate::{js_deserialize, js_weak_value};
+use crate::window::{WindowHandle, Window};
+use crate::{js_deserialize, js_value, js_weak_value};
+use crate::state::State;
 
 thread_local! {
-    pub static WINDOWS: RefCell<HashMap<i32, Window>> = RefCell::new(HashMap::new());
-    pub static WINIT_TO_WINDOW: RefCell<HashMap<WinitWindowId, WindowWeak>> = RefCell::new(HashMap::new());
-    pub static MODAL_TO_OWNERS: RefCell<HashMap<WinitWindowId, WindowWeak>> = RefCell::new(HashMap::new());
+    pub static WINDOWS: RefCell<HashMap<i32, WindowHandle >> = RefCell::new(HashMap::new());
+    pub static WINIT_TO_WINDOW: RefCell<HashMap<WinitWindowId, WindowHandle >> = RefCell::new(HashMap::new());
+    pub static MODAL_TO_OWNERS: RefCell<HashMap<WinitWindowId, WindowHandle >> = RefCell::new(HashMap::new());
 }
 
 pub const WINDOW_TYPE_NORMAL: &str = "normal";
@@ -72,7 +73,7 @@ pub fn handle_window_event(window_id: WinitWindowId, event: WindowEvent) {
             let has_modal = MODAL_TO_OWNERS.with_borrow_mut(|m| {
                 m.iter()
                     .find(|(_, o)| {
-                        if let Ok(o) = o.upgrade() {
+                        if let Ok(o) = o.upgrade_mut() {
                             o.get_window_id() == window_id
                         } else {
                             false
@@ -92,7 +93,7 @@ pub fn handle_window_event(window_id: WinitWindowId, event: WindowEvent) {
     });
     if let Some(window) = &mut window {
         if &WindowEvent::CloseRequested == &event {
-            if let Ok(mut f) = window.upgrade() {
+            if let Ok(mut f) = window.upgrade_mut() {
                 let _ = f.close();
             }
         } else {
@@ -105,12 +106,4 @@ pub fn handle_window_event(window_id: WinitWindowId, event: WindowEvent) {
     }
 }
 
-impl WindowWeak {
-    pub fn set_body(&mut self, body: Element) {
-        if let Ok(mut f) = self.upgrade_mut() {
-            f.set_body(body)
-        }
-    }
-}
-
-js_weak_value!(Window, WindowWeak);
+js_value!(WindowHandle);

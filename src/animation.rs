@@ -9,7 +9,7 @@ use crate::style::transform::{
 };
 use crate::style::{FixedStyleProp, StylePropKey, StylePropVal};
 use crate::timer::{set_timeout, set_timeout_nanos, TimerHandle};
-use crate::window::WindowWeak;
+use crate::window::{WindowHandle};
 use log::debug;
 use ordered_float::OrderedFloat;
 use std::cell::RefCell;
@@ -364,18 +364,18 @@ impl Drop for AnimationInstance {
 }
 
 pub struct WindowAnimationController {
-    frame: WindowWeak,
+    frame: WindowHandle,
 }
 
 impl WindowAnimationController {
-    pub fn new(frame: WindowWeak) -> Self {
+    pub fn new(frame: WindowHandle) -> Self {
         Self { frame }
     }
 }
 
 impl FrameController for WindowAnimationController {
     fn request_next_frame(&mut self, callback: Box<dyn FnOnce()>) {
-        if let Ok(mut frame) = self.frame.upgrade() {
+        if let Ok(mut frame) = self.frame.upgrade_mut() {
             frame.request_next_frame_callback(Callback::from_box(callback));
         }
     }

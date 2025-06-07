@@ -145,7 +145,7 @@ pub fn event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn window_event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
-    create_event(_attr, struct_def, quote! {deft::window::WindowWeak})
+    create_event(_attr, struct_def, quote! {deft::window::WindowHandle})
 }
 
 #[proc_macro_attribute]
@@ -401,8 +401,10 @@ fn build_bridge_body(func_inputs: Vec<FnArg>, asyncness: Option<Async>, struct_n
     let call_stmt = if asyncness.is_none() {
         if receiver.is_some() {
             quote! {
-                let mut inst = <#struct_name as deft::js::FromJsValue>::from_js_value(args.get(0).unwrap().clone())?;
-                let r = inst.#func_name( #(#param_list, )* );
+                let inst_js_value = args.get(0).unwrap().clone();
+                let r = <#struct_name as deft::js::BorrowFromJs>::borrow_from_js(inst_js_value, move |inst| {
+                    inst.#func_name( #(#param_list, )* )
+                })?;
             }
         } else {
             quote! {

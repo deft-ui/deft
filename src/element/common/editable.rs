@@ -252,7 +252,7 @@ impl Editable {
                 me.update_ime();
                 me.emit_caret_change();
             });
-            element.with_window(|w| {
+            element.with_window(|mut w| {
                 w.request_next_paint_callback(callback);
             });
         }

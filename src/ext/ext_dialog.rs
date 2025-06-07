@@ -2,7 +2,7 @@ use crate as deft;
 use crate::js::js_event_loop::js_create_event_loop_fn_mut;
 use crate::js::JsError;
 use crate::js_deserialize;
-use crate::window::Window;
+use crate::window::WindowHandle;
 use deft_macros::js_methods;
 use native_dialog::FileDialog;
 use quick_js::JsValue;
@@ -30,7 +30,7 @@ impl dialog {
     #[js_func]
     pub fn show_file_dialog(
         options: FileDialogOptions,
-        window: Option<Window>,
+        window: Option<WindowHandle>,
         callback: JsValue,
     ) -> Result<(), JsError> {
         let mut owner = None;

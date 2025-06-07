@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
-
 #[derive(Clone, Debug)]
 pub struct JsError {
     message: String,
@@ -65,6 +64,17 @@ pub trait JsFunc {
 
 pub trait FromJsValue: Sized {
     fn from_js_value(value: JsValue) -> Result<Self, ValueError>;
+}
+
+pub trait BorrowFromJs {
+    fn borrow_from_js<R, F: FnOnce(&mut Self) -> R>(value: JsValue, receiver: F) -> Result<R, ValueError>;
+}
+
+impl<T: FromJsValue> BorrowFromJs for T {
+    fn borrow_from_js<R, F: FnOnce(&mut Self) -> R>(value: JsValue, receiver: F) -> Result<R, ValueError> {
+        let mut value = Self::from_js_value(value).unwrap();
+        Ok(receiver(&mut value))
+    }
 }
 
 pub trait ToJsValue {

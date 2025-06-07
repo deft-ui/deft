@@ -34,8 +34,10 @@ pub fn stylesheet_update(id: Id<CSS>, source: String) -> Result<(), JsError> {
 fn refresh_windows_style() {
     WINDOWS.with_borrow_mut(|windows| {
         for (_, window) in windows.iter_mut() {
-            if let Some(mut body) = window.get_body() {
-                body.update_select_style_recurse();
+            if let Ok(window) = window.upgrade_mut() {
+                if let Some(mut body) = window.get_body() {
+                    body.update_select_style_recurse();
+                }
             }
         }
     });

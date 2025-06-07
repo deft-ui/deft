@@ -5,7 +5,7 @@ use crate::event::ClickEventListener;
 use crate::ext::ext_window::WindowAttrs;
 use crate::platform::support_multiple_windows;
 use crate::window::page::PageWeak;
-use crate::window::{Window, WindowResizeEventListener, WindowWeak};
+use crate::window::{WindowHandle, Window, WindowResizeEventListener};
 use crate::winit::dpi::Position;
 use crate::{js_weak_value, ok_or_return};
 use deft_macros::{js_methods, mrc_object};
@@ -15,7 +15,7 @@ use winit::platform::windows::WindowAttributesExtWindows;
 use winit::window::WindowAttributes;
 
 enum PopupWrapper {
-    Window(WindowWeak),
+    Window(WindowHandle),
     Page(PageWeak),
 }
 
@@ -28,7 +28,9 @@ js_weak_value!(Popup, PopupWeak);
 
 #[js_methods]
 impl Popup {
-    pub fn new(element: Element, target: Rect, owner: &Window) -> Popup {
+    pub fn new(element: Element, target: Rect, owner_handle: &WindowHandle) -> Popup {
+        //TODO no unwrap
+        let mut owner = owner_handle.upgrade_mut().unwrap();
         if support_multiple_windows() {
             let (win_x, win_y) = owner.inner_position();
             let pos_x = target.x + win_x;
@@ -51,13 +53,15 @@ impl Popup {
             let winit_attrs = WindowAttributes::default();
             #[cfg(windows_platform)]
             let winit_attrs = winit_attrs.with_skip_taskbar(true).with_active(false);
-            let mut window = Window::create_with_raw_attrs(window_attrs, winit_attrs).unwrap();
+            let mut window_handle = Window::create_with_raw_attrs(window_attrs, winit_attrs).unwrap();
+            //TODO no unwrap
+            let mut window = window_handle.upgrade_mut().unwrap();
             window.set_body(element.clone());
             let current_monitor = owner.window.current_monitor();
-            let window_weak = window.as_weak();
+            let window_weak = window_handle.clone();
             window.register_event_listener(WindowResizeEventListener::new(move |e, _| {
                 if let Some(m) = &current_monitor {
-                    let window = ok_or_return!(window_weak.upgrade());
+                    let window = ok_or_return!(window_weak.upgrade_mut());
                     let content_width = e.width as f32;
                     let content_height = e.height as f32;
                     let scale_factor = m.scale_factor();
@@ -78,12 +82,11 @@ impl Popup {
             }));
 
             PopupData {
-                wrapper: PopupWrapper::Window(window.as_weak()),
+                wrapper: PopupWrapper::Window(window_handle),
             }
             .to_ref()
         } else {
             let page = owner
-                .clone()
                 .create_page(element, target.x, target.bottom());
             let page_weak = page.as_weak();
             page.get_body()
@@ -101,11 +104,12 @@ impl Popup {
     }
 
     #[js_func]
-    pub fn close(self) {
+    pub fn close(&self) {
         match &self.wrapper {
             PopupWrapper::Window(w) => {
-                let mut w = w.upgrade().unwrap();
-                let _ = w.close();
+                if let Ok(mut w) = w.upgrade_mut() {
+                    let _ = w.close();
+                }
             }
             PopupWrapper::Page(page) => {
                 let page = page.upgrade().unwrap();

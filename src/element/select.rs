@@ -170,8 +170,8 @@ impl ElementBackend for Select {
 
     fn on_event(&mut self, event: &mut Event, _ctx: &mut EventContext<ElementWeak>) {
         let el = ok_or_return!(self.element_weak.upgrade());
-        let window = some_or_return!(el.get_window());
-        let window = ok_or_return!(window.upgrade());
+        let w = some_or_return!(el.get_window());
+        let window = ok_or_return!(w.upgrade_mut());
         let bounds = el.get_origin_bounds();
         if let Some(_) = ClickEvent::cast(event) {
             let mut popup: Mrc<Option<Popup>> = Mrc::new(None);
@@ -188,7 +188,7 @@ impl ElementBackend for Select {
             options_el.set_style_props(vec![FixedStyleProp::MinWidth(StylePropVal::Custom(
                 LengthOrPercent::Length(Length::PX(bounds.width)),
             ))]);
-            *popup = Some(Popup::new(options_el, bounds, &window));
+            *popup = Some(Popup::new(options_el, bounds, &w));
         }
     }
     fn accept_pseudo_element_styles(&mut self, styles: HashMap<String, Vec<ResolvedStyleProp>>) {

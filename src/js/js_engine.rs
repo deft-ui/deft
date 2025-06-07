@@ -51,7 +51,7 @@ use crate::stylesheet::{stylesheet_add, stylesheet_remove, stylesheet_update};
 use crate::typeface::typeface_create;
 use crate::window::page::Page;
 use crate::window::popup::Popup;
-use crate::window::{Window, WindowType};
+use crate::window::{WindowHandle, Window, WindowType};
 
 thread_local! {
     static JS_ENGINE: RefCell<Option<Mrc<JsEngine>>> = RefCell::new(None);
@@ -267,9 +267,11 @@ impl JsEngine {
         if let DeviceEvent::Button { .. } = event {
             let close_windows = WINDOWS.with_borrow(|windows| {
                 let mut result = Vec::new();
-                let menu_windows: Vec<&Window> = windows
+                let menu_windows: Vec<&WindowHandle> = windows
                     .iter()
-                    .filter(|(_, f)| f.window_type == WindowType::Menu)
+                    .filter(|(_, f)| {
+                        f.upgrade_mut().ok().map(|f| f.window_type == WindowType::Menu).unwrap_or(false)
+                    })
                     .map(|(_, f)| f)
                     .collect();
                 if menu_windows.is_empty() {
@@ -277,18 +279,20 @@ impl JsEngine {
                 }
                 run_with_event_loop(|el| {
                     if let Some(pos) = el.query_pointer(device_id) {
-                        menu_windows.iter().for_each(|window| {
-                            let w_size = window.window.outer_size();
-                            if let Some(wp) = window.window.outer_position().ok() {
-                                let (wx, wy) = (wp.x as f32, wp.y as f32);
-                                let (ww, wh) = (w_size.width as f32, w_size.height as f32);
-                                let is_in_window = pos.0 >= wx
-                                    && pos.0 <= wx + ww
-                                    && pos.1 >= wy
-                                    && pos.1 <= wy + wh;
-                                if !is_in_window {
-                                    let _ = window.window.set_cursor_grab(CursorGrabMode::None);
-                                    result.push(window.as_weak());
+                        menu_windows.iter().for_each(|w| {
+                            if let Ok(mut window) = w.upgrade_mut() {
+                                let w_size = window.window.outer_size();
+                                if let Some(wp) = window.window.outer_position().ok() {
+                                    let (wx, wy) = (wp.x as f32, wp.y as f32);
+                                    let (ww, wh) = (w_size.width as f32, w_size.height as f32);
+                                    let is_in_window = pos.0 >= wx
+                                        && pos.0 <= wx + ww
+                                        && pos.1 >= wy
+                                        && pos.1 <= wy + wh;
+                                    if !is_in_window {
+                                        let _ = window.window.set_cursor_grab(CursorGrabMode::None);
+                                        result.push(w.clone().clone());
+                                    }
                                 }
                             }
                         })
@@ -296,8 +300,8 @@ impl JsEngine {
                 });
                 result
             });
-            for window in close_windows {
-                if let Ok(mut f) = window.upgrade() {
+            for f in close_windows {
+                if let Ok(mut f) = f.upgrade_mut() {
                     let _ = f.close();
                 }
             }

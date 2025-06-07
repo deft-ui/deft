@@ -149,8 +149,10 @@ impl<T> MrcWeak<T> {
 
 impl<T> Clone for MrcWeak<T> {
     fn clone(&self) -> Self {
-        let weak = self.inner().weak.get();
-        self.inner().weak.set(weak + 1);
+        if !self.ptr.is_null() {
+            let weak = self.inner().weak.get();
+            self.inner().weak.set(weak + 1);            
+        }
         Self { ptr: self.ptr }
     }
 }

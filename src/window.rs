@@ -25,7 +25,7 @@ use crate::ext::ext_window::{
     WindowAttrs, MODAL_TO_OWNERS, WINDOWS, WINDOW_TYPE_MENU, WINDOW_TYPE_NORMAL, WINIT_TO_WINDOW,
 };
 use crate::frame_rate::FrameRateController;
-use crate::js::JsError;
+use crate::js::{BorrowFromJs, FromJsValue, JsError};
 use crate::mrc::{Mrc, MrcWeak};
 use crate::paint::{PaintContext, Painter, RenderTree};
 use crate::platform::support_multiple_windows;
@@ -43,15 +43,16 @@ use crate::{
 use anyhow::Error;
 use deft_macros::{js_methods, mrc_object, window_event};
 use log::{debug, error};
-use quick_js::JsValue;
+use quick_js::{JsValue, ValueError};
 use skia_safe::{Color, Point, Rect};
 use skia_window::renderer::Renderer;
 use skia_window::skia_window::{RenderBackendType, SkiaWindow};
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::string::ToString;
 use std::time::SystemTime;
 use std::{env, mem};
+use std::ops::Deref;
 use winit::dpi::Position::Logical;
 use winit::dpi::{LogicalPosition, LogicalSize, Size};
 use winit::event::{
@@ -66,6 +67,12 @@ use winit::window::{
     Cursor, CursorIcon, Fullscreen, ResizeDirection, Theme, WindowAttributes, WindowButtons,
     WindowId,
 };
+use crate::error::{DeftError, DeftResult};
+use crate::state::{State, StateManager, StateMutRef};
+
+thread_local! {
+    static WIN_STATE_MANAGER: RefCell<StateManager> = RefCell::new(StateManager::new());
+}
 
 #[derive(Clone)]
 struct MouseDownInfo {
@@ -97,8 +104,8 @@ pub enum WindowType {
     Menu,
 }
 
-#[mrc_object]
 pub struct Window {
+    handle: WindowHandle,
     id: i32,
     pub(crate) window: SkiaWindow,
     cursor_position: LogicalPosition<f64>,
@@ -118,12 +125,12 @@ pub struct Window {
     dirty: bool,
     layout_dirty_list: HashMap<u32, Element>,
     repaint_timer_handle: Option<TimerHandle>,
-    event_registration: EventRegistration<WindowWeak>,
+    event_registration: EventRegistration<WindowHandle>,
     attributes: WindowAttributes,
     init_width: Option<f32>,
     init_height: Option<f32>,
     background_color: Color,
-    renderer_idle: bool,
+    pub renderer_idle: bool,
     next_frame_callbacks: Vec<Callback>,
     next_paint_callbacks: Vec<Callback>,
     pub render_tree: HashMap<Element, RenderTree>,
@@ -134,8 +141,19 @@ pub struct Window {
     render_backend_types: Vec<RenderBackendType>,
 }
 
-pub type WindowEventHandler = EventHandler<WindowWeak>;
-pub type WindowEventContext = EventContext<WindowWeak>;
+#[derive(Clone, PartialEq)]
+pub struct WindowHandle {
+    state: State<Window>,
+}
+
+impl WindowHandle {
+    pub fn upgrade_mut(&self) -> DeftResult<StateMutRef<Window>> {
+        Ok(self.state.upgrade_mut()?)
+    }
+}
+
+pub type WindowEventHandler = EventHandler<WindowHandle>;
+pub type WindowEventContext = EventContext<WindowHandle>;
 
 thread_local! {
     pub static NEXT_WINDOW_ID: Cell<i32> = Cell::new(1);
@@ -156,26 +174,39 @@ pub struct WindowFocusEvent;
 #[window_event]
 pub struct WindowBlurEvent;
 
+
+impl BorrowFromJs for Window {
+    fn borrow_from_js<R, F: FnOnce(&mut Self) -> R>(value: JsValue, receiver: F) -> Result<R, ValueError> {
+        let window = WindowHandle::from_js_value(value)?;
+        let mut wi = window.upgrade_mut().map_err(|e| ValueError::UnexpectedType)?;
+        Ok(receiver(&mut wi))
+    }
+
+}
+
 #[js_methods]
 impl Window {
     #[js_func]
-    pub fn create(attrs: WindowAttrs) -> Result<Self, Error> {
+    pub fn create(attrs: WindowAttrs) -> Result<WindowHandle, DeftError> {
         Self::create_with_raw_attrs(attrs, winit::window::Window::default_attributes())
     }
 
     pub fn create_with_raw_attrs(
         attrs: WindowAttrs,
         raw_attrs: WindowAttributes,
-    ) -> Result<Self, Error> {
-        let mut window = Window::create_inner(attrs, raw_attrs);
-        send_app_event(AppEvent::BindWindow(window.get_id())).unwrap();
-        window.update_inset(InsetType::Ime, Rect::new_empty());
-        window.update_inset(InsetType::Navigation, Rect::new_empty());
-        window.update_inset(InsetType::StatusBar, Rect::new_empty());
-        let window_id = window.get_window_id();
-        WINDOWS.with_borrow_mut(|m| m.insert(window.get_id(), window.clone()));
-        WINIT_TO_WINDOW.with_borrow_mut(|m| m.insert(window_id, window.as_weak()));
-        Ok(window)
+    ) -> Result<WindowHandle, DeftError> {
+        let mut handle = Self::create_inner(attrs, raw_attrs);
+        let mut ws = handle.upgrade_mut()?;
+        send_app_event(AppEvent::BindWindow(ws.get_id())).unwrap();
+        ws.update_inset(InsetType::Ime, Rect::new_empty());
+        ws.update_inset(InsetType::Navigation, Rect::new_empty());
+        ws.update_inset(InsetType::StatusBar, Rect::new_empty());
+
+        let winit_window_id = ws.get_window_id();
+        let wid = ws.get_id();
+        WINIT_TO_WINDOW.with_borrow_mut(|m| m.insert(winit_window_id, handle.clone()));
+        WINDOWS.with_borrow_mut(|m| m.insert(wid, handle.clone()));
+        Ok(handle)
     }
 
     #[js_func]
@@ -183,7 +214,7 @@ impl Window {
         support_multiple_windows()
     }
 
-    fn create_inner(attrs: WindowAttrs, mut attributes: WindowAttributes) -> Self {
+    fn create_inner(attrs: WindowAttrs, mut attributes: WindowAttributes) -> WindowHandle {
         let id = NEXT_WINDOW_ID.get();
         NEXT_WINDOW_ID.set(id + 1);
 
@@ -264,52 +295,60 @@ impl Window {
         let body = Element::create(Body::create);
         let mut render_tree = HashMap::new();
         render_tree.insert(body.clone(), RenderTree::new(0));
-        let state = WindowData {
-            id,
-            window,
-            cursor_position: LogicalPosition { x: 0.0, y: 0.0 },
-            cursor_root_position: LogicalPosition { x: 0.0, y: 0.0 },
-            layer_roots: vec![(body, 0.0, 0.0)],
-            pressing: None,
-            focusing: None,
-            hover: None,
-            modifiers: Modifiers::default(),
-            dirty: false,
-            dragging: false,
-            last_drag_over: None,
-            event_registration: EventRegistration::new(),
-            attributes,
-            touching: TouchingInfo {
-                start_time: SystemTime::now(),
-                times: 0,
-                max_identifiers: 0,
-                touches: Default::default(),
-                scrolled: false,
-                start_point: (0.0, 0.0),
-            },
-            window_type,
-            init_width: attrs.width,
-            init_height: attrs.height,
-            background_color: Color::from_rgb(0, 0, 0),
-            repaint_timer_handle: None,
-            renderer_idle: true,
-            next_frame_callbacks: Vec::new(),
-            next_paint_callbacks: Vec::new(),
-            render_tree,
-            style_vars: StyleVars::new(),
-            frame_rate_controller: FrameRateController::new(),
-            next_frame_timer_handle: None,
-            resource_table: ResourceTable::new(),
-            drag_window_called: false,
-            render_backend_types,
-            layout_dirty_list: HashMap::new(),
-            pages: Vec::new(),
+        let handle = WindowHandle {
+            state: State::invalid(),
         };
-        let mut handle = Window {
-            inner: Mrc::new(state),
+        let state = WIN_STATE_MANAGER.with_borrow_mut(|wsm| {
+            let mut win_info = Window {
+                handle,
+                id,
+                window,
+                cursor_position: LogicalPosition { x: 0.0, y: 0.0 },
+                cursor_root_position: LogicalPosition { x: 0.0, y: 0.0 },
+                layer_roots: vec![(body, 0.0, 0.0)],
+                pressing: None,
+                focusing: None,
+                hover: None,
+                modifiers: Modifiers::default(),
+                dirty: false,
+                dragging: false,
+                last_drag_over: None,
+                event_registration: EventRegistration::new(),
+                attributes,
+                touching: TouchingInfo {
+                    start_time: SystemTime::now(),
+                    times: 0,
+                    max_identifiers: 0,
+                    touches: Default::default(),
+                    scrolled: false,
+                    start_point: (0.0, 0.0),
+                },
+                window_type,
+                init_width: attrs.width,
+                init_height: attrs.height,
+                background_color: Color::from_rgb(0, 0, 0),
+                repaint_timer_handle: None,
+                renderer_idle: true,
+                next_frame_callbacks: Vec::new(),
+                next_paint_callbacks: Vec::new(),
+                render_tree,
+                style_vars: StyleVars::new(),
+                frame_rate_controller: FrameRateController::new(),
+                next_frame_timer_handle: None,
+                resource_table: ResourceTable::new(),
+                drag_window_called: false,
+                render_backend_types,
+                layout_dirty_list: HashMap::new(),
+                pages: Vec::new(),
+            };
+            win_info.on_resize();
+            wsm.new_state(win_info)
+        });
+        let handle = WindowHandle {
+            state: state.clone(),
         };
-        // handle.body.set_window(Some(win.clone()));
-        handle.on_resize();
+        let mut ws = state.upgrade_mut().unwrap();
+        ws.handle = handle.clone();
         handle
     }
 
@@ -362,12 +401,13 @@ impl Window {
     }
 
     #[js_func]
-    pub fn set_modal(&mut self, owner: Window) -> Result<(), JsError> {
-        self.window.set_modal(&owner.window);
+    pub fn set_modal(&mut self, owner: WindowHandle) -> Result<(), JsError> {
+        let owner_state = owner.state.upgrade_mut()?;
+        self.window.set_modal(&owner_state.window);
         #[cfg(windows)]
-        owner.window.set_enable(false);
+        owner_state.window.set_enable(false);
         let window_id = self.get_window_id();
-        MODAL_TO_OWNERS.with_borrow_mut(|m| m.insert(window_id, owner.as_weak()));
+        MODAL_TO_OWNERS.with_borrow_mut(|m| m.insert(window_id, owner));
         Ok(())
     }
 
@@ -379,7 +419,7 @@ impl Window {
             #[allow(unused)]
             if let Some(modal_parent) = MODAL_TO_OWNERS.with_borrow_mut(|m| m.remove(&window_id)) {
                 #[cfg(windows_platform)]
-                if let Ok(p) = modal_parent.upgrade() {
+                if let Ok(p) = modal_parent.upgrade_mut() {
                     p.window.set_enable(true);
                 }
             }
@@ -389,6 +429,10 @@ impl Window {
                     let _ = exit_app(0);
                 }
             });
+            WIN_STATE_MANAGER.with_borrow_mut(|m| {
+                m.remove_state(&self.handle.state);
+            });
+            self.window.set_visible(false);
         }
         Ok(())
     }
@@ -494,7 +538,7 @@ impl Window {
 
     #[js_func]
     pub fn popup(&self, content: Element, target: base::Rect) -> Popup {
-        Popup::new(content, target, &self)
+        Popup::new(content, target, &self.handle)
     }
 
     pub fn allow_close(&mut self) -> bool {
@@ -739,7 +783,7 @@ impl Window {
         self.event_registration.unregister_event_listener(id)
     }
 
-    pub fn register_event_listener<T: 'static, H: EventListener<T, WindowWeak> + 'static>(
+    pub fn register_event_listener<T: 'static, H: EventListener<T, WindowHandle> + 'static>(
         &mut self,
         listener: H,
     ) -> u32 {
@@ -1239,11 +1283,13 @@ impl Window {
         }
         let sleep_time = self.frame_rate_controller.next_frame();
         if sleep_time > 0 {
-            let mut me = self.clone();
+            let mut me = self.handle.clone();
             let next_frame_timer_handle = set_timeout_nanos(
                 move || {
-                    me.next_frame_timer_handle = None;
-                    me.update_force();
+                    if let Ok(mut me) = me.upgrade_mut() {
+                        me.next_frame_timer_handle = None;
+                        me.update_force();
+                    }
                 },
                 sleep_time,
             );
@@ -1320,18 +1366,19 @@ impl Window {
     }
 
     #[js_func]
-    pub fn set_body(&mut self, body: Element) {
+    pub fn set_body(&mut self, body: Element) -> DeftResult<()> {
         self.layer_roots[0] = (body.clone(), 0.0, 0.0);
-        self.init_element_root(body, ElementParent::Window(self.as_weak()));
+        self.init_element_root(body, ElementParent::Window(self.handle.clone()));
+        Ok(())
     }
 
     #[js_func]
     pub fn create_page(&mut self, element: Element, x: f32, y: f32) -> Page {
-        let page = Page::new(self.as_weak(), element.clone());
+        let page = Page::new(self.handle.clone(), element.clone());
         let body = page.get_body().clone();
         self.pages.push(page.clone());
         self.layer_roots.push((body.clone(), x, y));
-        self.init_element_root(body, ElementParent::Page(self.as_weak()));
+        self.init_element_root(body, ElementParent::Page(self.handle.clone()));
         page
     }
 
@@ -1401,8 +1448,8 @@ impl Window {
         });
     }
 
-    pub fn emit<T: 'static>(&mut self, event: T) -> EventContext<WindowWeak> {
-        let mut ctx = EventContext::new(self.as_weak());
+    pub fn emit<T: 'static>(&mut self, event: T) -> EventContext<WindowHandle> {
+        let mut ctx = EventContext::new(self.handle.clone());
         self.event_registration.emit(event, &mut ctx);
         ctx
     }
@@ -1600,13 +1647,11 @@ impl Window {
     }
 }
 
-pub struct WeakWindowHandle {
-    inner: MrcWeak<WindowData>,
-}
-
-impl WeakWindowHandle {
-    pub fn upgrade(&self) -> Option<Window> {
-        self.inner.upgrade().map(|i| Window::from_inner(i)).ok()
+impl Drop for Window {
+    fn drop(&mut self) {
+        WIN_STATE_MANAGER.with_borrow_mut(|wsm| {
+            wsm.remove_state(&self.handle.state);
+        })
     }
 }
 
@@ -1667,7 +1712,9 @@ fn print_tree(node: &Element, padding: &str) {
 pub fn window_input(window_id: i32, content: String) {
     WINDOWS.with_borrow_mut(|m| {
         if let Some(f) = m.get_mut(&window_id) {
-            f.handle_input(&content);
+            if let Ok(mut f) = f.upgrade_mut() {
+                f.handle_input(&content);
+            }
         }
     });
 }
@@ -1676,16 +1723,18 @@ pub fn window_send_key(window_id: i32, key: &str, pressed: bool) {
     if let Some(k) = str_to_named_key(&key) {
         WINDOWS.with_borrow_mut(|m| {
             if let Some(f) = m.get_mut(&window_id) {
-                //FIXME scancode
-                f.handle_key(
-                    0,
-                    None,
-                    Some(k),
-                    Some(key.to_string()),
-                    None,
-                    false,
-                    pressed,
-                );
+                if let Ok(mut f) = f.upgrade_mut() {
+                    //FIXME scancode
+                    f.handle_key(
+                        0,
+                        None,
+                        Some(k),
+                        Some(key.to_string()),
+                        None,
+                        false,
+                        pressed,
+                    );
+                }
             }
         });
     }
@@ -1694,8 +1743,10 @@ pub fn window_send_key(window_id: i32, key: &str, pressed: bool) {
 pub fn window_update_inset(window_id: i32, ty: InsetType, rect: Rect) {
     WINDOWS.with_borrow_mut(|m| {
         if let Some(f) = m.get_mut(&window_id) {
-            f.update_inset(ty, rect);
-            // f.mark_dirty_and_update_immediate(true).wait_finish();
+            if let Ok(mut f) = f.upgrade_mut() {
+                f.update_inset(ty, rect);
+                // f.mark_dirty_and_update_immediate(true).wait_finish();
+            }
         }
     });
 }
@@ -1703,8 +1754,10 @@ pub fn window_update_inset(window_id: i32, ty: InsetType, rect: Rect) {
 pub fn window_on_render_idle(window_id: i32) {
     WINDOWS.with_borrow_mut(|m| {
         if let Some(f) = m.get_mut(&window_id) {
-            f.renderer_idle = true;
-            f.update();
+            if let Ok(mut f) = f.upgrade_mut() {
+                f.renderer_idle = true;
+                f.update();
+            }
         }
     });
 }
@@ -1712,7 +1765,9 @@ pub fn window_on_render_idle(window_id: i32) {
 pub fn window_check_update(window_id: i32) {
     WINDOWS.with_borrow_mut(|m| {
         if let Some(f) = m.get_mut(&window_id) {
-            f.update();
+            if let Ok(mut f) = f.upgrade_mut() {
+                f.update();
+            }
         }
     });
 }
