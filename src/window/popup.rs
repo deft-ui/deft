@@ -5,7 +5,7 @@ use crate::event::ClickEventListener;
 use crate::ext::ext_window::WindowAttrs;
 use crate::platform::support_multiple_windows;
 use crate::window::page::PageWeak;
-use crate::window::{WindowHandle, Window, WindowResizeEventListener};
+use crate::window::{Window, WindowHandle, WindowResizeEventListener};
 use crate::winit::dpi::Position;
 use crate::{js_weak_value, ok_or_return};
 use deft_macros::{js_methods, mrc_object};
@@ -53,7 +53,8 @@ impl Popup {
             let winit_attrs = WindowAttributes::default();
             #[cfg(windows_platform)]
             let winit_attrs = winit_attrs.with_skip_taskbar(true).with_active(false);
-            let mut window_handle = Window::create_with_raw_attrs(window_attrs, winit_attrs).unwrap();
+            let mut window_handle =
+                Window::create_with_raw_attrs(window_attrs, winit_attrs).unwrap();
             //TODO no unwrap
             let mut window = window_handle.upgrade_mut().unwrap();
             window.set_body(element.clone());
@@ -86,8 +87,7 @@ impl Popup {
             }
             .to_ref()
         } else {
-            let page = owner
-                .create_page(element, target.x, target.bottom());
+            let page = owner.create_page(element, target.x, target.bottom());
             let page_weak = page.as_weak();
             page.get_body()
                 .clone()

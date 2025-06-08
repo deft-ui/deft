@@ -35,7 +35,9 @@ impl dialog {
     ) -> Result<(), JsError> {
         let mut owner = None;
         if let Some(window) = window {
-            owner = Some(DialogHandle(window.window.raw_window_handle()?));
+            if let Ok(window) = window.upgrade_mut() {
+                owner = Some(DialogHandle(window.window.raw_window_handle()?));
+            }
         }
 
         let mut success = {

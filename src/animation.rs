@@ -9,7 +9,7 @@ use crate::style::transform::{
 };
 use crate::style::{FixedStyleProp, StylePropKey, StylePropVal};
 use crate::timer::{set_timeout, set_timeout_nanos, TimerHandle};
-use crate::window::{WindowHandle};
+use crate::window::WindowHandle;
 use log::debug;
 use ordered_float::OrderedFloat;
 use std::cell::RefCell;

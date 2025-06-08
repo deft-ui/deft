@@ -1,7 +1,7 @@
-use std::error::Error;
-use std::fmt::{Display, Formatter};
 use crate::js::JsError;
 use crate::mrc::UpgradeError;
+use std::error::Error;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug)]
 pub enum DeftError {
@@ -20,9 +20,7 @@ impl Display for DeftError {
     }
 }
 
-impl Error for DeftError {
-
-}
+impl Error for DeftError {}
 
 impl From<UpgradeError> for DeftError {
     fn from(_value: UpgradeError) -> Self {

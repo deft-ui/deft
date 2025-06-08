@@ -7,9 +7,9 @@ use winit::event::WindowEvent;
 use winit::window::WindowId as WinitWindowId;
 
 use crate::element::Element;
-use crate::window::{WindowHandle, Window};
-use crate::{js_deserialize, js_value, js_weak_value};
 use crate::state::State;
+use crate::window::{Window, WindowHandle};
+use crate::{js_deserialize, js_value, js_weak_value};
 
 thread_local! {
     pub static WINDOWS: RefCell<HashMap<i32, WindowHandle >> = RefCell::new(HashMap::new());

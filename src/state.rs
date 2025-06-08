@@ -44,9 +44,11 @@ impl<T> Clone for State<T> {
 }
 
 impl<T> State<T> {
-
     pub fn invalid() -> State<T> {
-        State { id: 0, store: StateData::Hosting(MrcWeak::new()) }
+        State {
+            id: 0,
+            store: StateData::Hosting(MrcWeak::new()),
+        }
     }
     pub fn upgrade_mut(&self) -> Result<StateMutRef<T>, UpgradeError> {
         match &self.store {
@@ -57,12 +59,10 @@ impl<T> State<T> {
                     data,
                 })
             }
-            StateData::SelfManaged(d) => {
-                Ok(StateMutRef {
-                    state_data: &self.store,
-                    data: d.clone(),
-                })
-            }
+            StateData::SelfManaged(d) => Ok(StateMutRef {
+                state_data: &self.store,
+                data: d.clone(),
+            }),
         }
     }
 }
@@ -101,7 +101,10 @@ impl StateManager {
         let data = Mrc::new(state);
         let weak = data.as_weak();
         self.states.insert(id, Box::new(data));
-        State { id, store: StateData::Hosting(weak) }
+        State {
+            id,
+            store: StateData::Hosting(weak),
+        }
     }
 
     pub fn new_self_managed_state<T: 'static>(&mut self, state: T) -> State<T> {
@@ -109,7 +112,10 @@ impl StateManager {
         self.next_id += 1;
 
         let data = Mrc::new(state);
-        State { id, store: StateData::SelfManaged(data) }
+        State {
+            id,
+            store: StateData::SelfManaged(data),
+        }
     }
 
     pub fn remove_state<T>(&mut self, state: &State<T>) {
@@ -120,12 +126,14 @@ impl StateManager {
         if let Some(data) = self.states.get(&id) {
             let raw_data = data.deref();
             if let Some(r) = raw_data.downcast_ref::<Mrc<T>>() {
-                return Some(State { id, store: StateData::Hosting(r.as_weak()) });
+                return Some(State {
+                    id,
+                    store: StateData::Hosting(r.as_weak()),
+                });
             }
         }
         None
     }
-
 }
 
 #[cfg(test)]

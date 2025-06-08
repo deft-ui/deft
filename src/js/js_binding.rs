@@ -67,11 +67,17 @@ pub trait FromJsValue: Sized {
 }
 
 pub trait BorrowFromJs {
-    fn borrow_from_js<R, F: FnOnce(&mut Self) -> R>(value: JsValue, receiver: F) -> Result<R, ValueError>;
+    fn borrow_from_js<R, F: FnOnce(&mut Self) -> R>(
+        value: JsValue,
+        receiver: F,
+    ) -> Result<R, ValueError>;
 }
 
 impl<T: FromJsValue> BorrowFromJs for T {
-    fn borrow_from_js<R, F: FnOnce(&mut Self) -> R>(value: JsValue, receiver: F) -> Result<R, ValueError> {
+    fn borrow_from_js<R, F: FnOnce(&mut Self) -> R>(
+        value: JsValue,
+        receiver: F,
+    ) -> Result<R, ValueError> {
         let mut value = Self::from_js_value(value).unwrap();
         Ok(receiver(&mut value))
     }

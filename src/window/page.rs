@@ -39,6 +39,5 @@ impl Page {
         if let Ok(mut window) = self.window_weak.upgrade_mut() {
             window.close_page(self.clone());
         }
-
     }
 }

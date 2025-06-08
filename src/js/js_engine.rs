@@ -51,7 +51,7 @@ use crate::stylesheet::{stylesheet_add, stylesheet_remove, stylesheet_update};
 use crate::typeface::typeface_create;
 use crate::window::page::Page;
 use crate::window::popup::Popup;
-use crate::window::{WindowHandle, Window, WindowType};
+use crate::window::{Window, WindowHandle, WindowType};
 
 thread_local! {
     static JS_ENGINE: RefCell<Option<Mrc<JsEngine>>> = RefCell::new(None);
@@ -270,7 +270,10 @@ impl JsEngine {
                 let menu_windows: Vec<&WindowHandle> = windows
                     .iter()
                     .filter(|(_, f)| {
-                        f.upgrade_mut().ok().map(|f| f.window_type == WindowType::Menu).unwrap_or(false)
+                        f.upgrade_mut()
+                            .ok()
+                            .map(|f| f.window_type == WindowType::Menu)
+                            .unwrap_or(false)
                     })
                     .map(|(_, f)| f)
                     .collect();

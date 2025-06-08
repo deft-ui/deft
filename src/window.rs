@@ -12,6 +12,7 @@ use crate::cursor::search_cursor;
 use crate::element::body::Body;
 use crate::element::util::get_tree_level;
 use crate::element::{Element, ElementBackend, ElementParent};
+use crate::error::{DeftError, DeftResult};
 use crate::event::{
     build_modifier, named_key_to_str, str_to_named_key, BlurEvent, ClickEvent, ContextMenuEvent,
     DragOverEvent, DragStartEvent, DropEvent, DroppedFileEvent, FocusEvent, FocusShiftEvent,
@@ -31,6 +32,7 @@ use crate::paint::{PaintContext, Painter, RenderTree};
 use crate::platform::support_multiple_windows;
 use crate::render::painter::ElementPainter;
 use crate::resource_table::ResourceTable;
+use crate::state::{State, StateManager, StateMutRef};
 use crate::style::length::LengthContext;
 use crate::style::style_vars::StyleVars;
 use crate::timer::{set_timeout_nanos, TimerHandle};
@@ -49,10 +51,10 @@ use skia_window::renderer::Renderer;
 use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::string::ToString;
 use std::time::SystemTime;
 use std::{env, mem};
-use std::ops::Deref;
 use winit::dpi::Position::Logical;
 use winit::dpi::{LogicalPosition, LogicalSize, Size};
 use winit::event::{
@@ -67,8 +69,6 @@ use winit::window::{
     Cursor, CursorIcon, Fullscreen, ResizeDirection, Theme, WindowAttributes, WindowButtons,
     WindowId,
 };
-use crate::error::{DeftError, DeftResult};
-use crate::state::{State, StateManager, StateMutRef};
 
 thread_local! {
     static WIN_STATE_MANAGER: RefCell<StateManager> = RefCell::new(StateManager::new());
@@ -174,14 +174,17 @@ pub struct WindowFocusEvent;
 #[window_event]
 pub struct WindowBlurEvent;
 
-
 impl BorrowFromJs for Window {
-    fn borrow_from_js<R, F: FnOnce(&mut Self) -> R>(value: JsValue, receiver: F) -> Result<R, ValueError> {
+    fn borrow_from_js<R, F: FnOnce(&mut Self) -> R>(
+        value: JsValue,
+        receiver: F,
+    ) -> Result<R, ValueError> {
         let window = WindowHandle::from_js_value(value)?;
-        let mut wi = window.upgrade_mut().map_err(|e| ValueError::UnexpectedType)?;
+        let mut wi = window
+            .upgrade_mut()
+            .map_err(|e| ValueError::UnexpectedType)?;
         Ok(receiver(&mut wi))
     }
-
 }
 
 #[js_methods]

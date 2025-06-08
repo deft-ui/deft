@@ -38,7 +38,7 @@ use crate::mrc::Mrc;
 use crate::number::DeNan;
 use crate::resource_table::ResourceTable;
 use crate::style::{FixedStyleProp, ResolvedStyleProp, StyleNode, StylePropKey, StylePropVal};
-use crate::window::{WindowHandle, Window};
+use crate::window::{Window, WindowHandle};
 use crate::{
     base, bind_js_event_listener, js_auto_upgrade, js_deserialize, js_serialize, js_value,
     ok_or_return,
