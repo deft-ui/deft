@@ -2,8 +2,8 @@ use crate as deft;
 use crate::base::EventRegistration;
 use crate::element::body::Body;
 use crate::element::{Element, ElementBackend, ElementType};
-use crate::window::WindowHandle;
 use crate::js_weak_value;
+use crate::window::WindowHandle;
 use deft_macros::{js_methods, mrc_object};
 
 #[mrc_object]

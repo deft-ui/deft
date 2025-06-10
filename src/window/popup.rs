@@ -53,8 +53,7 @@ impl Popup {
             let winit_attrs = WindowAttributes::default();
             #[cfg(windows_platform)]
             let winit_attrs = winit_attrs.with_skip_taskbar(true).with_active(false);
-            let window_handle =
-                Window::create_with_raw_attrs(window_attrs, winit_attrs).unwrap();
+            let window_handle = Window::create_with_raw_attrs(window_attrs, winit_attrs).unwrap();
             //TODO no unwrap
             let mut window = window_handle.upgrade_mut().unwrap();
             window.set_body(element.clone());
