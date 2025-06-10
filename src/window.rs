@@ -27,7 +27,6 @@ use crate::ext::ext_window::{
 };
 use crate::frame_rate::FrameRateController;
 use crate::js::{BorrowFromJs, FromJsValue, JsError};
-use crate::mrc::{Mrc, MrcWeak};
 use crate::paint::{PaintContext, Painter, RenderTree};
 use crate::platform::support_multiple_windows;
 use crate::render::painter::ElementPainter;
@@ -43,7 +42,7 @@ use crate::{
     warn_time,
 };
 use anyhow::Error;
-use deft_macros::{js_methods, mrc_object, window_event};
+use deft_macros::{js_methods, window_event};
 use log::{debug, error};
 use quick_js::{JsValue, ValueError};
 use skia_safe::{Color, Point, Rect};
@@ -51,7 +50,6 @@ use skia_window::renderer::Renderer;
 use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
-use std::ops::Deref;
 use std::string::ToString;
 use std::time::SystemTime;
 use std::{env, mem};
@@ -198,7 +196,7 @@ impl Window {
         attrs: WindowAttrs,
         raw_attrs: WindowAttributes,
     ) -> Result<WindowHandle, DeftError> {
-        let mut handle = Self::create_inner(attrs, raw_attrs);
+        let handle = Self::create_inner(attrs, raw_attrs);
         let mut ws = handle.upgrade_mut()?;
         send_app_event(AppEvent::BindWindow(ws.get_id())).unwrap();
         ws.update_inset(InsetType::Ime, Rect::new_empty());
@@ -1286,7 +1284,7 @@ impl Window {
         }
         let sleep_time = self.frame_rate_controller.next_frame();
         if sleep_time > 0 {
-            let mut me = self.handle.clone();
+            let me = self.handle.clone();
             let next_frame_timer_handle = set_timeout_nanos(
                 move || {
                     if let Ok(mut me) = me.upgrade_mut() {

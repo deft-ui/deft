@@ -1,5 +1,5 @@
 use crate::canvas_util::CanvasHelper;
-use crate::paint::{InvalidRects, LayerState, Painter, RenderLayerKey};
+use crate::paint::{DrawLayer, InvalidRects, LayerState, Painter, RenderLayerKey};
 use crate::render::paint_object::{ElementPO, LayerPO};
 use crate::{show_focus_hint, show_layer_hint, show_repaint_area};
 use skia_safe::{
@@ -54,7 +54,7 @@ impl ElementPainter {
         context: &mut RenderContext,
     ) {
         let mut state = mem::take(&mut self.layer_state_map);
-        self.draw_layer(painter, context, root, &mut state);
+        self.draw_layer(painter, context, root, &mut state, true);
     }
 
     fn draw_element_object_recurse(
@@ -88,7 +88,10 @@ impl ElementPainter {
         lpo: &mut LayerPO,
         layer: &mut LayerState,
     ) {
-        let img = layer.layer.as_image();
+        let img = match &mut layer.layer {
+            DrawLayer::Root => return,
+            DrawLayer::Sublayer(sl) => sl.as_image(),
+        };
         let canvas = painter.canvas;
         canvas.save();
         canvas.translate((layer.surface_bounds.left, layer.surface_bounds.top));
@@ -130,6 +133,7 @@ impl ElementPainter {
         context: &mut RenderContext,
         layer: &mut LayerPO,
         layer_state_map: &mut HashMap<RenderLayerKey, LayerState>,
+        is_root: bool,
     ) {
         let root_canvas = painter.canvas;
         let scale = self.scale;
@@ -139,49 +143,9 @@ impl ElementPainter {
             return;
         }
         {
-            let mut graphic_layer = if let Some(mut ogl_state) = layer_state_map.remove(&layer.key)
-            {
-                if ogl_state.surface_width != surface_width
-                    || ogl_state.surface_height != surface_height
-                {
-                    None
-                } else {
-                    //TODO fix scroll delta
-                    let scroll_delta_x = layer.surface_bounds.left - ogl_state.surface_bounds.left;
-                    let scroll_delta_y = layer.surface_bounds.top - ogl_state.surface_bounds.top;
-                    if scroll_delta_x != 0.0 || scroll_delta_y != 0.0 {
-                        let mut temp_gl =
-                            context.create_layer(surface_width, surface_height).unwrap();
-                        temp_gl.canvas().session(|canvas| {
-                            // canvas.clip_rect(&Rect::new(0.0, 0.0, layer.width * scale, layer.height * scale), ClipOp::Intersect, false);
-                            canvas.clear(Color::TRANSPARENT);
-                            canvas.draw_image(
-                                &ogl_state.layer.as_image(),
-                                (-scroll_delta_x * scale, -scroll_delta_y * scale),
-                                None,
-                            );
-                        });
-                        context.flush();
-
-                        ogl_state.layer.canvas().session(|canvas| {
-                            canvas.clear(Color::TRANSPARENT);
-                            // canvas.clip_rect(&Rect::from_xywh(0.0, 0.0, layer.width, layer.height), ClipOp::Intersect, false);
-                            canvas.scale((1.0 / scale, 1.0 / scale));
-                            canvas.draw_image(&temp_gl.as_image(), (0.0, 0.0), None);
-                        });
-                        context.flush();
-                    }
-                    ogl_state.surface_bounds = layer.surface_bounds;
-                    Some(ogl_state)
-                }
-            } else {
-                None
-            }
-            .unwrap_or_else(|| {
-                let mut gl = context.create_layer(surface_width, surface_height).unwrap();
-                gl.canvas().scale((scale, scale));
+            let mut graphic_layer = if is_root {
                 LayerState {
-                    layer: gl,
+                    layer: DrawLayer::Root,
                     surface_width,
                     surface_height,
                     total_matrix: Matrix::default(),
@@ -189,10 +153,22 @@ impl ElementPainter {
                     surface_bounds: layer.surface_bounds,
                     matrix: Matrix::default(),
                 }
-            });
+            } else {
+                self.get_graphic_layer(
+                    context,
+                    layer,
+                    layer_state_map,
+                    surface_width,
+                    surface_height,
+                    scale,
+                )
+            };
             graphic_layer.total_matrix = layer.total_matrix.clone();
             graphic_layer.matrix = layer.matrix.clone();
-            let layer_canvas = graphic_layer.layer.canvas();
+            let layer_canvas = match &mut graphic_layer.layer {
+                DrawLayer::Root => painter.canvas,
+                DrawLayer::Sublayer(sl) => sl.canvas(),
+            };
             layer_canvas.save();
 
             layer_canvas.translate((
@@ -235,9 +211,73 @@ impl ElementPainter {
         }
 
         for l in &mut layer.layers {
-            self.draw_layer(painter, context, l, layer_state_map);
+            self.draw_layer(painter, context, l, layer_state_map, false);
         }
         root_canvas.restore();
+    }
+
+    fn get_graphic_layer(
+        &mut self,
+        context: &mut RenderContext,
+        layer: &mut LayerPO,
+        layer_state_map: &mut HashMap<RenderLayerKey, LayerState>,
+        surface_width: usize,
+        surface_height: usize,
+        scale: f32,
+    ) -> LayerState {
+        if let Some(mut ogl_state) = layer_state_map.remove(&layer.key) {
+            let sublayer = match &mut ogl_state.layer {
+                DrawLayer::Sublayer(sl) => sl,
+                DrawLayer::Root => unreachable!(),
+            };
+            if ogl_state.surface_width != surface_width
+                || ogl_state.surface_height != surface_height
+            {
+                None
+            } else {
+                //TODO fix scroll delta
+                let scroll_delta_x = layer.surface_bounds.left - ogl_state.surface_bounds.left;
+                let scroll_delta_y = layer.surface_bounds.top - ogl_state.surface_bounds.top;
+                if scroll_delta_x != 0.0 || scroll_delta_y != 0.0 {
+                    let mut temp_gl = context.create_layer(surface_width, surface_height).unwrap();
+                    temp_gl.canvas().session(|canvas| {
+                        // canvas.clip_rect(&Rect::new(0.0, 0.0, layer.width * scale, layer.height * scale), ClipOp::Intersect, false);
+                        canvas.clear(Color::TRANSPARENT);
+                        canvas.draw_image(
+                            &sublayer.as_image(),
+                            (-scroll_delta_x * scale, -scroll_delta_y * scale),
+                            None,
+                        );
+                    });
+                    context.flush();
+
+                    sublayer.canvas().session(|canvas| {
+                        canvas.clear(Color::TRANSPARENT);
+                        // canvas.clip_rect(&Rect::from_xywh(0.0, 0.0, layer.width, layer.height), ClipOp::Intersect, false);
+                        canvas.scale((1.0 / scale, 1.0 / scale));
+                        canvas.draw_image(&temp_gl.as_image(), (0.0, 0.0), None);
+                    });
+                    context.flush();
+                }
+                ogl_state.surface_bounds = layer.surface_bounds;
+                Some(ogl_state)
+            }
+        } else {
+            None
+        }
+        .unwrap_or_else(|| {
+            let mut gl = context.create_layer(surface_width, surface_height).unwrap();
+            gl.canvas().scale((scale, scale));
+            LayerState {
+                layer: DrawLayer::Sublayer(gl),
+                surface_width,
+                surface_height,
+                total_matrix: Matrix::default(),
+                invalid_rects: InvalidRects::default(),
+                surface_bounds: layer.surface_bounds,
+                matrix: Matrix::default(),
+            }
+        })
     }
 
     fn draw_element_paint_object(&mut self, painter: &Painter, node: &mut ElementPO) {

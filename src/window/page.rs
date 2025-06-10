@@ -3,7 +3,7 @@ use crate::base::EventRegistration;
 use crate::element::body::Body;
 use crate::element::{Element, ElementBackend, ElementType};
 use crate::window::WindowHandle;
-use crate::{js_weak_value, ok_or_return};
+use crate::js_weak_value;
 use deft_macros::{js_methods, mrc_object};
 
 #[mrc_object]

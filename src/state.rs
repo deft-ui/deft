@@ -150,7 +150,7 @@ pub mod tests {
         let state = sm.new_state(my_state);
 
         {
-            let mut state_mut_ref = state.upgrade_mut().unwrap();
+            let state_mut_ref = state.upgrade_mut().unwrap();
             assert_eq!(162534, state_mut_ref.num);
         }
 

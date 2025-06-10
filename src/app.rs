@@ -10,7 +10,6 @@ use crate::js::loader::JsModuleLoader;
 use crate::mrc::Mrc;
 use crate::window::{
     window_check_update, window_input, window_on_render_idle, window_send_key, window_update_inset,
-    WindowHandle,
 };
 use anyhow::Error;
 #[cfg(target_os = "android")]

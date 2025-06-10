@@ -37,8 +37,13 @@ impl<'a> Painter<'a> {
     }
 }
 
+pub enum DrawLayer {
+    Root,
+    Sublayer(Layer),
+}
+
 pub struct LayerState {
-    pub layer: Layer,
+    pub layer: DrawLayer,
     pub matrix: Matrix,
     pub total_matrix: Matrix,
     pub invalid_rects: InvalidRects,

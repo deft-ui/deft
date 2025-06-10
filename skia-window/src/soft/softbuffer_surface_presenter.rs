@@ -2,7 +2,7 @@ use crate::paint::Canvas;
 use crate::soft::surface_presenter::SurfacePresenter;
 use skia_safe::{AlphaType, ColorSpace, ColorType, ImageInfo};
 use softbuffer::{Context, Surface};
-use std::num::NonZeroU32;
+use std::num::{NonZeroU32};
 use std::sync::mpsc::Sender;
 use std::sync::{mpsc, Arc, Mutex};
 use std::{slice, thread};
@@ -27,6 +27,10 @@ impl RenderTask {
         let mut win_surface = self.surface.lock().unwrap();
         let width = win_surface.width;
         let height = win_surface.height;
+        let _ = win_surface.surface.resize(
+            NonZeroU32::new(width).unwrap(),
+            NonZeroU32::new(height).unwrap(),
+        );
         let mut buffer = win_surface
             .surface
             .buffer_mut()
@@ -52,6 +56,8 @@ impl RenderTask {
         buffer
             .present()
             .expect("Failed to present the softbuffer buffer");
+        // Release buffer
+        let _ = win_surface.surface.resize(NonZeroU32::new(1).unwrap(), NonZeroU32::new(1).unwrap());
         (self.callback)(true);
     }
 }
@@ -100,10 +106,6 @@ impl SurfacePresenter for SoftBufferSurfacePresenter {
         let mut win_surface = self.win_surface.lock().unwrap();
         win_surface.width = width;
         win_surface.height = height;
-        let _ = win_surface.surface.resize(
-            NonZeroU32::new(width).unwrap(),
-            NonZeroU32::new(height).unwrap(),
-        );
     }
 
     fn render(

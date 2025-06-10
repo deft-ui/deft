@@ -283,7 +283,7 @@ impl JsEngine {
                 run_with_event_loop(|el| {
                     if let Some(pos) = el.query_pointer(device_id) {
                         menu_windows.iter().for_each(|w| {
-                            if let Ok(mut window) = w.upgrade_mut() {
+                            if let Ok(window) = w.upgrade_mut() {
                                 let w_size = window.window.outer_size();
                                 if let Some(wp) = window.window.outer_position().ok() {
                                     let (wx, wy) = (wp.x as f32, wp.y as f32);
