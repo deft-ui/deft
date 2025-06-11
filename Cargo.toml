@@ -4,18 +4,18 @@ readme = "README.md"
 license = "MIT"
 description = "Cross platform ui framework"
 
-version = "0.10.2"
+version = "0.10.3"
 authors = ["KasonYang <me@kason.fun>"]
 edition = "2021"
 
 
 [dependencies]
-deft-macros = { path = "packages/deft-macros", version = "0.3.0" }
+deft-macros = { path = "packages/deft-macros", version = "0.3.1" }
 
 quick-js = { package = "deft-quick-js", version = "0.5.0"}
 yoga = { package = "deft-yoga", version = "0.6.0" }
 winit = { package = "deft-winit", version = "0.31.3", features = ["android-native-activity", "rwh_06"] }
-skia-window = { path = "skia-window", version = "0.7.0" }
+skia-window = { path = "skia-window", version = "0.7.1" }
 deft-tray = { path = "packages/deft-tray", version = "0.2.0", optional = true }
 
 base64 = { version = "0.22.0" }
@@ -72,11 +72,11 @@ skia-safe = { package = "deft-skia-safe", version = "0.83.0", features = ["binar
 
 [target.'cfg(all(target_os = "linux", not(target_env = "ohos")))'.dependencies]
 skia-safe = { package = "deft-skia-safe", version = "0.83.0", features = ["binary-cache", "x11", "wayland"], default-features = false }
-skia-window = { path = "skia-window", version = "0.7.0", features = ["x11", "wayland"] }
+skia-window = { path = "skia-window", version = "0.7.1", features = ["x11", "wayland"] }
 
 [target.'cfg(target_env = "ohos")'.dependencies]
 skia-safe = { package = "deft-skia-safe", version = "0.83.0", features = ["binary-cache", "egl"], default-features = false }
-skia-window = { path = "skia-window", version = "0.7.0", features = ["gl"] }
+skia-window = { path = "skia-window", version = "0.7.1", features = ["gl"] }
 napi-ohos = "1.0.4"
 napi-derive-ohos = "1.0.4"
 ohos-hilog-binding = "0.1.0"
