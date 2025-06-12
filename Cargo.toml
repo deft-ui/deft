@@ -3,6 +3,7 @@ name = "deft"
 readme = "README.md"
 license = "MIT"
 description = "Cross platform ui framework"
+repository = "https://github.com/deft-ui/deft"
 
 version = "0.10.3"
 authors = ["KasonYang <me@kason.fun>"]
