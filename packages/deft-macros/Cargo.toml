@@ -4,6 +4,7 @@ version = "0.3.1"
 edition = "2021"
 license = "MIT"
 description = "Deft macros"
+repository = "https://github.com/deft-ui/deft/"
 
 [lib]
 proc-macro = true
