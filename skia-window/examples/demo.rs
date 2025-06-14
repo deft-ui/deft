@@ -28,11 +28,13 @@ impl App {
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let win = SkiaWindow::new(event_loop, WindowAttributes::default(), RenderBackendType::SoftBuffer).unwrap();
+        let win = SkiaWindow::new(event_loop, WindowAttributes::default(), RenderBackendType::WebGL).unwrap();
+        //TODO fix, no request redraw manually?
         self.windows.insert(win.id(), win);
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
+        // println!("window event {:?}: {:?}", window_id, event);
         if let Some(win) = self.windows.get_mut(&window_id) {
             match event {
                 WindowEvent::MouseInput { state, .. } => {
@@ -76,7 +78,7 @@ fn run(event_loop: EventLoop<()>) {
     log::trace!("Running mainloop...");
 
     let mut app = App::new();
-    event_loop.run_app(&mut app).unwrap();
+    event_loop.run_app(app).unwrap();
 }
 
 #[cfg(target_os = "android")]
@@ -91,13 +93,25 @@ fn android_main(app: AndroidApp) {
 }
 
 // declared as pub to avoid dead_code warnings from cdylib target build
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "emscripten")))]
 pub fn main() {
     // env_logger::builder()
     //     .filter_level(log::LevelFilter::Debug) // Default Log Level
     //     .parse_default_env()
     //     .init();
 
+    let event_loop = EventLoop::with_user_event().build().unwrap();
+    run(event_loop);
+}
+
+#[cfg(target_os = "emscripten")]
+pub fn main() {
+    // Do nothing
+}
+
+#[no_mangle]
+pub extern "C" fn asm_main() {
+    println!("Initializing...");
     let event_loop = EventLoop::with_user_event().build().unwrap();
     run(event_loop);
 }

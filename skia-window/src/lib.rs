@@ -11,3 +11,4 @@ pub mod renderer;
 mod soft;
 mod mrc;
 mod paint;
+mod webgl;

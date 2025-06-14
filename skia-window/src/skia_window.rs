@@ -18,6 +18,8 @@ pub enum RenderBackendType {
     GL,
     #[cfg(feature = "gl")]
     SoftGL,
+    #[cfg(feature = "webgl")]
+    WebGL,
 }
 
 impl RenderBackendType {
@@ -28,6 +30,8 @@ impl RenderBackendType {
         list.push(Self::GL);
         #[cfg(feature = "gl")]
         list.push(Self::SoftGL);
+        #[cfg(feature = "webgl")]
+        list.push(Self::WebGL);
         list
     }
 
@@ -83,10 +87,15 @@ impl SkiaWindow {
         let window = event_loop.create_window(attributes).unwrap();
         let surface_state: Box<dyn RenderBackend> = match backend {
             RenderBackendType::SoftBuffer => {
-                use crate::soft::softbuffer_surface_presenter::SoftBufferSurfacePresenter;
-                let presenter = SoftBufferSurfacePresenter::new(window);
-                let soft_surface = SoftSurface::new(event_loop, presenter);
-                Box::new(soft_surface)
+                #[cfg(target_os = "emscripten")]
+                return None;
+                #[cfg(not(target_os = "emscripten"))]
+                {
+                    use crate::soft::softbuffer_surface_presenter::SoftBufferSurfacePresenter;
+                    let presenter = SoftBufferSurfacePresenter::new(window);
+                    let soft_surface = SoftSurface::new(event_loop, presenter);
+                    Box::new(soft_surface)
+                }
             }
             #[cfg(feature = "gl")]
             RenderBackendType::SoftGL => {
@@ -101,6 +110,9 @@ impl SkiaWindow {
                 #[cfg(target_env = "ohos")]
                 return None;
                 Box::new(crate::gl::SurfaceState::new(event_loop, window)?)
+            }
+            RenderBackendType::WebGL => {
+                Box::new(crate::webgl::WebGLRenderer::new(event_loop, window)?)
             }
         };
         Some(Self { surface_state })
