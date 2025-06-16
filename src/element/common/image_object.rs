@@ -1,4 +1,4 @@
-use crate::element::label::FONT_MGR;
+use crate::element::common::svg_object::SvgObject;
 use crate::img_manager::{dyn_image_to_skia_image, IMG_MANAGER};
 use crate::render::RenderFn;
 use anyhow::Error;
@@ -6,15 +6,12 @@ use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use image::{EncodableLayout, ImageReader};
 use log::error;
-use skia_safe::svg::Dom;
-use skia_safe::wrapper::PointerWrapper;
 use skia_safe::Color;
-use std::fs::File;
 use std::io::Cursor;
 
 #[derive(Clone)]
 enum ImageSrc {
-    Svg(Dom),
+    Svg(SvgObject),
     Img(skia_safe::Image),
     None,
 }
@@ -24,10 +21,7 @@ unsafe impl Send for ImageSrc {}
 impl ImageSrc {
     pub fn get_size(&self) -> (f32, f32) {
         match self {
-            ImageSrc::Svg(dom) => unsafe {
-                let size = *dom.inner().containerSize();
-                (size.fWidth, size.fHeight)
-            },
+            ImageSrc::Svg(dom) => unsafe { dom.container_size() },
             ImageSrc::Img(img) => (img.width() as f32, img.height() as f32),
             ImageSrc::None => (0.0, 0.0),
         }
@@ -99,8 +93,8 @@ impl ImageObject {
             canvas.scale((width / img_width, height / img_height));
             match img {
                 ImageSrc::Svg(dom) => {
-                    dom.root().set_color(color);
-                    dom.render(canvas);
+                    dom.set_color(color);
+                    dom.render(canvas, painter.context.scale_factor);
                 }
                 ImageSrc::Img(img) => {
                     canvas.draw_image(img, (0.0, 0.0), None);
@@ -137,8 +131,7 @@ impl ImageObject {
     }
 
     fn load_svg_from_data(data: &[u8]) -> ImageSrc {
-        let fm = FONT_MGR.with(|fm| fm.clone());
-        match Dom::read(Cursor::new(data), fm) {
+        match SvgObject::from_bytes(data) {
             Ok(dom) => ImageSrc::Svg(dom),
             Err(_) => ImageSrc::None,
         }
@@ -157,10 +150,8 @@ impl ImageObject {
         }
     }
 
-    fn load_svg(src: &str) -> Result<Dom, Error> {
-        let fm = FONT_MGR.with(|fm| fm.clone());
-        let data = File::open(src)?;
-        Ok(Dom::read(data, fm)?)
+    fn load_svg(src: &str) -> Result<SvgObject, Error> {
+        Ok(SvgObject::from_file(src)?)
     }
 
     fn parse_data_url(url: &str) -> Option<(String, Vec<u8>)> {

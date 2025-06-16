@@ -49,6 +49,7 @@ font-kit = { version = "0.15.0", package = "deft-font-kit" }
 swash = "0.2.2"
 memmap2 = "0.9.5"
 simplecss = { version = "0.3.1", package = "deft-simplecss" }
+resvg = { version = "0.46.0", default-features = false, package = "deft-resvg" }
 
 [features]
 default = ["websocket", "http", "tray", "clipboard"]

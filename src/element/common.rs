@@ -1,6 +1,7 @@
 pub mod editable;
 pub mod image_object;
 pub mod scrollable;
+mod svg_object;
 
 use crate as deft;
 use crate::base::{EventContext, Rect};

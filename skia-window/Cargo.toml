@@ -25,7 +25,7 @@ winit = { package = "deft-winit", version = "0.31.4", features = ["android-nativ
 glutin = { version = "0.32.3", optional = true }
 measure_time = "0.8.3"
 raw-window-handle = "0.6.0"
-skia-safe = { package = "deft-skia-safe", features = ["binary-cache", "svg", "gl"], default-features = false, version = "0.83.0" }
+skia-safe = { package = "deft-skia-safe", features = ["binary-cache", "gl"], default-features = false, version = "0.83.0" }
 gl = { version = "0.14.0", optional = true }
 # sparkle = { version = "0.1.25" }
 softbuffer = { version = "0.5.0", package = "deft-softbuffer" }
