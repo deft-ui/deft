@@ -5,7 +5,7 @@ license = "MIT"
 description = "Cross platform ui framework"
 repository = "https://github.com/deft-ui/deft"
 
-version = "0.10.3"
+version = "0.11.0"
 authors = ["KasonYang <me@kason.fun>"]
 edition = "2021"
 
@@ -16,7 +16,7 @@ deft-macros = { path = "packages/deft-macros", version = "0.3.1" }
 quick-js = { package = "deft-quick-js", version = "0.6.1"}
 yoga = { package = "deft-yoga", version = "0.7.0" }
 winit = { package = "deft-winit", version = "0.32.0", features = ["android-native-activity", "rwh_06"] }
-skia-window = { path = "skia-window", version = "0.7.1"}
+skia-window = { path = "skia-window", version = "0.8.0"}
 deft-tray = { path = "packages/deft-tray", version = "0.2.0", optional = true }
 
 base64 = { version = "0.22.0" }
@@ -75,11 +75,11 @@ skia-safe = { package = "deft-skia-safe", version = "0.83.0", features = ["binar
 
 [target.'cfg(all(target_os = "linux", not(target_env = "ohos")))'.dependencies]
 skia-safe = { package = "deft-skia-safe", version = "0.83.0", features = ["binary-cache", "x11", "wayland", "svg"], default-features = false }
-skia-window = { path = "skia-window", version = "0.7.1", features = ["x11", "wayland"] }
+skia-window = { path = "skia-window", version = "0.8.0", features = ["x11", "wayland"] }
 
 [target.'cfg(target_env = "ohos")'.dependencies]
 skia-safe = { package = "deft-skia-safe", version = "0.83.0", features = ["binary-cache", "egl", "svg"], default-features = false }
-skia-window = { path = "skia-window", version = "0.7.1", features = ["gl"] }
+skia-window = { path = "skia-window", version = "0.8.0", features = ["gl"] }
 napi-ohos = "1.0.4"
 napi-derive-ohos = "1.0.4"
 ohos-hilog-binding = "0.1.0"
@@ -92,7 +92,7 @@ deft-ohos-logger = {version = "0.1.0", path = "packages/deft-ohos-logger" }
 windows = { version = "0.61.1", features = ["Win32_System_Console"] }
 
 [target.'cfg(target_os = "emscripten")'.dependencies]
-skia-window = { path = "skia-window", version = "0.7.1", features = ["webgl"] }
+skia-window = { path = "skia-window", version = "0.8.0", features = ["webgl"] }
 [target.'cfg(not(target_os = "emscripten"))'.dependencies]
 tokio = { version = "1.38.0", features = ["rt-multi-thread", "fs", "macros", "io-std", "io-util", "sync"] }
 

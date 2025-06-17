@@ -1,6 +1,6 @@
 [package]
 name = "skia-window"
-version = "0.7.1"
+version = "0.8.0"
 edition = "2021"
 description = "Rendering window with skia"
 license = "MIT"
