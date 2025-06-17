@@ -48,7 +48,7 @@ pub const DEFAULT_FALLBACK_FONTS: &str = "Roboto,Noto Sans CJK SC,Noto Sans CJK 
     target_os = "macos",
     target_os = "android"
 )))]
-pub const DEFAULT_FALLBACK_FONTS: &str = "sans-serif";
+pub const DEFAULT_FALLBACK_FONTS: &str = "Noto Serif,sans-serif";
 
 const ZERO_WIDTH_WHITESPACE: &str = "\u{200B}";
 

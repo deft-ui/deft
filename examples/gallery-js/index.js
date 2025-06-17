@@ -61,7 +61,7 @@ function createButton(title, callback) {
     label.text = title;
     btn.addChild(label);
     btn.style = {
-        width: "6em",
+        width: "7em",
         alignItems: 'center',
     }
     btn.bindClick((e) => {

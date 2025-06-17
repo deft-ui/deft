@@ -6,6 +6,7 @@ fn main() {
         // Systems.
         android_platform: { target_os = "android" },
         web_platform: { all(target_family = "wasm", target_os = "unknown") },
+        emscripten_platform: { all(target_family = "wasm", target_os = "emscripten") },
         macos_platform: { target_os = "macos" },
         ios_platform: { target_os = "ios" },
         windows_platform: { target_os = "windows" },
@@ -22,6 +23,10 @@ fn main() {
         orbital_platform: { redox },
         // Systems
         mobile_platform: { any(target_os = "ios", target_os = "android") },
+
+        // Available
+        fs_enabled: { not(target_family = "wasm") }
+
     }
 
     #[cfg(target_env = "ohos")]

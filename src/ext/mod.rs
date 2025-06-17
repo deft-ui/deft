@@ -2,6 +2,7 @@
 mod audio_player;
 pub mod common;
 pub mod ext_animation;
+#[cfg(fs_enabled)]
 pub mod ext_appfs;
 #[cfg(feature = "audio")]
 pub mod ext_audio;
@@ -14,6 +15,7 @@ pub mod ext_dialog;
 pub mod ext_env;
 #[cfg(feature = "http")]
 pub mod ext_fetch;
+#[cfg(fs_enabled)]
 pub mod ext_fs;
 #[cfg(feature = "http")]
 pub mod ext_http;

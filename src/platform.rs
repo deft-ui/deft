@@ -27,3 +27,8 @@ pub use macos::*;
 mod ios;
 #[cfg(ios_platform)]
 pub use ios::*;
+
+#[cfg(emscripten_platform)]
+mod emscripten;
+#[cfg(emscripten_platform)]
+pub use emscripten::*;

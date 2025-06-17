@@ -83,7 +83,7 @@ fn run_event_loop(event_loop: EventLoop<AppEventPayload>, deft_app: App) {
     #[cfg(ohos)]
     platform::run_app(event_loop, app);
     #[cfg(not(ohos))]
-    event_loop.run_app(&mut app).unwrap();
+    event_loop.run_app(app).unwrap();
 }
 
 /// Boostrap for desktop apps

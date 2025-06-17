@@ -7,6 +7,7 @@ use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
+use libc::c_int;
 
 thread_local! {
     pub static TIMER: RefCell<Timer> = RefCell::new(Timer::new());
@@ -66,23 +67,47 @@ struct Timer {
 
 const DEFAULT_SLEEP_TIME: u64 = 10000000000;
 
+enum InnerTimerHandle {
+    #[cfg(not(emscripten_platform))]
+    Task(u64),
+    #[cfg(emscripten_platform)]
+    JsTimeout(c_int),
+    #[cfg(emscripten_platform)]
+    JsInterval(c_int),
+}
+
 pub struct TimerHandle {
-    id: u64,
+    inner: InnerTimerHandle,
 }
 
 impl TimerHandle {
-    fn new(id: u64) -> Self {
-        Self { id }
+    fn new(inner: InnerTimerHandle) -> Self {
+        Self { inner }
     }
 
-    pub fn get_id(&self) -> u64 {
-        self.id
-    }
 }
 
 impl Drop for TimerHandle {
     fn drop(&mut self) {
-        remove_time_task(self.id);
+        #[cfg(not(emscripten_platform))]
+        {
+            match self.inner {
+                InnerTimerHandle::Task(id) => {
+                    remove_time_task(id);
+                }
+            }
+        }
+        #[cfg(emscripten_platform)]
+        unsafe {
+            match self.inner {
+                InnerTimerHandle::JsTimeout(id) => {
+                    deft_emscripten_sys::emscripten_clear_timeout(id)
+                }
+                InnerTimerHandle::JsInterval(id) => {
+                    deft_emscripten_sys::emscripten_clear_interval(id)
+                }
+            }
+        }
     }
 }
 
@@ -92,6 +117,7 @@ impl Timer {
         let tasks = Arc::new(Mutex::new(BTreeSet::<TimeTask>::new()));
         let tasks_arc = tasks.clone();
         let js_event_loop_proxy = js_create_event_loop_proxy();
+        #[cfg(not(emscripten_platform))]
         thread::spawn(move || {
             let mut sleep_time = Duration::from_millis(DEFAULT_SLEEP_TIME);
             loop {
@@ -127,6 +153,7 @@ pub fn set_timeout<F: FnOnce() + 'static>(callback: F, millis: u64) -> TimerHand
     set_timeout_nanos(callback, millis * 1000000)
 }
 
+#[cfg(not(target_os = "emscripten"))]
 pub fn set_timeout_nanos<F: FnOnce() + 'static>(callback: F, nanos: u64) -> TimerHandle {
     let id = get_next_id();
     let execute_time = get_now_time().add(Duration::from_nanos(nanos));
@@ -135,9 +162,40 @@ pub fn set_timeout_nanos<F: FnOnce() + 'static>(callback: F, nanos: u64) -> Time
         next_execute_time: execute_time,
         task: Task::Timeout(Box::new(callback)),
     });
-    TimerHandle::new(id)
+    TimerHandle::new(InnerTimerHandle::Task(id))
 }
 
+#[no_mangle]
+extern "C" fn js_timeout_callback(user_data: *mut ::core::ffi::c_void) {
+    let mut callback = unsafe { Box::from_raw(user_data as *mut Box<dyn FnOnce()>) };
+    callback();
+}
+
+#[no_mangle]
+extern "C" fn js_interval_callback(user_data: *mut ::core::ffi::c_void) {
+    unsafe {
+        let mut callback = unsafe { Box::from_raw(user_data as *mut Box<dyn Fn()>) };
+        callback();
+        Box::leak(callback);
+    }
+}
+
+#[cfg(target_os = "emscripten")]
+pub fn set_timeout_nanos<F: FnOnce() + 'static>(callback: F, nanos: u64) -> TimerHandle {
+    let callback: Box<dyn FnOnce()> = Box::new(callback);
+    let user_data = Box::leak(Box::new(callback));
+    let timeout = (nanos / 1000000) as f64;
+    unsafe {
+        let id = deft_emscripten_sys::emscripten_set_timeout(
+            Some(js_timeout_callback),
+            timeout,
+            user_data as *mut _ as *mut ::core::ffi::c_void
+        );
+        TimerHandle::new(InnerTimerHandle::JsTimeout(id))
+    }
+}
+
+#[cfg(not(target_os = "emscripten"))]
 pub fn set_interval<F: Fn() + 'static>(callback: F, interval: u64) -> TimerHandle {
     let id = get_next_id();
     let next_execute_time = get_now_time().add(Duration::from_millis(interval));
@@ -146,7 +204,21 @@ pub fn set_interval<F: Fn() + 'static>(callback: F, interval: u64) -> TimerHandl
         next_execute_time,
         task: Task::Interval(interval, Box::new(callback)),
     });
-    TimerHandle::new(id)
+    TimerHandle::new(InnerTimerHandle::Task(id))
+}
+
+#[cfg(target_os = "emscripten")]
+pub fn set_interval<F: Fn() + 'static>(callback: F, interval: u64) -> TimerHandle {
+    let callback: Box<dyn Fn()> = Box::new(callback);
+    let user_data = Box::leak(Box::new(callback));
+    unsafe {
+        let id = deft_emscripten_sys::emscripten_set_interval(
+            Some(js_interval_callback),
+            interval as f64,
+            user_data as *mut _ as *mut ::core::ffi::c_void
+        );
+        TimerHandle::new(InnerTimerHandle::JsInterval(id))
+    }
 }
 
 fn get_next_id() -> u64 {

@@ -6,10 +6,15 @@ use crate::style::font::FontStyle;
 use deft_macros::mrc_object;
 use font_kit::family_name::FamilyName;
 use font_kit::handle::Handle;
-use font_kit::source::{Source, SystemSource};
+use font_kit::source::Source;
+#[cfg(not(target_os = "emscripten"))]
+use font_kit::source::SystemSource;
+#[cfg(target_os = "emscripten")]
+use font_kit::sources::mem::MemSource as SystemSource;
 use skia_safe::font_style::Slant;
 use skia_safe::wrapper::NativeTransmutableWrapper;
 use std::collections::HashMap;
+use std::sync::Arc;
 use swash::{ObliqueAngle, Style, Weight};
 
 #[mrc_object]
@@ -27,6 +32,17 @@ struct FontCacheKey {
 
 impl FontManager {
     pub fn new() -> FontManager {
+        #[cfg(target_os = "emscripten")]
+        let mut source = {
+            let mut source = SystemSource::empty();
+            source.add_font(Handle::Memory {
+                bytes: Arc::new(include_bytes!("../../fonts/NotoSerif-Regular.ttf").to_vec()),
+                font_index: 0,
+            }).unwrap();
+            source
+        };
+
+        #[cfg(not(target_os = "emscripten"))]
         let source = SystemSource::new();
         // source.all_families().unwrap().iter().for_each(|family| println!("{}", family));
         FontManagerData {

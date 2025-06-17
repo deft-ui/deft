@@ -29,7 +29,6 @@ impl App {
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let win = SkiaWindow::new(event_loop, WindowAttributes::default(), RenderBackendType::WebGL).unwrap();
-        //TODO fix, no request redraw manually?
         self.windows.insert(win.id(), win);
     }
 

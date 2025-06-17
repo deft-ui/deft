@@ -24,10 +24,12 @@ use crate::element::textinput::TextInput;
 use crate::element::{init_base_components, Element, CSS_MANAGER};
 use crate::event_loop::run_with_event_loop;
 use crate::ext::ext_animation::animation_create;
+#[cfg(fs_enabled)]
 use crate::ext::ext_appfs::appfs;
 use crate::ext::ext_base64::Base64;
 use crate::ext::ext_console::Console as ExtConsole;
 use crate::ext::ext_env::env;
+#[cfg(fs_enabled)]
 use crate::ext::ext_fs::{
     fs_create_dir, fs_create_dir_all, fs_delete_file, fs_exists, fs_read_dir, fs_remove_dir,
     fs_remove_dir_all, fs_rename, fs_stat,
@@ -98,11 +100,22 @@ impl JsEngine {
             let mut app = app.app_impl.lock().unwrap();
             SharedModuleLoader::new(app.create_module_loader())
         };
-        let runtime = Builder::new_multi_thread()
-            .worker_threads(4)
-            .enable_all()
-            .build()
-            .unwrap();
+        #[cfg(not(emscripten_platform))]
+        let runtime =  {
+            Builder::new_multi_thread()
+                .worker_threads(4)
+                .enable_all()
+                .build()
+                .unwrap()
+        };
+        #[cfg(emscripten_platform)]
+        let runtime =  {
+            Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+        };
+
         let js_context = Context::builder()
             .console(Console::new())
             .module_loader(loader.clone())
@@ -149,6 +162,7 @@ impl JsEngine {
         engine.add_global_functions(env::create_js_apis());
         #[cfg(feature = "http")]
         engine.add_global_functions(crate::ext::ext_http::http::create_js_apis());
+        #[cfg(fs_enabled)]
         engine.add_global_functions(appfs::create_js_apis());
         engine.add_global_functions(localstorage::create_js_apis());
         // websocket
@@ -163,15 +177,18 @@ impl JsEngine {
         engine.add_global_func(timer_set_interval::new());
         engine.add_global_func(timer_clear_interval::new());
 
-        engine.add_global_func(fs_read_dir::new());
-        engine.add_global_func(fs_stat::new());
-        engine.add_global_func(fs_exists::new());
-        engine.add_global_func(fs_rename::new());
-        engine.add_global_func(fs_delete_file::new());
-        engine.add_global_func(fs_create_dir::new());
-        engine.add_global_func(fs_create_dir_all::new());
-        engine.add_global_func(fs_remove_dir::new());
-        engine.add_global_func(fs_remove_dir_all::new());
+        #[cfg(fs_enabled)]
+        {
+            engine.add_global_func(fs_read_dir::new());
+            engine.add_global_func(fs_stat::new());
+            engine.add_global_func(fs_exists::new());
+            engine.add_global_func(fs_rename::new());
+            engine.add_global_func(fs_delete_file::new());
+            engine.add_global_func(fs_create_dir::new());
+            engine.add_global_func(fs_create_dir_all::new());
+            engine.add_global_func(fs_remove_dir::new());
+            engine.add_global_func(fs_remove_dir_all::new());
+        }
 
         engine.add_global_func(animation_create::new());
         engine.add_global_func(typeface_create::new());

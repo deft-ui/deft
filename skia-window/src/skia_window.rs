@@ -84,7 +84,6 @@ impl SkiaWindow {
         attributes: WindowAttributes,
         backend: RenderBackendType,
     ) -> Option<Self> {
-        let window = event_loop.create_window(attributes).unwrap();
         let surface_state: Box<dyn RenderBackend> = match backend {
             RenderBackendType::SoftBuffer => {
                 #[cfg(target_os = "emscripten")]
@@ -92,6 +91,7 @@ impl SkiaWindow {
                 #[cfg(not(target_os = "emscripten"))]
                 {
                     use crate::soft::softbuffer_surface_presenter::SoftBufferSurfacePresenter;
+                    let window = event_loop.create_window(attributes).ok()?;
                     let presenter = SoftBufferSurfacePresenter::new(window);
                     let soft_surface = SoftSurface::new(event_loop, presenter);
                     Box::new(soft_surface)
@@ -99,6 +99,7 @@ impl SkiaWindow {
             }
             #[cfg(feature = "gl")]
             RenderBackendType::SoftGL => {
+                let window = event_loop.create_window(attributes).ok()?;
                 let soft_surface = SoftSurface::new(
                     event_loop,
                     crate::soft::gl_presenter::GlPresenter::new(event_loop, window)?,
@@ -109,9 +110,12 @@ impl SkiaWindow {
             RenderBackendType::GL => {
                 #[cfg(target_env = "ohos")]
                 return None;
+                let window = event_loop.create_window(attributes).ok()?;
                 Box::new(crate::gl::SurfaceState::new(event_loop, window)?)
             }
+            #[cfg(target_os = "emscripten")]
             RenderBackendType::WebGL => {
+                let window = event_loop.create_window(attributes).ok()?;
                 Box::new(crate::webgl::WebGLRenderer::new(event_loop, window)?)
             }
         };

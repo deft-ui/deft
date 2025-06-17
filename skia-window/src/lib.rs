@@ -11,4 +11,5 @@ pub mod renderer;
 mod soft;
 mod mrc;
 mod paint;
+#[cfg(feature = "webgl")]
 mod webgl;

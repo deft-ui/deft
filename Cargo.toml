@@ -13,17 +13,17 @@ edition = "2021"
 [dependencies]
 deft-macros = { path = "packages/deft-macros", version = "0.3.1" }
 
-quick-js = { package = "deft-quick-js", version = "0.6.0"}
+quick-js = { package = "deft-quick-js", version = "0.6.1"}
 yoga = { package = "deft-yoga", version = "0.7.0" }
-winit = { package = "deft-winit", version = "0.31.4", features = ["android-native-activity", "rwh_06"] }
-skia-window = { path = "skia-window", version = "0.7.1" }
+winit = { package = "deft-winit", version = "0.32.0", features = ["android-native-activity", "rwh_06"] }
+skia-window = { path = "skia-window", version = "0.7.1"}
 deft-tray = { path = "packages/deft-tray", version = "0.2.0", optional = true }
 
 base64 = { version = "0.22.0" }
 ordered-float = "3.9.2"
 serde = { version = "1.0.203", features = ["derive"] }
 anyhow = { version = "1.0.75" }
-tokio = { version = "1.38.0", features = ["rt-multi-thread", "fs", "macros", "io-std", "io-util", "sync"] }
+tokio = { version = "1.38.0", features = ["rt", "macros", "io-util", "sync"], default-features = false }
 tokio-tungstenite = { version = "0.23.1", features = ["tokio-rustls"], optional = true }
 futures-util = "0.3.30"
 clipboard = { version = "0.5.1", package="deft-clipboard", optional = true }
@@ -50,6 +50,7 @@ swash = "0.2.2"
 memmap2 = "0.9.5"
 simplecss = { version = "0.3.1", package = "deft-simplecss" }
 resvg = { version = "0.46.0", default-features = false, package = "deft-resvg" }
+deft-emscripten-sys = "0.1.0"
 
 [features]
 default = ["websocket", "http", "tray", "clipboard"]
@@ -70,14 +71,14 @@ reqwest = { version = "0.11.27",default-features = false, features = ["blocking"
 android_logger = "0.11.0"
 jni = "0.21.1"
 reqwest = { version = "0.11.27",default-features = false, features = ["blocking", "native-tls-vendored", "multipart", "stream"], optional = true }
-skia-safe = { package = "deft-skia-safe", version = "0.83.0", features = ["binary-cache", "x11"], default-features = false }
+skia-safe = { package = "deft-skia-safe", version = "0.83.0", features = ["binary-cache", "x11", "svg"], default-features = false }
 
 [target.'cfg(all(target_os = "linux", not(target_env = "ohos")))'.dependencies]
-skia-safe = { package = "deft-skia-safe", version = "0.83.0", features = ["binary-cache", "x11", "wayland"], default-features = false }
+skia-safe = { package = "deft-skia-safe", version = "0.83.0", features = ["binary-cache", "x11", "wayland", "svg"], default-features = false }
 skia-window = { path = "skia-window", version = "0.7.1", features = ["x11", "wayland"] }
 
 [target.'cfg(target_env = "ohos")'.dependencies]
-skia-safe = { package = "deft-skia-safe", version = "0.83.0", features = ["binary-cache", "egl"], default-features = false }
+skia-safe = { package = "deft-skia-safe", version = "0.83.0", features = ["binary-cache", "egl", "svg"], default-features = false }
 skia-window = { path = "skia-window", version = "0.7.1", features = ["gl"] }
 napi-ohos = "1.0.4"
 napi-derive-ohos = "1.0.4"
@@ -89,6 +90,11 @@ deft-ohos-logger = {version = "0.1.0", path = "packages/deft-ohos-logger" }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.61.1", features = ["Win32_System_Console"] }
+
+[target.'cfg(target_os = "emscripten")'.dependencies]
+skia-window = { path = "skia-window", version = "0.7.1", features = ["webgl"] }
+[target.'cfg(not(target_os = "emscripten"))'.dependencies]
+tokio = { version = "1.38.0", features = ["rt-multi-thread", "fs", "macros", "io-std", "io-util", "sync"] }
 
 [build-dependencies]
 cfg_aliases = "0.2.1"
