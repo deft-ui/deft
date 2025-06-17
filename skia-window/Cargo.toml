@@ -31,7 +31,7 @@ gl = { version = "0.14.0", optional = true }
 # sparkle = { version = "0.1.25" }
 softbuffer = { version = "0.5.0", package = "deft-softbuffer", default-features = false }
 
-[target.'cfg(all(target_os = "linux", not(target_env = "ohos")))'.dependencies]
+[target.'cfg(all(target_os = "linux"))'.dependencies]
 softbuffer = { version = "0.5.0", package = "deft-softbuffer", default-features = true }
 
 [target.'cfg(target_os = "android")'.dependencies]
