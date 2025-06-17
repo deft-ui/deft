@@ -8,6 +8,7 @@ use image::{EncodableLayout, ImageReader};
 use log::error;
 use skia_safe::Color;
 use std::io::Cursor;
+use crate::resource::Resource;
 
 #[derive(Clone)]
 enum ImageSrc {
@@ -114,6 +115,17 @@ impl ImageObject {
                     return Self::load_image_from_data(&data);
                 }
             }
+        } else if let Some(res_key) = src.strip_prefix("res://") {
+            return Resource::read(res_key, |data| {
+                if res_key.ends_with(".svg") {
+                    Self::load_svg_from_data(data)
+                } else {
+                    Self::load_image_from_data(data)
+                }
+            }).unwrap_or_else(|| {
+                error!("Image not found: {:?}", src);
+                ImageSrc::None
+            });
         } else if src.ends_with(".svg") {
             return if let Ok(dom) = Self::load_svg(&src) {
                 ImageSrc::Svg(dom)

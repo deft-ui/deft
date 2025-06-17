@@ -61,6 +61,7 @@ mod task_executor;
 mod text;
 mod typeface;
 pub mod winit;
+pub mod resource;
 
 use crate::base::ResultWaiter;
 use crate::console::init_console;

@@ -3,6 +3,7 @@ use deft::app::{App, IApp};
 use deft::bootstrap;
 use deft::js::js_engine::JsEngine;
 use quick_js::loader::JsModuleLoader;
+use deft::resource::Resource;
 
 struct AppImpl {}
 
@@ -27,11 +28,20 @@ impl IApp for AppImpl {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-fn main() {
+fn bootstrap_app() {
     env_logger::init();
+
+    // Add image resource
+    Resource::add("img.svg", include_bytes!("./gallery-js/img.svg").to_vec());
+
+    // Bootstrap app
     let app = App::new(AppImpl {});
     bootstrap(app);
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn main() {
+    bootstrap_app();
 }
 
 
@@ -40,9 +50,8 @@ pub fn main() {
     // Do nothing
 }
 
+#[cfg(target_os = "emscripten")]
 #[no_mangle]
 pub extern "C" fn asm_main() {
-    println!("Initializing...");
-    let app = App::new(AppImpl {});
-    bootstrap(app);
+    bootstrap_app();
 }
