@@ -21,6 +21,8 @@ Deft is a framework for building desktop and mobile applications with Rust and J
 
 # Component Gallery
 
+[Live Demo(WASM)](https://deft-ui.github.io/gallery/)
+
 <img width="360" src="https://github.com/deft-ui/deft/blob/main/snapshots/gallery.png?raw=true" />
 <img width="360" src="https://github.com/deft-ui/deft/blob/main/snapshots/gallery-dark.png?raw=true" />
 
@@ -66,9 +68,18 @@ apt install build-essential libssl-dev libclang-dev libc++-dev \
 
 ### Run demo
 
+Native:
 ```
-cargo run --example demo
+cargo run --example gallery
 ```
+
+Wasm:
+> Make sure that [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html) is installed.
+```bash
+./scripts/build-wasm.sh --release
+python3 -m http.server
+```
+Visit `http://localhost:8000/web/` to preview.
 
 # License
 
