@@ -15,7 +15,7 @@ deft-macros = { path = "packages/deft-macros", version = "0.3.1" }
 
 quick-js = { package = "deft-quick-js", version = "0.6.1"}
 yoga = { package = "deft-yoga", version = "0.7.0" }
-winit = { package = "deft-winit", version = "0.32.0", features = ["android-native-activity", "rwh_06"] }
+winit = { package = "deft-winit", version = "0.32.1", features = ["android-native-activity", "rwh_06"] }
 skia-window = { path = "skia-window", version = "0.8.0"}
 deft-tray = { path = "packages/deft-tray", version = "0.2.0", optional = true }
 

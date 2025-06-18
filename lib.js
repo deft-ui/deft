@@ -100,6 +100,10 @@ export class Process {
         return process_is_mobile_platform();
     }
 
+    get platform() {
+        return process_platform();
+    }
+
     /**
      *
      * @param handler {Function}

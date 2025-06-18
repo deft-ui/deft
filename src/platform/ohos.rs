@@ -1,3 +1,5 @@
+pub const PLATFORM_NAME: &'static str = "ohos";
+
 use crate::app::{AppEvent, AppEventPayload, WinitApp};
 use crate::{send_app_event, some_or_return};
 use log::debug;

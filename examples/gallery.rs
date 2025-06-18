@@ -29,8 +29,6 @@ impl IApp for AppImpl {
 }
 
 fn bootstrap_app() {
-    env_logger::init();
-
     // Add image resource
     Resource::add("img.svg", include_bytes!("./gallery-js/img.svg").to_vec());
 
@@ -41,6 +39,7 @@ fn bootstrap_app() {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
+    env_logger::init();
     bootstrap_app();
 }
 

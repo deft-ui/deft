@@ -161,6 +161,14 @@ function main() {
     const scroll = new ContainerElement();
     scroll.className = "main";
     window.body.addChild(scroll);
+    if (process.platform === "web") {
+        const tip = new LabelElement();
+        tip.text = "No CJK fonts loaded, only English will be displayed";
+        tip.style = {
+            color: '#F00'
+        }
+        scroll.addChild(tip);
+    }
 
     function createElementRow(label, element, flexDirection = "column") {
         const container = new ContainerElement();

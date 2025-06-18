@@ -41,6 +41,11 @@ impl process {
     }
 
     #[js_func]
+    pub fn platform() -> String {
+        crate::platform::PLATFORM_NAME.to_string()
+    }
+
+    #[js_func]
     pub fn set_promise_rejection_tracker(handler: JsValue) {
         let mut js_engine = JsEngine::get();
         let tracker = UserPromiseRejectionTracker { handler };

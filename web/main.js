@@ -13,11 +13,18 @@ function resizeCanvasToDisplaySize(canvas) {
     return false;
 }
 
+const loadingTip = document.createElement("div");
+loadingTip.textContent = "Loading wasm...";
+document.body.appendChild(loadingTip);
+
 // This loads and initialize our WASM module
 loadDeftApp().then((app) => {
+    document.body.removeChild(loadingTip);
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "width: 100vw; height: 100vh; display: block;";
+    document.body.appendChild(canvas);
     // Create the WebGL context
     let context;
-    const canvas = document.querySelector("#glcanvas");
     context = canvas.getContext("webgl2", {
         antialias: true,
         depth: true,
@@ -42,4 +49,8 @@ loadDeftApp().then((app) => {
     window.addEventListener("resize", () => {
         resizeCanvasToDisplaySize(canvas);
     });
+}).catch((e) => {
+    console.error(e);
+    loadingTip.style.color = "red";
+    loadingTip.textContent = "Failed to load wasm: " + e.message;
 });
