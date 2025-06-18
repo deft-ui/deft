@@ -165,7 +165,7 @@ impl Editable {
                 self.paragraph.set_mask_char(None);
             }
             InputType::Password => {
-                self.paragraph.set_mask_char(Some('●'));
+                self.paragraph.set_mask_char(Some('*'));
             }
         }
         self.input_type = input_type;
