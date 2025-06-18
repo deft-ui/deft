@@ -3,6 +3,7 @@ use deft::app::{App, IApp};
 use deft::bootstrap;
 use deft::js::js_engine::JsEngine;
 use quick_js::loader::JsModuleLoader;
+use deft::log::SimpleLogger;
 use deft::resource::Resource;
 
 struct AppImpl {}
@@ -52,5 +53,6 @@ pub fn main() {
 #[cfg(target_os = "emscripten")]
 #[no_mangle]
 pub extern "C" fn asm_main() {
+    SimpleLogger::init_with_max_level(log::LevelFilter::Info);
     bootstrap_app();
 }

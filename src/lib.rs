@@ -62,6 +62,7 @@ mod text;
 mod typeface;
 pub mod winit;
 pub mod resource;
+pub mod log;
 
 use crate::base::ResultWaiter;
 use crate::console::init_console;
