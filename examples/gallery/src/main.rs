@@ -15,7 +15,7 @@ impl IApp for AppImpl {
     #[cfg(desktop_platform)]
     fn create_module_loader(&mut self) -> Box<dyn JsModuleLoader + Send + Sync + 'static> {
         use deft::js::loader::FsJsModuleLoader;
-        let ml = FsJsModuleLoader::new("examples/gallery-js");
+        let ml = FsJsModuleLoader::new("js");
         Box::new(ml)
     }
 
@@ -25,7 +25,7 @@ impl IApp for AppImpl {
         let mut ml = StaticModuleLoader::new();
         ml.add_module(
             "index.js".to_string(),
-            include_str!("./gallery-js/index.js").to_owned(),
+            include_str!("../js/index.js").to_owned(),
         );
         Box::new(ml)
     }
@@ -33,7 +33,7 @@ impl IApp for AppImpl {
 
 fn bootstrap_app() {
     // Add image resource
-    Resource::add("img.svg", include_bytes!("./gallery-js/img.svg").to_vec());
+    Resource::add("img.svg", include_bytes!("../js/img.svg").to_vec());
 
     // Bootstrap app
     let app = App::new(AppImpl {});
