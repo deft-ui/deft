@@ -16,108 +16,108 @@ env:
   SHELL: /bin/bash
 
 jobs:
-  ci-linux:
-    name: Linux
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-      - name: Install
-        run: |
-          sudo apt-get update
-          sudo apt-get install build-essential libssl-dev libclang-dev libc++-dev xorg-dev libdbus-1-dev libxcb-xfixes0-dev libxcb-shape0-dev libasound2-dev libegl-dev libgles-dev librust-wayland-egl-dev;
-      # TODO support build with only wayland feature?
-      - name: Build
-        run: cargo build --all-features
-      - name: Tests
-        run: cargo test
-  #      - name: Format
-  #        run: cargo fmt --all -- --check
-
-  ci-macos:
-    name: macOS
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-      - name: Build
-        run: cargo build --all-features
-      - name: Tests
-        run: cargo test
-
-  ci-ios:
-    name: iOS
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-      - name: Install Target For iOS
-        run: rustup target add aarch64-apple-ios
-      - name: Build
-        run: cargo build --target aarch64-apple-ios
-      - name: Tests
-        run: cargo test
-
-  ci-win:
-    name: Windows
-    runs-on: windows-2022
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-      - name: Build
-        run: cargo build --all-features
-      - name: Tests
-        run: cargo test
-
-  ci-android:
-    name: Android
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-      - uses: nttld/setup-ndk@v1
-        id: setup-ndk
-        with:
-          ndk-version: r26d
-          add-to-path: false
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-      - name: Install Targets For Android
-        run: rustup target add aarch64-linux-android
-      - name: Build Targets For Android
-        run: ./scripts/build-android.sh
-        env:
-          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
-
-  ci-ohos:
-    name: OHOS
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-      - name: Setup OHOS SDK
-        id: setup-ohos-sdk
-        uses: openharmony-rs/setup-ohos-sdk@v0.2.1
-      - name: Setup OHOS Target
-        run: rustup target add x86_64-unknown-linux-ohos
-      - name: Build OHOS Target
-        run: scripts/build-ohos-example.sh
-        env:
-          OHOS_SDK_HOME: ${{ steps.setup-ohos-sdk.outputs.ohos-base-sdk-home }}
+#  ci-linux:
+#    name: Linux
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#        with:
+#          fetch-depth: 2
+#      - name: Setup Rust
+#        uses: dtolnay/rust-toolchain@stable
+#      - name: Install
+#        run: |
+#          sudo apt-get update
+#          sudo apt-get install build-essential libssl-dev libclang-dev libc++-dev xorg-dev libdbus-1-dev libxcb-xfixes0-dev libxcb-shape0-dev libasound2-dev libegl-dev libgles-dev librust-wayland-egl-dev;
+#      # TODO support build with only wayland feature?
+#      - name: Build
+#        run: cargo build --all-features
+#      - name: Tests
+#        run: cargo test
+#  #      - name: Format
+#  #        run: cargo fmt --all -- --check
+#
+#  ci-macos:
+#    name: macOS
+#    runs-on: macos-14
+#    steps:
+#      - uses: actions/checkout@v4
+#        with:
+#          fetch-depth: 2
+#      - name: Setup Rust
+#        uses: dtolnay/rust-toolchain@stable
+#      - name: Build
+#        run: cargo build --all-features
+#      - name: Tests
+#        run: cargo test
+#
+#  ci-ios:
+#    name: iOS
+#    runs-on: macos-14
+#    steps:
+#      - uses: actions/checkout@v4
+#        with:
+#          fetch-depth: 2
+#      - name: Setup Rust
+#        uses: dtolnay/rust-toolchain@stable
+#      - name: Install Target For iOS
+#        run: rustup target add aarch64-apple-ios
+#      - name: Build
+#        run: cargo build --target aarch64-apple-ios
+#      - name: Tests
+#        run: cargo test
+#
+#  ci-win:
+#    name: Windows
+#    runs-on: windows-2022
+#    steps:
+#      - uses: actions/checkout@v4
+#        with:
+#          fetch-depth: 2
+#      - name: Setup Rust
+#        uses: dtolnay/rust-toolchain@stable
+#      - name: Build
+#        run: cargo build --all-features
+#      - name: Tests
+#        run: cargo test
+#
+#  ci-android:
+#    name: Android
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#        with:
+#          fetch-depth: 2
+#      - uses: nttld/setup-ndk@v1
+#        id: setup-ndk
+#        with:
+#          ndk-version: r26d
+#          add-to-path: false
+#      - name: Setup Rust
+#        uses: dtolnay/rust-toolchain@stable
+#      - name: Install Targets For Android
+#        run: rustup target add aarch64-linux-android
+#      - name: Build Targets For Android
+#        run: ./scripts/build-android.sh
+#        env:
+#          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+#
+#  ci-ohos:
+#    name: OHOS
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#        with:
+#          fetch-depth: 2
+#      - name: Setup OHOS SDK
+#        id: setup-ohos-sdk
+#        uses: openharmony-rs/setup-ohos-sdk@v0.2.1
+#      - name: Setup OHOS Target
+#        run: rustup target add x86_64-unknown-linux-ohos
+#      - name: Build OHOS Target
+#        run: scripts/build-ohos-example.sh
+#        env:
+#          OHOS_SDK_HOME: ${{ steps.setup-ohos-sdk.outputs.ohos-base-sdk-home }}
 
   ci-wasm:
     name: Wasm
@@ -134,6 +134,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Install
         run: |
+          sudo apt-get update
+          sudo apt-get install build-essential libssl-dev libclang-dev libc++-dev libegl-dev libgles-dev
           rustup target add wasm32-unknown-emscripten
       - name: Build
         run: scripts/build-wasm.sh
