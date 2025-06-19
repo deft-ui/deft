@@ -118,3 +118,18 @@ jobs:
         run: scripts/build-ohos-example.sh
         env:
           OHOS_SDK_HOME: ${{ steps.setup-ohos-sdk.outputs.ohos-base-sdk-home }}
+
+  ci-wasm:
+    name: Wasm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install
+        run: |
+          rustup target add wasm32-unknown-emscripten
+      - name: Build
+        run: scripts/build-wasm.sh
