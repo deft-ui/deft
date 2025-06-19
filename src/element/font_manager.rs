@@ -36,7 +36,7 @@ impl FontManager {
             let mut source = SystemSource::empty();
             source
                 .add_font(Handle::Memory {
-                    bytes: Arc::new(include_bytes!("../../fonts/NotoSerif-Regular.ttf").to_vec()),
+                    bytes: std::sync::Arc::new(include_bytes!("../../fonts/NotoSerif-Regular.ttf").to_vec()),
                     font_index: 0,
                 })
                 .unwrap();
