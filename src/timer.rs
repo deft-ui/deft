@@ -70,9 +70,9 @@ enum InnerTimerHandle {
     #[cfg(not(emscripten_platform))]
     Task(u64),
     #[cfg(emscripten_platform)]
-    JsTimeout(c_int),
+    JsTimeout(libc::c_int),
     #[cfg(emscripten_platform)]
-    JsInterval(c_int),
+    JsInterval(libc::c_int),
 }
 
 pub struct TimerHandle {

@@ -118,3 +118,22 @@ jobs:
         run: scripts/build-ohos-example.sh
         env:
           OHOS_SDK_HOME: ${{ steps.setup-ohos-sdk.outputs.ohos-base-sdk-home }}
+
+  ci-wasm:
+    name: Wasm
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 4.0.9
+          actions-cache-folder: emsdk-cache
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install
+        run: |
+          rustup target add wasm32-unknown-emscripten
+      - name: Build
+        run: cd examples/gallery && cargo build --target wasm32-unknown-emscripten --release
