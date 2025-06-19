@@ -107,7 +107,11 @@ macro_rules! impl_number_from_js_value {
                 value
                     .as_number()
                     .map(|f| f as $ty)
-                    .ok_or(ValueError::Internal(format!("Cannot convert js:{} to rust:{}", value.value_type(), stringify!($ty))))
+                    .ok_or(ValueError::Internal(format!(
+                        "Cannot convert js:{} to rust:{}",
+                        value.value_type(),
+                        stringify!($ty)
+                    )))
             }
         }
     };

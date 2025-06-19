@@ -101,7 +101,7 @@ impl JsEngine {
             SharedModuleLoader::new(app.create_module_loader())
         };
         #[cfg(not(emscripten_platform))]
-        let runtime =  {
+        let runtime = {
             Builder::new_multi_thread()
                 .worker_threads(4)
                 .enable_all()
@@ -109,12 +109,7 @@ impl JsEngine {
                 .unwrap()
         };
         #[cfg(emscripten_platform)]
-        let runtime =  {
-            Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap()
-        };
+        let runtime = { Builder::new_current_thread().enable_all().build().unwrap() };
 
         let js_context = Context::builder()
             .console(Console::new())
@@ -311,6 +306,7 @@ impl JsEngine {
                                         && pos.1 <= wy + wh;
                                     if !is_in_window {
                                         let _ = window.window.set_cursor_grab(CursorGrabMode::None);
+                                        #[allow(suspicious_double_ref_op)]
                                         result.push(w.clone().clone());
                                     }
                                 }

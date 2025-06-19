@@ -1,14 +1,14 @@
 use anyhow::Error;
 use resvg::usvg::Tree;
 use resvg::{tiny_skia, usvg, RenderOptions};
-use skia_safe::{Color};
+use skia_safe::Color;
 use skia_safe::{surfaces, AlphaType, Canvas, ColorType, ImageInfo};
 use std::fs;
 use std::sync::{Arc, Mutex};
 
-pub struct SvgState{
+pub struct SvgState {
     tree: Tree,
-    options: RenderOptions,    
+    options: RenderOptions,
 }
 
 #[derive(Clone)]
@@ -21,7 +21,7 @@ impl SvgObject {
         let options = usvg::Options::default();
         let tree = Tree::from_data(bytes, &options)?;
         let options = RenderOptions::default();
-        Ok(Self { 
+        Ok(Self {
             state: Arc::new(Mutex::new(SvgState { tree, options })),
         })
     }

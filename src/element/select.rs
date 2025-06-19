@@ -171,7 +171,6 @@ impl ElementBackend for Select {
     fn on_event(&mut self, event: &mut Event, _ctx: &mut EventContext<ElementWeak>) {
         let el = ok_or_return!(self.element_weak.upgrade());
         let w = some_or_return!(el.get_window());
-        let window = ok_or_return!(w.upgrade_mut());
         let bounds = el.get_origin_bounds();
         if let Some(_) = ClickEvent::cast(event) {
             let mut popup: Mrc<Option<Popup>> = Mrc::new(None);

@@ -17,7 +17,6 @@ impl SimpleLogger {
             log::set_max_level(max_level);
         }
     }
-
 }
 
 impl log::Log for SimpleLogger {

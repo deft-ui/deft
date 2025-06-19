@@ -1,6 +1,5 @@
 #![allow(unused)]
 pub mod simple_paragraph_builder;
-pub mod typeface_mgr;
 
 use crate as deft;
 use crate::base::{EventContext, MouseDetail, MouseEventType};

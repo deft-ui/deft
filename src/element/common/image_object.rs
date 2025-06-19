@@ -1,6 +1,7 @@
 use crate::element::common::svg_object::SvgObject;
 use crate::img_manager::{dyn_image_to_skia_image, IMG_MANAGER};
 use crate::render::RenderFn;
+use crate::resource::Resource;
 use anyhow::Error;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
@@ -8,7 +9,6 @@ use image::{EncodableLayout, ImageReader};
 use log::error;
 use skia_safe::Color;
 use std::io::Cursor;
-use crate::resource::Resource;
 
 #[derive(Clone)]
 enum ImageSrc {
@@ -22,7 +22,7 @@ unsafe impl Send for ImageSrc {}
 impl ImageSrc {
     pub fn get_size(&self) -> (f32, f32) {
         match self {
-            ImageSrc::Svg(dom) => unsafe { dom.container_size() },
+            ImageSrc::Svg(dom) =>  dom.container_size(),
             ImageSrc::Img(img) => (img.width() as f32, img.height() as f32),
             ImageSrc::None => (0.0, 0.0),
         }
@@ -122,7 +122,8 @@ impl ImageObject {
                 } else {
                     Self::load_image_from_data(data)
                 }
-            }).unwrap_or_else(|| {
+            })
+            .unwrap_or_else(|| {
                 error!("Image not found: {:?}", src);
                 ImageSrc::None
             });

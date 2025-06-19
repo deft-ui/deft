@@ -9,13 +9,7 @@ use crate::style::StylePropKey;
 use crate::text::textbox::{TextBox, TextElement, TextUnit};
 use crate::text::TextAlign;
 use deft_macros::{element_backend, js_methods};
-use skia_safe::FontMgr;
 use yoga::Size;
-
-thread_local! {
-    //TODO remove
-    pub static FONT_MGR: FontMgr = FontMgr::new();
-}
 
 pub fn parse_align(align: &str) -> TextAlign {
     match align {
