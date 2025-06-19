@@ -180,7 +180,7 @@ impl BorrowFromJs for Window {
         let window = WindowHandle::from_js_value(value)?;
         let mut wi = window
             .upgrade_mut()
-            .map_err(|e| ValueError::UnexpectedType)?;
+            .map_err(|_| ValueError::UnexpectedType)?;
         Ok(receiver(&mut wi))
     }
 }

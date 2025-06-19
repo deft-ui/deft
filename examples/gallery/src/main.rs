@@ -2,8 +2,8 @@
 use deft::app::{App, IApp};
 use deft::bootstrap;
 use deft::js::js_engine::JsEngine;
-use quick_js::loader::JsModuleLoader;
 use deft::resource::Resource;
+use deft::js::loader::JsModuleLoader;
 
 struct AppImpl {}
 
@@ -14,7 +14,7 @@ impl IApp for AppImpl {
 
     #[cfg(desktop_platform)]
     fn create_module_loader(&mut self) -> Box<dyn JsModuleLoader + Send + Sync + 'static> {
-        use quick_js::loader::FsJsModuleLoader;
+        use deft::js::loader::FsJsModuleLoader;
         let ml = FsJsModuleLoader::new("examples/gallery-js");
         Box::new(ml)
     }
@@ -23,7 +23,10 @@ impl IApp for AppImpl {
     fn create_module_loader(&mut self) -> Box<dyn JsModuleLoader + Send + Sync + 'static> {
         use deft::loader::StaticModuleLoader;
         let mut ml = StaticModuleLoader::new();
-        ml.add_module("index.js".to_string(), include_str!("./gallery-js/index.js").to_owned());
+        ml.add_module(
+            "index.js".to_string(),
+            include_str!("./gallery-js/index.js").to_owned(),
+        );
         Box::new(ml)
     }
 }
@@ -43,14 +46,15 @@ fn main() {
     bootstrap_app();
 }
 
-
 #[cfg(target_os = "emscripten")]
 pub fn main() {
     // Do nothing
 }
 
 #[cfg(target_os = "emscripten")]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn asm_main() {
+    use deft::log::SimpleLogger;
+    SimpleLogger::init_with_max_level(log::LevelFilter::Info);
     bootstrap_app();
 }

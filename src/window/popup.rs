@@ -56,7 +56,7 @@ impl Popup {
             let window_handle = Window::create_with_raw_attrs(window_attrs, winit_attrs).unwrap();
             //TODO no unwrap
             let mut window = window_handle.upgrade_mut().unwrap();
-            window.set_body(element.clone());
+            let _ = window.set_body(element.clone());
             let current_monitor = owner.window.current_monitor();
             let window_weak = window_handle.clone();
             window.register_event_listener(WindowResizeEventListener::new(move |e, _| {

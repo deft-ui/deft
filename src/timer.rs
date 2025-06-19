@@ -7,7 +7,6 @@ use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
-use libc::c_int;
 
 thread_local! {
     pub static TIMER: RefCell<Timer> = RefCell::new(Timer::new());
@@ -71,9 +70,9 @@ enum InnerTimerHandle {
     #[cfg(not(emscripten_platform))]
     Task(u64),
     #[cfg(emscripten_platform)]
-    JsTimeout(c_int),
+    JsTimeout(libc::c_int),
     #[cfg(emscripten_platform)]
-    JsInterval(c_int),
+    JsInterval(libc::c_int),
 }
 
 pub struct TimerHandle {
@@ -84,7 +83,6 @@ impl TimerHandle {
     fn new(inner: InnerTimerHandle) -> Self {
         Self { inner }
     }
-
 }
 
 impl Drop for TimerHandle {
@@ -167,17 +165,15 @@ pub fn set_timeout_nanos<F: FnOnce() + 'static>(callback: F, nanos: u64) -> Time
 
 #[no_mangle]
 extern "C" fn js_timeout_callback(user_data: *mut ::core::ffi::c_void) {
-    let mut callback = unsafe { Box::from_raw(user_data as *mut Box<dyn FnOnce()>) };
+    let callback = unsafe { Box::from_raw(user_data as *mut Box<dyn FnOnce()>) };
     callback();
 }
 
 #[no_mangle]
 extern "C" fn js_interval_callback(user_data: *mut ::core::ffi::c_void) {
-    unsafe {
-        let mut callback = unsafe { Box::from_raw(user_data as *mut Box<dyn Fn()>) };
-        callback();
-        Box::leak(callback);
-    }
+    let callback = unsafe { Box::from_raw(user_data as *mut Box<dyn Fn()>) };
+    callback();
+    Box::leak(callback);
 }
 
 #[cfg(target_os = "emscripten")]
@@ -189,7 +185,7 @@ pub fn set_timeout_nanos<F: FnOnce() + 'static>(callback: F, nanos: u64) -> Time
         let id = deft_emscripten_sys::emscripten_set_timeout(
             Some(js_timeout_callback),
             timeout,
-            user_data as *mut _ as *mut ::core::ffi::c_void
+            user_data as *mut _ as *mut ::core::ffi::c_void,
         );
         TimerHandle::new(InnerTimerHandle::JsTimeout(id))
     }
@@ -215,7 +211,7 @@ pub fn set_interval<F: Fn() + 'static>(callback: F, interval: u64) -> TimerHandl
         let id = deft_emscripten_sys::emscripten_set_interval(
             Some(js_interval_callback),
             interval as f64,
-            user_data as *mut _ as *mut ::core::ffi::c_void
+            user_data as *mut _ as *mut ::core::ffi::c_void,
         );
         TimerHandle::new(InnerTimerHandle::JsInterval(id))
     }

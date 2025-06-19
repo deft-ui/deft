@@ -22,7 +22,7 @@ impl Resource {
 
     pub fn read<R, F: FnOnce(&Vec<u8>) -> R>(key: &str, handler: F) -> Option<R> {
         let data = RESOURCES.data.clone();
-        let mut data = data.lock().unwrap();
+        let data = data.lock().unwrap();
         data.get(&key.to_string()).map(|value| handler(value))
     }
 }

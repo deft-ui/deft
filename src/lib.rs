@@ -51,9 +51,11 @@ mod font;
 mod frame_rate;
 mod id_generator;
 mod id_hash_map;
+pub mod log;
 mod paint;
 mod platform;
 pub mod render;
+pub mod resource;
 mod state;
 mod style_list;
 mod stylesheet;
@@ -61,7 +63,6 @@ mod task_executor;
 mod text;
 mod typeface;
 pub mod winit;
-pub mod resource;
 
 use crate::base::ResultWaiter;
 use crate::console::init_console;
@@ -133,17 +134,17 @@ pub fn android_bootstrap(app: AndroidApp, deft_app: App) {
     use winit::platform::android::EventLoopBuilderExtAndroid;
     android::init_android_app(&app);
 
-    android_logger::init_once(android_logger::Config::default().with_min_level(log::Level::Warn));
+    android_logger::init_once(android_logger::Config::default().with_min_level(::log::Level::Warn));
 
     // info!("starting");
     if let Some(p) = app.internal_data_path() {
         let data_path = p.into_os_string().to_string_lossy().to_string();
-        log::debug!("internal data_path:{}", data_path);
+        ::log::debug!("internal data_path:{}", data_path);
         unsafe {
             std::env::set_var(data_dir::ENV_KEY, data_path);
         }
     }
-    log::debug!("data path: {:?}", data_dir::get_data_path(""));
+    ::log::debug!("data path: {:?}", data_dir::get_data_path(""));
     let event_loop = EventLoop::with_user_event()
         .with_android_app(app)
         .build()

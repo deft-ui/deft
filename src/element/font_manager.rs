@@ -14,7 +14,6 @@ use font_kit::sources::mem::MemSource as SystemSource;
 use skia_safe::font_style::Slant;
 use skia_safe::wrapper::NativeTransmutableWrapper;
 use std::collections::HashMap;
-use std::sync::Arc;
 use swash::{ObliqueAngle, Style, Weight};
 
 #[mrc_object]
@@ -35,10 +34,12 @@ impl FontManager {
         #[cfg(target_os = "emscripten")]
         let mut source = {
             let mut source = SystemSource::empty();
-            source.add_font(Handle::Memory {
-                bytes: Arc::new(include_bytes!("../../fonts/NotoSerif-Regular.ttf").to_vec()),
-                font_index: 0,
-            }).unwrap();
+            source
+                .add_font(Handle::Memory {
+                    bytes: std::sync::Arc::new(include_bytes!("../../fonts/NotoSerif-Regular.ttf").to_vec()),
+                    font_index: 0,
+                })
+                .unwrap();
             source
         };
 
