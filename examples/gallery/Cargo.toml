@@ -1,0 +1,12 @@
+[package]
+name = "gallery"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+deft = { path = "../..", default-features = false}
+env_logger = "0.11.8"
+log = "0.4.27"
+
+[build-dependencies]
+cfg_aliases = "0.2.1"

@@ -136,4 +136,4 @@ jobs:
         run: |
           rustup target add wasm32-unknown-emscripten
       - name: Build
-        run: scripts/build-wasm-example.bat
+        run: cd examples/gallery && cargo build --target wasm32-unknown-emscripten --release

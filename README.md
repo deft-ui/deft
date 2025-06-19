@@ -70,13 +70,15 @@ apt install build-essential libssl-dev libclang-dev libc++-dev \
 
 Native:
 ```
-cargo run --example gallery
+cd examples/gallery
+cargo run
 ```
 
 Wasm:
 > Make sure that [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html) is installed.
 ```bash
-./scripts/build-wasm.sh --release
+cd examples/gallery
+cargo build --target wasm32-unknown-emscripten --release
 python3 -m http.server
 ```
 Visit `http://localhost:8000/web/` to preview.
