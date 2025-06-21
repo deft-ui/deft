@@ -4,7 +4,7 @@ use jni::objects::{JClass, JString, JValue};
 use jni::sys::{jboolean, jfloat, jint, jlong};
 use jni::JNIEnv;
 use log::debug;
-use skia_safe::Rect;
+use crate::base::Rect;
 use std::sync::OnceLock;
 use winit::platform::android::activity::AndroidApp;
 
