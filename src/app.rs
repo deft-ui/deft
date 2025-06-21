@@ -1,4 +1,4 @@
-use crate::base::ResultWaiter;
+use crate::base::{Rect, ResultWaiter};
 use crate::event_loop::{
     init_event_loop_proxy, run_event_loop_task, run_with_event_loop, AppEventProxy,
 };
@@ -18,7 +18,6 @@ use jni::objects::JValue;
 use jni::sys::{jboolean, jlong};
 use log::debug;
 use measure_time::debug_time;
-use skia_safe::Rect;
 use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, Mutex};
 use winit::application::ApplicationHandler;

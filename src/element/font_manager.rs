@@ -1,5 +1,4 @@
 use crate as deft;
-use crate::element::paragraph::DEFAULT_FALLBACK_FONTS;
 use crate::font::family::{FontFamilies, FontFamily};
 use crate::font::Font;
 use crate::style::font::FontStyle;
@@ -15,6 +14,7 @@ use skia_safe::font_style::Slant;
 use skia_safe::wrapper::NativeTransmutableWrapper;
 use std::collections::HashMap;
 use swash::{ObliqueAngle, Style, Weight};
+use crate::text::textbox::DEFAULT_FALLBACK_FONTS;
 
 #[mrc_object]
 pub struct FontManager {

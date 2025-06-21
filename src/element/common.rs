@@ -197,8 +197,8 @@ impl ScrollBar {
             true
         } else if self.track_rect.contains_point(x, y) {
             let is_up = match self.direction {
-                ScrollBarDirection::Horizontal => x < self.thumb_rect.x,
-                ScrollBarDirection::Vertical => y < self.thumb_rect.y,
+                ScrollBarDirection::Horizontal => x < self.thumb_rect.left,
+                ScrollBarDirection::Vertical => y < self.thumb_rect.top,
             };
             let pages = if is_up { -1.0 } else { 1.0 };
             self.scroll_page(pages);

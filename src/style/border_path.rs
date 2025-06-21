@@ -1,13 +1,13 @@
-use crate::border::{build_border_paths, build_rect_with_radius};
-use skia_safe::Path;
+use tiny_skia::Path;
+use crate::render::cssborder::{build_border_paths, build_rect_with_radius};
 
 pub struct BorderPath {
     box_width: f32,
     box_height: f32,
     radius: [f32; 4],
     widths: [f32; 4],
-    path: Option<[Path; 4]>,
-    box_path: Option<Path>,
+    path: Option<[Option<Path>; 4]>,
+    box_path: Option<Option<Path>>,
 }
 
 impl BorderPath {
@@ -29,7 +29,7 @@ impl BorderPath {
         }
     }
 
-    pub fn get_box_path(&mut self) -> &Path {
+    pub fn get_box_path(&mut self) -> &Option<Path> {
         if self.box_path.is_none() {
             let p = build_rect_with_radius(self.radius, self.box_width, self.box_height);
             self.box_path = Some(p);
@@ -37,11 +37,11 @@ impl BorderPath {
         self.box_path.as_ref().unwrap()
     }
 
-    pub fn get_paths(&mut self) -> &[Path; 4] {
+    pub fn get_paths(&mut self) -> &[Option<Path>; 4] {
         if self.path.is_none() {
-            let path =
+            let (t, r, b, l) =
                 build_border_paths(self.widths, self.radius, self.box_width, self.box_height);
-            self.path = Some(path);
+            self.path = Some([t, r, b, l]);
         }
         self.path.as_ref().unwrap()
     }

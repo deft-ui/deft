@@ -11,13 +11,10 @@ use bitflags::bitflags;
 use deft_macros::{js_methods, mrc_object};
 use quick_js::JsValue;
 use serde::{Deserialize, Serialize};
-use skia_safe::Rect;
 use winit::window::{Cursor, CursorIcon};
 use yoga::{Direction, StyleUnit};
 
-use crate::base::{
-    BoxJsEventListenerFactory, EventContext, EventListener, EventRegistration, JsEvent,
-};
+use crate::base::{BoxJsEventListenerFactory, EventContext, EventListener, EventRegistration, JsEvent, Rect};
 use crate::element::button::Button;
 use crate::element::container::Container;
 use crate::element::image::Image;
@@ -50,7 +47,6 @@ pub mod checkbox;
 pub mod common;
 pub mod container;
 mod edit_history;
-pub mod entry;
 mod font_manager;
 pub mod image;
 pub mod label;
@@ -69,9 +65,7 @@ use crate::computed::ComputedValue;
 use crate::element::body::Body;
 use crate::element::checkbox::Checkbox;
 use crate::element::common::scrollable::Scrollable;
-use crate::element::entry::Entry;
 use crate::element::label::Label;
-use crate::element::paragraph::Paragraph;
 use crate::element::radio::{Radio, RadioGroup};
 use crate::element::richtext::RichText;
 use crate::element::select::Select;
@@ -141,8 +135,6 @@ pub fn init_base_components() {
     register_component::<Radio>("radio");
     register_component::<Image>("image");
     register_component::<Label>("label");
-    register_component::<Paragraph>("paragraph");
-    register_component::<Entry>("entry");
     register_component::<TextInput>("text-input");
     register_component::<TextEdit>("text-edit");
     register_component::<Body>("body");
@@ -656,8 +648,8 @@ impl Element {
         let (t, r, b, l) = self.get_padding();
         let bounds = self.get_origin_bounds();
         base::Rect::new(
-            bounds.x + l,
-            bounds.y + t,
+            bounds.left + l,
+            bounds.top + t,
             bounds.width - l - r,
             bounds.height - t - b,
         )
@@ -669,8 +661,8 @@ impl Element {
         return if let Some(p) = self.get_parent() {
             let pob = p.get_origin_bounds();
             let (offset_left, offset_top) = p.scrollable.scroll_offset();
-            let x = pob.x + b.x - offset_left;
-            let y = pob.y + b.y - offset_top;
+            let x = pob.left + b.left - offset_left;
+            let y = pob.top + b.top - offset_top;
             base::Rect::new(x, y, b.width, b.height)
         } else {
             b
@@ -1169,7 +1161,7 @@ impl Element {
         let y = border.0 + children_decoration.0;
         let right = bounds.width - border.1 - children_decoration.1;
         let bottom = bounds.height - border.2 - children_decoration.2;
-        Some(Rect::new(x, y, right, bottom))
+        Some(Rect::from_ltrb(x, y, right, bottom))
     }
 
     pub fn before_layout_recurse(&mut self) {

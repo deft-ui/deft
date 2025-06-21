@@ -1,4 +1,4 @@
-use crate::base::{Id, IdKey};
+use crate::base::{Id, IdKey, Rect};
 use crate::element::Element;
 use crate::render::layout_tree::LayoutTree;
 use crate::render::paint_object::{ElementPO, LayerPO};
@@ -7,7 +7,7 @@ use crate::renderer::CpuRenderer;
 use crate::{some_or_continue, some_or_return};
 use skia_safe::Canvas;
 use skia_safe::{
-    scalar, ClipOp, Color, Contains, Image, Matrix, Path, PathOp, Point, Rect, Vector,
+    scalar, Color, Contains, Image, Matrix, Path, PathOp, Point, Vector,
 };
 use skia_window::layer::Layer;
 use std::cell::Cell;
@@ -195,7 +195,7 @@ impl RenderTree {
         let rect = lod
             .clip_rect
             .unwrap_or(Rect::from_xywh(0.0, 0.0, lod.width, lod.height));
-        if !rect.contains(Point::new(x, y)) {
+        if !rect.contains(x, y) {
             return None;
         }
         for sub_lo in lo.layer_nodes.iter().rev() {
@@ -243,7 +243,7 @@ impl RenderTree {
         let element_data = ElementObjectData {
             element: element.clone(),
             element_id: element.get_eid(),
-            coord: (bounds.x, bounds.y),
+            coord: (bounds.left, bounds.top),
             children_viewport: element.get_children_viewport(),
             border_color: element.style.border_color,
             renderer: Box::new(move || {
@@ -275,7 +275,7 @@ impl RenderTree {
             &mut matrix_calculator,
             0.0,
             0.0,
-            &bounds.to_skia_rect(),
+            &bounds,
             true,
         );
         if let RenderObject::Layer(lo) = &rro {
@@ -368,11 +368,11 @@ impl RenderTree {
         for mut c in element.get_children() {
             let child_bounds = c.get_bounds();
             matrix_calculator.save();
-            matrix_calculator.translate((child_bounds.x, child_bounds.y));
-            let child_origin_x = origin_x + child_bounds.x;
-            let child_origin_y = origin_y + child_bounds.y;
-            let child_layer_x = layer_x + child_bounds.x;
-            let child_layer_y = layer_y + child_bounds.y;
+            matrix_calculator.translate((child_bounds.left, child_bounds.top));
+            let child_origin_x = origin_x + child_bounds.left;
+            let child_origin_y = origin_y + child_bounds.top;
+            let child_layer_x = layer_x + child_bounds.left;
+            let child_layer_y = layer_y + child_bounds.top;
             children.push(self.build_render_object(
                 &mut c,
                 child_origin_x,
@@ -381,7 +381,7 @@ impl RenderTree {
                 matrix_calculator,
                 child_layer_x,
                 child_layer_y,
-                &child_bounds.to_skia_rect(),
+                &child_bounds,
                 false,
             ));
             matrix_calculator.restore();
@@ -403,7 +403,7 @@ impl RenderTree {
         let need_create_children_layer = Self::need_create_children_layer(element);
         if need_create_children_layer {
             let (scroll_left, scroll_top) = element.scrollable.scroll_offset();
-            let clip_rect = bounds.translate(-bounds.x + scroll_left, -bounds.y + scroll_top);
+            let clip_rect = bounds.translate(-bounds.left + scroll_left, -bounds.top + scroll_top);
             matrix_calculator.save();
 
             let mut matrix = Matrix::default();
@@ -428,7 +428,7 @@ impl RenderTree {
                 //TODO init surface_bounds?
                 surface_bounds: Rect::default(),
                 visible_bounds: Rect::default(),
-                clip_rect: Some(clip_rect.to_skia_rect()),
+                clip_rect: Some(clip_rect),
             };
             self.layout_tree.layer_objects.push(layer_object_data);
             let children_layer_object = LayerRO {
@@ -482,8 +482,8 @@ impl RenderTree {
             let layer_object_data = LayerObjectData {
                 matrix: mc.get_total_matrix(),
                 total_matrix: matrix_calculator.get_total_matrix(),
-                width: bounds.width(),
-                height: bounds.height(),
+                width: bounds.width,
+                height: bounds.height,
                 key: RenderLayerKey::new(self.id, element.get_eid(), RenderLayerType::Root),
                 invalid_area: InvalidArea::Full,
                 origin_absolute_pos: (origin_x, origin_y),
@@ -621,7 +621,7 @@ impl RenderTree {
         ));
         let border_path_mut = eo.element.get_border_path_mut();
         let border_path = border_path_mut.get_paths().clone();
-        let border_box_path = border_path_mut.get_box_path().clone();
+        let border_box_path = border_path_mut.get_box_path().clone().unwrap();
         let epo = ElementPO {
             coord: eo.coord,
             children,
@@ -650,19 +650,19 @@ impl RenderTree {
         let invalid_rects = {
             let lo = &mut self.layout_tree.layer_objects[lod.layer_object_idx];
             let mut invalid_area = lo.invalid_area.clone();
-            let layer_path = Path::rect(&Rect::from_xywh(0.0, 0.0, lo.width, lo.height), None);
+            let layer_path = Path::rect(&Rect::from_xywh(0.0, 0.0, lo.width, lo.height).to_skia_rect(), None);
             let im = lo.total_matrix.invert().unwrap();
-            let mut viewport_path = Path::rect(viewport, None);
+            let mut viewport_path = Path::rect(viewport.to_skia_rect(), None);
             let visible_path = viewport_path
                 .transform(&im)
                 .op(&layer_path, PathOp::Intersect)
                 .unwrap_or(Path::new());
-            let mut visible_bounds = visible_path.bounds().clone();
+            let mut visible_bounds = Rect::from_skia(visible_path.bounds());
             visible_bounds.top = visible_bounds.top.floor();
-            visible_bounds.bottom = visible_bounds.bottom.ceil();
+            visible_bounds.height = visible_bounds.height.ceil();
 
-            let max_len = (viewport.width() * viewport.width()
-                + viewport.height() * viewport.height())
+            let max_len = (viewport.width * viewport.width
+                + viewport.height * viewport.height)
             .sqrt()
             .ceil();
             let max_surface_width = f32::min(lo.width, max_len).ceil();
@@ -679,8 +679,8 @@ impl RenderTree {
                 );
             } else {
                 // Handle visible bound change
-                let mut common_visible_bounds = visible_bounds.clone();
-                if common_visible_bounds.intersect(&lo.visible_bounds) {
+                let common_visible_bounds = visible_bounds.clone();
+                if !common_visible_bounds.intersect(&lo.visible_bounds).is_empty() {
                     if common_visible_bounds.left > visible_bounds.left {
                         let new_rect = Rect::from_xywh(
                             visible_bounds.left,
@@ -699,21 +699,21 @@ impl RenderTree {
                         );
                         invalid_area.add_rect(Some(&new_rect));
                     }
-                    if common_visible_bounds.right < visible_bounds.right {
+                    if common_visible_bounds.right() < visible_bounds.right() {
                         let new_rect = Rect::from_xywh(
-                            common_visible_bounds.right,
+                            common_visible_bounds.right(),
                             visible_bounds.top,
-                            visible_bounds.right - common_visible_bounds.right,
+                            visible_bounds.right() - common_visible_bounds.right(),
                             visible_bounds.height(),
                         );
                         invalid_area.add_rect(Some(&new_rect));
                     }
-                    if common_visible_bounds.bottom < visible_bounds.bottom {
+                    if common_visible_bounds.bottom() < visible_bounds.bottom() {
                         let new_rect = Rect::from_xywh(
                             visible_bounds.left,
-                            common_visible_bounds.bottom,
+                            common_visible_bounds.bottom(),
                             visible_bounds.width(),
-                            visible_bounds.bottom - common_visible_bounds.bottom,
+                            visible_bounds.bottom() - common_visible_bounds.bottom(),
                         );
                         invalid_area.add_rect(Some(&new_rect));
                     }
@@ -731,16 +731,16 @@ impl RenderTree {
                     invalid_area.add_rect(Some(&new_rect));
                     lo.surface_bounds
                         .offset((visible_bounds.left - lo.surface_bounds.left, 0.0));
-                } else if lo.surface_bounds.right < visible_bounds.right {
+                } else if lo.surface_bounds.right() < visible_bounds.right() {
                     let new_rect = Rect::from_xywh(
-                        lo.surface_bounds.right,
+                        lo.surface_bounds.right(),
                         lo.surface_bounds.top,
-                        visible_bounds.right - lo.surface_bounds.right,
+                        visible_bounds.right() - lo.surface_bounds.right(),
                         lo.surface_bounds.height(),
                     );
                     invalid_area.add_rect(Some(&new_rect));
                     lo.surface_bounds
-                        .offset((visible_bounds.right - lo.surface_bounds.right, 0.0));
+                        .offset((visible_bounds.right() - lo.surface_bounds.right(), 0.0));
                 }
                 if lo.surface_bounds.top > visible_bounds.top {
                     let new_rect = Rect::from_xywh(
@@ -752,16 +752,16 @@ impl RenderTree {
                     invalid_area.add_rect(Some(&new_rect));
                     lo.surface_bounds
                         .offset((0.0, visible_bounds.top - lo.surface_bounds.top));
-                } else if lo.surface_bounds.bottom < visible_bounds.bottom {
+                } else if lo.surface_bounds.bottom() < visible_bounds.bottom() {
                     let new_rect = Rect::from_xywh(
                         lo.surface_bounds.left,
-                        lo.surface_bounds.bottom,
+                        lo.surface_bounds.bottom(),
                         lo.surface_bounds.width(),
-                        visible_bounds.bottom - lo.surface_bounds.bottom,
+                        visible_bounds.bottom() - lo.surface_bounds.bottom(),
                     );
                     invalid_area.add_rect(Some(&new_rect));
                     lo.surface_bounds
-                        .offset((0.0, visible_bounds.bottom - lo.surface_bounds.bottom));
+                        .offset((0.0, visible_bounds.bottom() - lo.surface_bounds.bottom()));
                 }
             }
             lo.visible_bounds = visible_bounds.clone();
@@ -818,8 +818,8 @@ impl InvalidRects {
     }
     pub fn has_intersects(&self, rect: &Rect) -> bool {
         for r in &self.rects {
-            let intersect = f32::min(r.right, rect.right) >= f32::max(r.left(), rect.left())
-                && f32::min(r.bottom, rect.bottom) >= f32::max(r.top, rect.top);
+            let intersect = f32::min(r.right(), rect.right()) >= f32::max(r.left(), rect.left())
+                && f32::min(r.bottom(), rect.bottom()) >= f32::max(r.top, rect.top);
             if intersect {
                 return true;
             }
@@ -829,7 +829,7 @@ impl InvalidRects {
     pub fn to_path(&self) -> Path {
         let mut path = Path::new();
         for r in &self.rects {
-            path.add_rect(r, None);
+            path.add_rect(r.to_skia_rect(), None);
         }
         path
     }
@@ -921,7 +921,7 @@ impl InvalidArea {
                     rects.push(viewport);
                 } else {
                     for (_, r) in &pia.rects {
-                        rects.push(*r);
+                        rects.push(r.clone());
                     }
                 }
             }
@@ -1000,96 +1000,13 @@ impl MatrixCalculator {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct ClipPath {
-    unlimited: bool,
-    path: Path,
-}
-
-impl ClipPath {
-    pub fn unlimited() -> ClipPath {
-        Self {
-            unlimited: true,
-            path: Path::new(),
-        }
-    }
-    pub fn empty() -> ClipPath {
-        Self {
-            unlimited: false,
-            path: Path::new(),
-        }
-    }
-    pub fn from_wh(width: f32, height: f32) -> ClipPath {
-        Self::from_rect(&Rect::from_xywh(0.0, 0.0, width, height))
-    }
-    pub fn from_rect(rect: &Rect) -> ClipPath {
-        Self {
-            unlimited: false,
-            path: Path::rect(rect, None),
-        }
-    }
-
-    pub fn from_path(path: &Path) -> ClipPath {
-        Self {
-            unlimited: false,
-            path: path.clone(),
-        }
-    }
-
-    pub fn intersect(&mut self, other: &ClipPath) {
-        if other.unlimited {
-            return;
-        }
-        if self.unlimited {
-            *self = other.clone();
-            return;
-        }
-        self.path = self
-            .path
-            .op(&other.path, PathOp::Intersect)
-            .unwrap_or(Path::new());
-    }
-
-    pub fn offset(&mut self, d: impl Into<Vector>) {
-        if !self.unlimited {
-            self.path.offset(d);
-        }
-    }
-
-    pub fn transform(&mut self, matrix: &Matrix) {
-        if self.unlimited {
-            return;
-        }
-        self.path = self.path.with_transform(matrix);
-    }
-
-    pub fn with_offset(&self, d: impl Into<Vector>) -> ClipPath {
-        let mut cp = self.clone();
-        cp.offset(d);
-        cp
-    }
-
-    pub fn apply(&self, canvas: &Canvas) {
-        if !self.unlimited {
-            canvas.clip_path(&self.path, ClipOp::Intersect, false);
-        }
-    }
-
-    pub fn clip(&self, path: &Path) -> Path {
-        if self.unlimited {
-            path.clone()
-        } else {
-            self.path.op(path, PathOp::Intersect).unwrap_or(Path::new())
-        }
-    }
-}
-
 #[cfg(test)]
 pub mod tests {
     use crate::paint::InvalidArea;
     use log::debug;
     use measure_time::print_time;
-    use skia_safe::{Matrix, Path, Rect, Vector};
+    use skia_safe::{Matrix, Path, Vector};
+    use crate::base::Rect;
 
     #[test]
     pub fn test_visible() {
@@ -1122,7 +1039,7 @@ pub mod tests {
         assert!(!empty_path.contains((0.0, 0.0)));
 
         let rect = Rect::from_xywh(10.0, 70.0, 100.0, 100.0);
-        let path = Path::rect(rect, None);
+        let path = Path::rect(rect.to_skia_rect(), None);
         assert!(!path.contains((0.0, 10.0)));
         assert!(path.contains((30.0, 80.0)));
     }
@@ -1146,7 +1063,7 @@ pub mod tests {
             print_time!("map rect time");
             for i in 0..10000 {
                 let rect = Rect::from_xywh(0.0, 0.0, i as f32, i as f32);
-                let _p = matrix.map_rect(&rect);
+                let _p = matrix.map_rect(&rect.to_skia_rect());
             }
         }
     }

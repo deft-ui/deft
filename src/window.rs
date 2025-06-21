@@ -4,10 +4,7 @@ pub mod popup;
 use crate as deft;
 use crate::app::{exit_app, AppEvent, InsetType};
 use crate::base::MouseEventType::{MouseClick, MouseUp};
-use crate::base::{
-    Callback, EventContext, EventHandler, EventListener, EventRegistration, JsValueContext,
-    MouseDetail, MouseEventType, ResultWaiter, Touch, TouchDetail,
-};
+use crate::base::{Callback, EventContext, EventHandler, EventListener, EventRegistration, JsValueContext, MouseDetail, MouseEventType, Rect, ResultWaiter, Touch, TouchDetail};
 use crate::cursor::search_cursor;
 use crate::element::body::Body;
 use crate::element::util::get_tree_level;
@@ -45,7 +42,7 @@ use anyhow::Error;
 use deft_macros::{js_methods, window_event};
 use log::{debug, error};
 use quick_js::{JsValue, ValueError};
-use skia_safe::{Color, Point, Rect};
+use skia_safe::{Color, Point};
 use skia_window::renderer::Renderer;
 use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 use std::cell::{Cell, RefCell};

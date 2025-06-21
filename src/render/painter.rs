@@ -3,11 +3,13 @@ use crate::paint::{DrawLayer, InvalidRects, LayerState, Painter, RenderLayerKey}
 use crate::render::paint_object::{ElementPO, LayerPO};
 use crate::{show_focus_hint, show_layer_hint, show_repaint_area};
 use skia_safe::{
-    Canvas, ClipOp, Color, FilterMode, Matrix, Paint, PaintStyle, Rect, SamplingOptions,
+    Canvas, ClipOp, Color, FilterMode, Matrix, Paint, PaintStyle, SamplingOptions,
 };
 use skia_window::context::RenderContext;
 use std::collections::HashMap;
 use std::mem;
+use crate::base::Rect;
+use crate::border::tiny_path_to_skia_path;
 
 pub struct ElementPainter {
     scale: f32,
@@ -71,7 +73,7 @@ impl ElementPainter {
         }
         canvas.save();
         canvas.translate(epo.coord);
-        canvas.clip_path(&epo.border_box_path, ClipOp::Intersect, false);
+        canvas.clip_path(&tiny_path_to_skia_path(&epo.border_box_path), ClipOp::Intersect, false);
         if epo.need_paint {
             self.draw_element_paint_object(painter, epo);
         }
@@ -124,7 +126,7 @@ impl ElementPainter {
         let mut paint = Paint::default();
         paint.set_style(PaintStyle::Stroke);
         paint.set_color(Color::RED);
-        canvas.draw_rect(&rect, &paint);
+        canvas.draw_rect(&rect.to_skia_rect(), &paint);
     }
 
     pub fn draw_layer(
@@ -178,7 +180,7 @@ impl ElementPainter {
             if !layer.invalid_rects.is_empty() {
                 layer_canvas.clip_path(&layer.invalid_rects.to_path(), ClipOp::Intersect, false);
                 layer_canvas.clip_rect(
-                    &Rect::from_xywh(0.0, 0.0, layer.width, layer.height),
+                    &Rect::from_xywh(0.0, 0.0, layer.width, layer.height).to_skia_rect(),
                     ClipOp::Intersect,
                     false,
                 );
@@ -195,11 +197,11 @@ impl ElementPainter {
             let old_total_matrix = root_canvas.local_to_device();
             root_canvas.concat(&layer.total_matrix);
             if let Some(clip_rect) = &layer.clip_rect {
-                root_canvas.clip_rect(&clip_rect, ClipOp::Intersect, false);
+                root_canvas.clip_rect(&clip_rect.to_skia_rect(), ClipOp::Intersect, false);
             } else {
                 //TODO support overflow
                 let rect = Rect::from_xywh(0.0, 0.0, layer.width, layer.height);
-                root_canvas.clip_rect(&rect, ClipOp::Intersect, false);
+                root_canvas.clip_rect(&rect.to_skia_rect(), ClipOp::Intersect, false);
             }
             self.submit_layer(painter, context, layer, &mut graphic_layer);
             context.flush();

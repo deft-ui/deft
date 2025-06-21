@@ -1564,83 +1564,6 @@ export class SelectElement extends Element {
  *   fontSize ?: number,
  *   color ?: string,
  *   backgroundColor ?: string
- * }} ParagraphUnit
- *
- * @deprecated
- */
-export class ParagraphElement extends Element {
-    constructor() {
-        super(VT_PARAGRAPH);
-    }
-
-    /**
-     *
-     * @param units {ParagraphUnit[]}
-     */
-    addLine(units) {
-        Paragraph_add_line(this.handle, units);
-    }
-
-    /**
-     *
-     * @param index {number}
-     * @param units {ParagraphUnit[]}
-     */
-    insertLine(index, units) {
-        Paragraph_insert_line(this.handle, index, units);
-    }
-
-
-    /**
-     *
-     * @param index {number}
-     */
-    deleteLine(index) {
-        Paragraph_delete_line(this.handle, index);
-    }
-
-    /**
-     *
-     * @param index {number}
-     * @param units {ParagraphUnit[]}
-     */
-    updateLine(index, units) {
-        Paragraph_update_line(this.handle, index, units);
-    }
-
-    clear() {
-        Paragraph_clear(this.handle);
-    }
-
-    /**
-     *
-     * @param units {ParagraphUnit[]}
-     * @return {[number, number]}
-     */
-    measureLine(units) {
-        return Paragraph_measure_line(this.handle, units);
-    }
-
-    /**
-     *
-     * @returns {string | undefined}
-     */
-    get selectionText() {
-        return Paragraph_get_selection_text(this.handle);
-    }
-
-}
-
-/**
- * @typedef {{
- *   type: "text",
- *   text: string,
- *   weight ?: string,
- *   textDecorationLine ?: string,
- *   fontFamilies ?: string[],
- *   fontSize ?: number,
- *   color ?: string,
- *   backgroundColor ?: string
  * }} TextUnit
  */
 export class RichTextElement extends Element {
@@ -1713,145 +1636,6 @@ export class ImageElement extends Element {
     set src(src) {
         Image_set_src(this.handle, src);
     }
-}
-
-
-export class EntryElement extends Element {
-
-    #placeholderStyle;
-
-    constructor() {
-        super(VT_ENTRY);
-    }
-
-    /**
-     *
-     * @param align {"left"|"right"|"center"}
-     */
-    set align(align) {
-        Element_set_property(this.handle, "align", align);
-    }
-
-    /**
-     *
-     * @param text {string}
-     */
-    set text(text) {
-        Entry_set_text(this.handle, text);
-    }
-
-    /**
-     *
-     * @param placeholder {string}
-     */
-    set placeholder(placeholder) {
-        Entry_set_placeholder(this.handle, placeholder);
-    }
-
-    get placeholder() {
-        return Entry_get_placeholder(this.handle);
-    }
-
-    /**
-     *
-     * @param style {StyleProps}
-     */
-    set placeholderStyle(style) {
-        this.#placeholderStyle = style;
-        Entry_set_placeholder_style(this.handle, style);
-    }
-
-    /**
-     *
-     * @param type {"text"|"password"}
-     */
-    set type(type) {
-        Entry_set_type(this.handle, type);
-    }
-
-    /**
-     *
-     * @returns {"text" | "password"}
-     */
-    get type() {
-        return Entry_get_type(this.handle);
-    }
-
-    /**
-     *
-     * @returns {StyleProps}
-     */
-    get placeholderStyle() {
-        return this.#placeholderStyle;
-    }
-
-    /**
-     *
-     * @param start {number}
-     * @param end {number}
-     */
-    setSelectionByCharOffset(start, end) {
-        Entry_set_selection_by_char_offset(this.handle, start, end)
-    }
-
-    /**
-     *
-     * @param charOffset {number}
-     */
-    setCaretByCharOffset(charOffset) {
-        Entry_set_caret_by_char_offset(this.handle, charOffset);
-    }
-
-    /**
-     *
-     * @param multipleLine {boolean}
-     */
-    set multipleLine(multipleLine) {
-        Entry_set_multiple_line(this.handle, multipleLine)
-        // Element_set_property(this.el, "multipleline", String(multipleLine));
-    }
-
-    /**
-     *
-     * @param value {boolean}
-     */
-    set autoHeight(value) {
-        Entry_set_auto_height(this.handle, value);
-    }
-
-    /**
-     *
-     * @returns {string}
-     */
-    get text() {
-        return Entry_get_text(this.handle);
-    }
-
-    /**
-     *
-     * @param rows {number}
-     */
-    set rows(rows) {
-        TextInput_set_rows(this.handle, rows);
-    }
-
-    get disabled() {
-        return Element_is_disabled(this.handle);
-    }
-
-    set disabled(value) {
-        Element_set_disabled(this.handle, value);
-    }
-
-
-    bindTextChange(callback) {
-        this.bindEvent("textchange", callback);
-    }
-
-    bindCaretChange(callback) {
-        this.bindEvent("caretchange", callback);
-    }
-
 }
 
 export class TextInputElement extends Element {
@@ -2584,12 +2368,10 @@ globalThis.Element = Element;
 globalThis.ContainerElement = ContainerElement;
 globalThis.ScrollElement = ScrollElement;
 globalThis.LabelElement = LabelElement;
-globalThis.EntryElement = EntryElement;
 globalThis.TextInputElement = TextInputElement;
 globalThis.TextEditElement = TextEditElement;
 globalThis.ButtonElement = ButtonElement;
 globalThis.ImageElement  = ImageElement;
-globalThis.ParagraphElement = ParagraphElement;
 globalThis.RichTextElement = RichTextElement;
 globalThis.CheckboxElement = CheckboxElement;
 globalThis.RadioElement = RadioElement;

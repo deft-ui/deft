@@ -51,6 +51,7 @@ memmap2 = "0.9.5"
 simplecss = { version = "0.3.1", package = "deft-simplecss" }
 resvg = { version = "0.46.0", default-features = false, package = "deft-resvg" }
 deft-emscripten-sys = "0.1.0"
+tiny-skia = "0.11.4"
 
 [features]
 default = ["websocket", "http", "tray", "clipboard"]

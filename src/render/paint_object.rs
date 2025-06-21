@@ -2,13 +2,16 @@ use crate::paint::{InvalidRects, RenderLayerKey};
 use crate::render::RenderFn;
 use crate::style::color::ColorHelper;
 use skia_safe::PaintStyle::{Fill, Stroke};
-use skia_safe::{Canvas, Color, Image, Matrix, Paint, Path, Rect};
+use skia_safe::{Canvas, Color, Image, Matrix, Paint, Rect};
+use tiny_skia::Path;
+use crate::base;
+use crate::border::tiny_path_to_skia_path;
 
 pub struct ElementPO {
     pub coord: (f32, f32),
     pub children: Vec<ElementPO>,
-    pub children_viewport: Option<Rect>,
-    pub border_path: [Path; 4],
+    pub children_viewport: Option<base::Rect>,
+    pub border_path: [Option<Path>; 4],
     pub border_box_path: Path,
     // pub layer_x: f32,
     // pub layer_y: f32,
@@ -46,12 +49,12 @@ impl ElementPO {
         let paths = &self.border_path;
         let color = &self.border_color;
         for i in 0..4 {
-            let p = &paths[i];
-            if !p.is_empty() {
+            if let Some(p) =  &paths[i] {
                 let mut paint = Paint::default();
                 paint.set_style(Fill);
                 paint.set_anti_alias(true);
                 paint.set_color(color[i]);
+                let p = tiny_path_to_skia_path(p);
                 canvas.draw_path(&p, &paint);
             }
         }
@@ -80,7 +83,7 @@ pub struct LayerPO {
     // Original position relative to viewport before transform
     pub origin_absolute_pos: (f32, f32),
     pub invalid_rects: InvalidRects,
-    pub surface_bounds: Rect,
-    pub visible_bounds: Rect,
-    pub clip_rect: Option<Rect>,
+    pub surface_bounds: base::Rect,
+    pub visible_bounds: base::Rect,
+    pub clip_rect: Option<base::Rect>,
 }

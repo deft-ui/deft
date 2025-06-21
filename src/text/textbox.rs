@@ -589,12 +589,12 @@ impl TextBox {
         };
 
         if self.vertical_caret_moving_coord_x <= 0.0 {
-            self.vertical_caret_moving_coord_x = caret_coord.x;
+            self.vertical_caret_moving_coord_x = caret_coord.left;
         }
         let new_coord_y = if is_up {
-            caret_coord.y - line_height
+            caret_coord.top - line_height
         } else {
-            caret_coord.y + line_height
+            caret_coord.top + line_height
         };
         let new_coord = (self.vertical_caret_moving_coord_x, new_coord_y);
         self.update_caret_by_offset_coordinate(new_coord.0, new_coord.1, true);
