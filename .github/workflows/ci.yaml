@@ -74,6 +74,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
+      - name: Upgrade LLVM
+        run: choco upgrade llvm
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Build
