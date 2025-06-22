@@ -55,13 +55,15 @@ function createMultiLineEntry() {
  *
  * @param title
  * @param callback {(e: IMouseEvent) => void}
+ * @param tooltip
  * @returns {ButtonElement}
  */
-function createButton(title, callback) {
+function createButton(title, callback, tooltip = "") {
     const btn = new ButtonElement();
     const label = new LabelElement();
     label.text = title;
     btn.addChild(label);
+    btn.tooltip = tooltip;
     btn.style = {
         width: "7em",
         alignItems: 'center',
@@ -198,21 +200,20 @@ function main() {
         window.showAlert("Clicked", {
             title: window.title
         });
-    });
+    }, "Show alert dialog");
     const confirmBtn = createButton("Confirm", async () => {
         const result = await window.showConfirm("Are you ok?", {
             confirmBtnText: "Yes",
             cancelBtnText: "No",
         });
         console.log("confirm result:", result);
-    })
+    }, "Show confirm dialog")
 
     const buttonPopup = createButton("Popup", (e) => {
         const label = new LabelElement();
         label.text = "Hello, Deft Gallery!";
         label.style = {
             padding: "4em 2em",
-            background: '#ccc',
         }
         window.popup(label, {x: e.detail.windowX, y: e.detail.windowY});
     });

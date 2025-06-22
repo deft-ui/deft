@@ -19,6 +19,7 @@ body {
     --deft-scrollbar-thumb-background: #C1C1C1;
 
     --deft-dialog-title-background: #E1E3E4;
+    --deft-tooltip-border-color: #c7ced5;
 
     color: var(--deft-default-color);
     background: var(--deft-body-background);
@@ -46,6 +47,12 @@ body[theme="dark"] {
     --deft-scrollbar-thumb-background: #424546;
 
     --deft-dialog-title-background: #31363B;
+    --deft-tooltip-border-color: #8b9298;
+}
+
+tooltip {
+    border: 1px var(--deft-tooltip-border-color);
+    padding: 0.2em 0.6em;
 }
 
 dialog {

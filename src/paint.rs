@@ -7,7 +7,7 @@ use crate::renderer::CpuRenderer;
 use crate::{some_or_continue, some_or_return};
 use skia_safe::Canvas;
 use skia_safe::{
-    scalar, Color, Contains, Image, Matrix, Path, PathOp, Point, Vector,
+    scalar, Color, Image, Matrix, Path, PathOp, Point, Vector,
 };
 use skia_window::layer::Layer;
 use std::cell::Cell;

@@ -956,6 +956,14 @@ export class Element {
         Element_focus(this.handle);
     }
 
+    set tooltip(text) {
+        Element_set_tooltip(this.handle, text);
+    }
+
+    get tooltip() {
+        return Element_get_tooltip(this.handle);
+    }
+
     /**
      * Get the window of element
      * @returns {Window}

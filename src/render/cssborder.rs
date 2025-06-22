@@ -21,7 +21,7 @@ fn ellipse_arc(pb: &mut PathBuilder, cx: f32, cy: f32, a: f32, b: f32, start_ang
     let mut x0 = cx + a * f32::cos(current_angle);
     let mut y0 = cy + b * f32::sin(current_angle);
 
-    for i in  0..segments as usize {
+    for _ in  0..segments as usize {
         let next_angle = current_angle + segment_angle;
         let x3 = cx + a * f32::cos(next_angle);
         let y3 = cy + b * f32::sin(next_angle);

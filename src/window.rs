@@ -64,6 +64,7 @@ use winit::window::{
     Cursor, CursorIcon, Fullscreen, ResizeDirection, Theme, WindowAttributes, WindowButtons,
     WindowId,
 };
+use crate::tooltip::Tooltip;
 
 thread_local! {
     static WIN_STATE_MANAGER: RefCell<StateManager> = RefCell::new(StateManager::new());
@@ -880,6 +881,7 @@ impl Window {
             self.update_cursor(&node);
             if let Some(hover) = &mut self.hover.clone() {
                 if hover != &node {
+                    //Leave node
                     self.emit_mouse_event(
                         hover,
                         MouseEventType::MouseLeave,
@@ -889,6 +891,7 @@ impl Window {
                         screen_x,
                         screen_y,
                     );
+                    hover.tooltip_instance = None;
                     self.mouse_enter_node(node.clone(), window_x, window_y, screen_x, screen_y);
                 } else {
                     self.emit_mouse_event(
@@ -967,7 +970,25 @@ impl Window {
             screen_x,
             screen_y,
         );
+        if let Some((tooltip, target)) = Self::find_tooltip(&node, offset_x) {
+            node.tooltip_instance = Some(Tooltip::new(self.handle.clone(), tooltip, target));
+        }
         self.hover = Some(node);
+    }
+
+    fn find_tooltip(node: &Element, x: f32) -> Option<(String, Rect)> {
+        if !node.tooltip.is_empty() {
+            let mut bounds = node.get_origin_bounds();
+            bounds.x = x;
+            bounds.y -= 4.0;
+            bounds.width = 1.0;
+            bounds.height += 8.0;
+            Some((node.tooltip.clone(), bounds))
+        } else if let Some(p) = node.get_parent() {
+            Self::find_tooltip(&p, x)
+        } else {
+            None
+        }
     }
 
     fn is_pressing(&self, node: &Element) -> bool {
@@ -1372,7 +1393,7 @@ impl Window {
         //TODO optimize performance
         // if layout_dirty {
         self.render_tree.clear();
-        for mut lr in self.layer_roots.clone() {
+        for lr in self.layer_roots.clone() {
             //TODO call before_renderer when layout is not dirty
             let mut body = lr.element;
             body.before_render_recurse();
@@ -1416,14 +1437,12 @@ impl Window {
     fn init_element_root(&mut self, mut body: Element, parent: ElementParent) {
         body.set_parent(parent);
         body.set_focusable(true);
-        let theme = self.window.theme();
-        if let Some(theme) = theme {
-            let theme = match theme {
-                Theme::Light => "light",
-                Theme::Dark => "dark",
-            };
-            body.set_attribute("theme".to_string(), theme.to_string());
-        }
+        let theme = self.window.theme().unwrap_or(Theme::Light);
+        let theme = match theme {
+            Theme::Light => "light",
+            Theme::Dark => "dark",
+        };
+        body.set_attribute("theme".to_string(), theme.to_string());
         // if self.focusing.is_none() {
         // TODO move focusing to page?
         self.focus(body.clone());

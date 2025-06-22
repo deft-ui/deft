@@ -1,6 +1,6 @@
 use crate as deft;
 use crate::base::Rect;
-use crate::element::Element;
+use crate::element::{Element, ElementBackend, ElementType};
 use crate::event::ClickEventListener;
 use crate::ext::ext_window::WindowAttrs;
 use crate::platform::support_multiple_windows;
@@ -13,6 +13,7 @@ use winit::dpi::LogicalPosition;
 #[cfg(windows)]
 use winit::platform::windows::WindowAttributesExtWindows;
 use winit::window::WindowAttributes;
+use crate::element::body::Body;
 
 enum PopupWrapper {
     Window(WindowHandle),
@@ -56,7 +57,11 @@ impl Popup {
             let window_handle = Window::create_with_raw_attrs(window_attrs, winit_attrs).unwrap();
             //TODO no unwrap
             let mut window = window_handle.upgrade_mut().unwrap();
-            let _ = window.set_body(element.clone());
+            let mut body = Element::create(Body::create);
+            body.tag = "body".to_string();
+            body.set_element_type(ElementType::Widget);
+            let _ = body.add_child(element.clone(), 0);
+            let _ = window.set_body(body);
             let current_monitor = owner.window.current_monitor();
             let window_weak = window_handle.clone();
             window.register_event_listener(WindowResizeEventListener::new(move |e, _| {

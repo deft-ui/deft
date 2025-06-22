@@ -83,6 +83,7 @@ use crate::style::length::LengthContext;
 use crate::style::style_vars::StyleVars;
 use crate::style::styles::Styles;
 use crate::style_list::StyleList;
+use crate::tooltip::Tooltip;
 
 type BackendCreator = Box<dyn FnMut(&mut Element) -> Box<dyn ElementBackend + 'static>>;
 
@@ -424,6 +425,16 @@ impl Element {
         self.with_window(|mut w| {
             w.focus(self.clone());
         });
+    }
+
+    #[js_func]
+    pub fn set_tooltip(&mut self, tooltip: String) {
+        self.tooltip = tooltip;
+    }
+
+    #[js_func]
+    pub fn get_tooltip(&self) -> String {
+        self.tooltip.to_string()
     }
 
     #[js_func]
@@ -1355,6 +1366,8 @@ pub struct Element {
     is_form_element: bool,
     pub allow_ime: bool,
     js_event_listener_factory: HashMap<String, BoxJsEventListenerFactory<ElementWeak>>,
+    pub(crate) tooltip: String,
+    pub(crate) tooltip_instance: Option<Tooltip>,
 }
 
 // js_weak_value!(Element, ElementWeak);
@@ -1406,6 +1419,8 @@ impl ElementData {
             is_form_element: false,
             allow_ime: false,
             js_event_listener_factory: HashMap::new(),
+            tooltip: String::new(),
+            tooltip_instance: None,
         }
     }
 }
