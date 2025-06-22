@@ -99,6 +99,21 @@ pub enum WindowType {
     Menu,
 }
 
+#[derive(Clone, Debug)]
+pub struct LayerRoot {
+    element: Element,
+    x: f32,
+    y: f32,
+    focusing: Element,
+}
+
+impl LayerRoot {
+    pub fn new(element: Element, x: f32, y: f32) -> Self {
+        let focusing = element.clone();
+        Self { element, x, y, focusing }
+    }
+}
+
 pub struct Window {
     handle: WindowHandle,
     id: i32,
@@ -107,7 +122,7 @@ pub struct Window {
     pub(crate) window_type: WindowType,
     cursor_root_position: LogicalPosition<f64>,
     pages: Vec<Page>,
-    layer_roots: Vec<(Element, f32, f32)>,
+    layer_roots: Vec<LayerRoot>,
     focusing: Option<Element>,
     /// (element, button)
     pressing: Option<(Element, MouseDownInfo)>,
@@ -303,7 +318,7 @@ impl Window {
                 window,
                 cursor_position: LogicalPosition { x: 0.0, y: 0.0 },
                 cursor_root_position: LogicalPosition { x: 0.0, y: 0.0 },
-                layer_roots: vec![(body, 0.0, 0.0)],
+                layer_roots: vec![LayerRoot::new(body, 0.0, 0.0)],
                 pressing: None,
                 focusing: None,
                 hover: None,
@@ -365,8 +380,8 @@ impl Window {
         let height = rect.height() / self.window.scale_factor() as f32;
         debug!("updating style variable: {} {}", name, height);
         self.style_vars.set(name, &format!("{:.6}", height));
-        for (mut root, ..) in self.layer_roots.clone() {
-            root.mark_style_dirty();
+        for mut lr in self.layer_roots.clone() {
+            lr.element.mark_style_dirty();
         }
     }
 
@@ -545,7 +560,7 @@ impl Window {
     }
 
     pub fn handle_input(&mut self, content: &str) {
-        if let Some(focusing) = &mut self.focusing {
+        if let Some(focusing) = &self.focusing {
             focusing.emit(TextInputEvent(content.to_string()));
         }
     }
@@ -574,7 +589,7 @@ impl Window {
             pressed,
         };
 
-        if let Some(focusing) = &mut self.focusing {
+        if let Some(focusing) = &self.focusing {
             if detail.pressed {
                 focusing.emit(KeyDownEvent(detail));
             } else {
@@ -801,8 +816,8 @@ impl Window {
     pub fn on_element_removed(&mut self, _element: &Element) {
         if let Some(f) = &self.focusing {
             if f.get_window().is_none() {
-                let (body, ..) = self.layer_roots.last().unwrap().clone();
-                self.focusing = Some(body);
+                let lr = self.layer_roots.last().unwrap().clone();
+                self.focus(lr.element);
             }
         }
     }
@@ -1179,11 +1194,16 @@ impl Window {
             }
             return;
         }
+        let last_layer = self.layer_roots.last().unwrap();
+        if node.get_root_element() != last_layer.element {
+            return;
+        }
 
         let focusing = Some(node.clone());
         if self.focusing != focusing {
             // debug!("focusing {:?}", node.get_id());
             let mut old_focusing = self.focusing.clone();
+            self.layer_roots.last_mut().unwrap().focusing = node.clone();
             self.focusing = focusing;
             if let Some(old_focusing) = &mut old_focusing {
                 old_focusing.emit(BlurEvent);
@@ -1261,8 +1281,8 @@ impl Window {
             root.calculate_layout(w, h);
         }
         if auto_size {
-            let (body, ..) = some_or_return!(self.layer_roots.first());
-            let (final_width, final_height) = body.get_size();
+            let lr = some_or_return!(self.layer_roots.first());
+            let (final_width, final_height) = lr.element.get_size();
             if win_width as u32 != final_width as u32 || win_height as u32 != final_height as u32 {
                 self.resize(crate::base::Size {
                     width: final_width,
@@ -1310,7 +1330,8 @@ impl Window {
         }
         let (viewport_width, viewport_height) = self.get_inner_size();
         warn_time!(16, "update window");
-        for (body, ..) in &mut self.layer_roots.clone() {
+        for lr in &mut self.layer_roots.clone() {
+            let body = &mut lr.element;
             let length_ctx = LengthContext {
                 root: body.style.font_size,
                 font_size: body.style.font_size,
@@ -1332,7 +1353,8 @@ impl Window {
                 .inner_size()
                 .to_logical(self.window.scale_factor());
             for i in 1..self.layer_roots.len() {
-                let (root, x, y) = &mut self.layer_roots[i];
+                let lr = &mut self.layer_roots[i];
+                let (root, x, y) = (&mut lr.element, &mut lr.x, &mut lr.y);
                 let bounds = root.get_bounds();
                 if x.is_nan() {
                     *x = (win_size.width - bounds.width) / 2.0;
@@ -1350,8 +1372,9 @@ impl Window {
         //TODO optimize performance
         // if layout_dirty {
         self.render_tree.clear();
-        for (mut body, ..) in self.layer_roots.clone() {
+        for mut lr in self.layer_roots.clone() {
             //TODO call before_renderer when layout is not dirty
+            let mut body = lr.element;
             body.before_render_recurse();
             let rt = build_render_nodes(&mut body);
             let body = body.clone();
@@ -1365,7 +1388,7 @@ impl Window {
 
     #[js_func]
     pub fn set_body(&mut self, body: Element) -> DeftResult<()> {
-        self.layer_roots[0] = (body.clone(), 0.0, 0.0);
+        self.layer_roots[0] = LayerRoot::new(body.clone(), 0.0, 0.0);
         self.init_element_root(body, ElementParent::Window(self.handle.clone()));
         Ok(())
     }
@@ -1375,7 +1398,7 @@ impl Window {
         let page = Page::new(self.handle.clone(), element.clone());
         let body = page.get_body().clone();
         self.pages.push(page.clone());
-        self.layer_roots.push((body.clone(), x, y));
+        self.layer_roots.push(LayerRoot::new(body.clone(), x, y));
         self.init_element_root(body, ElementParent::Page(self.handle.clone()));
         page
     }
@@ -1383,7 +1406,9 @@ impl Window {
     #[js_func]
     pub fn close_page(&mut self, page: Page) {
         self.pages.retain(|p| p != &page);
-        self.layer_roots.retain(|e| &e.0 != page.get_body());
+        self.layer_roots.retain(|e| &e.element != page.get_body());
+        let new_layer = self.layer_roots.last().unwrap();
+        self.focus(new_layer.element.clone());
         self.notify_update();
         //TODO emit close event?
     }
@@ -1401,14 +1426,14 @@ impl Window {
         }
         // if self.focusing.is_none() {
         // TODO move focusing to page?
-        self.focusing = Some(body.clone());
+        self.focus(body.clone());
         // }
         self.invalid_layout(body);
     }
 
     #[js_func]
     pub fn get_body(&self) -> Option<Element> {
-        Some(self.layer_roots[0].0.clone())
+        Some(self.layer_roots[0].element.clone())
     }
 
     #[js_func]
@@ -1491,7 +1516,8 @@ impl Window {
         //TODO support config
         let layer_cache_enabled = false;
         let mut paint_tree = Vec::new();
-        for (root, x, y) in &mut self.layer_roots.clone() {
+        for lr in &mut self.layer_roots.clone() {
+            let (root, x, y) = (&mut lr.element, lr.x, lr.y);
             self.render_tree
                 .get_mut(root)
                 .unwrap()
@@ -1502,7 +1528,7 @@ impl Window {
                 .unwrap()
                 .build_paint_tree(&viewport);
             //TODO notify absolute position change
-            paint_tree.push((pt, *x, *y));
+            paint_tree.push((pt, x, y));
         }
         let waiter_finisher = waiter.clone();
         let window_id = self.get_id();
@@ -1546,7 +1572,7 @@ impl Window {
         let x = self.cursor_position.x as f32;
         let y = self.cursor_position.y as f32;
         self.get_node_by_pos(x, y).unwrap_or_else(|| {
-            let element = self.layer_roots.last().unwrap().0.clone();
+            let element = self.layer_roots.last().unwrap().element.clone();
             (element, x, y)
         })
     }
@@ -1565,7 +1591,8 @@ impl Window {
 
     fn get_node_by_pos(&self, window_x: f32, window_y: f32) -> Option<(Element, f32, f32)> {
         // debug!("search node time in layers");
-        let (body, x, y) = self.layer_roots.last().clone()?;
+        let lr = self.layer_roots.last().clone()?;
+        let (body, x, y) = (&lr.element, lr.x, lr.y);
         let (eo, x, y) = self
             .render_tree
             .get(body)?

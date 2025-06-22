@@ -6,7 +6,7 @@ use std::hash::{Hash, Hasher};
 use std::mem;
 use std::ops::{Deref, DerefMut};
 
-use anyhow::Error;
+use anyhow::{anyhow, Error};
 use bitflags::bitflags;
 use deft_macros::{js_methods, mrc_object};
 use quick_js::JsValue;
@@ -317,11 +317,11 @@ impl Element {
         let tag = tag.to_lowercase();
         let mut view = ELEMENT_CREATORS.with_borrow_mut(|map| {
             if let Some(creator) = map.get_mut(&tag) {
-                Element::new(creator)
+                Ok(Element::new(creator))
             } else {
-                Element::create(Container::create)
+                return Err(anyhow!("Unexpected element tag {}", tag));
             }
-        });
+        })?;
         view.resource_table.put(ElementJsContext { context });
         view.set_tag(tag);
         view.set_element_type(ElementType::Widget);

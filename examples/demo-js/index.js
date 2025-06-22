@@ -53,7 +53,7 @@ function createSystemTray() {
 }
 
 function createEntry() {
-    const entry = new EntryElement();
+    const entry = new TextInputElement();
     entry.class = "small-entry";
     entry.placeholder = "Please input some text"
     console.log("entry id:", entry.eid)
@@ -61,7 +61,7 @@ function createEntry() {
 }
 
 function createPassword() {
-    const entry = new EntryElement();
+    const entry = new TextInputElement();
     entry.class = "small-entry";
     entry.setAttribute("color", "red")
     entry.placeholder = "Input password"
@@ -185,8 +185,8 @@ function createAnimationButton() {
 }
 
 function createParagraph() {
-    const paragraph = new ParagraphElement();
-    paragraph.addLine([
+    const richTextElement = new RichTextElement();
+    richTextElement.addLine([
         {
             type: "text",
             text: "Normal",
@@ -200,7 +200,7 @@ function createParagraph() {
             color: "#F00",
         }
     ]);
-    return paragraph;
+    return richTextElement;
 }
 
 function testWindowHandle(window) {
