@@ -197,8 +197,8 @@ impl Editable {
 
         let mut me = self.clone();
         let caret_rect = me.paragraph.get_caret_rect()?;
-        let x = caret_rect.left - scroll_left;
-        let y = caret_rect.top - scroll_top;
+        let x = caret_rect.x - scroll_left;
+        let y = caret_rect.y - scroll_top;
         Some(Rect::new(x, y, 1.0, caret_rect.height))
     }
 
@@ -209,8 +209,8 @@ impl Editable {
         let win = win.upgrade_mut().ok()?;
         //TOOD use transformed position
         let el_offset = el.get_origin_bounds();
-        let x = (el_offset.left + pos.left) as f64;
-        let y = (el_offset.top + pos.bottom()) as f64;
+        let x = (el_offset.x + pos.x) as f64;
+        let y = (el_offset.y + pos.bottom()) as f64;
         win.window.set_ime_cursor_area(
             crate::winit::dpi::Position::Logical(LogicalPosition { x, y }),
             Size::Logical(LogicalSize {
@@ -282,7 +282,7 @@ impl Editable {
         };
         // bounds relative to entry
         let origin_bounds =
-            bounds.translate(origin_bounds.left + border_left, origin_bounds.top + border_top);
+            bounds.translate(origin_bounds.x + border_left, origin_bounds.y + border_top);
 
         let element = ok_or_return!(self.element.upgrade_mut());
         element.emit(CaretChangeEvent {
@@ -747,8 +747,8 @@ impl ElementBackend for Editable {
             canvas.session(|_| {
                 if focusing && caret_visible {
                     paint.set_stroke_width(2.0);
-                    let start = (caret_pos.left, caret_pos.top);
-                    let end = (caret_pos.left, caret_pos.bottom());
+                    let start = (caret_pos.x, caret_pos.y);
+                    let end = (caret_pos.x, caret_pos.bottom());
                     canvas.draw_line(start, end, &paint);
                 }
             });

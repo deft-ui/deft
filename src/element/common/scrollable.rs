@@ -53,8 +53,8 @@ impl Scrollable {
     /// Scroll rect into view.
     /// Returns true if scroll occurs
     pub fn scroll_into_view(&mut self, rect: &Rect) -> bool {
-        let scrolled_y = self.vertical_bar.scroll_into_view(rect.top, rect.height);
-        let scrolled_x = self.horizontal_bar.scroll_into_view(rect.left, rect.width);
+        let scrolled_y = self.vertical_bar.scroll_into_view(rect.y, rect.height);
+        let scrolled_x = self.horizontal_bar.scroll_into_view(rect.x, rect.width);
         scrolled_x || scrolled_y
     }
 

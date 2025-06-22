@@ -243,7 +243,7 @@ impl RenderTree {
         let element_data = ElementObjectData {
             element: element.clone(),
             element_id: element.get_eid(),
-            coord: (bounds.left, bounds.top),
+            coord: (bounds.x, bounds.y),
             children_viewport: element.get_children_viewport(),
             border_color: element.style.border_color,
             renderer: Box::new(move || {
@@ -368,11 +368,11 @@ impl RenderTree {
         for mut c in element.get_children() {
             let child_bounds = c.get_bounds();
             matrix_calculator.save();
-            matrix_calculator.translate((child_bounds.left, child_bounds.top));
-            let child_origin_x = origin_x + child_bounds.left;
-            let child_origin_y = origin_y + child_bounds.top;
-            let child_layer_x = layer_x + child_bounds.left;
-            let child_layer_y = layer_y + child_bounds.top;
+            matrix_calculator.translate((child_bounds.x, child_bounds.y));
+            let child_origin_x = origin_x + child_bounds.x;
+            let child_origin_y = origin_y + child_bounds.y;
+            let child_layer_x = layer_x + child_bounds.x;
+            let child_layer_y = layer_y + child_bounds.y;
             children.push(self.build_render_object(
                 &mut c,
                 child_origin_x,
@@ -403,7 +403,7 @@ impl RenderTree {
         let need_create_children_layer = Self::need_create_children_layer(element);
         if need_create_children_layer {
             let (scroll_left, scroll_top) = element.scrollable.scroll_offset();
-            let clip_rect = bounds.translate(-bounds.left + scroll_left, -bounds.top + scroll_top);
+            let clip_rect = bounds.translate(-bounds.x + scroll_left, -bounds.y + scroll_top);
             matrix_calculator.save();
 
             let mut matrix = Matrix::default();
@@ -474,7 +474,7 @@ impl RenderTree {
         if need_create_root_layer {
             matrix_calculator.save();
             let mut mc = MatrixCalculator::new();
-            mc.translate((bounds.left, bounds.top));
+            mc.translate((bounds.x, bounds.y));
             element.apply_transform(&mut mc);
 
             element.apply_transform(matrix_calculator);
@@ -494,7 +494,7 @@ impl RenderTree {
             self.layout_tree.layer_objects.push(layer_object_data);
             let obj = self.create_normal_render_object(
                 element,
-                &bounds.with_offset((-bounds.left, -bounds.top)),
+                &bounds.with_offset((-bounds.x, -bounds.y)),
                 origin_x,
                 origin_y,
                 0.0,
@@ -541,7 +541,7 @@ impl RenderTree {
         element_data.background_image = element.style.background_image.clone();
         element_data.background_color = element.style.background_color;
         element_data.border_width = element.get_border_width();
-        element_data.coord = (bounds.left, bounds.top);
+        element_data.coord = (bounds.x, bounds.y);
         element_data.layer_object_idx = Some(layer_object_idx);
         element_data.layer_coord = (layer_x, layer_y);
         let element_obj = ElementRO {
@@ -658,7 +658,7 @@ impl RenderTree {
                 .op(&layer_path, PathOp::Intersect)
                 .unwrap_or(Path::new());
             let mut visible_bounds = Rect::from_skia(visible_path.bounds());
-            visible_bounds.top = visible_bounds.top.floor();
+            visible_bounds.y = visible_bounds.y.floor();
             visible_bounds.height = visible_bounds.height.ceil();
 
             let max_len = (viewport.width * viewport.width
@@ -672,8 +672,8 @@ impl RenderTree {
             {
                 invalid_area = InvalidArea::Full;
                 lo.surface_bounds = Rect::from_xywh(
-                    visible_bounds.left,
-                    visible_bounds.top,
+                    visible_bounds.x,
+                    visible_bounds.y,
                     max_surface_width,
                     max_surface_height,
                 );
@@ -681,28 +681,28 @@ impl RenderTree {
                 // Handle visible bound change
                 let common_visible_bounds = visible_bounds.clone();
                 if !common_visible_bounds.intersect(&lo.visible_bounds).is_empty() {
-                    if common_visible_bounds.left > visible_bounds.left {
+                    if common_visible_bounds.x > visible_bounds.x {
                         let new_rect = Rect::from_xywh(
-                            visible_bounds.left,
-                            visible_bounds.top,
-                            common_visible_bounds.left - visible_bounds.left,
+                            visible_bounds.x,
+                            visible_bounds.y,
+                            common_visible_bounds.x - visible_bounds.x,
                             visible_bounds.height(),
                         );
                         invalid_area.add_rect(Some(&new_rect));
                     }
-                    if common_visible_bounds.top > visible_bounds.top {
+                    if common_visible_bounds.y > visible_bounds.y {
                         let new_rect = Rect::from_xywh(
-                            visible_bounds.left,
-                            visible_bounds.top,
+                            visible_bounds.x,
+                            visible_bounds.y,
                             visible_bounds.width(),
-                            common_visible_bounds.top - visible_bounds.top,
+                            common_visible_bounds.y - visible_bounds.y,
                         );
                         invalid_area.add_rect(Some(&new_rect));
                     }
                     if common_visible_bounds.right() < visible_bounds.right() {
                         let new_rect = Rect::from_xywh(
                             common_visible_bounds.right(),
-                            visible_bounds.top,
+                            visible_bounds.y,
                             visible_bounds.right() - common_visible_bounds.right(),
                             visible_bounds.height(),
                         );
@@ -710,7 +710,7 @@ impl RenderTree {
                     }
                     if common_visible_bounds.bottom() < visible_bounds.bottom() {
                         let new_rect = Rect::from_xywh(
-                            visible_bounds.left,
+                            visible_bounds.x,
                             common_visible_bounds.bottom(),
                             visible_bounds.width(),
                             visible_bounds.bottom() - common_visible_bounds.bottom(),
@@ -721,20 +721,20 @@ impl RenderTree {
                     invalid_area.add_rect(Some(&visible_bounds));
                 }
                 // Handle surface change
-                if lo.surface_bounds.left > visible_bounds.left {
+                if lo.surface_bounds.x > visible_bounds.x {
                     let new_rect = Rect::from_xywh(
-                        visible_bounds.left,
-                        lo.surface_bounds.top,
-                        lo.surface_bounds.left - visible_bounds.left,
+                        visible_bounds.x,
+                        lo.surface_bounds.y,
+                        lo.surface_bounds.x - visible_bounds.x,
                         lo.surface_bounds.height(),
                     );
                     invalid_area.add_rect(Some(&new_rect));
                     lo.surface_bounds
-                        .offset((visible_bounds.left - lo.surface_bounds.left, 0.0));
+                        .offset((visible_bounds.x - lo.surface_bounds.x, 0.0));
                 } else if lo.surface_bounds.right() < visible_bounds.right() {
                     let new_rect = Rect::from_xywh(
                         lo.surface_bounds.right(),
-                        lo.surface_bounds.top,
+                        lo.surface_bounds.y,
                         visible_bounds.right() - lo.surface_bounds.right(),
                         lo.surface_bounds.height(),
                     );
@@ -742,19 +742,19 @@ impl RenderTree {
                     lo.surface_bounds
                         .offset((visible_bounds.right() - lo.surface_bounds.right(), 0.0));
                 }
-                if lo.surface_bounds.top > visible_bounds.top {
+                if lo.surface_bounds.y > visible_bounds.y {
                     let new_rect = Rect::from_xywh(
-                        lo.surface_bounds.left,
-                        visible_bounds.top,
+                        lo.surface_bounds.x,
+                        visible_bounds.y,
                         lo.surface_bounds.width(),
-                        lo.surface_bounds.top - visible_bounds.top,
+                        lo.surface_bounds.y - visible_bounds.y,
                     );
                     invalid_area.add_rect(Some(&new_rect));
                     lo.surface_bounds
-                        .offset((0.0, visible_bounds.top - lo.surface_bounds.top));
+                        .offset((0.0, visible_bounds.y - lo.surface_bounds.y));
                 } else if lo.surface_bounds.bottom() < visible_bounds.bottom() {
                     let new_rect = Rect::from_xywh(
-                        lo.surface_bounds.left,
+                        lo.surface_bounds.x,
                         lo.surface_bounds.bottom(),
                         lo.surface_bounds.width(),
                         visible_bounds.bottom() - lo.surface_bounds.bottom(),
@@ -819,7 +819,7 @@ impl InvalidRects {
     pub fn has_intersects(&self, rect: &Rect) -> bool {
         for r in &self.rects {
             let intersect = f32::min(r.right(), rect.right()) >= f32::max(r.left(), rect.left())
-                && f32::min(r.bottom(), rect.bottom()) >= f32::max(r.top, rect.top);
+                && f32::min(r.bottom(), rect.bottom()) >= f32::max(r.y, rect.y);
             if intersect {
                 return true;
             }

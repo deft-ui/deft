@@ -648,8 +648,8 @@ impl Element {
         let (t, r, b, l) = self.get_padding();
         let bounds = self.get_origin_bounds();
         base::Rect::new(
-            bounds.left + l,
-            bounds.top + t,
+            bounds.x + l,
+            bounds.y + t,
             bounds.width - l - r,
             bounds.height - t - b,
         )
@@ -661,8 +661,8 @@ impl Element {
         return if let Some(p) = self.get_parent() {
             let pob = p.get_origin_bounds();
             let (offset_left, offset_top) = p.scrollable.scroll_offset();
-            let x = pob.left + b.left - offset_left;
-            let y = pob.top + b.top - offset_top;
+            let x = pob.x + b.x - offset_left;
+            let y = pob.y + b.y - offset_top;
             base::Rect::new(x, y, b.width, b.height)
         } else {
             b

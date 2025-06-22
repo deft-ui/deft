@@ -33,7 +33,7 @@ impl Popup {
         let mut owner = owner_handle.upgrade_mut().unwrap();
         if support_multiple_windows() {
             let (win_x, win_y) = owner.inner_position();
-            let pos_x = target.left + win_x;
+            let pos_x = target.x + win_x;
             let pos_y = target.bottom() + win_y;
             let window_attrs = WindowAttrs {
                 width: None,
@@ -86,7 +86,7 @@ impl Popup {
             }
             .to_ref()
         } else {
-            let page = owner.create_page(element, target.left, target.bottom());
+            let page = owner.create_page(element, target.x, target.bottom());
             let page_weak = page.as_weak();
             page.get_body()
                 .clone()

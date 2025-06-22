@@ -95,7 +95,7 @@ impl ElementBackend for TextInput {
         // let el = ok_or_return!(self.element.upgrade());
         if ctx.target == self.element {
             let eb = self.editable_element.get_bounds();
-            self.editable.handle_event(event, ctx, (-eb.left, -eb.top));
+            self.editable.handle_event(event, ctx, (-eb.x, -eb.y));
         }
     }
 

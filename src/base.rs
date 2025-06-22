@@ -209,8 +209,8 @@ pub struct JsValueContext {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default, Copy)]
 pub struct Rect {
-    pub left: f32,
-    pub top: f32,
+    pub x: f32,
+    pub y: f32,
     pub width: f32,
     pub height: f32,
 }
@@ -556,8 +556,8 @@ impl<E: ToJsValue + Clone + 'static> EventRegistration<E> {
 impl Rect {
     pub fn new(x: f32, y: f32, width: f32, height: f32) -> Self {
         Self {
-            left: x,
-            top: y,
+            x: x,
+            y: y,
             width,
             height,
         }
@@ -569,8 +569,8 @@ impl Rect {
     
     pub fn from_skia(src: &skia_safe::Rect) -> Self {
         Self {
-            left: src.left,
-            top: src.top,
+            x: src.left,
+            y: src.top,
             width: src.width(),
             height: src.height(),
         }
@@ -586,8 +586,8 @@ impl Rect {
 
     pub fn from_layout(layout: &Layout) -> Self {
         Self {
-            left: layout.left().nan_to_zero(),
-            top: layout.top().nan_to_zero(),
+            x: layout.left().nan_to_zero(),
+            y: layout.top().nan_to_zero(),
             width: layout.width().nan_to_zero(),
             height: layout.height().nan_to_zero(),
         }
@@ -595,19 +595,19 @@ impl Rect {
 
     pub fn empty() -> Self {
         Self {
-            left: 0.0,
-            top: 0.0,
+            x: 0.0,
+            y: 0.0,
             width: 0.0,
             height: 0.0,
         }
     }
     
     pub fn left(&self) -> f32 {
-        self.left
+        self.x
     }
     
     pub fn top(&self) -> f32 {
-        self.top
+        self.y
     }
     
     pub fn width(&self) -> f32 {
@@ -619,13 +619,13 @@ impl Rect {
     }
 
     pub fn to_skia_rect(&self) -> skia_safe::Rect {
-        skia_safe::Rect::new(self.left, self.top, self.left + self.width, self.top + self.height)
+        skia_safe::Rect::new(self.x, self.y, self.x + self.width, self.y + self.height)
     }
 
     pub fn from_skia_rect(rect: skia_safe::Rect) -> Self {
         Self {
-            left: rect.left,
-            top: rect.top,
+            x: rect.left,
+            y: rect.top,
             width: rect.width(),
             height: rect.height(),
         }
@@ -633,18 +633,18 @@ impl Rect {
 
     #[inline]
     pub fn right(&self) -> f32 {
-        self.left + self.width
+        self.x + self.width
     }
     
     pub fn offset(&mut self, (x, y): (f32, f32)) {
-        self.left += x;
-        self.top += y;
+        self.x += x;
+        self.y += y;
     }
     
     pub fn with_offset(&self, (x, y):  (f32, f32)) -> Self {
         Self {
-            left: self.left + x,
-            top: self.top + y,
+            x: self.x + x,
+            y: self.y + y,
             width: self.width,
             height: self.height,
         }
@@ -652,14 +652,14 @@ impl Rect {
 
     #[inline]
     pub fn bottom(&self) -> f32 {
-        self.top + self.height
+        self.y + self.height
     }
 
     #[inline]
     pub fn translate(&self, x: f32, y: f32) -> Self {
         Self {
-            left: self.left + x,
-            top: self.top + y,
+            x: self.x + x,
+            y: self.y + y,
             width: self.width,
             height: self.height,
         }
@@ -668,8 +668,8 @@ impl Rect {
     #[inline]
     pub fn new_origin(&self, x: f32, y: f32) -> Self {
         Self {
-            left: x,
-            top: y,
+            x: x,
+            y: y,
             width: self.width,
             height: self.height,
         }
@@ -685,13 +685,13 @@ impl Rect {
     //TODO rename
     #[inline]
     pub fn intersect(&self, other: &Rect) -> Self {
-        let x = f32::max(self.left, other.left);
-        let y = f32::max(self.top, other.top);
+        let x = f32::max(self.x, other.x);
+        let y = f32::max(self.y, other.y);
         let r = f32::min(self.right(), other.right());
         let b = f32::min(self.bottom(), other.bottom());
         return Self {
-            left: x,
-            top: y,
+            x: x,
+            y: y,
             width: f32::max(0.0, r - x),
             height: f32::max(0.0, b - y),
         };
@@ -699,8 +699,8 @@ impl Rect {
 
     #[inline]
     pub fn contains_point(&self, x: f32, y: f32) -> bool {
-        let left = self.left;
-        let top = self.top;
+        let left = self.x;
+        let top = self.y;
         let right = self.right();
         let bottom = self.bottom();
         x >= left && x <= right && y >= top && y <= bottom
@@ -716,7 +716,7 @@ impl Rect {
 
     pub fn to_origin_bounds(&self, node: &Element) -> Self {
         let origin_bounds = node.get_origin_bounds();
-        self.translate(origin_bounds.left, origin_bounds.top)
+        self.translate(origin_bounds.x, origin_bounds.y)
     }
 }
 

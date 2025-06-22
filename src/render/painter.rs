@@ -96,7 +96,7 @@ impl ElementPainter {
         };
         let canvas = painter.canvas;
         canvas.save();
-        canvas.translate((layer.surface_bounds.left, layer.surface_bounds.top));
+        canvas.translate((layer.surface_bounds.x, layer.surface_bounds.y));
         canvas.scale((1.0 / self.scale, 1.0 / self.scale));
         let mut options = SamplingOptions::default();
         //TODO use Nearest?
@@ -174,8 +174,8 @@ impl ElementPainter {
             layer_canvas.save();
 
             layer_canvas.translate((
-                -graphic_layer.surface_bounds.left,
-                -graphic_layer.surface_bounds.top,
+                -graphic_layer.surface_bounds.x,
+                -graphic_layer.surface_bounds.y,
             ));
             if !layer.invalid_rects.is_empty() {
                 layer_canvas.clip_path(&layer.invalid_rects.to_path(), ClipOp::Intersect, false);
@@ -238,8 +238,8 @@ impl ElementPainter {
                 None
             } else {
                 //TODO fix scroll delta
-                let scroll_delta_x = layer.surface_bounds.left - ogl_state.surface_bounds.left;
-                let scroll_delta_y = layer.surface_bounds.top - ogl_state.surface_bounds.top;
+                let scroll_delta_x = layer.surface_bounds.x - ogl_state.surface_bounds.x;
+                let scroll_delta_y = layer.surface_bounds.y - ogl_state.surface_bounds.y;
                 if scroll_delta_x != 0.0 || scroll_delta_y != 0.0 {
                     let mut temp_gl = context.create_layer(surface_width, surface_height).unwrap();
                     temp_gl.canvas().session(|canvas| {
