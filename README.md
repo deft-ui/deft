@@ -15,7 +15,7 @@ Deft is a framework for building desktop and mobile applications with Rust and J
 
 # Limits
 
-* Not all CSS properties are supported, see [documentation](https://deft-ui.github.io/styles/properties/) for more details.
+* Not all CSS properties are supported, see [documentation](https://deft-ui.github.io/en/styles/properties/) for more details.
 * Accessibility is not yet available.
 * JavaScript debugger is not yet available.
 
@@ -36,9 +36,9 @@ npm install
 npm run dev
 ```
 
-[Documentation](https://deft-ui.github.io/guides/what-is-deft/)
+[Documentation](https://deft-ui.github.io/en/guides/what-is-deft/)
 
-[Demos](https://deft-ui.github.io/demos/)
+[Demos](https://deft-ui.github.io/en/demos/)
 
 # Platforms
 
