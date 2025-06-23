@@ -31,7 +31,7 @@ impl Tooltip {
             set_timeout(
                 move || {
                     if let Ok(w) = window_handle.upgrade_mut() {
-                        let p = w.popup(container_el, target);
+                        let p = w.popup_ex(container_el, target, false);
                         popup_holder.replace(p);
                     }
                 },

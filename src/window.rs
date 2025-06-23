@@ -102,17 +102,24 @@ pub enum WindowType {
 
 #[derive(Clone, Debug)]
 pub struct LayerRoot {
-    element: Element,
+    body: Element,
     x: f32,
     y: f32,
     focusing: Element,
+    focusable: bool,
 }
 
 impl LayerRoot {
     pub fn new(element: Element, x: f32, y: f32) -> Self {
         let focusing = element.clone();
-        Self { element, x, y, focusing }
+        Self { body: element, x, y, focusing, focusable: true }
     }
+
+    pub fn new_not_focusable(element: Element, x: f32, y: f32) -> Self {
+        let focusing = element.clone();
+        Self { body: element, x, y, focusing, focusable: false }
+    }
+
 }
 
 pub struct Window {
@@ -150,6 +157,8 @@ pub struct Window {
     next_frame_timer_handle: Option<TimerHandle>,
     resource_table: ResourceTable,
     render_backend_types: Vec<RenderBackendType>,
+    /// (ElementId, Tooltip)
+    tooltip_instance: Option<(u32, Tooltip)>,
 }
 
 #[derive(Clone, PartialEq)]
@@ -354,6 +363,7 @@ impl Window {
                 render_backend_types,
                 layout_dirty_list: HashMap::new(),
                 pages: Vec::new(),
+                tooltip_instance: None,
             };
             win_info.on_resize();
             wsm.new_state(win_info)
@@ -382,7 +392,7 @@ impl Window {
         debug!("updating style variable: {} {}", name, height);
         self.style_vars.set(name, &format!("{:.6}", height));
         for mut lr in self.layer_roots.clone() {
-            lr.element.mark_style_dirty();
+            lr.body.mark_style_dirty();
         }
     }
 
@@ -553,6 +563,10 @@ impl Window {
     #[js_func]
     pub fn popup(&self, content: Element, target: base::Rect) -> Popup {
         Popup::new(content, target, &self.handle)
+    }
+
+    pub fn popup_ex(&self, content: Element, target: base::Rect, focusable: bool) -> Popup {
+        Popup::new_ex(content, target, &self.handle, focusable)
     }
 
     pub fn allow_close(&mut self) -> bool {
@@ -817,10 +831,32 @@ impl Window {
     pub fn on_element_removed(&mut self, _element: &Element) {
         if let Some(f) = &self.focusing {
             if f.get_window().is_none() {
-                let lr = self.layer_roots.last().unwrap().clone();
-                self.focus(lr.element);
+                let lr = self.get_focused_layer();
+                self.focus(lr.body.clone());
             }
         }
+    }
+
+    fn get_focused_layer(&self) -> &LayerRoot {
+        let layer_count = self.layer_roots.len();
+        for i in 0..layer_count {
+            let lr = &self.layer_roots[layer_count - i - 1];
+            if lr.focusable {
+                return lr;
+            }
+        }
+        panic!("no focused layer found");
+    }
+
+    fn get_focused_layer_mut(&mut self) -> &mut LayerRoot {
+        let layer_count = self.layer_roots.len();
+        for i in 0..layer_count {
+            let idx = layer_count - i - 1;
+            if self.layer_roots[idx].focusable {
+                return &mut self.layer_roots[idx];
+            }
+        }
+        panic!("no focused layer found");
     }
 
     fn handle_mouse_wheel(&mut self, delta: (f32, f32)) {
@@ -891,7 +927,6 @@ impl Window {
                         screen_x,
                         screen_y,
                     );
-                    hover.tooltip_instance = None;
                     self.mouse_enter_node(node.clone(), window_x, window_y, screen_x, screen_y);
                 } else {
                     self.emit_mouse_event(
@@ -970,20 +1005,25 @@ impl Window {
             screen_x,
             screen_y,
         );
-        if let Some((tooltip, target)) = Self::find_tooltip(&node, offset_x) {
-            node.tooltip_instance = Some(Tooltip::new(self.handle.clone(), tooltip, target));
+        if let Some((eid, tooltip, target)) = Self::find_tooltip(&node, offset_x) {
+            let is_same = self.tooltip_instance.as_ref().map(|ti| ti.0 == eid).unwrap_or(false);
+            if !is_same {
+                self.tooltip_instance = Some((eid, Tooltip::new(self.handle.clone(), tooltip, target)));
+            }
+        } else {
+            self.tooltip_instance = None;
         }
         self.hover = Some(node);
     }
 
-    fn find_tooltip(node: &Element, x: f32) -> Option<(String, Rect)> {
+    fn find_tooltip(node: &Element, x: f32) -> Option<(u32, String, Rect)> {
         if !node.tooltip.is_empty() {
             let mut bounds = node.get_origin_bounds();
             bounds.x = x;
             bounds.y -= 4.0;
             bounds.width = 1.0;
             bounds.height += 8.0;
-            Some((node.tooltip.clone(), bounds))
+            Some((node.get_eid(), node.tooltip.clone(), bounds))
         } else if let Some(p) = node.get_parent() {
             Self::find_tooltip(&p, x)
         } else {
@@ -1215,8 +1255,8 @@ impl Window {
             }
             return;
         }
-        let last_layer = self.layer_roots.last().unwrap();
-        if node.get_root_element() != last_layer.element {
+        let last_layer = self.get_focused_layer();
+        if &node.get_root_element() != &last_layer.body {
             return;
         }
 
@@ -1224,7 +1264,8 @@ impl Window {
         if self.focusing != focusing {
             // debug!("focusing {:?}", node.get_id());
             let mut old_focusing = self.focusing.clone();
-            self.layer_roots.last_mut().unwrap().focusing = node.clone();
+            let layer = self.get_focused_layer_mut();
+            layer.focusing = node.clone();
             self.focusing = focusing;
             if let Some(old_focusing) = &mut old_focusing {
                 old_focusing.emit(BlurEvent);
@@ -1303,7 +1344,7 @@ impl Window {
         }
         if auto_size {
             let lr = some_or_return!(self.layer_roots.first());
-            let (final_width, final_height) = lr.element.get_size();
+            let (final_width, final_height) = lr.body.get_size();
             if win_width as u32 != final_width as u32 || win_height as u32 != final_height as u32 {
                 self.resize(crate::base::Size {
                     width: final_width,
@@ -1352,7 +1393,7 @@ impl Window {
         let (viewport_width, viewport_height) = self.get_inner_size();
         warn_time!(16, "update window");
         for lr in &mut self.layer_roots.clone() {
-            let body = &mut lr.element;
+            let body = &mut lr.body;
             let length_ctx = LengthContext {
                 root: body.style.font_size,
                 font_size: body.style.font_size,
@@ -1375,7 +1416,7 @@ impl Window {
                 .to_logical(self.window.scale_factor());
             for i in 1..self.layer_roots.len() {
                 let lr = &mut self.layer_roots[i];
-                let (root, x, y) = (&mut lr.element, &mut lr.x, &mut lr.y);
+                let (root, x, y) = (&mut lr.body, &mut lr.x, &mut lr.y);
                 let bounds = root.get_bounds();
                 if x.is_nan() {
                     *x = (win_size.width - bounds.width) / 2.0;
@@ -1395,7 +1436,7 @@ impl Window {
         self.render_tree.clear();
         for lr in self.layer_roots.clone() {
             //TODO call before_renderer when layout is not dirty
-            let mut body = lr.element;
+            let mut body = lr.body;
             body.before_render_recurse();
             let rt = build_render_nodes(&mut body);
             let body = body.clone();
@@ -1416,10 +1457,19 @@ impl Window {
 
     #[js_func]
     pub fn create_page(&mut self, element: Element, x: f32, y: f32) -> Page {
+        self.create_page_ex(element, x, y, true)
+    }
+
+    pub fn create_page_ex(&mut self, element: Element, x: f32, y: f32, focusable: bool) -> Page {
         let page = Page::new(self.handle.clone(), element.clone());
         let body = page.get_body().clone();
         self.pages.push(page.clone());
-        self.layer_roots.push(LayerRoot::new(body.clone(), x, y));
+        let root = if focusable {
+            LayerRoot::new(body.clone(), x, y)
+        } else {
+            LayerRoot::new_not_focusable(body.clone(), x, y)
+        };
+        self.layer_roots.push(root);
         self.init_element_root(body, ElementParent::Page(self.handle.clone()));
         page
     }
@@ -1427,9 +1477,9 @@ impl Window {
     #[js_func]
     pub fn close_page(&mut self, page: Page) {
         self.pages.retain(|p| p != &page);
-        self.layer_roots.retain(|e| &e.element != page.get_body());
-        let new_layer = self.layer_roots.last().unwrap();
-        self.focus(new_layer.element.clone());
+        self.layer_roots.retain(|e| &e.body != page.get_body());
+        let new_layer = self.get_focused_layer();
+        self.focus(new_layer.focusing.clone());
         self.notify_update();
         //TODO emit close event?
     }
@@ -1452,7 +1502,7 @@ impl Window {
 
     #[js_func]
     pub fn get_body(&self) -> Option<Element> {
-        Some(self.layer_roots[0].element.clone())
+        Some(self.layer_roots[0].body.clone())
     }
 
     #[js_func]
@@ -1536,7 +1586,7 @@ impl Window {
         let layer_cache_enabled = false;
         let mut paint_tree = Vec::new();
         for lr in &mut self.layer_roots.clone() {
-            let (root, x, y) = (&mut lr.element, lr.x, lr.y);
+            let (root, x, y) = (&mut lr.body, lr.x, lr.y);
             self.render_tree
                 .get_mut(root)
                 .unwrap()
@@ -1591,7 +1641,7 @@ impl Window {
         let x = self.cursor_position.x as f32;
         let y = self.cursor_position.y as f32;
         self.get_node_by_pos(x, y).unwrap_or_else(|| {
-            let element = self.layer_roots.last().unwrap().element.clone();
+            let element = self.get_focused_layer().body.clone();
             (element, x, y)
         })
     }
@@ -1610,8 +1660,8 @@ impl Window {
 
     fn get_node_by_pos(&self, window_x: f32, window_y: f32) -> Option<(Element, f32, f32)> {
         // debug!("search node time in layers");
-        let lr = self.layer_roots.last().clone()?;
-        let (body, x, y) = (&lr.element, lr.x, lr.y);
+        let lr = self.get_focused_layer();
+        let (body, x, y) = (&lr.body, lr.x, lr.y);
         let (eo, x, y) = self
             .render_tree
             .get(body)?

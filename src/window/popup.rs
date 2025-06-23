@@ -30,6 +30,9 @@ js_weak_value!(Popup, PopupWeak);
 #[js_methods]
 impl Popup {
     pub fn new(element: Element, target: Rect, owner_handle: &WindowHandle) -> Popup {
+        Self::new_ex(element, target, owner_handle, true)
+    }
+    pub fn new_ex(element: Element, target: Rect, owner_handle: &WindowHandle, focusable: bool) -> Popup {
         //TODO no unwrap
         let mut owner = owner_handle.upgrade_mut().unwrap();
         if support_multiple_windows() {
@@ -91,7 +94,7 @@ impl Popup {
             }
             .to_ref()
         } else {
-            let page = owner.create_page(element, target.x, target.bottom());
+            let page = owner.create_page_ex(element, target.x, target.bottom(), focusable);
             let page_weak = page.as_weak();
             page.get_body()
                 .clone()

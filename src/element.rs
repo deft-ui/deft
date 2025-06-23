@@ -83,7 +83,6 @@ use crate::style::length::LengthContext;
 use crate::style::style_vars::StyleVars;
 use crate::style::styles::Styles;
 use crate::style_list::StyleList;
-use crate::tooltip::Tooltip;
 
 type BackendCreator = Box<dyn FnMut(&mut Element) -> Box<dyn ElementBackend + 'static>>;
 
@@ -364,6 +363,18 @@ impl Element {
     pub fn remove_all_child(&mut self) {
         while !self.children.is_empty() {
             let _ = self.remove_child(0);
+        }
+    }
+
+    pub fn is_parent_of(&self, child: &Element) -> bool {
+        if let Some(p) = child.get_parent() {
+            if &p == self {
+                true
+            } else {
+                self.is_parent_of(&p)
+            }
+        } else {
+            false
         }
     }
 
@@ -1367,7 +1378,6 @@ pub struct Element {
     pub allow_ime: bool,
     js_event_listener_factory: HashMap<String, BoxJsEventListenerFactory<ElementWeak>>,
     pub(crate) tooltip: String,
-    pub(crate) tooltip_instance: Option<Tooltip>,
 }
 
 // js_weak_value!(Element, ElementWeak);
@@ -1420,7 +1430,6 @@ impl ElementData {
             allow_ime: false,
             js_event_listener_factory: HashMap::new(),
             tooltip: String::new(),
-            tooltip_instance: None,
         }
     }
 }
