@@ -26,6 +26,14 @@ body {
     font-size: 14px;
 }
 
+*::scrollbar, *::scrollbar {
+    background: var(--deft-scrollbar-background);
+}
+
+*::scrollbar-thumb, *::scrollbar-thumb {
+    background: var(--deft-scrollbar-thumb-background);
+}
+
 body[theme="dark"] {
     --deft-border-color: #6E7175;
     --deft-highlight-border-color: #5993B2;
@@ -81,37 +89,6 @@ button[disabled], button[disabled]:hover {
     background: var(--deft-disabled-background);
     border: 1px var(--deft-disabled-border-color);
 }
-
-entry {
-    background: var(--deft-form-control-background);
-    border: 1px var(--deft-border-color);
-    border-radius: 3px;
-    min-height: 2em;
-    padding: 4px;
-}
-
-entry:hover {
-    border: 1px var(--deft-highlight-border-color);
-}
-entry:focus {
-    border: 1px var(--deft-highlight-border-color);
-}
-entry::placeholder {
-    color: var(--deft-placeholder-color);
-}
-entry[disabled], entry[disabled]:hover {
-    background: var(--deft-disabled-background);
-    border: 1px var(--deft-disabled-border-color);
-    color: var(--deft-disabled-color);
-}
-entry::scrollbar, scroll::scrollbar {
-    background: var(--deft-scrollbar-background);
-}
-
-entry::scrollbar-thumb, scroll::scrollbar-thumb {
-    background: var(--deft-scrollbar-thumb-background);
-}
-
 
 checkbox::box {
     width: 1.2em;
@@ -201,14 +178,6 @@ text-input[disabled], text-edit[disabled], text-input[disabled]:hover, text-edit
 }
 text-input[disabled]::placeholder, text-edit[disabled]::placeholder {
     color: var(--deft-disabled-placeholder-color);
-}
-
-text-edit::scrollbar, scroll::scrollbar {
-    background: var(--deft-scrollbar-background);
-}
-
-text-edit::scrollbar-thumb, scroll::scrollbar-thumb {
-    background: var(--deft-scrollbar-thumb-background);
 }
 
 select {

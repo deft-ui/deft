@@ -97,16 +97,18 @@ fn parse_text_decoration(value: &str) -> TextDecoration {
     decoration
 }
 
-#[test]
-fn test_measure() {
-    let text_demo = include_str!("../../Cargo.lock");
-    let mut text = String::new();
-    for i in 0..200 {
-        text.push_str(text_demo);
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_measure() {
+        let text_demo = include_str!("../../Cargo.lock");
+        let mut text = String::new();
+        for i in 0..200 {
+            text.push_str(text_demo);
+        }
+        // let font = DEFAULT_TYPE_FACE.with(|tf| Font::from_typeface(tf, 14.0));
+        // debug!("font {:?}", font.typeface().family_name());
+        // print_time!("measure time");
+        // let result = font.measure_text(text.as_str(), None);
     }
-    // let font = DEFAULT_TYPE_FACE.with(|tf| Font::from_typeface(tf, 14.0));
-    // debug!("font {:?}", font.typeface().family_name());
-    // print_time!("measure time");
-    // let result = font.measure_text(text.as_str(), None);
 }
-

@@ -1005,8 +1005,7 @@ impl Element {
             }
         }
         if !changed_pe_styles_map.is_empty() {
-            self.backend
-                .accept_pseudo_element_styles(changed_pe_styles_map);
+            self.accept_pseudo_element_styles(changed_pe_styles_map);
             changed = true;
         }
 
@@ -1014,6 +1013,11 @@ impl Element {
         self.applied_style = styles;
         self.applied_pseudo_element_styles = pseudo_element_styles;
         changed
+    }
+
+    fn accept_pseudo_element_styles(&mut self, styles: HashMap<String, Vec<ResolvedStyleProp>>) {
+        self.scrollable.accept_css_style(&styles);
+        self.backend.accept_pseudo_element_styles(styles);
     }
 
     pub fn register_event_listener<T: 'static, H: EventListener<T, ElementWeak> + 'static>(
