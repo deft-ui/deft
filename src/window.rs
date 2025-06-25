@@ -411,7 +411,7 @@ impl Window {
 
     pub fn invalid_layout(&mut self, element: Element) {
         // Note: Uncomment to debug layout problems
-        // if layout_dirty && !self.layout_dirty { crate::trace::print_trace("layout dirty") }
+        // if self.layout_dirty_list.is_empty() { crate::trace::print_trace("layout dirty") }
         self.layout_dirty_list.insert(element.get_eid(), element);
         self.notify_update();
     }
@@ -1444,6 +1444,7 @@ impl Window {
         }
         // }
         let r = self.paint();
+        self.layout_dirty_list.clear();
         self.dirty = false;
         r
     }
