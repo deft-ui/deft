@@ -180,6 +180,27 @@ text-input[disabled]::placeholder, text-edit[disabled]::placeholder {
     color: var(--deft-disabled-placeholder-color);
 }
 
+menu {
+    border: var(--deft-border-color) 1px;
+    padding: 3px;
+}
+menu-item-standard {
+    padding: 4px 12px;
+}
+menu-item-standard:hover {
+    background: var(--deft-highlight-background);
+}
+menu-item-standard[disabled], menu-item-standard[disabled]:hover {
+    color: var(--deft-disabled-color);
+    background: transparent;
+}
+menu-item-separator {
+    background: var(--deft-disabled-color);
+    height: 1px;
+    width: 100%;
+    margin: 3px 0;
+}
+
 select {
     background: var(--deft-form-control-background);
     border: 1px var(--deft-border-color);

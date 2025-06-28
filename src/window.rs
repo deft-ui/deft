@@ -10,14 +10,7 @@ use crate::element::body::Body;
 use crate::element::util::get_tree_level;
 use crate::element::{Element, ElementBackend, ElementParent};
 use crate::error::{DeftError, DeftResult};
-use crate::event::{
-    build_modifier, named_key_to_str, str_to_named_key, BlurEvent, ClickEvent, ContextMenuEvent,
-    DragOverEvent, DragStartEvent, DropEvent, DroppedFileEvent, FocusEvent, FocusShiftEvent,
-    HoveredFileEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent, MouseEnterEvent,
-    MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, TextInputEvent,
-    TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_ALT, KEY_MOD_CTRL,
-    KEY_MOD_META, KEY_MOD_SHIFT,
-};
+use crate::event::{build_modifier, named_key_to_str, str_to_named_key, BlurEvent, ClickEvent, ClickEventListener, ContextMenuEvent, DragOverEvent, DragStartEvent, DropEvent, DroppedFileEvent, FocusEvent, FocusShiftEvent, HoveredFileEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent, MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, TextInputEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT};
 use crate::event_loop::run_with_event_loop;
 use crate::ext::ext_window::{
     WindowAttrs, MODAL_TO_OWNERS, WINDOWS, WINDOW_TYPE_MENU, WINDOW_TYPE_NORMAL, WINIT_TO_WINDOW,
@@ -50,6 +43,7 @@ use std::collections::HashMap;
 use std::string::ToString;
 use std::time::SystemTime;
 use std::{env, mem};
+use std::ops::{Deref};
 use winit::dpi::Position::Logical;
 use winit::dpi::{LogicalPosition, LogicalSize, Size};
 use winit::event::{
@@ -64,6 +58,8 @@ use winit::window::{
     Cursor, CursorIcon, Fullscreen, ResizeDirection, Theme, WindowAttributes, WindowButtons,
     WindowId,
 };
+use crate::menu::{build_menu_elements, Menu};
+use crate::mrc::Mrc;
 use crate::tooltip::Tooltip;
 
 thread_local! {
@@ -567,6 +563,23 @@ impl Window {
 
     pub fn popup_ex(&self, content: Element, target: base::Rect, focusable: bool) -> Popup {
         Popup::new_ex(content, target, &self.handle, focusable)
+    }
+
+    #[js_func]
+    pub fn popup_menu(&self, menu: Menu, x: f32, y: f32) {
+        let target = Rect::new(x, y, 1.0, 1.0);
+        let mut el = build_menu_elements(menu);
+        let mut popup_holder: Mrc<Option<Popup>> = Mrc::new(None);
+        {
+            let popup_holder = popup_holder.clone();
+            el.register_event_listener(ClickEventListener::new(move |_, _| {
+                if let Some(popup) = popup_holder.deref() {
+                    let _ = popup.close();
+                }
+            }));
+        }
+        let p = self.popup(el, target);
+        popup_holder.replace(p);
     }
 
     pub fn allow_close(&mut self) -> bool {
@@ -1488,12 +1501,14 @@ impl Window {
     fn init_element_root(&mut self, mut body: Element, parent: ElementParent) {
         body.set_parent(parent);
         body.set_focusable(true);
-        let theme = self.window.theme().unwrap_or(Theme::Light);
-        let theme = match theme {
-            Theme::Light => "light",
-            Theme::Dark => "dark",
+        let theme = match env::var("DEFT_THEME")  {
+            Ok(str) => str,
+            Err(_) => match self.window.theme().unwrap_or(Theme::Light) {
+                Theme::Light => "light".to_string(),
+                Theme::Dark => "dark".to_string(),
+            }
         };
-        body.set_attribute("theme".to_string(), theme.to_string());
+        body.set_attribute("theme".to_string(), theme);
         // if self.focusing.is_none() {
         // TODO move focusing to page?
         self.focus(body.clone());

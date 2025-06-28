@@ -64,6 +64,7 @@ mod text;
 mod typeface;
 pub mod winit;
 mod tooltip;
+pub mod menu;
 
 use crate::base::ResultWaiter;
 use crate::console::init_console;

@@ -4,7 +4,7 @@ use std::future::Future;
 use std::panic::RefUnwindSafe;
 use std::path::PathBuf;
 use tokio::runtime::Builder;
-use winit::event::{DeviceEvent, DeviceId, WindowEvent};
+use winit::event::{DeviceEvent, DeviceId, ElementState, WindowEvent};
 use winit::window::{CursorGrabMode, WindowId};
 
 use crate::app::App;
@@ -46,6 +46,7 @@ use crate::ext::ext_worker::{SharedModuleLoader, Worker, WorkerInitParams};
 use crate::js::js_binding::{JsCallError, JsFunc};
 use crate::js::js_runtime::{JsContext, PromiseResolver};
 use crate::js::ToJsCallResult;
+use crate::menu::{Menu, StandardMenuItem};
 use crate::mrc::Mrc;
 use crate::stylesheet::{stylesheet_add, stylesheet_remove, stylesheet_update};
 use crate::typeface::typeface_create;
@@ -123,6 +124,10 @@ impl JsEngine {
 
         init_base_components();
         engine.add_global_functions(Popup::create_js_apis());
+
+        engine.add_global_functions(Menu::create_js_apis());
+        engine.add_global_functions(StandardMenuItem::create_js_apis());
+
         engine.add_global_functions(Page::create_js_apis());
         engine.add_global_functions(ExtConsole::create_js_apis());
         engine.add_global_functions(Element::create_js_apis());
@@ -185,10 +190,7 @@ impl JsEngine {
         engine.add_global_func(typeface_create::new());
 
         #[cfg(feature = "clipboard")]
-        {
-            engine.add_global_func(crate::ext::ext_clipboard::clipboard_write_text::new());
-            engine.add_global_func(crate::ext::ext_clipboard::clipboard_read_text::new());
-        }
+        engine.add_global_functions(crate::ext::ext_clipboard::Clipboard::create_js_apis());
         engine.add_global_func(stylesheet_add::new());
         engine.add_global_func(stylesheet_remove::new());
         engine.add_global_func(stylesheet_update::new());
@@ -272,49 +274,51 @@ impl JsEngine {
     }
 
     pub fn handle_device_event(&mut self, device_id: DeviceId, event: DeviceEvent) {
-        if let DeviceEvent::Button { .. } = event {
-            let close_windows = WINDOWS.with_borrow(|windows| {
-                let mut result = Vec::new();
-                let menu_windows: Vec<&WindowHandle> = windows
-                    .iter()
-                    .filter(|(_, f)| {
-                        f.upgrade_mut()
-                            .ok()
-                            .map(|f| f.window_type == WindowType::Menu)
-                            .unwrap_or(false)
-                    })
-                    .map(|(_, f)| f)
-                    .collect();
-                if menu_windows.is_empty() {
-                    return result;
-                }
-                run_with_event_loop(|el| {
-                    if let Some(pos) = el.query_pointer(device_id) {
-                        menu_windows.iter().for_each(|w| {
-                            if let Ok(window) = w.upgrade_mut() {
-                                let w_size = window.window.outer_size();
-                                if let Some(wp) = window.window.outer_position().ok() {
-                                    let (wx, wy) = (wp.x as f32, wp.y as f32);
-                                    let (ww, wh) = (w_size.width as f32, w_size.height as f32);
-                                    let is_in_window = pos.0 >= wx
-                                        && pos.0 <= wx + ww
-                                        && pos.1 >= wy
-                                        && pos.1 <= wy + wh;
-                                    if !is_in_window {
-                                        let _ = window.window.set_cursor_grab(CursorGrabMode::None);
-                                        #[allow(suspicious_double_ref_op)]
-                                        result.push(w.clone().clone());
+        if let DeviceEvent::Button { state, .. } = event {
+            if state == ElementState::Pressed {
+                let close_windows = WINDOWS.with_borrow(|windows| {
+                    let mut result = Vec::new();
+                    let menu_windows: Vec<&WindowHandle> = windows
+                        .iter()
+                        .filter(|(_, f)| {
+                            f.upgrade_mut()
+                                .ok()
+                                .map(|f| f.window_type == WindowType::Menu)
+                                .unwrap_or(false)
+                        })
+                        .map(|(_, f)| f)
+                        .collect();
+                    if menu_windows.is_empty() {
+                        return result;
+                    }
+                    run_with_event_loop(|el| {
+                        if let Some(pos) = el.query_pointer(device_id) {
+                            menu_windows.iter().for_each(|w| {
+                                if let Ok(window) = w.upgrade_mut() {
+                                    let w_size = window.window.outer_size();
+                                    if let Some(wp) = window.window.outer_position().ok() {
+                                        let (wx, wy) = (wp.x as f32, wp.y as f32);
+                                        let (ww, wh) = (w_size.width as f32, w_size.height as f32);
+                                        let is_in_window = pos.0 >= wx
+                                            && pos.0 <= wx + ww
+                                            && pos.1 >= wy
+                                            && pos.1 <= wy + wh;
+                                        if !is_in_window {
+                                            let _ = window.window.set_cursor_grab(CursorGrabMode::None);
+                                            #[allow(suspicious_double_ref_op)]
+                                            result.push(w.clone().clone());
+                                        }
                                     }
                                 }
-                            }
-                        })
-                    }
+                            })
+                        }
+                    });
+                    result
                 });
-                result
-            });
-            for f in close_windows {
-                if let Ok(mut f) = f.upgrade_mut() {
-                    let _ = f.close();
+                for f in close_windows {
+                    if let Ok(mut f) = f.upgrade_mut() {
+                        let _ = f.close();
+                    }
                 }
             }
         }

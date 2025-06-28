@@ -1378,7 +1378,7 @@ pub struct Element {
     pub(crate) attributes: HashMap<String, String>,
     pub scrollable: Scrollable,
     pub tag: String,
-    is_form_element: bool,
+    pub(crate) is_form_element: bool,
     pub allow_ime: bool,
     js_event_listener_factory: HashMap<String, BoxJsEventListenerFactory<ElementWeak>>,
     pub(crate) tooltip: String,

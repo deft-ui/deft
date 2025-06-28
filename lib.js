@@ -25,7 +25,7 @@ class Clipboard {
      * @returns {Promise<string>}
      */
     async readText() {
-        return clipboard_read_text();
+        return Clipboard_read_text();
     }
 
     /**
@@ -34,7 +34,7 @@ class Clipboard {
      * @returns {Promise<void>}
      */
     async writeText(text) {
-        clipboard_write_text(text);
+        Clipboard_write_text(text);
     }
 }
 
@@ -156,6 +156,58 @@ export class Popup {
     }
 }
 
+export class StandardMenuItem {
+    #handle;
+    constructor(label, callback) {
+        this.#handle = StandardMenuItem_js_new(label, callback);
+    }
+
+    /**
+     *
+     * @param value {boolean}
+     */
+    set disabled(value) {
+        StandardMenuItem_set_disabled(this.#handle, value);
+    }
+
+    /**
+     *
+     * @returns {boolean}
+     */
+    get disabled() {
+        return StandardMenuItem_get_disabled(this.#handle);
+    }
+
+    get handle() {
+        return this.#handle;
+    }
+}
+
+export class Menu {
+    #handle
+
+    constructor() {
+        this.#handle = Menu_new();
+    }
+
+    /**
+     *
+     * @param item {StandardMenuItem}
+     */
+    addStandardItem(item) {
+        Menu_add_standard_item(this.#handle, item.handle);
+    }
+
+    addSeparator() {
+        Menu_add_separator(this.#handle);
+    }
+
+    get handle() {
+        return this.#handle;
+    }
+
+}
+
 /**
  * @typedef {IEvent<ResizeDetail>} IResizeEvent
  */
@@ -253,6 +305,16 @@ export class Window {
         }
         const handle = Window_popup(this.handle, content.handle, rect);
         return new Popup(handle);
+    }
+
+    /**
+     *
+     * @param menu {Menu}
+     * @param x {number}
+     * @param y {number}
+     */
+    popupMenu(menu, x, y) {
+        Window_popup_menu(this.#windowHandle, menu.handle, x, y);
     }
 
     /**
@@ -2372,6 +2434,8 @@ globalThis.Window = Window;
 if (globalThis.SystemTray_create) {
     globalThis.SystemTray = SystemTray;
 }
+globalThis.Menu = Menu;
+globalThis.StandardMenuItem = StandardMenuItem;
 globalThis.Element = Element;
 globalThis.ContainerElement = ContainerElement;
 globalThis.ScrollElement = ScrollElement;

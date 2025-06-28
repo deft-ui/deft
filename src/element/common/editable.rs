@@ -5,11 +5,7 @@ use crate::canvas_util::CanvasHelper;
 use crate::element::edit_history::{EditHistory, EditOpType};
 use crate::element::util::is_form_event;
 use crate::element::{Element, ElementBackend, ElementWeak};
-use crate::event::{
-    BlurEvent, BoundsChangeEvent, CaretChangeEvent, Event, FocusEvent, KeyDownEvent,
-    KeyEventDetail, MouseLeaveEvent, ScrollEvent, TextChangeEvent, TextInputEvent, TextUpdateEvent,
-    KEY_MOD_CTRL, KEY_MOD_SHIFT,
-};
+use crate::event::{BlurEvent, BoundsChangeEvent, CaretChangeEvent, Event, FocusEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseLeaveEvent, ScrollEvent, TextChangeEvent, TextInputEvent, TextUpdateEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
 use crate::event_loop::create_event_loop_proxy;
 use crate::js::{FromJsValue, ToJsValue};
 use crate::number::DeNan;
@@ -31,7 +27,7 @@ use std::rc::Rc;
 use winit::keyboard::NamedKey;
 use winit::window::{Cursor, CursorIcon};
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum InputType {
     Text,
@@ -313,6 +309,43 @@ impl Editable {
         }
     }
 
+    fn get_text_for_copy(&self) -> String {
+        if self.input_type == InputType::Text {
+            self.paragraph.get_selection_text().unwrap_or_else(String::new)
+        } else {
+            String::new()
+        }
+    }
+
+    #[cfg(feature = "clipboard")]
+    fn copy(&self) {
+        use clipboard::{ClipboardContext, ClipboardProvider};
+        let text_for_copy = self.get_text_for_copy();
+        if !text_for_copy.is_empty() {
+            let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
+            ctx.set_contents(text_for_copy).unwrap();
+        }
+    }
+
+    #[cfg(feature = "clipboard")]
+    fn cut(&mut self) {
+        self.copy();
+        self.handle_input("");
+    }
+
+    #[cfg(feature = "clipboard")]
+    fn paste(&mut self) {
+        use clipboard::{ClipboardContext, ClipboardProvider};
+        let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
+        if let Ok(text) = ctx.get_contents() {
+            self.handle_input(&text);
+        }
+    }
+
+    fn select_all(&mut self) {
+        self.paragraph.select_all();
+    }
+
     fn handle_key_down(&mut self, event: &KeyEventDetail) {
         if event.modifiers == 0 {
             if let Some(nk) = &event.named_key {
@@ -365,28 +398,12 @@ impl Editable {
             if let Some(text) = &event.key_str {
                 match text.as_str() {
                     #[cfg(feature = "clipboard")]
-                    "c" | "x" => {
-                        use clipboard::{ClipboardContext, ClipboardProvider};
-                        if let Some(sel) = self.paragraph.get_selection_text() {
-                            let sel = sel.to_string();
-                            if text == "x" {
-                                self.handle_input("");
-                            }
-                            let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
-                            ctx.set_contents(sel).unwrap();
-                        }
-                    }
+                    "c" => self.copy(),
                     #[cfg(feature = "clipboard")]
-                    "v" => {
-                        use clipboard::{ClipboardContext, ClipboardProvider};
-                        let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
-                        if let Ok(text) = ctx.get_contents() {
-                            self.handle_input(&text);
-                        }
-                    }
-                    "a" => {
-                        //TODO self.base.set_selection((0, self.get_text().chars().count()))
-                    }
+                    "x" => self.cut(),
+                    #[cfg(feature = "clipboard")]
+                    "v" => self.paste(),
+                    "a" => self.select_all(),
                     "z" => {
                         self.undo();
                     }
@@ -598,8 +615,83 @@ impl Editable {
         } else if let Some(_e) = MouseLeaveEvent::cast(event) {
             let mut el = ok_or_return!(self.element.upgrade());
             el.set_cursor(Cursor::Icon(CursorIcon::Default));
-        } else if let Some(e) = KeyDownEvent::cast(event) {
+        }
+    }
+
+    pub(crate) fn on_execute_default_behavior(&mut self, event: &mut Event) -> bool {
+        #[cfg(feature = "clipboard")]
+        if let Some(_e) = MouseDownEvent::cast(event) {
+            if _e.0.button == 2 {
+                self.show_menu(_e.0.window_x, _e.0.window_y);
+                return true;
+            }
+        }
+        if let Some(e) = KeyDownEvent::cast(event) {
             self.handle_key_down(&e.0);
+        }
+        false
+    }
+
+    #[cfg(feature = "clipboard")]
+    fn show_menu(&self, x: f32, y: f32) {
+        use crate::menu::{Menu, MenuItem, StandardMenuItem};
+        let mut menu = Menu::new();
+        let (cut_menu, copy_menu) = {
+            let text_for_copy = self.get_text_for_copy();
+            let is_empty = text_for_copy.is_empty();
+            let me_weak = self.as_weak();
+            let mut copy_item = StandardMenuItem::new("Copy", move || {
+                if let Ok(me) = me_weak.upgrade_mut() {
+                    me.copy();
+                }
+            });
+            copy_item.set_disabled(is_empty);
+
+            let me_weak = self.as_weak();
+            let mut cut_item = StandardMenuItem::new("Cut", move || {
+                if let Ok(mut me) = me_weak.upgrade_mut() {
+                    me.cut();
+                }
+            });
+            cut_item.set_disabled(is_empty);
+            (cut_item, copy_item)
+        };
+        let paste_menu = {
+            let content = crate::ext::ext_clipboard::Clipboard::read_text().ok().unwrap_or_else(String::new);
+            let has_content = !content.is_empty();
+            let me_weak = self.as_weak();
+            let mut item = StandardMenuItem::new("Paste", move || {
+                if let Ok(mut me) = me_weak.upgrade_mut() {
+                    me.paste();
+                }
+            });
+            item.set_disabled(!has_content);
+            item
+        };
+        let select_all_menu = {
+            let me_weak = self.as_weak();
+            let content = self.paragraph.get_text();
+            let allow_select_all = !content.is_empty() && Some(content) != self.paragraph.get_selection_text();
+            let mut item = StandardMenuItem::new("Select All", move || {
+                if let Ok(mut me) = me_weak.upgrade_mut() {
+                    me.paragraph.select_all();
+                }
+            });
+            item.set_disabled(!allow_select_all);
+            item
+        };
+        menu.add_item(MenuItem::Standard(cut_menu));
+        menu.add_item(MenuItem::Standard(copy_menu));
+        menu.add_item(MenuItem::Standard(paste_menu));
+        menu.add_item(MenuItem::Separator);
+        menu.add_item(MenuItem::Standard(select_all_menu));
+
+        if let Ok(e) = self.element.upgrade_mut() {
+            if let Some(w) = e.get_window() {
+                if let Ok(w) = w.upgrade_mut() {
+                    w.popup_menu(menu, x, y);
+                }
+            }
         }
     }
 }
@@ -757,6 +849,10 @@ impl ElementBackend for Editable {
 
     fn on_event(&mut self, event: &mut Event, ctx: &mut EventContext<ElementWeak>) {
         self.handle_event(event, ctx, (0.0, 0.0));
+    }
+
+    fn execute_default_behavior(&mut self, event: &mut Event, _ctx: &mut EventContext<ElementWeak>) -> bool {
+        self.on_execute_default_behavior(event)
     }
 
     fn before_layout(&mut self) {

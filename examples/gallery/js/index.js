@@ -3,7 +3,7 @@ const stylesheet = `
     gap: 10px;
     padding: 10px;
     width: 100%;
-    max-width: 500px;
+    max-width: 600px;
     margin: 0 auto;
     height: 100%;
     overflow: auto;
@@ -156,8 +156,8 @@ function main() {
     navigator.stylesheet.append(stylesheet);
     // saveStartTime();
     const window = new Window({
-        width: 400,
-        height: 360,
+        width: 520,
+        height: 400,
     });
     window.title = "Deft Gallery";
     const scroll = new ContainerElement();
@@ -217,6 +217,15 @@ function main() {
         }
         window.popup(label, {x: e.detail.windowX, y: e.detail.windowY});
     });
+
+    const buttonMenu = createButton("Menu", (e) => {
+        const menu = new Menu();
+        menu.addStandardItem(new StandardMenuItem("Menu1", () => console.log("Menu1 clicked")));
+        menu.addSeparator();
+        menu.addStandardItem(new StandardMenuItem("Menu2", () => console.log("Menu2 clicked")));
+        window.popupMenu(menu, e.detail.windowX, e.detail.windowY);
+    });
+
     const checkbox = createCheckbox("Checkbox1");
     const disabledCheckbox = createCheckbox("Disabled");
     const radio1 = createRadio("Rust");
@@ -225,7 +234,7 @@ function main() {
     const select = createSelect();
     disabledCheckbox.bindChange(() => {
         console.log("checked", disabledCheckbox.checked);
-        for (const el of [entry, password, multilineEntry, button, confirmBtn, buttonPopup, radio1, radio2, checkbox, select]) {
+        for (const el of [entry, password, multilineEntry, button, confirmBtn, buttonPopup, buttonMenu, radio1, radio2, checkbox, select]) {
             el.disabled = disabledCheckbox.checked;
         }
     })
@@ -234,7 +243,7 @@ function main() {
     createElementRow("TextInput", entry);
     createElementRow("Password", password);
     createElementRow("TextEdit", multilineEntry);
-    createElementRow("Button", [button, confirmBtn, buttonPopup], "row");
+    createElementRow("Button", [button, confirmBtn, buttonPopup, buttonMenu], "row");
     createElementRow("Radio", radioGroup)
     createElementRow("Select", select);
     createElementRow("Checkbox", [checkbox, disabledCheckbox], "row");

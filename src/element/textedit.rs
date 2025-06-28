@@ -88,6 +88,13 @@ impl ElementBackend for TextEdit {
         }
     }
 
+    fn execute_default_behavior(&mut self, event: &mut Event, ctx: &mut EventContext<ElementWeak>) -> bool {
+        if ctx.target == self.element {
+            return self.editable.on_execute_default_behavior(event);
+        }
+        false
+    }
+
     fn accept_pseudo_element_styles(&mut self, styles: HashMap<String, Vec<ResolvedStyleProp>>) {
         self.editable.accept_pseudo_element_styles(styles);
     }

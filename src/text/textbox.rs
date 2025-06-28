@@ -291,10 +291,22 @@ impl TextBox {
         &self.lines
     }
 
+    fn get_end_text_coord(&self) -> TextCoord {
+        let lines_count = self.lines.len();
+        let col = self.lines.last().unwrap().atom_count();
+        TextCoord(lines_count - 1, col)
+    }
+
     pub fn select(&mut self, start: TextCoord, end: TextCoord) {
         //TODO validate params
         self.selection = Some((start, end));
         self.request_repaint();
+    }
+
+    pub fn select_all(&mut self) {
+        let start = TextCoord(0, 0);
+        let end = self.get_end_text_coord();
+        self.select(start, end);
     }
 
     pub fn is_selecting(&self) -> bool {
