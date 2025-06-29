@@ -625,57 +625,61 @@ impl Editable {
     }
 
     pub(crate) fn on_execute_default_behavior(&mut self, event: &mut Event) -> bool {
-        #[cfg(feature = "clipboard")]
-        if let Some(_e) = MouseDownEvent::cast(event) {
-            if _e.0.button == 2 {
-                self.show_menu(_e.0.window_x, _e.0.window_y);
+        if let Some(e) = MouseDownEvent::cast(event) {
+            if e.0.button == 2 {
+                self.show_menu(e.0.window_x, e.0.window_y);
                 return true;
             }
-        }
-        if let Some(e) = KeyDownEvent::cast(event) {
+        } else if let Some(e) = KeyDownEvent::cast(event) {
             self.handle_key_down(&e.0);
         }
         false
     }
 
-    #[cfg(feature = "clipboard")]
     fn show_menu(&self, x: f32, y: f32) {
         use crate::menu::{Menu, MenuItem, StandardMenuItem};
         let mut menu = Menu::new();
-        let (cut_menu, copy_menu) = {
-            let text_for_copy = self.get_text_for_copy();
-            let is_empty = text_for_copy.is_empty();
-            let me_weak = self.as_weak();
-            let mut copy_item = StandardMenuItem::new("Copy", move || {
-                if let Ok(me) = me_weak.upgrade_mut() {
-                    me.copy();
-                }
-            });
-            copy_item.set_disabled(is_empty);
+        #[cfg(feature = "clipboard")]
+        {
+            let (cut_menu, copy_menu) = {
+                let text_for_copy = self.get_text_for_copy();
+                let is_empty = text_for_copy.is_empty();
+                let me_weak = self.as_weak();
+                let mut copy_item = StandardMenuItem::new("Copy", move || {
+                    if let Ok(me) = me_weak.upgrade_mut() {
+                        me.copy();
+                    }
+                });
+                copy_item.set_disabled(is_empty);
 
-            let me_weak = self.as_weak();
-            let mut cut_item = StandardMenuItem::new("Cut", move || {
-                if let Ok(mut me) = me_weak.upgrade_mut() {
-                    me.cut();
-                }
-            });
-            cut_item.set_disabled(is_empty);
-            (cut_item, copy_item)
-        };
-        let paste_menu = {
-            let content = crate::ext::ext_clipboard::Clipboard::read_text()
-                .ok()
-                .unwrap_or_else(String::new);
-            let has_content = !content.is_empty();
-            let me_weak = self.as_weak();
-            let mut item = StandardMenuItem::new("Paste", move || {
-                if let Ok(mut me) = me_weak.upgrade_mut() {
-                    me.paste();
-                }
-            });
-            item.set_disabled(!has_content);
-            item
-        };
+                let me_weak = self.as_weak();
+                let mut cut_item = StandardMenuItem::new("Cut", move || {
+                    if let Ok(mut me) = me_weak.upgrade_mut() {
+                        me.cut();
+                    }
+                });
+                cut_item.set_disabled(is_empty);
+                (cut_item, copy_item)
+            };
+            let paste_menu = {
+                let content = crate::ext::ext_clipboard::Clipboard::read_text()
+                    .ok()
+                    .unwrap_or_else(String::new);
+                let has_content = !content.is_empty();
+                let me_weak = self.as_weak();
+                let mut item = StandardMenuItem::new("Paste", move || {
+                    if let Ok(mut me) = me_weak.upgrade_mut() {
+                        me.paste();
+                    }
+                });
+                item.set_disabled(!has_content);
+                item
+            };
+            menu.add_item(MenuItem::Standard(cut_menu));
+            menu.add_item(MenuItem::Standard(copy_menu));
+            menu.add_item(MenuItem::Standard(paste_menu));
+            menu.add_item(MenuItem::Separator);
+        }
         let select_all_menu = {
             let me_weak = self.as_weak();
             let content = self.paragraph.get_text();
@@ -689,10 +693,6 @@ impl Editable {
             item.set_disabled(!allow_select_all);
             item
         };
-        menu.add_item(MenuItem::Standard(cut_menu));
-        menu.add_item(MenuItem::Standard(copy_menu));
-        menu.add_item(MenuItem::Standard(paste_menu));
-        menu.add_item(MenuItem::Separator);
         menu.add_item(MenuItem::Standard(select_all_menu));
 
         if let Ok(e) = self.element.upgrade_mut() {

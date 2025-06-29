@@ -21,6 +21,9 @@ document.body.appendChild(loadingTip);
 loadDeftApp().then((app) => {
     document.body.removeChild(loadingTip);
     const canvas = document.createElement("canvas");
+    canvas.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+    })
     canvas.style.cssText = "width: 100vw; height: 100vh; display: block;";
     document.body.appendChild(canvas);
     // Create the WebGL context

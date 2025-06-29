@@ -318,8 +318,21 @@ declare class Process {
      * @param code {number}
      */
     exit(code: number): void;
-    get argv(): any;
-    get isMobilePlatform(): any;
+    /**
+     *
+     * @returns {string[]}
+     */
+    get argv(): string[];
+    /**
+     *
+     * @returns {boolean}
+     */
+    get isMobilePlatform(): boolean;
+    /**
+     *
+     * @returns {string}
+     */
+    get platform(): string;
     /**
      *
      * @param handler {Function}
@@ -343,6 +356,31 @@ declare class Popup {
     constructor(handle: any);
     handle: any;
     close(): void;
+}
+declare class StandardMenuItem {
+    constructor(label: any, callback: any);
+    /**
+     *
+     * @param value {boolean}
+     */
+    set disabled(value: boolean);
+    /**
+     *
+     * @returns {boolean}
+     */
+    get disabled(): boolean;
+    get handle(): any;
+    
+}
+declare class Menu {
+    /**
+     *
+     * @param item {StandardMenuItem}
+     */
+    addStandardItem(item: StandardMenuItem): void;
+    addSeparator(): void;
+    get handle(): any;
+    
 }
 /**
  * @typedef {IEvent<ResizeDetail>} IResizeEvent
@@ -394,6 +432,13 @@ declare class Window {
         width?: number;
         height?: number;
     }): Popup;
+    /**
+     *
+     * @param menu {Menu}
+     * @param x {number}
+     * @param y {number}
+     */
+    popupMenu(menu: Menu, x: number, y: number): void;
     /**
      *
      * @param message {string | Element}
@@ -648,6 +693,8 @@ declare class Element {
      * Request focus on the current element
      */
     focus(): void;
+    set tooltip(text: any);
+    get tooltip(): any;
     /**
      * Get the window of element
      * @returns {Window}
@@ -984,57 +1031,6 @@ declare class SelectElement extends Element {
  *   fontSize ?: number,
  *   color ?: string,
  *   backgroundColor ?: string
- * }} ParagraphUnit
- *
- * @deprecated
- */
-declare class ParagraphElement extends Element {
-    constructor();
-    /**
-     *
-     * @param units {ParagraphUnit[]}
-     */
-    addLine(units: ParagraphUnit[]): void;
-    /**
-     *
-     * @param index {number}
-     * @param units {ParagraphUnit[]}
-     */
-    insertLine(index: number, units: ParagraphUnit[]): void;
-    /**
-     *
-     * @param index {number}
-     */
-    deleteLine(index: number): void;
-    /**
-     *
-     * @param index {number}
-     * @param units {ParagraphUnit[]}
-     */
-    updateLine(index: number, units: ParagraphUnit[]): void;
-    clear(): void;
-    /**
-     *
-     * @param units {ParagraphUnit[]}
-     * @return {[number, number]}
-     */
-    measureLine(units: ParagraphUnit[]): [number, number];
-    /**
-     *
-     * @returns {string | undefined}
-     */
-    get selectionText(): string | undefined;
-}
-/**
- * @typedef {{
- *   type: "text",
- *   text: string,
- *   weight ?: string,
- *   textDecorationLine ?: string,
- *   fontFamilies ?: string[],
- *   fontSize ?: number,
- *   color ?: string,
- *   backgroundColor ?: string
  * }} TextUnit
  */
 declare class RichTextElement extends Element {
@@ -1077,81 +1073,6 @@ declare class RichTextElement extends Element {
 declare class ImageElement extends Element {
     constructor();
     set src(src: any);
-}
-declare class EntryElement extends Element {
-    constructor();
-    /**
-     *
-     * @param align {"left"|"right"|"center"}
-     */
-    set align(align: "left" | "right" | "center");
-    /**
-     *
-     * @param text {string}
-     */
-    set text(text: string);
-    /**
-     *
-     * @returns {string}
-     */
-    get text(): string;
-    /**
-     *
-     * @param placeholder {string}
-     */
-    set placeholder(placeholder: string);
-    get placeholder(): string;
-    /**
-     *
-     * @param style {StyleProps}
-     */
-    set placeholderStyle(style: StyleProps);
-    /**
-     *
-     * @returns {StyleProps}
-     */
-    get placeholderStyle(): StyleProps;
-    /**
-     *
-     * @param type {"text"|"password"}
-     */
-    set type(type: "text" | "password");
-    /**
-     *
-     * @returns {"text" | "password"}
-     */
-    get type(): "text" | "password";
-    /**
-     *
-     * @param start {number}
-     * @param end {number}
-     */
-    setSelectionByCharOffset(start: number, end: number): void;
-    /**
-     *
-     * @param charOffset {number}
-     */
-    setCaretByCharOffset(charOffset: number): void;
-    /**
-     *
-     * @param multipleLine {boolean}
-     */
-    set multipleLine(multipleLine: boolean);
-    /**
-     *
-     * @param value {boolean}
-     */
-    set autoHeight(value: boolean);
-    /**
-     *
-     * @param rows {number}
-     */
-    set rows(rows: number);
-    set disabled(value: any);
-    get disabled(): any;
-    bindTextChange(callback: any): void;
-    bindCaretChange(callback: any): void;
-    
 }
 declare class TextInputElement extends Element {
     constructor();
@@ -1360,16 +1281,6 @@ declare class FetchResponse {
     json(): Promise<any>;
 }
 declare type IResizeEvent = IEvent<ResizeDetail>;
-declare type ParagraphUnit = {
-    type: "text";
-    text: string;
-    weight?: string;
-    textDecorationLine?: string;
-    fontFamilies?: string[];
-    fontSize?: number;
-    color?: string;
-    backgroundColor?: string;
-};
 declare type TextUnit = {
     type: "text";
     text: string;

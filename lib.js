@@ -93,13 +93,27 @@ export class Process {
     exit(code) {
         process_exit(code);
     }
+
+    /**
+     *
+     * @returns {string[]}
+     */
     get argv() {
         return process_argv();
     }
+
+    /**
+     *
+     * @returns {boolean}
+     */
     get isMobilePlatform() {
         return process_is_mobile_platform();
     }
 
+    /**
+     *
+     * @returns {string}
+     */
     get platform() {
         return process_platform();
     }
