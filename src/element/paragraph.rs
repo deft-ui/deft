@@ -48,7 +48,6 @@ pub struct ParagraphParams {
     pub font_style: FontStyle,
 }
 
-
 pub fn parse_optional_weight(value: Option<&String>) -> Option<Weight> {
     if let Some(v) = value {
         parse_weight(v)

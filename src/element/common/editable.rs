@@ -5,7 +5,11 @@ use crate::canvas_util::CanvasHelper;
 use crate::element::edit_history::{EditHistory, EditOpType};
 use crate::element::util::is_form_event;
 use crate::element::{Element, ElementBackend, ElementWeak};
-use crate::event::{BlurEvent, BoundsChangeEvent, CaretChangeEvent, Event, FocusEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseLeaveEvent, ScrollEvent, TextChangeEvent, TextInputEvent, TextUpdateEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
+use crate::event::{
+    BlurEvent, BoundsChangeEvent, CaretChangeEvent, Event, FocusEvent, KeyDownEvent,
+    KeyEventDetail, MouseDownEvent, MouseLeaveEvent, ScrollEvent, TextChangeEvent, TextInputEvent,
+    TextUpdateEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT,
+};
 use crate::event_loop::create_event_loop_proxy;
 use crate::js::{FromJsValue, ToJsValue};
 use crate::number::DeNan;
@@ -311,7 +315,9 @@ impl Editable {
 
     fn get_text_for_copy(&self) -> String {
         if self.input_type == InputType::Text {
-            self.paragraph.get_selection_text().unwrap_or_else(String::new)
+            self.paragraph
+                .get_selection_text()
+                .unwrap_or_else(String::new)
         } else {
             String::new()
         }
@@ -657,7 +663,9 @@ impl Editable {
             (cut_item, copy_item)
         };
         let paste_menu = {
-            let content = crate::ext::ext_clipboard::Clipboard::read_text().ok().unwrap_or_else(String::new);
+            let content = crate::ext::ext_clipboard::Clipboard::read_text()
+                .ok()
+                .unwrap_or_else(String::new);
             let has_content = !content.is_empty();
             let me_weak = self.as_weak();
             let mut item = StandardMenuItem::new("Paste", move || {
@@ -671,7 +679,8 @@ impl Editable {
         let select_all_menu = {
             let me_weak = self.as_weak();
             let content = self.paragraph.get_text();
-            let allow_select_all = !content.is_empty() && Some(content) != self.paragraph.get_selection_text();
+            let allow_select_all =
+                !content.is_empty() && Some(content) != self.paragraph.get_selection_text();
             let mut item = StandardMenuItem::new("Select All", move || {
                 if let Ok(mut me) = me_weak.upgrade_mut() {
                     me.paragraph.select_all();
@@ -851,7 +860,11 @@ impl ElementBackend for Editable {
         self.handle_event(event, ctx, (0.0, 0.0));
     }
 
-    fn execute_default_behavior(&mut self, event: &mut Event, _ctx: &mut EventContext<ElementWeak>) -> bool {
+    fn execute_default_behavior(
+        &mut self,
+        event: &mut Event,
+        _ctx: &mut EventContext<ElementWeak>,
+    ) -> bool {
         self.on_execute_default_behavior(event)
     }
 

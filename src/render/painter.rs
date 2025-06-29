@@ -1,15 +1,13 @@
+use crate::base::Rect;
+use crate::border::tiny_path_to_skia_path;
 use crate::canvas_util::CanvasHelper;
 use crate::paint::{DrawLayer, InvalidRects, LayerState, Painter, RenderLayerKey};
 use crate::render::paint_object::{ElementPO, LayerPO};
 use crate::{show_focus_hint, show_layer_hint, show_repaint_area};
-use skia_safe::{
-    Canvas, ClipOp, Color, FilterMode, Matrix, Paint, PaintStyle, SamplingOptions,
-};
+use skia_safe::{Canvas, ClipOp, Color, FilterMode, Matrix, Paint, PaintStyle, SamplingOptions};
 use skia_window::context::RenderContext;
 use std::collections::HashMap;
 use std::mem;
-use crate::base::Rect;
-use crate::border::tiny_path_to_skia_path;
 
 pub struct ElementPainter {
     scale: f32,
@@ -73,7 +71,11 @@ impl ElementPainter {
         }
         canvas.save();
         canvas.translate(epo.coord);
-        canvas.clip_path(&tiny_path_to_skia_path(&epo.border_box_path), ClipOp::Intersect, false);
+        canvas.clip_path(
+            &tiny_path_to_skia_path(&epo.border_box_path),
+            ClipOp::Intersect,
+            false,
+        );
         if epo.need_paint {
             self.draw_element_paint_object(painter, epo);
         }

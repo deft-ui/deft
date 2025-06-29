@@ -4,19 +4,31 @@ pub mod popup;
 use crate as deft;
 use crate::app::{exit_app, AppEvent, InsetType};
 use crate::base::MouseEventType::{MouseClick, MouseUp};
-use crate::base::{Callback, EventContext, EventHandler, EventListener, EventRegistration, JsValueContext, MouseDetail, MouseEventType, Rect, ResultWaiter, Touch, TouchDetail};
+use crate::base::{
+    Callback, EventContext, EventHandler, EventListener, EventRegistration, JsValueContext,
+    MouseDetail, MouseEventType, Rect, ResultWaiter, Touch, TouchDetail,
+};
 use crate::cursor::search_cursor;
 use crate::element::body::Body;
 use crate::element::util::get_tree_level;
 use crate::element::{Element, ElementBackend, ElementParent};
 use crate::error::{DeftError, DeftResult};
-use crate::event::{build_modifier, named_key_to_str, str_to_named_key, BlurEvent, ClickEvent, ClickEventListener, ContextMenuEvent, DragOverEvent, DragStartEvent, DropEvent, DroppedFileEvent, FocusEvent, FocusShiftEvent, HoveredFileEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent, MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, TextInputEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT};
+use crate::event::{
+    build_modifier, named_key_to_str, str_to_named_key, BlurEvent, ClickEvent, ClickEventListener,
+    ContextMenuEvent, DragOverEvent, DragStartEvent, DropEvent, DroppedFileEvent, FocusEvent,
+    FocusShiftEvent, HoveredFileEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent,
+    MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent,
+    TextInputEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_ALT,
+    KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT,
+};
 use crate::event_loop::run_with_event_loop;
 use crate::ext::ext_window::{
     WindowAttrs, MODAL_TO_OWNERS, WINDOWS, WINDOW_TYPE_MENU, WINDOW_TYPE_NORMAL, WINIT_TO_WINDOW,
 };
 use crate::frame_rate::FrameRateController;
 use crate::js::{BorrowFromJs, FromJsValue, JsError};
+use crate::menu::{build_menu_elements, Menu};
+use crate::mrc::Mrc;
 use crate::paint::{PaintContext, Painter, RenderTree};
 use crate::platform::support_multiple_windows;
 use crate::render::painter::ElementPainter;
@@ -25,6 +37,7 @@ use crate::state::{State, StateManager, StateMutRef};
 use crate::style::length::LengthContext;
 use crate::style::style_vars::StyleVars;
 use crate::timer::{set_timeout_nanos, TimerHandle};
+use crate::tooltip::Tooltip;
 use crate::window::page::Page;
 use crate::window::popup::Popup;
 use crate::{
@@ -40,10 +53,10 @@ use skia_window::renderer::Renderer;
 use skia_window::skia_window::{RenderBackendType, SkiaWindow};
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::string::ToString;
 use std::time::SystemTime;
 use std::{env, mem};
-use std::ops::{Deref};
 use winit::dpi::Position::Logical;
 use winit::dpi::{LogicalPosition, LogicalSize, Size};
 use winit::event::{
@@ -58,9 +71,6 @@ use winit::window::{
     Cursor, CursorIcon, Fullscreen, ResizeDirection, Theme, WindowAttributes, WindowButtons,
     WindowId,
 };
-use crate::menu::{build_menu_elements, Menu};
-use crate::mrc::Mrc;
-use crate::tooltip::Tooltip;
 
 thread_local! {
     static WIN_STATE_MANAGER: RefCell<StateManager> = RefCell::new(StateManager::new());
@@ -108,14 +118,25 @@ pub struct LayerRoot {
 impl LayerRoot {
     pub fn new(element: Element, x: f32, y: f32) -> Self {
         let focusing = element.clone();
-        Self { body: element, x, y, focusing, focusable: true }
+        Self {
+            body: element,
+            x,
+            y,
+            focusing,
+            focusable: true,
+        }
     }
 
     pub fn new_not_focusable(element: Element, x: f32, y: f32) -> Self {
         let focusing = element.clone();
-        Self { body: element, x, y, focusing, focusable: false }
+        Self {
+            body: element,
+            x,
+            y,
+            focusing,
+            focusable: false,
+        }
     }
-
 }
 
 pub struct Window {
@@ -1019,9 +1040,14 @@ impl Window {
             screen_y,
         );
         if let Some((eid, tooltip, target)) = Self::find_tooltip(&node, offset_x) {
-            let is_same = self.tooltip_instance.as_ref().map(|ti| ti.0 == eid).unwrap_or(false);
+            let is_same = self
+                .tooltip_instance
+                .as_ref()
+                .map(|ti| ti.0 == eid)
+                .unwrap_or(false);
             if !is_same {
-                self.tooltip_instance = Some((eid, Tooltip::new(self.handle.clone(), tooltip, target)));
+                self.tooltip_instance =
+                    Some((eid, Tooltip::new(self.handle.clone(), tooltip, target)));
             }
         } else {
             self.tooltip_instance = None;
@@ -1501,12 +1527,12 @@ impl Window {
     fn init_element_root(&mut self, mut body: Element, parent: ElementParent) {
         body.set_parent(parent);
         body.set_focusable(true);
-        let theme = match env::var("DEFT_THEME")  {
+        let theme = match env::var("DEFT_THEME") {
             Ok(str) => str,
             Err(_) => match self.window.theme().unwrap_or(Theme::Light) {
                 Theme::Light => "light".to_string(),
                 Theme::Dark => "dark".to_string(),
-            }
+            },
         };
         body.set_attribute("theme".to_string(), theme);
         // if self.focusing.is_none() {

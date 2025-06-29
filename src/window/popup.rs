@@ -1,5 +1,6 @@
 use crate as deft;
 use crate::base::Rect;
+use crate::element::body::Body;
 use crate::element::{Element, ElementBackend, ElementType};
 use crate::event::ClickEventListener;
 use crate::ext::ext_window::WindowAttrs;
@@ -13,7 +14,6 @@ use winit::dpi::LogicalPosition;
 #[cfg(windows)]
 use winit::platform::windows::WindowAttributesExtWindows;
 use winit::window::WindowAttributes;
-use crate::element::body::Body;
 
 enum PopupWrapper {
     Window(WindowHandle),
@@ -32,7 +32,12 @@ impl Popup {
     pub fn new(element: Element, target: Rect, owner_handle: &WindowHandle) -> Popup {
         Self::new_ex(element, target, owner_handle, true)
     }
-    pub fn new_ex(element: Element, target: Rect, owner_handle: &WindowHandle, focusable: bool) -> Popup {
+    pub fn new_ex(
+        element: Element,
+        target: Rect,
+        owner_handle: &WindowHandle,
+        focusable: bool,
+    ) -> Popup {
         //TODO no unwrap
         let mut owner = owner_handle.upgrade_mut().unwrap();
         if support_multiple_windows() {

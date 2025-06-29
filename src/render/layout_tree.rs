@@ -95,9 +95,7 @@ impl LayoutTree {
                         layer_width,
                         layer_height,
                     );
-                    parent_layer
-                        .invalid_area
-                        .add_rect(Some(&rect));
+                    parent_layer.invalid_area.add_rect(Some(&rect));
                 }
                 self.merge_objects_invalid_area(lo.layer_object_idx, &lo.objects, new_tree);
             }

@@ -6,9 +6,7 @@ use crate::render::RenderFn;
 use crate::renderer::CpuRenderer;
 use crate::{some_or_continue, some_or_return};
 use skia_safe::Canvas;
-use skia_safe::{
-    scalar, Color, Image, Matrix, Path, PathOp, Point, Vector,
-};
+use skia_safe::{scalar, Color, Image, Matrix, Path, PathOp, Point, Vector};
 use skia_window::layer::Layer;
 use std::cell::Cell;
 use std::cmp::Ordering;
@@ -650,7 +648,10 @@ impl RenderTree {
         let invalid_rects = {
             let lo = &mut self.layout_tree.layer_objects[lod.layer_object_idx];
             let mut invalid_area = lo.invalid_area.clone();
-            let layer_path = Path::rect(&Rect::from_xywh(0.0, 0.0, lo.width, lo.height).to_skia_rect(), None);
+            let layer_path = Path::rect(
+                &Rect::from_xywh(0.0, 0.0, lo.width, lo.height).to_skia_rect(),
+                None,
+            );
             let im = lo.total_matrix.invert().unwrap();
             let mut viewport_path = Path::rect(viewport.to_skia_rect(), None);
             let visible_path = viewport_path
@@ -661,10 +662,9 @@ impl RenderTree {
             visible_bounds.y = visible_bounds.y.floor();
             visible_bounds.height = visible_bounds.height.ceil();
 
-            let max_len = (viewport.width * viewport.width
-                + viewport.height * viewport.height)
-            .sqrt()
-            .ceil();
+            let max_len = (viewport.width * viewport.width + viewport.height * viewport.height)
+                .sqrt()
+                .ceil();
             let max_surface_width = f32::min(lo.width, max_len).ceil();
             let max_surface_height = f32::min(lo.height, max_len).ceil();
             if lo.surface_bounds.width() != max_surface_width
@@ -680,7 +680,10 @@ impl RenderTree {
             } else {
                 // Handle visible bound change
                 let common_visible_bounds = visible_bounds.clone();
-                if !common_visible_bounds.intersect(&lo.visible_bounds).is_empty() {
+                if !common_visible_bounds
+                    .intersect(&lo.visible_bounds)
+                    .is_empty()
+                {
                     if common_visible_bounds.x > visible_bounds.x {
                         let new_rect = Rect::from_xywh(
                             visible_bounds.x,
@@ -1002,11 +1005,11 @@ impl MatrixCalculator {
 
 #[cfg(test)]
 pub mod tests {
+    use crate::base::Rect;
     use crate::paint::InvalidArea;
     use log::debug;
     use measure_time::print_time;
     use skia_safe::{Matrix, Path, Vector};
-    use crate::base::Rect;
 
     #[test]
     pub fn test_visible() {
@@ -1027,7 +1030,7 @@ pub mod tests {
 
     #[test]
     pub fn test_rect_intersect() {
-        let mut rect = Rect::from_xywh(0.0, 0.0, 100.0, 100.0);
+        let rect = Rect::from_xywh(0.0, 0.0, 100.0, 100.0);
         let rect2 = Rect::from_xywh(50.0, 50.0, 100.0, 100.0);
         rect.intersect(&rect2);
         debug!("{:?}", rect);

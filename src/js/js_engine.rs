@@ -304,7 +304,8 @@ impl JsEngine {
                                             && pos.1 >= wy
                                             && pos.1 <= wy + wh;
                                         if !is_in_window {
-                                            let _ = window.window.set_cursor_grab(CursorGrabMode::None);
+                                            let _ =
+                                                window.window.set_cursor_grab(CursorGrabMode::None);
                                             #[allow(suspicious_double_ref_op)]
                                             result.push(w.clone().clone());
                                         }

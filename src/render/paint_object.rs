@@ -1,11 +1,11 @@
+use crate::base;
+use crate::border::tiny_path_to_skia_path;
 use crate::paint::{InvalidRects, RenderLayerKey};
 use crate::render::RenderFn;
 use crate::style::color::ColorHelper;
 use skia_safe::PaintStyle::{Fill, Stroke};
 use skia_safe::{Canvas, Color, Image, Matrix, Paint, Rect};
 use tiny_skia::Path;
-use crate::base;
-use crate::border::tiny_path_to_skia_path;
 
 pub struct ElementPO {
     pub coord: (f32, f32),
@@ -49,7 +49,7 @@ impl ElementPO {
         let paths = &self.border_path;
         let color = &self.border_color;
         for i in 0..4 {
-            if let Some(p) =  &paths[i] {
+            if let Some(p) = &paths[i] {
                 let mut paint = Paint::default();
                 paint.set_style(Fill);
                 paint.set_anti_alias(true);

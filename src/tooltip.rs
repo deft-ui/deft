@@ -1,12 +1,12 @@
-use std::ops::{Deref};
 use crate::base::Rect;
+use crate::element::container::Container;
 use crate::element::label::Label;
 use crate::element::{Element, ElementBackend, ElementType};
-use crate::element::container::Container;
 use crate::mrc::Mrc;
 use crate::timer::{set_timeout, TimerHandle};
 use crate::window::popup::Popup;
 use crate::window::WindowHandle;
+use std::ops::Deref;
 
 pub struct Tooltip {
     timer_handle: Option<TimerHandle>,

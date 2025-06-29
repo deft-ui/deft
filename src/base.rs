@@ -562,11 +562,11 @@ impl Rect {
             height,
         }
     }
-    
+
     pub fn new_empty() -> Self {
         Self::new(0.0, 0.0, 0.0, 0.0)
     }
-    
+
     pub fn from_skia(src: &skia_safe::Rect) -> Self {
         Self {
             x: src.left,
@@ -575,11 +575,11 @@ impl Rect {
             height: src.height(),
         }
     }
-    
+
     pub fn from_ltrb(left: f32, top: f32, right: f32, bottom: f32) -> Self {
         Self::new(left, top, right - left, bottom - top)
     }
-    
+
     pub fn from_xywh(x: f32, y: f32, w: f32, h: f32) -> Self {
         Self::new(x, y, w, h)
     }
@@ -601,19 +601,19 @@ impl Rect {
             height: 0.0,
         }
     }
-    
+
     pub fn left(&self) -> f32 {
         self.x
     }
-    
+
     pub fn top(&self) -> f32 {
         self.y
     }
-    
+
     pub fn width(&self) -> f32 {
         self.width
     }
-    
+
     pub fn height(&self) -> f32 {
         self.height
     }
@@ -635,13 +635,13 @@ impl Rect {
     pub fn right(&self) -> f32 {
         self.x + self.width
     }
-    
+
     pub fn offset(&mut self, (x, y): (f32, f32)) {
         self.x += x;
         self.y += y;
     }
-    
-    pub fn with_offset(&self, (x, y):  (f32, f32)) -> Self {
+
+    pub fn with_offset(&self, (x, y): (f32, f32)) -> Self {
         Self {
             x: self.x + x,
             y: self.y + y,
@@ -705,7 +705,7 @@ impl Rect {
         let bottom = self.bottom();
         x >= left && x <= right && y >= top && y <= bottom
     }
-    
+
     pub fn contains(&self, x: f32, y: f32) -> bool {
         self.contains_point(x, y)
     }

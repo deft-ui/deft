@@ -1,10 +1,10 @@
 use crate::app::{AppEvent, InsetType};
+use crate::base::Rect;
 use crate::send_app_event;
 use jni::objects::{JClass, JString, JValue};
 use jni::sys::{jboolean, jfloat, jint, jlong};
 use jni::JNIEnv;
 use log::debug;
-use crate::base::Rect;
 use std::sync::OnceLock;
 use winit::platform::android::activity::AndroidApp;
 

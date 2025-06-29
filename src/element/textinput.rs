@@ -99,7 +99,11 @@ impl ElementBackend for TextInput {
         }
     }
 
-    fn execute_default_behavior(&mut self, event: &mut Event, ctx: &mut EventContext<ElementWeak>) -> bool {
+    fn execute_default_behavior(
+        &mut self,
+        event: &mut Event,
+        ctx: &mut EventContext<ElementWeak>,
+    ) -> bool {
         if ctx.target == self.element {
             return self.editable.on_execute_default_behavior(event);
         }

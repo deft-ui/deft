@@ -22,7 +22,7 @@ unsafe impl Send for ImageSrc {}
 impl ImageSrc {
     pub fn get_size(&self) -> (f32, f32) {
         match self {
-            ImageSrc::Svg(dom) =>  dom.container_size(),
+            ImageSrc::Svg(dom) => dom.container_size(),
             ImageSrc::Img(img) => (img.width() as f32, img.height() as f32),
             ImageSrc::None => (0.0, 0.0),
         }

@@ -14,7 +14,9 @@ use serde::{Deserialize, Serialize};
 use winit::window::{Cursor, CursorIcon};
 use yoga::{Direction, StyleUnit};
 
-use crate::base::{BoxJsEventListenerFactory, EventContext, EventListener, EventRegistration, JsEvent, Rect};
+use crate::base::{
+    BoxJsEventListenerFactory, EventContext, EventListener, EventRegistration, JsEvent, Rect,
+};
 use crate::element::button::Button;
 use crate::element::container::Container;
 use crate::element::image::Image;

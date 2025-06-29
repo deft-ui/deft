@@ -2,6 +2,7 @@ use crate as deft;
 use crate::font::family::{FontFamilies, FontFamily};
 use crate::font::Font;
 use crate::style::font::FontStyle;
+use crate::text::textbox::DEFAULT_FALLBACK_FONTS;
 use deft_macros::mrc_object;
 use font_kit::family_name::FamilyName;
 use font_kit::handle::Handle;
@@ -14,7 +15,6 @@ use skia_safe::font_style::Slant;
 use skia_safe::wrapper::NativeTransmutableWrapper;
 use std::collections::HashMap;
 use swash::{ObliqueAngle, Style, Weight};
-use crate::text::textbox::DEFAULT_FALLBACK_FONTS;
 
 #[mrc_object]
 pub struct FontManager {
@@ -36,7 +36,9 @@ impl FontManager {
             let mut source = SystemSource::empty();
             source
                 .add_font(Handle::Memory {
-                    bytes: std::sync::Arc::new(include_bytes!("../../fonts/NotoSerif-Regular.ttf").to_vec()),
+                    bytes: std::sync::Arc::new(
+                        include_bytes!("../../fonts/NotoSerif-Regular.ttf").to_vec(),
+                    ),
                     font_index: 0,
                 })
                 .unwrap();

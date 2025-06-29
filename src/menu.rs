@@ -1,6 +1,3 @@
-use deft_macros::{js_methods, mrc_object};
-use log::error;
-use quick_js::JsValue;
 use crate as deft;
 use crate::element::container::Container;
 use crate::element::label::Label;
@@ -8,6 +5,9 @@ use crate::element::{Element, ElementBackend, ElementType};
 use crate::event::ClickEventListener;
 use crate::js_value;
 use crate::mrc::Mrc;
+use deft_macros::{js_methods, mrc_object};
+use log::error;
+use quick_js::JsValue;
 
 #[mrc_object]
 pub struct Menu {
@@ -18,12 +18,9 @@ js_value!(Menu);
 
 #[js_methods]
 impl Menu {
-
     #[js_func]
     pub fn new() -> Self {
-        MenuData {
-            items: Vec::new(),
-        }.to_ref()
+        MenuData { items: Vec::new() }.to_ref()
     }
     pub fn add_item(&mut self, item: MenuItem) {
         self.items.push(item);
@@ -51,13 +48,13 @@ js_value!(StandardMenuItem);
 
 #[js_methods]
 impl StandardMenuItem {
-
     pub fn new<F: FnMut() + 'static>(label: &str, callback: F) -> Self {
         StandardMenuItemData {
             disabled: false,
             label: label.to_string(),
             onclick: Mrc::new(Some(Box::new(callback))),
-        }.to_ref()
+        }
+        .to_ref()
     }
 
     #[js_func]
@@ -70,7 +67,8 @@ impl StandardMenuItem {
                     error!("Error calling callback: {}", e);
                 }
             }))),
-        }.to_ref()
+        }
+        .to_ref()
     }
 
     #[js_func]
