@@ -297,6 +297,11 @@ impl Window {
                 height: attrs.height.unwrap_or(default_height) as f64,
             };
             attributes.inner_size = Some(Size::Logical(size));
+        } else {
+            attributes.inner_size = Some(Size::Logical(LogicalSize {
+                width: 1.0,
+                height: 1.0,
+            }))
         }
         #[cfg(x11_platform)]
         {
@@ -1785,9 +1790,10 @@ impl Window {
 
 impl Drop for Window {
     fn drop(&mut self) {
-        WIN_STATE_MANAGER.with_borrow_mut(|wsm| {
+        let _ = WIN_STATE_MANAGER.try_with(|wsm| {
+            let mut wsm = wsm.borrow_mut();
             wsm.remove_state(&self.handle.state);
-        })
+        });
     }
 }
 
