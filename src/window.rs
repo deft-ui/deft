@@ -13,14 +13,7 @@ use crate::element::body::Body;
 use crate::element::util::get_tree_level;
 use crate::element::{Element, ElementBackend, ElementParent};
 use crate::error::{DeftError, DeftResult};
-use crate::event::{
-    build_modifier, named_key_to_str, str_to_named_key, BlurEvent, ClickEvent, ClickEventListener,
-    ContextMenuEvent, DragOverEvent, DragStartEvent, DropEvent, DroppedFileEvent, FocusEvent,
-    FocusShiftEvent, HoveredFileEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent,
-    MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent,
-    TextInputEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_ALT,
-    KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT,
-};
+use crate::event::{build_modifier, named_key_to_str, str_to_named_key, BlurEvent, ClickEvent, ClickEventListener, ContextMenuEvent, DragOverEvent, DragStartEvent, DropEvent, DroppedFileEvent, FocusEvent, FocusShiftEvent, HoveredFileEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent, MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, PreeditEvent, TextInputEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT};
 use crate::event_loop::run_with_event_loop;
 use crate::ext::ext_window::{
     WindowAttrs, MODAL_TO_OWNERS, WINDOWS, WINDOW_TYPE_MENU, WINDOW_TYPE_NORMAL, WINIT_TO_WINDOW,
@@ -619,6 +612,15 @@ impl Window {
         }
     }
 
+    pub fn handle_ime_preedit(&mut self, content: String, offset: Option<usize>) {
+        if let Some(focusing) = &self.focusing {
+            focusing.emit(PreeditEvent{
+                content,
+                offset,
+            });
+        }
+    }
+
     pub fn handle_key(
         &mut self,
         modifiers: u32,
@@ -664,7 +666,9 @@ impl Window {
             WindowEvent::ModifiersChanged(new_modifiers) => self.modifiers = new_modifiers,
             WindowEvent::Ime(ime) => match ime {
                 Ime::Enabled => {}
-                Ime::Preedit(_, _) => {}
+                Ime::Preedit(content, offset) => {
+                    self.handle_ime_preedit(content, offset.map(|v| v.0));
+                }
                 Ime::Commit(str) => {
                     self.handle_input(&str);
                 }
@@ -712,7 +716,7 @@ impl Window {
                 );
             }
             WindowEvent::MouseInput { button, state, .. } => {
-                // debug!("mouse:{:?}:{:?}", button, state);
+                self.window.commit_ime();
                 if let Some((dir, _)) = self.get_resize_direction() {
                     if let Err(e) = self.window.drag_resize_window(dir) {
                         error!("Failed to drag resize window: {:?}", e);

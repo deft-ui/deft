@@ -721,6 +721,12 @@ pub fn named_key_to_str(key: &NamedKey) -> &'static str {
 pub struct TextInputEvent(pub String);
 
 #[event]
+pub struct PreeditEvent {
+    pub content: String,
+    pub offset: Option<usize>,
+}
+
+#[event]
 pub struct ClickEvent(pub MouseDetail);
 
 #[event]

@@ -555,13 +555,18 @@ impl TextBox {
         }
     }
 
-    pub fn move_caret(&mut self, mut delta: isize) {
+    pub fn move_caret(&mut self, delta: isize) {
+        if let Some(caret) = self.calculate_caret(delta) {
+            self.update_caret_value(caret, false);
+        }
+    }
+    pub fn calculate_caret(&self, mut delta: isize) -> Option<TextCoord> {
         let mut row = self.caret.0;
         let mut col = self.caret.1 as isize;
         loop {
             let lines = self.get_lines();
             let line = match lines.get(row) {
-                None => return,
+                None => return None,
                 Some(ln) => ln,
             };
             let atom_count = line.atom_count() as isize;
@@ -573,7 +578,7 @@ impl TextBox {
                 continue;
             } else if col < 0 {
                 if row == 0 {
-                    return;
+                    return None;
                 }
                 delta += -col;
                 row -= 1;
@@ -582,8 +587,7 @@ impl TextBox {
                 continue;
             } else {
                 let new_caret = (row, col as usize);
-                self.update_caret_value(TextCoord::new(new_caret), false);
-                break;
+                return Some(TextCoord::new(new_caret));
             }
         }
     }
