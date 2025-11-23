@@ -5,11 +5,7 @@ use crate::canvas_util::CanvasHelper;
 use crate::element::edit_history::{EditHistory, EditOpType};
 use crate::element::util::is_form_event;
 use crate::element::{Element, ElementBackend, ElementWeak};
-use crate::event::{
-    BlurEvent, BoundsChangeEvent, CaretChangeEvent, Event, FocusEvent, KeyDownEvent,
-    KeyEventDetail, MouseDownEvent, MouseLeaveEvent, ScrollEvent, TextChangeEvent, TextInputEvent,
-    TextUpdateEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT,
-};
+use crate::event::{BlurEvent, BoundsChangeEvent, CaretChangeEvent, Event, FocusEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseLeaveEvent, PreeditEvent, ScrollEvent, TextChangeEvent, TextInputEvent, TextUpdateEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
 use crate::event_loop::create_event_loop_proxy;
 use crate::js::{FromJsValue, ToJsValue};
 use crate::number::DeNan;
@@ -632,6 +628,25 @@ impl Editable {
             }
         } else if let Some(e) = KeyDownEvent::cast(event) {
             self.handle_key_down(&e.0);
+        } else if let Some(e) = PreeditEvent::cast(event) {
+            self.handle_input(&e.content);
+            if !e.content.is_empty() {
+                let end_caret = self.paragraph.get_caret();
+                let content_chars_count = e.content.chars_count() as isize;
+                if let Some(start_caret) = self.paragraph.calculate_caret(-content_chars_count) {
+                    self.paragraph.select(start_caret, end_caret);
+                    if let Some(offset) = e.offset {
+                        let char_offset = if offset == 0 {
+                            0
+                        } else {
+                            e.content[0..offset].chars_count()
+                        } as isize;
+                        if char_offset < content_chars_count {
+                            self.paragraph.move_caret( char_offset - content_chars_count)
+                        }
+                    }
+                }
+            }
         }
         false
     }
