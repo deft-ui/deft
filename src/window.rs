@@ -658,7 +658,7 @@ impl Window {
         match event {
             WindowEvent::RedrawRequested => {
                 self.dirty = true;
-                self.update();
+                self.update_force();
             }
             WindowEvent::Resized(_physical_size) => {
                 self.on_resize();
