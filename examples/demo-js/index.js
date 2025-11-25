@@ -35,6 +35,7 @@ function createSystemTray() {
     tray.bindActivate(() => {
         console.log("tray clicked");
     });
+    tray.setShowMenuOnLeftClick(true);
     tray.setMenus([
         {
             id: "Test",

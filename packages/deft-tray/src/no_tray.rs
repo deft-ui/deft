@@ -19,6 +19,10 @@ impl NoTray {
 
     }
 
+    pub fn set_show_menu_on_left_click(&mut self, _value: bool) {
+        
+    }
+
     pub fn set_icon(&mut self, _icon: &str) {
 
     }

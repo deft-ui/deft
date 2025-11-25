@@ -101,6 +101,11 @@ impl SystemTray {
     }
 
     #[js_func]
+    pub fn set_show_menu_on_left_click(&mut self, value: bool) {
+        self.tray_impl.set_show_menu_on_left_click(value);
+    }
+
+    #[js_func]
     pub fn set_icon(&mut self, icon: String) {
         #[cfg(target_os = "linux")]
         self.tray_impl.set_icon(&icon);

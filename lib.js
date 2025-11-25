@@ -874,6 +874,10 @@ export class SystemTray {
         this.#eventRegistry.bindEvent("menuclick", menuHandler)
     }
 
+    setShowMenuOnLeftClick(value) {
+        SystemTray_set_show_menu_on_left_click(this.tray, value);
+    }
+
     bindActivate(callback) {
         this.#eventRegistry.bindEvent("activate", callback);
     }

@@ -110,6 +110,10 @@ impl GenericTray {
         self.tray_icon.set_title(Some(title));
     }
 
+    pub fn set_show_menu_on_left_click(&mut self, value: bool) {
+        self.tray_icon.set_show_menu_on_left_click(value);
+    }
+
     pub fn set_icon_from_rgba(&mut self, data: Vec<u8>, width: u32, height: u32) {
         let icon = Icon::from_rgba(data, width, height).ok();
         let _ = self.tray_icon.set_icon(icon);

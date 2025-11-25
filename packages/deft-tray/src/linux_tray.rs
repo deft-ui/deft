@@ -111,6 +111,10 @@ impl LinuxTray {
         });
     }
 
+    pub fn set_show_menu_on_left_click(&mut self, _value: bool) {
+        // Not supported
+    }
+
     pub fn set_icon(&mut self, icon: &str) {
         self.handle.update(move |t| {
             t.icon = icon.to_string();
