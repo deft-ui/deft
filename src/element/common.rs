@@ -8,7 +8,7 @@ use crate::base::{EventContext, Rect};
 use crate::canvas_util::CanvasHelper;
 use crate::element::scroll::ScrollBarStrategy;
 use crate::element::ElementWeak;
-use crate::event::{Event, MouseDownEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent};
+use crate::event::{Event, MouseDownEvent, MouseMoveEvent, MouseUpEvent, WheelEvent};
 use crate::render::RenderFn;
 use crate::timer::{set_interval, set_timeout, TimerHandle};
 use deft_macros::mrc_object;
@@ -174,9 +174,14 @@ impl ScrollBar {
         } else if let Some(e) = MouseMoveEvent::cast(event) {
             let d = e.0;
             self.on_mouse_move(d.offset_x, d.offset_y)
-        } else if let Some(e) = MouseWheelEvent::cast(event) {
+        } else if let Some(e) = WheelEvent::cast(event) {
             if self.is_scrollable() {
-                let new_scroll_top = self.scroll_offset - 40.0 * e.rows;
+                let delta_y = match e.delta_mode {
+                    WheelEvent::DELTA_MODE_PIXEL => e.delta_y,
+                    WheelEvent::DELTA_MODE_LINE => 40.0 * e.delta_y,
+                    _ => 0.0,
+                };
+                let new_scroll_top = self.scroll_offset - delta_y;
                 self.update_scroll_offset(new_scroll_top);
                 true
             } else {

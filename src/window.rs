@@ -13,7 +13,7 @@ use crate::element::body::Body;
 use crate::element::util::get_tree_level;
 use crate::element::{Element, ElementBackend, ElementParent};
 use crate::error::{DeftError, DeftResult};
-use crate::event::{build_modifier, named_key_to_str, str_to_named_key, BlurEvent, ClickEvent, ClickEventListener, ContextMenuEvent, DragOverEvent, DragStartEvent, DropEvent, DroppedFileEvent, FocusEvent, FocusShiftEvent, HoveredFileEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent, MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, PreeditEvent, TextInputEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT};
+use crate::event::{build_modifier, named_key_to_str, str_to_named_key, BlurEvent, ClickEvent, ClickEventListener, ContextMenuEvent, DragOverEvent, DragStartEvent, DropEvent, DroppedFileEvent, FocusEvent, FocusShiftEvent, HoveredFileEvent, KeyDownEvent, KeyEventDetail, KeyUpEvent, MouseDownEvent, MouseEnterEvent, MouseLeaveEvent, MouseMoveEvent, MouseUpEvent, MouseWheelEvent, PreeditEvent, TextInputEvent, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent, WheelEvent, KEY_MOD_ALT, KEY_MOD_CTRL, KEY_MOD_META, KEY_MOD_SHIFT};
 use crate::event_loop::run_with_event_loop;
 use crate::ext::ext_window::{
     WindowAttrs, MODAL_TO_OWNERS, WINDOWS, WINDOW_TYPE_MENU, WINDOW_TYPE_NORMAL, WINIT_TO_WINDOW,
@@ -778,9 +778,11 @@ impl Window {
             WindowEvent::MouseWheel { delta, .. } => {
                 match delta {
                     MouseScrollDelta::LineDelta(x, y) => {
-                        self.handle_mouse_wheel((x, y));
+                        self.handle_mouse_wheel(x, y, WheelEvent::DELTA_MODE_LINE);
                     }
-                    MouseScrollDelta::PixelDelta(_) => {}
+                    MouseScrollDelta::PixelDelta(d) => {
+                        self.handle_mouse_wheel(d.x as f32, d.y as f32, WheelEvent::DELTA_MODE_PIXEL)
+                    }
                 }
                 // debug!("delta:{:?}", delta);
             }
@@ -902,12 +904,13 @@ impl Window {
         panic!("no focused layer found");
     }
 
-    fn handle_mouse_wheel(&mut self, delta: (f32, f32)) {
+    fn handle_mouse_wheel(&mut self, delta_x: f32, delta_y: f32, delta_mode: u8) {
         let (target_node, _, _) = self.get_node_by_point();
         target_node.emit(MouseWheelEvent {
-            cols: delta.0,
-            rows: delta.1,
+            cols: delta_x,
+            rows: delta_y,
         });
+        target_node.emit(WheelEvent { delta_x, delta_y, delta_mode });
     }
 
     fn handle_cursor_moved(&mut self) {

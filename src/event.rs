@@ -753,10 +753,23 @@ pub struct KeyDownEvent(pub KeyEventDetail);
 #[event]
 pub struct KeyUpEvent(pub KeyEventDetail);
 
+#[deprecated]
 #[event]
 pub struct MouseWheelEvent {
     pub cols: f32,
     pub rows: f32,
+}
+
+#[event]
+pub struct WheelEvent {
+    pub delta_x: f32,
+    pub delta_y: f32,
+    pub delta_mode: u8,
+}
+
+impl WheelEvent {
+    pub const DELTA_MODE_PIXEL: u8 = 0;
+    pub const DELTA_MODE_LINE: u8 = 1;
 }
 
 #[event]
