@@ -64,6 +64,7 @@ use winit::window::{
     Cursor, CursorIcon, Fullscreen, ResizeDirection, Theme, WindowAttributes, WindowButtons,
     WindowId,
 };
+use crate::ext::ext_process::{EXIT_ON_ALL_WINDOWS_CLOSED};
 
 thread_local! {
     static WIN_STATE_MANAGER: RefCell<StateManager> = RefCell::new(StateManager::new());
@@ -464,7 +465,7 @@ impl Window {
             }
             WINDOWS.with_borrow_mut(|m| {
                 m.remove(&self.get_id());
-                if m.is_empty() {
+                if m.is_empty() && EXIT_ON_ALL_WINDOWS_CLOSED.get() {
                     let _ = exit_app(0);
                 }
             });

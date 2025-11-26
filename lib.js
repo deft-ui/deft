@@ -96,6 +96,14 @@ export class Process {
 
     /**
      *
+     * @param value {boolean}
+     */
+    setExitOnAllWindowsClosed(value) {
+        process_set_exit_on_all_windows_closed(value);
+    }
+
+    /**
+     *
      * @returns {string[]}
      */
     get argv() {

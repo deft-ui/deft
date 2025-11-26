@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use crate as deft;
 use crate::app::exit_app;
 use crate::is_mobile_platform;
@@ -7,6 +8,10 @@ use log::error;
 use quick_js::exception::HostPromiseRejectionTracker;
 use quick_js::JsValue;
 use std::env;
+
+thread_local! {
+    pub static EXIT_ON_ALL_WINDOWS_CLOSED: Cell<bool> = Cell::new(true);
+}
 
 struct UserPromiseRejectionTracker {
     handler: JsValue,
@@ -28,6 +33,11 @@ impl process {
     #[js_func]
     pub fn exit(code: i32) {
         let _ = exit_app(code);
+    }
+
+    #[js_func]
+    pub fn set_exit_on_all_windows_closed(value: bool) {
+        EXIT_ON_ALL_WINDOWS_CLOSED.set(value);
     }
 
     #[js_func]
