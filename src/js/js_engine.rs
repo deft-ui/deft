@@ -4,6 +4,7 @@ use std::future::Future;
 use std::panic::RefUnwindSafe;
 use std::path::PathBuf;
 use tokio::runtime::Builder;
+use winit::dpi::{LogicalPosition, LogicalSize};
 use winit::event::{DeviceEvent, DeviceId, ElementState, WindowEvent};
 use winit::window::{CursorGrabMode, WindowId};
 
@@ -295,10 +296,12 @@ impl JsEngine {
                         if let Some(pos) = el.query_pointer(device_id) {
                             menu_windows.iter().for_each(|w| {
                                 if let Ok(window) = w.upgrade_mut() {
-                                    let w_size = window.window.outer_size();
+                                    let win_scale_factor = window.window.scale_factor();
+                                    let w_size: LogicalSize<f32> = window.window.outer_size().to_logical(win_scale_factor);
                                     if let Some(wp) = window.window.outer_position().ok() {
-                                        let (wx, wy) = (wp.x as f32, wp.y as f32);
-                                        let (ww, wh) = (w_size.width as f32, w_size.height as f32);
+                                        let wp: LogicalPosition<f32> = wp.to_logical(win_scale_factor);
+                                        let (wx, wy) = (wp.x, wp.y);
+                                        let (ww, wh) = (w_size.width, w_size.height);
                                         let is_in_window = pos.0 >= wx
                                             && pos.0 <= wx + ww
                                             && pos.1 >= wy

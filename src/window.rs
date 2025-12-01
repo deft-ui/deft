@@ -56,6 +56,7 @@ use winit::event::{
     ElementState, Ime, Modifiers, MouseButton, MouseScrollDelta, TouchPhase, WindowEvent,
 };
 use winit::keyboard::{Key, KeyCode, NamedKey, PhysicalKey};
+use winit::platform::macos::WindowAttributesExtMacOS;
 #[cfg(windows)]
 use winit::platform::windows::WindowExtWindows;
 #[cfg(x11_platform)]
@@ -316,6 +317,9 @@ impl Window {
             WINDOW_TYPE_MENU => WindowType::Menu,
             _ => WindowType::Normal,
         };
+        if window_type == WindowType::Menu {
+            attributes = attributes.with_can_become_key_window(false);
+        }
 
         let user_pf_backends = match attrs.preferred_renderers {
             None => Vec::new(),
