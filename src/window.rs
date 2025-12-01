@@ -1406,6 +1406,9 @@ impl Window {
                     width: final_width,
                     height: final_height,
                 });
+                #[cfg(wayland_platform)]
+                //Note: No ResizeEvent will receive on wayland after Window::resize called.
+                self.on_resize();
             }
         }
     }

@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 #![allow(deprecated)]
 
+use std::env;
 use crate::app::{App, AppEvent, AppEventPayload, WinitApp};
 use anyhow::{anyhow, Error};
 use measure_time::debug_time;
@@ -93,7 +94,18 @@ fn run_event_loop(event_loop: EventLoop<AppEventPayload>, deft_app: App) {
 /// Boostrap for desktop apps
 pub fn bootstrap(deft_app: App) {
     init_console();
-    let event_loop: EventLoop<AppEventPayload> = EventLoop::with_user_event().build().unwrap();
+    let mut elb: EventLoopBuilder<AppEventPayload> = EventLoop::with_user_event();
+    #[cfg(all(x11_platform, wayland_platform))]
+    {
+        use ::winit::platform::wayland::EventLoopBuilderExtWayland;
+        use ::winit::platform::x11::EventLoopBuilderExtX11;
+        if env::var("DEFT_FORCE_WAYLAND").is_ok() {
+            elb.with_wayland();
+        } else {
+            elb.with_x11();
+        }
+    }
+    let event_loop = elb.build().unwrap();
     run_event_loop(event_loop, deft_app);
 }
 
