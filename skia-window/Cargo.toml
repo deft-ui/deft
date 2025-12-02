@@ -22,7 +22,7 @@ webgl = ["dep:gl"]
 
 [dependencies]
 log = "0.4"
-winit = { package = "deft-winit", version = "0.34.0", features = ["android-native-activity", "rwh_06"] }
+winit = { package = "deft-winit", version = "0.35.0", features = ["android-native-activity", "rwh_06"] }
 glutin = { version = "0.32.3", optional = true }
 measure_time = "0.8.3"
 raw-window-handle = "0.6.0"

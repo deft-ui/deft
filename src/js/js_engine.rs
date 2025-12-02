@@ -4,9 +4,9 @@ use std::future::Future;
 use std::panic::RefUnwindSafe;
 use std::path::PathBuf;
 use tokio::runtime::Builder;
-use winit::dpi::{LogicalPosition, LogicalSize};
+use winit::dpi::{PhysicalSize};
 use winit::event::{DeviceEvent, DeviceId, ElementState, WindowEvent};
-use winit::window::{CursorGrabMode, WindowId};
+use winit::window::{WindowId};
 
 use crate::app::App;
 use crate::console::Console;
@@ -21,7 +21,6 @@ use crate::element::select::Select;
 use crate::element::textedit::TextEdit;
 use crate::element::textinput::TextInput;
 use crate::element::{init_base_components, Element, CSS_MANAGER};
-use crate::event_loop::run_with_event_loop;
 use crate::ext::ext_animation::animation_create;
 #[cfg(fs_enabled)]
 use crate::ext::ext_appfs::appfs;
@@ -274,12 +273,11 @@ impl JsEngine {
         handle_window_event(window_id, event);
     }
 
-    pub fn handle_device_event(&mut self, device_id: DeviceId, event: DeviceEvent) {
+    pub fn handle_device_event(&mut self, _device_id: DeviceId, event: DeviceEvent) {
         if let DeviceEvent::Button { state, .. } = event {
             if state == ElementState::Pressed {
-                let close_windows = WINDOWS.with_borrow(|windows| {
-                    let mut result = Vec::new();
-                    let menu_windows: Vec<&WindowHandle> = windows
+                let close_windows: Vec<WindowHandle> = WINDOWS.with_borrow(|windows| {
+                    windows
                         .iter()
                         .filter(|(_, f)| {
                             f.upgrade_mut()
@@ -287,37 +285,23 @@ impl JsEngine {
                                 .map(|f| f.window_type == WindowType::Menu)
                                 .unwrap_or(false)
                         })
-                        .map(|(_, f)| f)
-                        .collect();
-                    if menu_windows.is_empty() {
-                        return result;
-                    }
-                    run_with_event_loop(|el| {
-                        if let Some(pos) = el.query_pointer(device_id) {
-                            menu_windows.iter().for_each(|w| {
-                                if let Ok(window) = w.upgrade_mut() {
-                                    let win_scale_factor = window.window.scale_factor();
-                                    let w_size: LogicalSize<f32> = window.window.outer_size().to_logical(win_scale_factor);
-                                    if let Some(wp) = window.window.outer_position().ok() {
-                                        let wp: LogicalPosition<f32> = wp.to_logical(win_scale_factor);
-                                        let (wx, wy) = (wp.x, wp.y);
-                                        let (ww, wh) = (w_size.width, w_size.height);
-                                        let is_in_window = pos.0 >= wx
-                                            && pos.0 <= wx + ww
-                                            && pos.1 >= wy
-                                            && pos.1 <= wy + wh;
-                                        if !is_in_window {
-                                            let _ =
-                                                window.window.set_cursor_grab(CursorGrabMode::None);
-                                            #[allow(suspicious_double_ref_op)]
-                                            result.push(w.clone().clone());
-                                        }
+                        .map(|(_, f)| f.clone())
+                        .filter(|w| {
+                            if let Ok(window) = w.upgrade_mut() {
+                                let w_size: PhysicalSize<i32> = window.window.outer_size().cast();
+                                if let Some(ptr_pos) = window.window.pointer_position() {
+                                    let is_in_window = ptr_pos.x >= 0
+                                        && ptr_pos.x <= w_size.width
+                                        && ptr_pos.y >= 0
+                                        && ptr_pos.y <= w_size.height;
+                                    if !is_in_window {
+                                        return true;
                                     }
                                 }
-                            })
-                        }
-                    });
-                    result
+                            }
+                            false
+                        })
+                        .collect()
                 });
                 for f in close_windows {
                     if let Ok(mut f) = f.upgrade_mut() {

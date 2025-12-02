@@ -50,7 +50,7 @@ impl<T> State<T> {
             store: StateData::Hosting(MrcWeak::new()),
         }
     }
-    pub fn upgrade_mut(&self) -> Result<StateMutRef<T>, UpgradeError> {
+    pub fn upgrade_mut(&self) -> Result<StateMutRef<'_, T>, UpgradeError> {
         match &self.store {
             StateData::Hosting(d) => {
                 let data = d.upgrade()?;

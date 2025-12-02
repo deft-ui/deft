@@ -56,7 +56,6 @@ use winit::event::{
     ElementState, Ime, Modifiers, MouseButton, MouseScrollDelta, TouchPhase, WindowEvent,
 };
 use winit::keyboard::{Key, KeyCode, NamedKey, PhysicalKey};
-use winit::platform::macos::WindowAttributesExtMacOS;
 #[cfg(windows)]
 use winit::platform::windows::WindowExtWindows;
 #[cfg(x11_platform)]
@@ -179,7 +178,7 @@ pub struct WindowHandle {
 }
 
 impl WindowHandle {
-    pub fn upgrade_mut(&self) -> DeftResult<StateMutRef<Window>> {
+    pub fn upgrade_mut(&self) -> DeftResult<StateMutRef<'_, Window>> {
         Ok(self.state.upgrade_mut()?)
     }
 }
@@ -317,7 +316,9 @@ impl Window {
             WINDOW_TYPE_MENU => WindowType::Menu,
             _ => WindowType::Normal,
         };
+        #[cfg(macos_platform)]
         if window_type == WindowType::Menu {
+            use winit::platform::macos::WindowAttributesExtMacOS;
             attributes = attributes.with_can_become_key_window(false);
         }
 

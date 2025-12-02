@@ -93,7 +93,7 @@ impl Font {
         self.as_ref().attributes()
     }
 
-    pub fn charmap(&self) -> Charmap {
+    pub fn charmap(&self) -> Charmap<'_> {
         self.as_ref().charmap()
     }
 
@@ -161,7 +161,7 @@ impl Font {
 
     // Create the transient font reference for accessing this crate's
     // functionality.
-    pub fn as_ref(&self) -> FontRef {
+    pub fn as_ref(&self) -> FontRef<'_> {
         // Note that you'll want to initialize the struct directly here as
         // using any of the FontRef constructors will generate a new key which,
         // while completely safe, will nullify the performance optimizations of
