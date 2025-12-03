@@ -44,6 +44,11 @@ function createSystemTray() {
                 console.log("clicked test menu");
             }
         },{
+            label: "Disabled",
+            enabled: false,
+        },{
+            kind: 'separator',
+        },{
             id: "quit",
             label: "Quit",
             handler() {

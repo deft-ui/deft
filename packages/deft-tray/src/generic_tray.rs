@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex};
-use tray_icon::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem};
+use tray_icon::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tray_icon::{Icon, MouseButton, MouseButtonState, TrayIcon, TrayIconAttributes, TrayIconEvent};
 use crate::{MenuKind, TrayMenu};
 
@@ -132,36 +132,38 @@ impl GenericTray {
             };
             let enabled = m.enabled.unwrap_or(true);
             let label = m.label.unwrap_or("".to_string());
-            //TODO auto generate id?
-            let menu_id = match m.id {
-                Some(id) => id,
-                None => continue,
-            };
-            self.menu_ids.push(menu_id.clone());
-            let menu_callback = self.menu_click_callback.clone();
-            let activate: Box<dyn FnMut() + Send> = {
-                let menu_id = menu_id.clone();
-                Box::new(move || {
-                    let mut menu_callback = menu_callback.lock().unwrap();
-                    menu_callback(menu_id.clone());
-                })
-            };
-            EVENT_MANAGER.set_menu_click_callback(&menu_id, activate);
+            if let Some(menu_id) = &m.id {
+                self.menu_ids.push(menu_id.clone());
+                let menu_callback = self.menu_click_callback.clone();
+                let activate: Box<dyn FnMut() + Send> = {
+                    let menu_id = menu_id.clone();
+                    Box::new(move || {
+                        let mut menu_callback = menu_callback.lock().unwrap();
+                        menu_callback(menu_id.clone());
+                    })
+                };
+                EVENT_MANAGER.set_menu_click_callback(&menu_id, activate);
+            }
             match kind {
                 MenuKind::Standard => {
-                    let std_menu = MenuItem::with_id(menu_id, label, true, None);
+                    let std_menu = match &m.id {
+                        Some(menu_id) => MenuItem::with_id(menu_id, label, true, None),
+                        None => MenuItem::new(label, true, None),
+                    };
                     std_menu.set_enabled(enabled);
                     let _ = menu.append(&std_menu);
                 }
                 MenuKind::Checkmark => {
                     let checked = m.checked.unwrap_or(false);
-                    let check_menu = CheckMenuItem::with_id(menu_id, label, true, checked, None);
+                    let check_menu = match &m.id {
+                        Some(menu_id) => CheckMenuItem::with_id(menu_id, label, true, checked, None),
+                        None => CheckMenuItem::new(label, true, checked, None),
+                    };
                     check_menu.set_enabled(enabled);
                     let _ = menu.append(&check_menu);
                 }
                 MenuKind::Separator => {
-                    let std_menu = MenuItem::new("-".to_string(), true, None);
-                    std_menu.set_enabled(enabled);
+                    let std_menu = PredefinedMenuItem::separator();
                     let _ = menu.append(&std_menu);
                 }
             }
