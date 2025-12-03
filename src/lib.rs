@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 #![allow(deprecated)]
 
-use std::env;
 use crate::app::{App, AppEvent, AppEventPayload, WinitApp};
 use anyhow::{anyhow, Error};
 use measure_time::debug_time;
@@ -99,7 +98,7 @@ pub fn bootstrap(deft_app: App) {
     {
         use ::winit::platform::wayland::EventLoopBuilderExtWayland;
         use ::winit::platform::x11::EventLoopBuilderExtX11;
-        if env::var("DEFT_FORCE_WAYLAND").is_ok() {
+        if std::env::var("DEFT_FORCE_WAYLAND").is_ok() {
             elb.with_wayland();
         } else {
             elb.with_x11();

@@ -1846,6 +1846,22 @@ export class TextEditElement extends Element {
 
     /**
      *
+     * @returns {number}
+     */
+    get maxHistory() {
+        return TextEdit_get_max_history(this.handle);
+    }
+
+    /**
+     *
+     * @param maxHistory {number}
+     */
+    set maxHistory(maxHistory) {
+        TextEdit_set_max_history(this.handle, maxHistory);
+    }
+
+    /**
+     *
      * @param start {number}
      * @param end {number}
      */

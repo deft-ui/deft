@@ -2,7 +2,7 @@ use crate as deft;
 use crate::app::AppEvent;
 use crate::base::{Callback, EventContext, Rect};
 use crate::canvas_util::CanvasHelper;
-use crate::element::edit_history::{EditHistory, EditOpType};
+use crate::element::edit_history::{EditDetail, EditHistory};
 use crate::element::util::is_form_event;
 use crate::element::{Element, ElementBackend, ElementWeak};
 use crate::event::{BlurEvent, BoundsChangeEvent, CaretChangeEvent, Event, FocusEvent, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseLeaveEvent, PreeditEvent, ScrollEvent, TextChangeEvent, TextInputEvent, TextUpdateEvent, KEY_MOD_CTRL, KEY_MOD_SHIFT};
@@ -186,6 +186,14 @@ impl Editable {
             ele.remove_attribute("disabled".to_string());
         }
     }
+    
+    pub fn set_max_history(&mut self, max_history: usize) {
+        self.edit_history.set_max_history(max_history);
+    }
+    
+    pub fn get_max_history(&self) -> usize {
+        self.edit_history.get_max_history()
+    }
 
     fn get_caret_pixels_position(&self) -> Option<Rect> {
         let element = self.element.upgrade_mut().ok()?;
@@ -354,7 +362,7 @@ impl Editable {
                 match nk {
                     NamedKey::Backspace => {
                         let end = self.paragraph.get_caret();
-                        if self.paragraph.get_selection().is_none() {
+                        if self.paragraph.get_selection().is_empty() {
                             if end.0 > 0 || end.1 > 0 {
                                 self.move_caret(-1);
                                 let start = self.paragraph.get_caret();
@@ -412,20 +420,35 @@ impl Editable {
                     _ => {}
                 }
             }
+        } else if event.modifiers == KEY_MOD_CTRL | KEY_MOD_SHIFT {
+            if let Some(text) = &event.key_str {
+                match text.to_lowercase().as_str() {
+                    "z" => {
+                        self.redo();
+                    }
+                    _ => {}
+                }
+            }
         }
     }
 
     fn undo(&mut self) {
-        if let Some(op) = &self.edit_history.undo() {
-            match op.op {
-                EditOpType::Insert => {
-                    //TODO self.insert_text(op.content.as_str(), op.caret, false);
-                }
-                EditOpType::Delete => {
-                    //TODO self.base.select(op.caret, op.caret + op.content.chars_count());
-                    //TODO self.insert_text("", op.caret, false);
-                }
+        if let Some(op) = self.edit_history.undo() {
+            if let Some(insert) = op.insert {
+                self.paragraph.select(op.caret, insert.end);
             }
+            let delete_content = op.delete.map(|it| it.content).unwrap_or_else(String::new);
+            self.insert_text(&delete_content, op.caret, false);
+        }
+    }
+
+    fn redo(&mut self) {
+        if let Some(op) = self.edit_history.redo() {
+            if let Some(delete) = op.delete {
+                self.paragraph.select(op.caret, delete.end);
+            }
+            let insert_content = op.insert.map(|it| it.content).unwrap_or_else(String::new);
+            self.insert_text(&insert_content, op.caret, false);
         }
     }
 
@@ -456,12 +479,12 @@ impl Editable {
     }
 
     fn insert_text(&mut self, input: &str, mut caret: TextCoord, record_history: bool) {
-        if let Some((start, end)) = self.paragraph.get_selection() {
-            if record_history {
-                // let text= self.paragraph.get_selection_text().unwrap();
-                //TODO self.edit_history.record_delete(begin, &text);
-            }
-
+        let mut delete_detail = None;
+        let mut insert_detail = None;
+        let selection = self.paragraph.get_selection();
+        if !selection.is_empty() {
+            let (start, end) = selection.normalize();
+            let selected_text = self.paragraph.get_selection_text().unwrap_or(String::new());
             if start.0 == end.0 {
                 let line_text = self.paragraph.get_line_text(start.0).unwrap();
                 let left = line_text.substring(0, start.1);
@@ -487,11 +510,15 @@ impl Editable {
             self.paragraph.unselect();
             self.update_caret_value(start, false);
             caret = start;
-        }
-        if !input.is_empty() {
-            if record_history {
-                //TODO self.edit_history.record_input(caret, input);
+            if start != end {
+                delete_detail = Some(EditDetail {
+                    content: selected_text,
+                    end,
+                });
             }
+        }
+        let start_caret = caret;
+        if !input.is_empty() {
             let line_text = self.paragraph.get_line_text(caret.0).unwrap();
             let left_str = line_text.substring(0, caret.1);
             let right_str = line_text.substring(caret.1, line_text.len() - caret.1);
@@ -526,6 +553,14 @@ impl Editable {
             };
             //TODO maybe update caret twice?
             self.update_caret_value(new_caret, false);
+            insert_detail = Some(EditDetail {
+                content: input.to_string(),
+                end: self.paragraph.get_caret(),
+            });
+        }
+
+        if record_history {
+            self.edit_history.record_input(start_caret, delete_detail, insert_detail);
         }
 
         // emit text update
@@ -768,7 +803,7 @@ impl ElementBackend for Editable {
             align: TextAlign::Left,
             multiple_line: false,
             element: ele.as_weak(),
-            edit_history: EditHistory::new(),
+            edit_history: EditHistory::new(10),
             rows: 5,
             disabled: false,
             line_height: None,

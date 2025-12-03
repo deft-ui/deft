@@ -102,11 +102,49 @@ impl TextCoord {
 
 js_serialize!(TextCoord);
 
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub struct Selection(TextCoord, TextCoord);
+
+impl Selection {
+    pub fn is_empty(&self) -> bool {
+        self.0 == self.1
+    }
+
+    pub fn min(&self) -> TextCoord {
+        if self.1 < self.0 {
+            self.1
+        } else {
+            self.0
+        }
+    }
+
+    pub fn max(&self) -> TextCoord {
+        if self.0 > self.1 {
+            self.0
+        } else {
+            self.1
+        }
+    }
+
+    pub fn start(&self) -> TextCoord {
+        self.0
+    }
+
+    pub fn end(&self) -> TextCoord {
+        self.1
+    }
+
+    pub fn normalize(&self) -> (TextCoord, TextCoord) {
+        (self.min(), self.max())
+    }
+
+}
+
 pub struct TextBox {
     params: ParagraphParams,
     lines: Vec<Line>,
     /// Option<(start coord, end coord)>
-    selection: Option<(TextCoord, TextCoord)>,
+    selection: Selection,
     selecting_begin: Option<TextCoord>,
     selection_bg: Paint,
     selection_fg: Paint,
@@ -299,7 +337,7 @@ impl TextBox {
 
     pub fn select(&mut self, start: TextCoord, end: TextCoord) {
         //TODO validate params
-        self.selection = Some((start, end));
+        self.selection = Selection(start, end);
         self.request_repaint();
     }
 
@@ -314,7 +352,7 @@ impl TextBox {
     }
 
     pub fn unselect(&mut self) {
-        self.selection = None;
+        self.selection = Selection(self.selection.end(), self.selection.end());
         self.request_repaint();
     }
 
@@ -519,14 +557,12 @@ impl TextBox {
         Some(self.lines.get(row)?.get_text())
     }
 
-    pub fn get_selection(&self) -> Option<(TextCoord, TextCoord)> {
+    pub fn get_selection(&self) -> Selection {
         self.selection
     }
 
     pub fn get_selection_text(&self) -> Option<String> {
-        let selection = self.selection.as_ref()?;
-        let start = selection.0;
-        let end = selection.1;
+        let (start, end) = self.selection.normalize();
         let start_line = self.lines.get(start.0)?;
         let end_line = self.lines.get(end.0)?;
         let text = if start.0 == end.0 {
@@ -730,7 +766,7 @@ impl TextBox {
         Self {
             lines: Vec::new(),
             params,
-            selection: None,
+            selection: Selection(TextCoord(0, 0), TextCoord(0, 0)),
             selecting_begin: None,
             selection_bg,
             selection_fg,
@@ -786,9 +822,9 @@ impl TextBox {
                 ln_layout.paint(painter, (0.0, ln_top).into());
 
                 if atom_count > 0 {
-                    if let Some(selection_range) = selection {
+                    if !selection.is_empty() {
                         let ln_range = (TextCoord(ln_row, 0), TextCoord(ln_row, atom_count));
-                        if let Some((begin, end)) = intersect_range(selection_range, ln_range) {
+                        if let Some((begin, end)) = intersect_range(selection.normalize(), ln_range) {
                             ln_layout.paint_selection(
                                 painter,
                                 (0.0, ln_top),

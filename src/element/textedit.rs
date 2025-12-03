@@ -33,6 +33,16 @@ impl TextEdit {
     }
 
     #[js_func]
+    pub fn set_max_history(&mut self, max_history: usize) {
+        self.editable.set_max_history(max_history);
+    }
+
+    #[js_func]
+    pub fn get_max_history(&self) -> usize {
+        self.editable.get_max_history()
+    }
+
+    #[js_func]
     pub fn get_placeholder(&self) -> String {
         self.editable.get_placeholder()
     }

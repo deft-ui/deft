@@ -1,15 +1,17 @@
-use crate::string::StringUtils;
+use crate::some_or_return;
+use crate::text::textbox::TextCoord;
 
-#[derive(PartialEq, Eq)]
-pub enum EditOpType {
-    Insert,
-    Delete,
+#[derive(Clone, Debug)]
+pub struct EditDetail {
+    pub content: String,
+    pub end: TextCoord,
 }
 
+#[derive(Clone, Debug)]
 pub struct EditOp {
-    pub caret: usize,
-    pub op: EditOpType,
-    pub content: String,
+    pub caret: TextCoord,
+    pub delete: Option<EditDetail>,
+    pub insert: Option<EditDetail>,
 }
 
 pub struct EditHistory {
@@ -19,30 +21,36 @@ pub struct EditHistory {
 }
 
 impl EditHistory {
-    pub fn new() -> Self {
+    pub fn new(max_history: usize) -> Self {
         EditHistory {
             history: Vec::new(),
             history_ptr: 0,
-            max_history: 20,
+            max_history,
         }
     }
 
-    pub fn record_input(&mut self, caret: usize, content: &str) {
-        if !self.merge_input(caret, content) {
-            self.push_op(EditOp {
-                caret,
-                op: EditOpType::Insert,
-                content: content.to_string(),
-            });
-        }
+    pub fn set_max_history(&mut self, max_history: usize) {
+        self.max_history = max_history;
+    }
+    
+    pub fn get_max_history(&self) -> usize {
+        self.max_history
     }
 
-    pub fn record_delete(&mut self, caret: usize, content: &str) {
-        if !self.merge_delete(caret, content) {
+    pub fn record_input(
+        &mut self,
+        caret: TextCoord,
+        delete_detail: Option<EditDetail>,
+        insert_detail: Option<EditDetail>,
+    ) {
+        if self.max_history == 0 || (delete_detail.is_none() && insert_detail.is_none()) {
+            return;
+        }
+        if !self.merge_input(caret, &delete_detail, &insert_detail) {
             self.push_op(EditOp {
                 caret,
-                op: EditOpType::Delete,
-                content: content.to_string(),
+                delete: delete_detail,
+                insert: insert_detail,
             });
         }
     }
@@ -53,55 +61,55 @@ impl EditHistory {
         }
         let prev_op = unsafe { self.history.get_unchecked(self.history_ptr - 1) };
         self.history_ptr -= 1;
-        let op = match prev_op.op {
-            EditOpType::Insert => EditOp {
-                caret: prev_op.caret,
-                op: EditOpType::Delete,
-                content: prev_op.content.to_string(),
-            },
-            EditOpType::Delete => EditOp {
-                caret: prev_op.caret,
-                op: EditOpType::Insert,
-                content: prev_op.content.to_string(),
-            },
-        };
-        Some(op)
+        Some(prev_op.clone())
     }
 
-    fn merge_input(&mut self, op_caret: usize, content: &str) -> bool {
+    pub fn redo(&mut self) -> Option<EditOp> {
+        if self.history.is_empty() || self.history_ptr >= self.history.len() {
+            return None;
+        }
+        let next_op = unsafe { self.history.get_unchecked(self.history_ptr) };
+        self.history_ptr += 1;
+        Some(next_op.clone())
+    }
+
+    fn merge_input(
+        &mut self,
+        caret: TextCoord,
+        delete_detail: &Option<EditDetail>,
+        insert_detail: &Option<EditDetail>,
+    ) -> bool {
         if self.history_ptr == 0 || self.history_ptr != self.history.len() {
             return false;
         }
         let last_op = unsafe { self.history.get_unchecked_mut(self.history_ptr - 1) };
-        if last_op.op == EditOpType::Insert
-            && last_op.caret + last_op.content.chars_count() == op_caret
-        {
-            last_op.content.push_str(content);
-            true
-        } else {
-            false
-        }
-    }
-
-    fn merge_delete(&mut self, op_caret: usize, content: &str) -> bool {
-        if self.history_ptr == 0 || self.history_ptr != self.history.len() {
-            return false;
-        }
-        let last_op = unsafe { self.history.get_unchecked_mut(self.history_ptr - 1) };
-        if last_op.op != EditOpType::Delete {
-            return false;
-        }
-        if last_op.caret + last_op.content.chars_count() == op_caret {
-            last_op.content.push_str(content);
-            true
-        } else if op_caret + content.chars_count() == last_op.caret {
-            last_op.caret = op_caret;
-            let mut content = content.to_string();
-            content.push_str(&last_op.content);
-            last_op.content = content;
-            true
-        } else {
-            false
+        match (
+            delete_detail,
+            insert_detail,
+            &mut last_op.delete,
+            &mut last_op.insert,
+        ) {
+            (None, Some(insert_detail), None, Some(last_insert)) => {
+                if last_insert.end == caret
+                    && !Self::starts_with_whitespace(&insert_detail.content)
+                {
+                    last_insert.content.push_str(&insert_detail.content);
+                    last_insert.end = insert_detail.end;
+                    true
+                } else {
+                    false
+                }
+            }
+            (Some(delete_detail), None, Some(last_delete), None) => {
+                if delete_detail.end == last_op.caret {
+                    last_delete.content = format!("{}{}", delete_detail.content, last_delete.content);
+                    last_op.caret = caret;
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
         }
     }
 
@@ -117,4 +125,10 @@ impl EditHistory {
         self.history.push(op);
         self.history_ptr += 1;
     }
+
+    fn starts_with_whitespace(content: &str) -> bool {
+        let first = some_or_return!(content.chars().next(), false);
+        ['\t', '\r', '\n', ' '].contains(&first)
+    }
+
 }
