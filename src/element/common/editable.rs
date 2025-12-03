@@ -783,6 +783,7 @@ impl ElementBackend for Editable {
                 let mut entry = ok_or_return!(weak.upgrade());
                 entry.setup_auto_scroll_callback();
                 entry.emit_caret_change();
+                entry.update_ime();
                 entry.element.mark_dirty(false);
             });
         }
