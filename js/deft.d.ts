@@ -320,6 +320,11 @@ declare class Process {
     exit(code: number): void;
     /**
      *
+     * @param value {boolean}
+     */
+    setExitOnAllWindowsClosed(value: boolean): void;
+    /**
+     *
      * @returns {string[]}
      */
     get argv(): string[];
@@ -623,6 +628,7 @@ declare class SystemTray {
      * @param menus {TrayMenu[]}
      */
     setMenus(menus: TrayMenu[]): void;
+    setShowMenuOnLeftClick(value: any): void;
     bindActivate(callback: any): void;
     bindMenuClick(callback: any): void;
     
@@ -1141,6 +1147,16 @@ declare class TextEditElement extends Element {
      */
     set placeholder(placeholder: string);
     get placeholder(): string;
+    /**
+     *
+     * @param maxHistory {number}
+     */
+    set maxHistory(maxHistory: number);
+    /**
+     *
+     * @returns {number}
+     */
+    get maxHistory(): number;
     /**
      *
      * @param start {number}
