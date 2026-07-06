@@ -357,6 +357,10 @@ impl Editable {
     }
 
     fn handle_key_down(&mut self, event: &KeyEventDetail) {
+        #[cfg(target_os = "macos")]
+        let shortcut_modifier = crate::event::KEY_MOD_META;
+        #[cfg(not(target_os = "macos"))]
+        let shortcut_modifier = crate::event::KEY_MOD_CTRL;
         if event.modifiers == 0 {
             if let Some(nk) = &event.named_key {
                 match nk {
@@ -404,7 +408,7 @@ impl Editable {
             if let Some(text) = &event.key_str {
                 self.handle_input(&text);
             }
-        } else if event.modifiers == KEY_MOD_CTRL {
+        } else if event.modifiers == shortcut_modifier {
             if let Some(text) = &event.key_str {
                 match text.as_str() {
                     #[cfg(feature = "clipboard")]
