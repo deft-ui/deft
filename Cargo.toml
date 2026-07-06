@@ -97,6 +97,9 @@ skia-window = { path = "skia-window", version = "0.10.0", features = ["webgl"] }
 [target.'cfg(not(target_os = "emscripten"))'.dependencies]
 tokio = { version = "1.38.0", features = ["rt-multi-thread", "fs", "macros", "io-std", "io-util", "sync"] }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = { version = "0.5", features = ["relax-sign-encoding"] }
+
 [build-dependencies]
 cfg_aliases = "0.2.1"
 
