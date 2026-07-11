@@ -149,6 +149,11 @@ pub fn window_event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream 
 }
 
 #[proc_macro_attribute]
+pub fn app_event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
+    create_event(_attr, struct_def, quote! { () })
+}
+
+#[proc_macro_attribute]
 pub fn worker_event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
     create_event(_attr, struct_def, quote! {deft::ext::ext_worker::WorkerWeak})
 }

@@ -22,6 +22,7 @@ use crate::element::textedit::TextEdit;
 use crate::element::textinput::TextInput;
 use crate::element::{init_base_components, Element, CSS_MANAGER};
 use crate::ext::ext_animation::animation_create;
+use crate::ext::ext_app::{AppReopenEvent, JsApp};
 #[cfg(fs_enabled)]
 use crate::ext::ext_appfs::appfs;
 use crate::ext::ext_base64::Base64;
@@ -197,6 +198,10 @@ impl JsEngine {
 
         Worker::init_js_api(WorkerInitParams { app });
         engine.add_global_functions(Worker::create_js_apis());
+
+
+        engine.add_global_functions(JsApp::create_js_apis());
+
         JS_ENGINE.with(|e| *e.borrow_mut() = Some(Mrc::new(engine)));
     }
 
@@ -310,6 +315,10 @@ impl JsEngine {
                 }
             }
         }
+    }
+
+    pub fn handle_reopen(&mut self, has_visible: bool) {
+        JsApp::emit(AppReopenEvent { has_visible });
     }
 
     pub fn execute_pending_jobs(&self) {

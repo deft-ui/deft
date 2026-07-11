@@ -34,3 +34,4 @@ pub mod ext_window;
 pub mod ext_worker;
 pub mod promise;
 pub mod service;
+pub mod ext_app;

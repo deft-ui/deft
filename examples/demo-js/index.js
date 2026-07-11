@@ -26,7 +26,7 @@ function runWorker() {
 
 function createSystemTray() {
     if (!globalThis.SystemTray) {
-        return;
+        return null;
     }
     console.log("Setting up tray");
     const tray = new SystemTray();
@@ -56,6 +56,7 @@ function createSystemTray() {
             }
         }
     ]);
+    return tray;
 }
 
 function createEntry() {
@@ -229,7 +230,7 @@ function main() {
     navigator.stylesheet.append(stylesheet);
     // saveStartTime();
     runWorker();
-    createSystemTray();
+    const tray = createSystemTray();
     console.log("begin create window");
     const window = new Window({
         width: 800,
@@ -241,6 +242,18 @@ function main() {
     window.bindResize((e) => {
         console.log("window resized", e);
     })
+
+    if (tray) {
+        window.bindClose(e => {
+            window.visible = false;
+            e.preventDefault();
+        });
+        navigator.app.bindReopen((e) => {
+            console.log("onReopen", e);
+            window.visible = true;
+        })
+    }
+
     console.log("window created", window);
 
     typeface_create("auto-mono", {

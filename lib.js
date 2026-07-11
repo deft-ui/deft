@@ -18,6 +18,22 @@ const VT_SELECT = "select"
 const VT_DIALOG = "dialog";
 const VT_DIALOG_TITLE = "dialog-title";
 
+class DeftApp {
+
+    /**
+     * @var {EventBinder}
+     */
+    #eventBinder;
+
+    constructor() {
+        this.#eventBinder = new EventBinder(null, JsApp_bind_js_event_listener, JsApp_unbind_js_event_listener, this);
+    }
+
+    bindReopen(callback) {
+        this.#eventBinder.bindEvent("reopen", callback);
+    }
+
+}
 
 class Clipboard {
     /**
@@ -79,9 +95,14 @@ export class Navigator {
      * @var {Stylesheet}
      */
     stylesheet;
+    /**
+     * @var {DeftApp}
+     */
+    app;
     constructor() {
         this.clipboard = new Clipboard();
         this.stylesheet = new Stylesheet();
+        this.app = new DeftApp();
     }
 }
 
@@ -812,7 +833,7 @@ export class EventBinder {
         if (!this.#allEventListeners[type]) {
             this.#allEventListeners[type] = new Map();
         }
-        const id = this.#addEventListenerApi(this.#target, type, eventCallback);
+        const id = this.#target ? this.#addEventListenerApi(this.#target, type, eventCallback) : this.#addEventListenerApi(type, eventCallback);
         this.#allEventListeners[type].set(callback, id);
         return id;
     }
@@ -825,7 +846,7 @@ export class EventBinder {
         const id = map.get(callback);
         if (id) {
             map.delete(callback);
-            this.#removeEventListenerApi(this.#target, id);
+            this.#target ? this.#removeEventListenerApi(this.#target, id) : this.#removeEventListenerApi(id);
         }
     }
 

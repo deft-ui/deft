@@ -224,6 +224,13 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
             self.execute_pending_jobs();
         });
     }
+
+    fn reopen(&mut self, event_loop: &ActiveEventLoop, has_visible: bool) {
+        run_event_loop_task(event_loop, move || {
+            self.js_engine.handle_reopen(has_visible);
+        })
+    }
+
 }
 
 pub fn exit_app(_code: i32) -> Result<(), Error> {
