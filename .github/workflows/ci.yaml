@@ -134,6 +134,8 @@ jobs:
           actions-cache-folder: emsdk-cache
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.89
       - name: Install
         run: |
           rustup target add wasm32-unknown-emscripten
