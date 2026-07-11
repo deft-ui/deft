@@ -457,6 +457,11 @@ impl Window {
     }
 
     #[js_func]
+    pub fn focus(&mut self) {
+        self.window.focus_window();
+    }
+
+    #[js_func]
     pub fn close(&mut self) -> Result<(), JsError> {
         let window_id = self.get_window_id();
         if self.allow_close() {
@@ -883,7 +888,7 @@ impl Window {
         if let Some(f) = &self.focusing {
             if f.get_window().is_none() {
                 let lr = self.get_focused_layer();
-                self.focus(lr.body.clone());
+                self.focus_element(lr.body.clone());
             }
         }
     }
@@ -1305,10 +1310,10 @@ impl Window {
         None
     }
 
-    pub fn focus(&mut self, mut node: Element) {
+    pub fn focus_element(&mut self, mut node: Element) {
         if !node.is_focusable() {
             if let Some(p) = node.get_parent() {
-                self.focus(p);
+                self.focus_element(p);
             }
             return;
         }
@@ -1540,7 +1545,7 @@ impl Window {
         self.pages.retain(|p| p != &page);
         self.layer_roots.retain(|e| &e.body != page.get_body());
         let new_layer = self.get_focused_layer();
-        self.focus(new_layer.focusing.clone());
+        self.focus_element(new_layer.focusing.clone());
         self.notify_update();
         //TODO emit close event?
     }
@@ -1558,7 +1563,7 @@ impl Window {
         body.set_attribute("theme".to_string(), theme);
         // if self.focusing.is_none() {
         // TODO move focusing to page?
-        self.focus(body.clone());
+        self.focus_element(body.clone());
         // }
         self.invalid_layout(body);
     }

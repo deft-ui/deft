@@ -436,7 +436,7 @@ impl Element {
     #[js_func]
     pub fn focus(&mut self) {
         self.with_window(|mut w| {
-            w.focus(self.clone());
+            w.focus_element(self.clone());
         });
     }
 
@@ -1115,7 +1115,7 @@ impl Element {
             if self.as_weak() == ctx.target {
                 if let Some(win) = self.get_window() {
                     if let Ok(mut win) = win.upgrade_mut() {
-                        win.focus(self.clone());
+                        win.focus_element(self.clone());
                     }
                 }
             }

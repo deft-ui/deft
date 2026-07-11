@@ -24,7 +24,7 @@ function runWorker() {
     });
 }
 
-function createSystemTray() {
+function createSystemTray(window) {
     if (!globalThis.SystemTray) {
         return null;
     }
@@ -34,8 +34,10 @@ function createSystemTray() {
     tray.title="DeftTest";
     tray.bindActivate(() => {
         console.log("tray clicked");
+        window.visible = true;
+        window.focus();
     });
-    tray.setShowMenuOnLeftClick(true);
+    tray.setShowMenuOnLeftClick(false);
     tray.setMenus([
         {
             id: "Test",
@@ -230,7 +232,6 @@ function main() {
     navigator.stylesheet.append(stylesheet);
     // saveStartTime();
     runWorker();
-    const tray = createSystemTray();
     console.log("begin create window");
     const window = new Window({
         width: 800,
@@ -242,6 +243,7 @@ function main() {
     window.bindResize((e) => {
         console.log("window resized", e);
     })
+    const tray = createSystemTray(window);
 
     if (tray) {
         window.bindClose(e => {

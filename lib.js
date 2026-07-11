@@ -528,6 +528,10 @@ export class Window {
         Window_drag(this.#windowHandle);
     }
 
+    focus() {
+        Window_focus(this.#windowHandle);
+    }
+
     /**
      *
      * @returns {boolean}
