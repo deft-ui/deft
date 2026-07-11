@@ -84,6 +84,10 @@ declare interface BoundsChangeDetail {
     originBounds: ElementRect,
 }
 
+declare interface AppReopenDetail {
+    hasVisible: boolean,
+}
+
 declare interface TouchInfo {
     identifier: number;
     offsetX: number;

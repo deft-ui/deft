@@ -29,6 +29,10 @@ class DeftApp {
         this.#eventBinder = new EventBinder(null, JsApp_bind_js_event_listener, JsApp_unbind_js_event_listener, this);
     }
 
+    /**
+     *
+     * @param callback {(event: IAppReopenEvent) => void}
+     */
     bindReopen(callback) {
         this.#eventBinder.bindEvent("reopen", callback);
     }
@@ -2552,4 +2556,5 @@ globalThis.KEY_MOD_SHIFT = 0x1 << 3;
  * @typedef {IEvent<ScrollDetail>} IScrollEvent
  * @typedef {IEvent<string>} IDroppedFileEvent
  * @typedef {IEvent<string>} IHoveredFileEvent
+ * @typedef {IEvent<AppReopenDetail>} IAppReopenEvent
  */

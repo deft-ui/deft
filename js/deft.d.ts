@@ -84,6 +84,10 @@ declare interface BoundsChangeDetail {
     originBounds: ElementRect,
 }
 
+declare interface AppReopenDetail {
+    hasVisible: boolean,
+}
+
 declare interface TouchInfo {
     identifier: number;
     offsetX: number;
@@ -311,6 +315,10 @@ declare class Navigator {
      * @var {Stylesheet}
      */
     stylesheet: Stylesheet;
+    /**
+     * @var {DeftApp}
+     */
+    app: DeftApp;
 }
 declare class Process {
     /**
@@ -490,6 +498,7 @@ declare class Window {
      */
     resize(size: Size): void;
     drag(): void;
+    focus(): void;
     /**
      *
      * @param minimized {boolean}
@@ -1328,6 +1337,7 @@ declare type ITouchEvent = IEvent<TouchDetail>;
 declare type IScrollEvent = IEvent<ScrollDetail>;
 declare type IDroppedFileEvent = IEvent<string>;
 declare type IHoveredFileEvent = IEvent<string>;
+declare type IAppReopenEvent = IEvent<AppReopenDetail>;
 declare class Clipboard {
     /**
      *
@@ -1353,6 +1363,14 @@ declare class Stylesheet {
      * @param stylesheet {StylesheetItem}
      */
     remove(stylesheet: StylesheetItem): void;
+}
+declare class DeftApp {
+    /**
+     *
+     * @param callback {(event: IAppReopenEvent) => void}
+     */
+    bindReopen(callback: (event: IAppReopenEvent) => void): void;
+    
 }
 declare class ContainerBasedElement extends Element {
     /**
