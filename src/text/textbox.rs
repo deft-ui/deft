@@ -27,7 +27,7 @@ use crate::text::{TextAlign, TextStyle};
 use crate::{base, js_deserialize, js_serialize, some_or_continue};
 use serde::{Deserialize, Serialize};
 use skia_safe::font_style::{Weight, Width};
-use skia_safe::{Color, Paint};
+use skia_safe::{Color, Paint, PaintStyle};
 
 #[cfg(target_os = "windows")]
 pub const DEFAULT_FALLBACK_FONTS: &str = "sans-serif,Microsoft YaHei,Segoe UI Emoji";
@@ -726,6 +726,7 @@ impl TextBox {
                     if let Some(bg) = parse_optional_color_str(unit.background_color.as_ref()) {
                         let mut bg_paint = Paint::default();
                         bg_paint.set_color(bg);
+                        bg_paint.set_style(PaintStyle::Fill);
                         text_style.set_background_paint(&bg_paint);
                     }
 

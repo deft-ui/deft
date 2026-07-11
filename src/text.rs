@@ -27,7 +27,7 @@ pub struct TextStyle {
     font_size: f32,
     font_families: Option<FontFamilies>,
     foreground_paint: Paint,
-    background_paint: Paint,
+    background_paint: Option<Paint>,
     font_style: FontStyle,
     decoration_type: TextDecoration,
 }
@@ -61,10 +61,10 @@ impl TextStyle {
     }
 
     pub fn set_background_paint(&mut self, paint: &Paint) {
-        self.background_paint = paint.clone();
+        self.background_paint = Some(paint.clone());
     }
 
-    pub fn background(&self) -> Paint {
+    pub fn background(&self) -> Option<Paint> {
         self.background_paint.clone()
     }
 

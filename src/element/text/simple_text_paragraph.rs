@@ -28,6 +28,7 @@ struct LineUnit {
     char_offset: usize,
 }
 
+#[derive(Clone)]
 struct BoundsWithOffset {
     pub x: f32,
     pub bounds: Rect,
@@ -92,14 +93,14 @@ impl LineUnit {
         let mut layout_bounds = self
             .get_inner_layout_bounds(false)
             .iter()
-            .map(|b| Point::new(b.x, 0.0))
+            .cloned()
             .collect::<Vec<_>>();
         let mut offset = 0;
         let (mut range_start, mut range_end) = range.unwrap_or((0, glyphs.len()));
         for i in 0..glyphs.len() {
             if glyphs[i] != 0 {
                 glyphs[offset] = glyphs[i];
-                layout_bounds[offset] = layout_bounds[i];
+                layout_bounds[offset] = layout_bounds[i].clone();
                 offset += 1;
             } else {
                 if i < range_start {
@@ -113,11 +114,22 @@ impl LineUnit {
 
         let scale = painter.context.scale_factor;
         let canvas = painter.canvas;
+
+        if let Some(bg) = &self.block.style.background() {
+            let first = &layout_bounds[range_start];
+            let last = &layout_bounds[range_end - 1];
+            let left = origin.x + first.x;
+            let right = origin.x + last.x + last.bounds.right;
+            let top = origin.y + first.bounds.top;
+            let bottom = origin.y + first.bounds.bottom;
+            canvas.draw_rect(Rect::new(left, top, right, bottom), bg);
+        }
+
         canvas.save();
         canvas.scale((1.0 / scale, 1.0 / scale));
         let color = paint.color();
         for idx in range_start..range_end {
-            let lb = layout_bounds[idx];
+            let lb = &layout_bounds[idx];
             let glyph = glyphs[idx];
             let rasterized_img =
                 RASTERIZE_CACHE.with(move |cache| cache.get_image(&font, glyph, font_size * scale));
