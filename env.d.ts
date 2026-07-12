@@ -214,21 +214,24 @@ declare interface TrayMenu {
     handler ?: () => void,
 }
 
-declare function process_exit(code: number);
-declare function path_filename(path: string): string;
-declare function path_join(path: string, other: string): string;
-declare function animation_create(name: string, keyFrames: Record<string, Record<string, any>>)
+declare module "deft:path" {
+    export function filename(path: string): string;
+    export function join(path: string, other: string): string;
+}
+
+// declare function animation_create(name: string, keyFrames: Record<string, Record<string, any>>)
 
 declare interface TypefaceParams {
     family: string,
     weight?: string,
 }
 
-declare function typeface_create(name: string, params: TypefaceParams): boolean;
+// declare function typeface_create(name: string, params: TypefaceParams): boolean;
 
-declare function env_exe_dir(): String;
-declare function env_exe_path(): String;
-
+declare module "deft:env" {
+    export function exeDir(): string;
+    export function exePath(): string;
+}
 
 declare interface UploadOptions {
     file: string,
@@ -244,11 +247,12 @@ declare interface FetchOptions {
     body ?: string,
     proxy ?: string,
 }
-declare function fetch_create(url: string, options ?: FetchOptions) : Promise<any>;
-declare function fetch_response_status(rsp): Promise<number>;
-declare function fetch_response_headers(rsp): Promise<{name: string, value: string}[]>;
-declare function fetch_response_save(rsp, path: string): Promise<number>;
-declare function fetch_response_body_string(rsp): Promise<string>;
+
+// declare function fetch_create(url: string, options ?: FetchOptions) : Promise<any>;
+// declare function fetch_response_status(rsp): Promise<number>;
+// declare function fetch_response_headers(rsp): Promise<{name: string, value: string}[]>;
+// declare function fetch_response_save(rsp, path: string): Promise<number>;
+// declare function fetch_response_body_string(rsp): Promise<string>;
 
 declare function AudioRef_create(path: string);
 declare function AudioRef_destroy(id): void;
@@ -264,38 +268,43 @@ declare interface ShowFileDialogOptions {
 }
 declare function dialog_show_file_dialog(options ?: ShowFileDialogOptions): Promise<string[]>;
 
-declare function fs_read_dir(path: string): Promise<string[]>;
-declare function fs_exists(path: string): Promise<boolean>;
-declare function fs_rename(path: string, dest:string): Promise<void>;
-declare function fs_delete_file(path: string): Promise<void>;
-declare function fs_create_dir(path: string): Promise<void>;
-declare function fs_create_dir_all(path: string): Promise<void>;
-declare function fs_remove_dir(path: string): Promise<void>;
-declare function fs_remove_dir_all(path: string): Promise<void>;
+declare module "deft:fs" {
+    export function readDir(path: string): Promise<string[]>;
+    export function exists(path: string): Promise<boolean>;
+    export function rename(path: string, dest:string): Promise<void>;
+    export function deleteFile(path: string): Promise<void>;
+    export function createDir(path: string): Promise<void>;
+    export function createDirAll(path: string): Promise<void>;
+    export function removeDir(path: string): Promise<void>;
+    export function removeDirAll(path: string): Promise<void>;
+}
+
+declare module "deft:appfs" {
+    export function dataPath(path ?: string): string;
+
+    export function exists(path: string): Promise<boolean>;
+
+    export function readdir(path: string): Promise<string[]>;
+
+    export function read(path: string): Promise<string>;
+
+    export function writeNew(path: string, content: string): Promise<void>;
+
+    export function write(path: string, content: string): Promise<void>;
+
+    export function deleteFile(path: string): Promise<void>;
+
+    export function createDir(path: string): Promise<void>;
+
+    export function createDirAll(path: string): Promise<void>;
+
+    export function removeDir(path: string): Promise<void>;
+
+    export function removeDirAll(path: string): Promise<void>;
+}
 
 
-declare function appfs_data_path(path ?: string): string;
-declare function appfs_exists(path: string): Promise<boolean>;
-
-declare function appfs_readdir(path: string): Promise<string[]>;
-
-declare function appfs_read(path: string): Promise<string>;
-
-declare function appfs_write_new(path: string, content: string): Promise<void>;
-
-declare function appfs_write(path: string, content: string): Promise<void>;
-
-declare function appfs_delete_file(path: string): Promise<void>;
-
-declare function appfs_create_dir(path: string): Promise<void>;
-
-declare function appfs_create_dir_all(path: string): Promise<void>;
-
-declare function appfs_remove_dir(path: string): Promise<void>;
-
-declare function appfs_remove_dir_all(path: string): Promise<void>;
-
-declare function shell_spawn(executable: string, args ?: string[]): void;
+// declare function shell_spawn(executable: string, args ?: string[]): void;
 
 declare function setTimeout(callback: () => void, timeout: number): number;
 

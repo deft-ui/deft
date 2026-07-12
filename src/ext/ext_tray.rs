@@ -1,7 +1,7 @@
 use crate as deft;
 use crate::base::{Event, EventHandler, EventRegistration};
 use crate::event_loop::{create_event_loop_fn_mut, create_event_loop_proxy, AppEventProxy};
-use crate::{js_deserialize, js_value};
+use crate::{js_deserialize, js_module, js_value};
 use anyhow::Error;
 use deft_macros::{js_methods, mrc_object};
 use deft_tray::{Tray, TrayMenu};
@@ -16,7 +16,7 @@ thread_local! {
 #[mrc_object]
 pub struct SystemTray {
     event_loop_proxy: AppEventProxy,
-    event_registration: EventRegistration<SystemTray>,
+    event_registration: EventRegistration,
     id: u32,
     tray_impl: Tray,
 }
@@ -24,6 +24,8 @@ pub struct SystemTray {
 js_value!(SystemTray);
 
 js_deserialize!(TrayMenu);
+
+js_module!(SystemTray, include_str!("./system-tray.js"));
 
 #[js_methods]
 impl SystemTray {
@@ -49,13 +51,13 @@ impl SystemTray {
 
         let mut me = inst.clone();
         let mut menu_active_callback = create_event_loop_fn_mut(move |menu_id: String| {
-            let mut event = Event::new("menuclick", menu_id, me.clone());
+            let mut event = Event::new("menuclick", menu_id);
             me.event_registration.emit_event(&mut event);
         });
 
         let mut sr = inst.clone();
         let mut activate_callback = create_event_loop_fn_mut(move |()| {
-            let mut event = Event::new("activate", (), sr.clone());
+            let mut event = Event::new("activate", ());
             sr.event_registration.emit_event(&mut event);
         });
         inst.tray_impl.set_active_callback(Box::new(move || {
@@ -70,7 +72,7 @@ impl SystemTray {
     pub fn add_event_listener(
         &mut self,
         event_type: String,
-        handler: Box<EventHandler<SystemTray>>,
+        handler: Box<EventHandler>,
     ) -> u32 {
         self.inner
             .event_registration

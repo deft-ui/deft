@@ -1,20 +1,17 @@
 use crate as deft;
 use crate::animation::actor::AnimationActor;
-use crate::base::EventContext;
+use crate::js_module;
 use crate::element::container::Container;
 use crate::element::scroll::ScrollBarStrategy::{Always, Auto, Never};
-use crate::element::{Element, ElementBackend, ElementWeak};
-use crate::event::{CaretChangeEvent, Event};
+use crate::element::{Element, Widget, ElementWeak};
+use crate::event::CaretChangeEvent;
 use crate::js::FromJsValue;
-use crate::render::RenderFn;
-use crate::style::ResolvedStyleProp;
-use crate::{backend_as_api, ok_or_return};
+use crate::ok_or_return;
 use bezier_rs::{Bezier, TValue};
-use deft_macros::{element_backend, js_methods};
+use deft_macros::{widget, js_methods};
 use log::debug;
 use quick_js::{JsValue, ValueError};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::time::Instant;
 use yoga::{MeasureMode, NodeRef, Size};
 
@@ -59,7 +56,7 @@ impl FromJsValue for ScrollBarStrategy {
     }
 }
 
-backend_as_api!(ScrollBackend, Scroll, as_scroll, as_scroll_mut);
+// backend_as_api!(ScrollBackend, Scroll, as_scroll, as_scroll_mut);
 
 extern "C" fn measure_scroll(
     _node_ref: NodeRef,
@@ -89,7 +86,7 @@ extern "C" fn measure_scroll(
     }
 }
 
-#[element_backend]
+#[widget]
 pub struct Scroll {
     element: ElementWeak,
     base: Container,
@@ -105,7 +102,7 @@ impl Scroll {
 
     //TODO rename
     // pub fn scroll_to_top(&mut self, top: f32) -> Result<(), JsError> {
-    //     self.element.upgrade_mut()?.set_scroll_top(top);
+    //     self.element.upgrade()?.set_scroll_top(top);
     //     Ok(())
     // }
 
@@ -117,7 +114,7 @@ impl Scroll {
     fn handle_caret_change(&mut self, _detail: &CaretChangeEvent) {
         // debug!("caretchange:{:?}", detail.origin_bounds);
         /*
-        let mut body = ok_or_return!(self.element.upgrade_mut());
+        let mut body = ok_or_return!(self.element.upgrade());
         let scroll_origin_bounds = body.get_origin_content_bounds();
 
         let caret_bottom = detail.origin_bounds.bottom();
@@ -160,24 +157,25 @@ impl Scroll {
     }
 }
 
-impl ElementBackend for Scroll {
-    fn create(ele: &mut Element) -> Self {
-        // ele.create_shadow();
-        ele.need_snapshot = true;
-        let base = Container::create(ele);
-
-        let inst = ScrollData {
-            // scroll_bar_size: if is_mobile_platform { 4.0 } else { 14.0 },
-            element: ele.as_weak(),
-            base,
-            auto_height: false,
-        }
-        .to_ref();
-        // ele.style.yoga_node.measure_func = (Some(measure_scroll));
-        // let weak_ptr = inst.as_weak();
-        // ele.style.yoga_node.context = (Some(Context::new(weak_ptr)));
-        inst
-    }
+impl Widget for Scroll {
+    // fn create(ele: &mut Element) -> Self {
+    //     // ele.create_shadow();
+    //     ele.need_snapshot = true;
+    //     let base = Container::create(ele);
+    //
+    //     let inst = ScrollData {
+    //         el: ele.clone(),
+    //         // scroll_bar_size: if is_mobile_platform { 4.0 } else { 14.0 },
+    //         element: ele.as_weak(),
+    //         base,
+    //         auto_height: false,
+    //     }
+    //     .to_ref();
+    //     // ele.style.yoga_node.measure_func = (Some(measure_scroll));
+    //     // let weak_ptr = inst.as_weak();
+    //     // ele.style.yoga_node.context = (Some(Context::new(weak_ptr)));
+    //     inst
+    // }
 
     /*
     fn execute_default_behavior(
@@ -187,7 +185,7 @@ impl ElementBackend for Scroll {
     ) -> bool {
         let is_target_self = ctx.target == self.element;
         let element = self.element.clone();
-        let element = ok_or_return!(element.upgrade_mut(), false);
+        let element = ok_or_return!(element.upgrade(), false);
         if let Some(e) = event.downcast_mut::<MouseDownEvent>() {
             let d = e.0;
             if !is_target_self {
@@ -313,18 +311,13 @@ impl ElementBackend for Scroll {
     }
     */
 
-    fn render(&mut self) -> RenderFn {
-        // let scrollbar_renderer = self.scrollable.render();
-        RenderFn::new(move |_painter| {
-            // scrollbar_renderer.run(painter);
-        })
-    }
+    // fn render(&mut self) -> RenderFn {
+    //     RenderFn::new(move |_painter| {
+    //      })
+    // }
 
-    fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend> {
-        Some(&mut self.base)
-    }
 
-    fn accept_pseudo_element_styles(&mut self, _styles: HashMap<String, Vec<ResolvedStyleProp>>) {
+    // fn accept_pseudo_element_styles(&mut self, _styles: HashMap<String, Vec<ResolvedStyleProp>>) {
         /*
         if let Some(scrollbar_styles) = styles.get("scrollbar") {
             for style in scrollbar_styles {
@@ -349,12 +342,12 @@ impl ElementBackend for Scroll {
             }
         }
          */
-    }
+    // }
 
-    fn on_event(&mut self, event: &mut Event, ctx: &mut EventContext<ElementWeak>) {
-        let element = ok_or_return!(self.element.upgrade());
-        element.clone().scrollable.on_event(&event, ctx, &element);
-    }
+    // fn on_event(&mut self, event: &mut Event, ctx: &mut EventContext<ElementWeak>) {
+    //     let element = ok_or_return!(self.element.upgrade());
+    //     element.clone().scrollable.on_event(&event, ctx, &element);
+    // }
 }
 
 pub fn calculate_speed(distance: f32, duration: f32) -> f32 {
@@ -407,7 +400,7 @@ impl AnimationActor for ScrollAnimationActor {
     fn apply_animation(&mut self, position: f32, stop: &mut bool) {
         let mut left_stopped = self.left_dist == 0.0;
         let mut top_stooped = self.top_dist == 0.0;
-        let ele = ok_or_return!(self.element.upgrade_mut());
+        let ele = ok_or_return!(self.element.upgrade());
 
         if !left_stopped {
             let new_left = self.old_left
@@ -435,3 +428,5 @@ impl AnimationActor for ScrollAnimationActor {
         }
     }
 }
+
+js_module!(Scroll);

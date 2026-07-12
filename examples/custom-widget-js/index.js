@@ -1,3 +1,6 @@
+import {Window} from "deft:ui";
+import {HelloWidget} from "custom_widget";
+
 const stylesheet = `
 body {
     justify-content: center;
@@ -10,12 +13,6 @@ hello {
 }
 `
 
-class HelloElement extends Element {
-    constructor() {
-        super("hello");
-    }
-}
-
 function main() {
     navigator.stylesheet.append(stylesheet);
     // saveStartTime();
@@ -23,10 +20,10 @@ function main() {
         width: 400,
         height: 360,
     });
-    window.title = "Deft Custom Element";
+    window.title = "Deft Custom Widget";
 
-    const helloElement = new HelloElement();
-    window.body.addChild(helloElement);
+    const helloWidget = new HelloWidget();
+    window.body.addChild(helloWidget);
 }
 
 try {

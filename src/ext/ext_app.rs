@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use crate as deft;
-use deft_macros::{app_event, js_methods};
+use crate::js_module;
+use deft_macros::{event, js_methods};
 use quick_js::JsValue;
 use crate::js::JsError;
 use crate::{bind_js_event_listener};
@@ -11,7 +12,7 @@ thread_local! {
 }
 
 pub struct JsApp {
-    event_registration: EventRegistration<()>,
+    event_registration: EventRegistration,
 }
 
 impl JsApp {
@@ -23,7 +24,7 @@ impl JsApp {
 
 }
 
-#[app_event]
+#[event]
 pub struct AppReopenEvent {
     pub has_visible: bool,
 }
@@ -56,12 +57,12 @@ impl JsApp {
 
     pub fn emit<T: 'static>(e: T) {
         INSTANCE.with_borrow_mut(|app| {
-            let mut ctx = EventContext::new(());
+            let mut ctx = EventContext::new();
             app.event_registration.emit(e, &mut ctx);
         })
     }
 
-    pub fn register_event_listener<T: 'static, H: EventListener<T, ()> + 'static>(
+    pub fn register_event_listener<T: 'static, H: EventListener<T> + 'static>(
         &mut self,
         listener: H,
     ) -> u32 {
@@ -81,3 +82,5 @@ impl JsApp {
     }
 
 }
+
+js_module!(JsApp, include_str!("./jsapp.js"));

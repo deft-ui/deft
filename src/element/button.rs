@@ -1,54 +1,28 @@
 use crate as deft;
-use crate::base::{EventContext, Rect};
-use crate::element::container::Container;
-use crate::element::{Element, ElementBackend, ElementWeak};
-use crate::event::Event;
-use crate::render::RenderFn;
-use crate::style::StylePropKey;
-use deft_macros::{element_backend, js_methods};
+use crate::element::{Element, Widget};
+use crate::js_module;
+use deft_macros::{widget, js_methods};
 
-#[element_backend]
+#[widget]
 pub struct Button {
-    element_weak: ElementWeak,
-    base: Container,
+
 }
+
+impl Widget for Button {}
 
 #[js_methods]
-impl Button {}
+impl Button {
 
-impl ElementBackend for Button {
-    fn create(element: &mut Element) -> Self {
+    #[js_func]
+    pub fn create() -> Button {
+        let mut element = Element::new("button");
         element.is_form_element = true;
         element.set_focusable(true);
-        let base = Container::create(element);
-        ButtonData {
-            base,
-            element_weak: element.as_weak(),
+        Button {
+            el: element,
         }
-        .to_ref()
     }
 
-    fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend> {
-        Some(&mut self.base)
-    }
-
-    fn handle_style_changed(&mut self, key: StylePropKey) {
-        self.base.handle_style_changed(key);
-    }
-
-    fn render(&mut self) -> RenderFn {
-        self.base.render()
-    }
-
-    fn execute_default_behavior(
-        &mut self,
-        event: &mut Event,
-        ctx: &mut EventContext<ElementWeak>,
-    ) -> bool {
-        self.base.execute_default_behavior(event, ctx)
-    }
-
-    fn handle_origin_bounds_change(&mut self, bounds: &Rect) {
-        self.base.handle_origin_bounds_change(bounds)
-    }
 }
+
+js_module!(Button);

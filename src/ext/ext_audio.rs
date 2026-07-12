@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use crate::base::{Event, EventRegistration};
 use crate::ext::audio_player::{AudioNotify, AudioServer, AudioSources};
 use crate::js::js_event_loop::{js_create_event_loop_proxy, JsEventLoopProxy};
-use crate::{js_deserialize, js_value};
+use crate::{js_deserialize, js_module, js_value};
 use anyhow::Error;
 use deft_macros::{js_methods, mrc_object};
 use quick_js::JsValue;
@@ -27,9 +27,11 @@ thread_local! {
 #[mrc_object]
 pub struct Audio {
     id: u32,
-    event_registration: EventRegistration<Audio>,
+    event_registration: EventRegistration,
     sources: Arc<Mutex<AudioSources>>,
 }
+
+js_module!(Audio, include_str!("./audio.js"));
 
 impl AudioData {
     pub fn new(id: u32, sources: Arc<Mutex<AudioSources>>) -> Self {
@@ -54,35 +56,34 @@ fn handle_play_notify(elp: JsEventLoopProxy, id: u32, msg: AudioNotify) {
     let _ = elp.schedule_macro_task(move || {
         let mut audio = PLAYING_MAP.with_borrow_mut(|m| m.get(&id).cloned());
         if let Some(a) = &mut audio {
-            let target = a.clone();
             match msg {
                 AudioNotify::Load(meta) => {
-                    let mut event = Event::new("load", meta, target);
+                    let mut event = Event::new("load", meta);
                     a.event_registration.emit_event(&mut event);
                 }
                 AudioNotify::TimeUpdate(time) => {
-                    let mut event = Event::new("timeupdate", time, target);
+                    let mut event = Event::new("timeupdate", time);
                     a.event_registration.emit_event(&mut event);
                 }
                 AudioNotify::End => {
-                    let mut event = Event::new("end", (), target);
+                    let mut event = Event::new("end", ());
                     a.event_registration.emit_event(&mut event);
                 }
                 AudioNotify::Finish => {
-                    let mut event = Event::new("finish", (), target);
+                    let mut event = Event::new("finish", ());
                     a.event_registration.emit_event(&mut event);
                     unregistry_playing(a);
                 }
                 AudioNotify::Pause => {
-                    let mut event = Event::new("pause", (), target);
+                    let mut event = Event::new("pause", ());
                     a.event_registration.emit_event(&mut event);
                 }
                 AudioNotify::Stop => {
-                    let mut event = Event::new("stop", (), target);
+                    let mut event = Event::new("stop", ());
                     a.event_registration.emit_event(&mut event);
                 }
                 AudioNotify::CurrentChange(info) => {
-                    let mut event = Event::new("currentchange", info, target);
+                    let mut event = Event::new("currentchange", info);
                     a.event_registration.emit_event(&mut event);
                 }
             }

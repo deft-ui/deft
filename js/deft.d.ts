@@ -214,21 +214,24 @@ declare interface TrayMenu {
     handler ?: () => void,
 }
 
-declare function process_exit(code: number);
-declare function path_filename(path: string): string;
-declare function path_join(path: string, other: string): string;
-declare function animation_create(name: string, keyFrames: Record<string, Record<string, any>>)
+declare module "deft:path" {
+    export function filename(path: string): string;
+    export function join(path: string, other: string): string;
+}
+
+// declare function animation_create(name: string, keyFrames: Record<string, Record<string, any>>)
 
 declare interface TypefaceParams {
     family: string,
     weight?: string,
 }
 
-declare function typeface_create(name: string, params: TypefaceParams): boolean;
+// declare function typeface_create(name: string, params: TypefaceParams): boolean;
 
-declare function env_exe_dir(): String;
-declare function env_exe_path(): String;
-
+declare module "deft:env" {
+    export function exeDir(): string;
+    export function exePath(): string;
+}
 
 declare interface UploadOptions {
     file: string,
@@ -244,11 +247,12 @@ declare interface FetchOptions {
     body ?: string,
     proxy ?: string,
 }
-declare function fetch_create(url: string, options ?: FetchOptions) : Promise<any>;
-declare function fetch_response_status(rsp): Promise<number>;
-declare function fetch_response_headers(rsp): Promise<{name: string, value: string}[]>;
-declare function fetch_response_save(rsp, path: string): Promise<number>;
-declare function fetch_response_body_string(rsp): Promise<string>;
+
+// declare function fetch_create(url: string, options ?: FetchOptions) : Promise<any>;
+// declare function fetch_response_status(rsp): Promise<number>;
+// declare function fetch_response_headers(rsp): Promise<{name: string, value: string}[]>;
+// declare function fetch_response_save(rsp, path: string): Promise<number>;
+// declare function fetch_response_body_string(rsp): Promise<string>;
 
 declare function AudioRef_create(path: string);
 declare function AudioRef_destroy(id): void;
@@ -264,38 +268,43 @@ declare interface ShowFileDialogOptions {
 }
 declare function dialog_show_file_dialog(options ?: ShowFileDialogOptions): Promise<string[]>;
 
-declare function fs_read_dir(path: string): Promise<string[]>;
-declare function fs_exists(path: string): Promise<boolean>;
-declare function fs_rename(path: string, dest:string): Promise<void>;
-declare function fs_delete_file(path: string): Promise<void>;
-declare function fs_create_dir(path: string): Promise<void>;
-declare function fs_create_dir_all(path: string): Promise<void>;
-declare function fs_remove_dir(path: string): Promise<void>;
-declare function fs_remove_dir_all(path: string): Promise<void>;
+declare module "deft:fs" {
+    export function readDir(path: string): Promise<string[]>;
+    export function exists(path: string): Promise<boolean>;
+    export function rename(path: string, dest:string): Promise<void>;
+    export function deleteFile(path: string): Promise<void>;
+    export function createDir(path: string): Promise<void>;
+    export function createDirAll(path: string): Promise<void>;
+    export function removeDir(path: string): Promise<void>;
+    export function removeDirAll(path: string): Promise<void>;
+}
+
+declare module "deft:appfs" {
+    export function dataPath(path ?: string): string;
+
+    export function exists(path: string): Promise<boolean>;
+
+    export function readdir(path: string): Promise<string[]>;
+
+    export function read(path: string): Promise<string>;
+
+    export function writeNew(path: string, content: string): Promise<void>;
+
+    export function write(path: string, content: string): Promise<void>;
+
+    export function deleteFile(path: string): Promise<void>;
+
+    export function createDir(path: string): Promise<void>;
+
+    export function createDirAll(path: string): Promise<void>;
+
+    export function removeDir(path: string): Promise<void>;
+
+    export function removeDirAll(path: string): Promise<void>;
+}
 
 
-declare function appfs_data_path(path ?: string): string;
-declare function appfs_exists(path: string): Promise<boolean>;
-
-declare function appfs_readdir(path: string): Promise<string[]>;
-
-declare function appfs_read(path: string): Promise<string>;
-
-declare function appfs_write_new(path: string, content: string): Promise<void>;
-
-declare function appfs_write(path: string, content: string): Promise<void>;
-
-declare function appfs_delete_file(path: string): Promise<void>;
-
-declare function appfs_create_dir(path: string): Promise<void>;
-
-declare function appfs_create_dir_all(path: string): Promise<void>;
-
-declare function appfs_remove_dir(path: string): Promise<void>;
-
-declare function appfs_remove_dir_all(path: string): Promise<void>;
-
-declare function shell_spawn(executable: string, args ?: string[]): void;
+// declare function shell_spawn(executable: string, args ?: string[]): void;
 
 declare function setTimeout(callback: () => void, timeout: number): number;
 
@@ -306,99 +315,71 @@ declare function setInterval(callback: () => void, interval: number): number;
 declare function clearInterval(timer: number): void;
 
 
-declare class Navigator {
+declare module 'deft:core' {
+/**
+ * @template D
+ */
+export class EventObject<D> {
+    constructor(type: any, detail: any);
+    _propagationCancelled: boolean;
+    _preventDefault: boolean;
+    type: any;
     /**
-     * @var {Clipboard}
+     * @type {D}
      */
-    clipboard: Clipboard;
-    /**
-     * @var {Stylesheet}
-     */
-    stylesheet: Stylesheet;
-    /**
-     * @var {DeftApp}
-     */
-    app: DeftApp;
+    detail: D;
+    stopPropagation(): void;
+    preventDefault(): void;
+    result(): {
+        propagationCancelled: boolean;
+        preventDefault: boolean;
+    };
 }
-declare class Process {
-    /**
-     *
-     * @param code {number}
-     */
-    exit(code: number): void;
-    /**
-     *
-     * @param value {boolean}
-     */
-    setExitOnAllWindowsClosed(value: boolean): void;
-    /**
-     *
-     * @returns {string[]}
-     */
-    get argv(): string[];
-    /**
-     *
-     * @returns {boolean}
-     */
-    get isMobilePlatform(): boolean;
-    /**
-     *
-     * @returns {string}
-     */
-    get platform(): string;
-    /**
-     *
-     * @param handler {Function}
-     */
-    setPromiseRejectionTracker(handler: Function): void;
-}
-declare class FileDialog {
-    /**
-     *
-     * @param options {ShowFileDialogOptions}
-     * @returns {Promise<string[]>}
-     */
-    show(options: ShowFileDialogOptions): Promise<string[]>;
-}
-declare class Page {
-    constructor(handle: any);
-    handle: any;
-    close(): void;
-}
-declare class Popup {
-    constructor(handle: any);
-    handle: any;
-    close(): void;
-}
-declare class StandardMenuItem {
-    constructor(label: any, callback: any);
-    /**
-     *
-     * @param value {boolean}
-     */
-    set disabled(value: boolean);
-    /**
-     *
-     * @returns {boolean}
-     */
-    get disabled(): boolean;
-    get handle(): any;
+export class EventBinder {
+    constructor(target: any, addApi: any, removeApi: any, self: any);
+    bindEvent(type: any, callback: any): void;
+    addEventListener(type: any, callback: any): any;
+    removeEventListener(type: any, callback: any): void;
     
 }
-declare class Menu {
-    /**
-     *
-     * @param item {StandardMenuItem}
-     */
-    addStandardItem(item: StandardMenuItem): void;
-    addSeparator(): void;
-    get handle(): any;
+export class EventRegistry {
+    constructor(id: any, addApi: any, removeApi: any, self: any);
+    eventListeners: any;
+    _id: any;
+    _remove_api: any;
+    _add_api: any;
+    bindEvent(type: any, callback: any): void;
     
 }
+}
+
+declare module 'deft:ui' {
+/**
+ * @template T
+ * @typedef {{
+ *     detail: T,
+ *     stopPropagation(): void,
+ *     preventDefault(): void,
+ * }} IEvent<T>
+ */
+/**
+ * @typedef {IEvent<BoundsChangeDetail>} IBoundsChangeEvent
+ * @typedef {IEvent<void>} IVoidEvent
+ * @typedef {IEvent<CaretDetail>} ICaretEvent
+ * @typedef {IEvent<MouseDetail>} IMouseEvent
+ * @typedef {IEvent<KeyDetail>} IKeyEvent
+ * @typedef {IEvent<MouseWheelDetail>} IMouseWheelEvent
+ * @typedef {IEvent<TextDetail>} ITextEvent
+ * @typedef {IEvent<TouchDetail>} ITouchEvent
+ * @typedef {IEvent<ScrollDetail>} IScrollEvent
+ * @typedef {IEvent<string>} IDroppedFileEvent
+ * @typedef {IEvent<string>} IHoveredFileEvent
+ * @typedef {IEvent<AppReopenDetail>} IAppReopenEvent
+ */
 /**
  * @typedef {IEvent<ResizeDetail>} IResizeEvent
  */
-declare class Window {
+export class Window {
     /**
      *
      * @param windowHandle
@@ -447,11 +428,11 @@ declare class Window {
     }): Popup;
     /**
      *
-     * @param menu {Menu}
+     * @param menu { import('deft:menu').Menu }
      * @param x {number}
      * @param y {number}
      */
-    popupMenu(menu: Menu, x: number, y: number): void;
+    popupMenu(menu: import("deft:menu").Menu, x: number, y: number): void;
     /**
      *
      * @param message {string | Element}
@@ -576,7 +557,6 @@ declare class Window {
     bindBlur(callback: (event: IVoidEvent) => void): void;
     bindEvent(type: any, callback: any): void;
     /**
-     * @typedef {("resize", event)} addEventListener
      * @param type
      * @param callback
      */
@@ -584,65 +564,17 @@ declare class Window {
     removeEventListener(type: any, callback: any): void;
     
 }
-/**
- * @template D
- * @template E
- */
-declare class EventObject<D, E> {
-    constructor(type: any, detail: any, target: any, currentTarget: any);
-    _propagationCancelled: boolean;
-    _preventDefault: boolean;
-    type: any;
-    /**
-     * @type {D}
-     */
-    detail: D;
-    /**
-     * @type {E}
-     */
-    target: E;
-    /**
-     * @type {E}
-     */
-    currentTarget: E;
-    stopPropagation(): void;
-    preventDefault(): void;
-    result(): {
-        propagationCancelled: boolean;
-        preventDefault: boolean;
-    };
+export class Popup {
+    constructor(handle: any);
+    handle: any;
+    close(): void;
 }
-declare class EventRegistry {
-    constructor(id: any, addApi: any, removeApi: any, self: any, contextGetter: any);
-    eventListeners: any;
-    _id: any;
-    _remove_api: any;
-    _add_api: any;
-    bindEvent(type: any, callback: any): void;
-    
+export class Page {
+    constructor(handle: any);
+    handle: any;
+    close(): void;
 }
-declare class EventBinder {
-    constructor(target: any, addApi: any, removeApi: any, self: any, contextGetter: any);
-    bindEvent(type: any, callback: any): void;
-    addEventListener(type: any, callback: any): any;
-    removeEventListener(type: any, callback: any): void;
-    
-}
-declare class SystemTray {
-    tray: any;
-    set title(title: any);
-    set icon(icon: any);
-    /**
-     *
-     * @param menus {TrayMenu[]}
-     */
-    setMenus(menus: TrayMenu[]): void;
-    setShowMenuOnLeftClick(value: any): void;
-    bindActivate(callback: any): void;
-    bindMenuClick(callback: any): void;
-    
-}
-declare class Element {
+export class Element {
     static fromHandle(elementHandle: any): any;
     /**
      *
@@ -892,23 +824,7 @@ declare class Element {
     toString(): string;
     
 }
-declare class Audio {
-    constructor(config: any);
-    context: any;
-    id: any;
-    play(): void;
-    pause(): void;
-    stop(): void;
-    bindLoad(callback: any): void;
-    bindTimeUpdate(callback: any): void;
-    bindEnd(callback: any): void;
-    bindPause(callback: any): void;
-    bindStop(callback: any): void;
-    bindCurrentChange(callback: any): void;
-    bindEvent(type: any, callback: any): void;
-    
-}
-declare class LabelElement extends Element {
+export class LabelElement extends Element {
     constructor();
     /**
      *
@@ -916,7 +832,7 @@ declare class LabelElement extends Element {
      */
     set text(text: string);
 }
-declare class CheckboxElement extends Element {
+export class CheckboxElement extends Element {
     constructor();
     /**
      *
@@ -954,7 +870,7 @@ declare class CheckboxElement extends Element {
      */
     bindChange(callback: (e: IVoidEvent) => void): void;
 }
-declare class RadioElement extends Element {
+export class RadioElement extends Element {
     constructor();
     /**
      *
@@ -992,7 +908,7 @@ declare class RadioElement extends Element {
      */
     bindChange(callback: (e: IVoidEvent) => void): void;
 }
-declare class SelectElement extends Element {
+export class SelectElement extends Element {
     constructor();
     /**
      *
@@ -1048,7 +964,7 @@ declare class SelectElement extends Element {
  *   backgroundColor ?: string
  * }} TextUnit
  */
-declare class RichTextElement extends Element {
+export class RichTextElement extends Element {
     constructor();
     /**
      *
@@ -1085,11 +1001,11 @@ declare class RichTextElement extends Element {
      */
     get selectionText(): string | undefined;
 }
-declare class ImageElement extends Element {
+export class ImageElement extends Element {
     constructor();
     set src(src: any);
 }
-declare class TextInputElement extends Element {
+export class TextInputElement extends Element {
     constructor();
     /**
      *
@@ -1138,7 +1054,7 @@ declare class TextInputElement extends Element {
      */
     bindCaretChange(callback: (e: ICaretEvent) => void): void;
 }
-declare class TextEditElement extends Element {
+export class TextEditElement extends Element {
     constructor();
     /**
      *
@@ -1198,181 +1114,7 @@ declare class TextEditElement extends Element {
      */
     bindCaretChange(callback: (e: ICaretEvent) => void): void;
 }
-declare class ButtonElement extends ContainerBasedElement {
-    constructor();
-    /**
-     *
-     * @param value {boolean}
-     */
-    set disabled(value: boolean);
-    /**
-     *
-     * @returns {boolean}
-     */
-    get disabled(): boolean;
-}
-declare class ContainerElement extends ContainerBasedElement {
-    constructor();
-}
-declare class DialogElement extends ContainerBasedElement {
-    constructor();
-}
-declare class DialogTitleElement extends ContainerBasedElement {
-    constructor();
-}
-declare class BodyElement extends ContainerBasedElement {
-    constructor();
-}
-declare class ScrollElement extends ContainerBasedElement {
-    constructor();
-    /**
-     *
-     * @param value {"auto"|"always"|"never"}
-     */
-    set scrollX(value: "auto" | "always" | "never");
-    /**
-     *
-     * @param value {"auto"|"always"|"never"}
-     */
-    set scrollY(value: "auto" | "always" | "never");
-    scrollBy(value: any): void;
-}
-declare class RadioGroupElement extends ContainerBasedElement {
-    constructor();
-}
-declare class WebSocket {
-    constructor(url: any);
-    client: any;
-    listeners: any;
-    onopen: any;
-    onclose: any;
-    onmessage: any;
-    onping: any;
-    onpong: any;
-    onerror: any;
-    addEventListener(name: any, callback: any): void;
-    send(data: any): Promise<void>;
-    close(): void;
-    
-}
-declare class Worker {
-    /**
-     *
-     * @param source {number | string}
-     */
-    constructor(source: number | string);
-    postMessage(data: any): void;
-    bindMessage(callback: any): void;
-    
-}
-declare class WorkerContext {
-    static create(): WorkerContext;
-    postMessage(data: any): void;
-    bindMessage(callback: any): void;
-    
-}
-declare class SqliteConn {
-    constructor(conn: any);
-    /**
-     *
-     * @param sql {string}
-     * @param params {*[]}
-     * @returns {Promise<number>}
-     */
-    execute(sql: string, params?: any[]): Promise<number>;
-    /**
-     *
-     * @param sql {string}
-     * @param params {*[]}
-     * @returns {Promise<Object[]>}
-     */
-    query(sql: string, params?: any[]): Promise<any[]>;
-    
-}
-declare class Sqlite {
-    /**
-     *
-     * @param path {string}
-     * @returns {Promise<SqliteConn>}
-     */
-    static open(path: string): Promise<SqliteConn>;
-}
-declare const workerContext: WorkerContext;
-declare class FetchResponse {
-    constructor(resp: any, status: any);
-    _resp: any;
-    status: any;
-    ok: boolean;
-    json(): Promise<any>;
-}
-declare type IResizeEvent = IEvent<ResizeDetail>;
-declare type TextUnit = {
-    type: "text";
-    text: string;
-    weight?: string;
-    textDecorationLine?: string;
-    fontFamilies?: string[];
-    fontSize?: number;
-    color?: string;
-    backgroundColor?: string;
-};
-/**
- * <T>
- */
-declare type IEvent<T> = {
-    detail: T;
-    target: Element;
-    currentTarget: Element;
-    stopPropagation(): void;
-    preventDefault(): void;
-};
-declare type IBoundsChangeEvent = IEvent<BoundsChangeDetail>;
-declare type IVoidEvent = IEvent<void>;
-declare type ICaretEvent = IEvent<CaretDetail>;
-declare type IMouseEvent = IEvent<MouseDetail>;
-declare type IKeyEvent = IEvent<KeyDetail>;
-declare type IMouseWheelEvent = IEvent<MouseWheelDetail>;
-declare type ITextEvent = IEvent<TextDetail>;
-declare type ITouchEvent = IEvent<TouchDetail>;
-declare type IScrollEvent = IEvent<ScrollDetail>;
-declare type IDroppedFileEvent = IEvent<string>;
-declare type IHoveredFileEvent = IEvent<string>;
-declare type IAppReopenEvent = IEvent<AppReopenDetail>;
-declare class Clipboard {
-    /**
-     *
-     * @returns {Promise<string>}
-     */
-    readText(): Promise<string>;
-    /**
-     *
-     * @param text {string}
-     * @returns {Promise<void>}
-     */
-    writeText(text: string): Promise<void>;
-}
-declare class Stylesheet {
-    /**
-     *
-     * @param code {string}
-     * @returns {StylesheetItem}
-     */
-    append(code: string): StylesheetItem;
-    /**
-     *
-     * @param stylesheet {StylesheetItem}
-     */
-    remove(stylesheet: StylesheetItem): void;
-}
-declare class DeftApp {
-    /**
-     *
-     * @param callback {(event: IAppReopenEvent) => void}
-     */
-    bindReopen(callback: (event: IAppReopenEvent) => void): void;
-    
-}
-declare class ContainerBasedElement extends Element {
+export class ContainerBasedElement extends Element {
     /**
      *
      * @param child {Element}
@@ -1403,9 +1145,235 @@ declare class ContainerBasedElement extends Element {
     get children(): Element[];
     
 }
-declare class StylesheetItem {
-    constructor(id: any);
+export class ButtonElement extends ContainerBasedElement {
+    constructor();
+    /**
+     *
+     * @param value {boolean}
+     */
+    set disabled(value: boolean);
+    /**
+     *
+     * @returns {boolean}
+     */
+    get disabled(): boolean;
+}
+export class ContainerElement extends ContainerBasedElement {
+    constructor();
+}
+export class DialogElement extends ContainerBasedElement {
+    constructor();
+}
+export class DialogTitleElement extends ContainerBasedElement {
+    constructor();
+}
+export class BodyElement extends ContainerBasedElement {
+    constructor(creator: any);
+}
+export class RadioGroupElement extends ContainerBasedElement {
+    constructor();
+}
+/**
+ * <T>
+ */
+export type IEvent<T> = {
+    detail: T;
+    stopPropagation(): void;
+    preventDefault(): void;
+};
+export type IBoundsChangeEvent = IEvent<BoundsChangeDetail>;
+export type IVoidEvent = IEvent<void>;
+export type ICaretEvent = IEvent<CaretDetail>;
+export type IMouseEvent = IEvent<MouseDetail>;
+export type IKeyEvent = IEvent<KeyDetail>;
+export type IMouseWheelEvent = IEvent<MouseWheelDetail>;
+export type ITextEvent = IEvent<TextDetail>;
+export type ITouchEvent = IEvent<TouchDetail>;
+export type IScrollEvent = IEvent<ScrollDetail>;
+export type IDroppedFileEvent = IEvent<string>;
+export type IHoveredFileEvent = IEvent<string>;
+export type IAppReopenEvent = IEvent<AppReopenDetail>;
+export type IResizeEvent = IEvent<ResizeDetail>;
+export type TextUnit = {
+    type: "text";
+    text: string;
+    weight?: string;
+    textDecorationLine?: string;
+    fontFamilies?: string[];
+    fontSize?: number;
+    color?: string;
+    backgroundColor?: string;
+};
+import { EventBinder } from "deft:core";
+}
+
+declare module 'deft:menu' {
+export class StandardMenuItem {
+    constructor(label: any, callback: any);
+    /**
+     *
+     * @param value {boolean}
+     */
+    set disabled(value: boolean);
+    /**
+     *
+     * @returns {boolean}
+     */
+    get disabled(): boolean;
+    get handle(): any;
+    
+}
+export class Menu {
+    /**
+     *
+     * @param item {StandardMenuItem}
+     */
+    addStandardItem(item: StandardMenuItem): void;
+    addSeparator(): void;
+    get handle(): any;
+    
+}
+}
+
+declare module 'deft:systemtray' {
+export class SystemTray {
+    tray: any;
+    set title(title: any);
+    set icon(icon: any);
+    /**
+     *
+     * @param menus {TrayMenu[]}
+     */
+    setMenus(menus: TrayMenu[]): void;
+    setShowMenuOnLeftClick(value: any): void;
+    bindActivate(callback: any): void;
+    bindMenuClick(callback: any): void;
+    
+}
+}
+
+declare module 'deft:process' {
+export class Process {
+    /**
+     *
+     * @param code {number}
+     */
+    exit(code: number): void;
+    /**
+     *
+     * @param value {boolean}
+     */
+    setExitOnAllWindowsClosed(value: boolean): void;
+    /**
+     *
+     * @returns {string[]}
+     */
+    get argv(): string[];
+    /**
+     *
+     * @returns {boolean}
+     */
+    get isMobilePlatform(): boolean;
+    /**
+     *
+     * @returns {string}
+     */
+    get platform(): string;
+    /**
+     *
+     * @param handler {Function}
+     */
+    setPromiseRejectionTracker(handler: Function): void;
+}
+}
+
+declare module 'deft:audio' {
+export class Audio {
+    constructor(config: any);
+    context: any;
     id: any;
-    update(code: any): void;
+    play(): void;
+    pause(): void;
+    stop(): void;
+    bindLoad(callback: any): void;
+    bindTimeUpdate(callback: any): void;
+    bindEnd(callback: any): void;
+    bindPause(callback: any): void;
+    bindStop(callback: any): void;
+    bindCurrentChange(callback: any): void;
+    bindEvent(type: any, callback: any): void;
+    
+}
+}
+
+declare module 'deft:clipboard' {
+export class Clipboard {
+    /**
+     *
+     * @returns {Promise<string>}
+     */
+    readText(): Promise<string>;
+    /**
+     *
+     * @param text {string}
+     * @returns {Promise<void>}
+     */
+    writeText(text: string): Promise<void>;
+}
+}
+
+declare module 'deft:dialog' {
+export class FileDialog {
+    /**
+     *
+     * @param options {ShowFileDialogOptions}
+     * @returns {Promise<string[]>}
+     */
+    show(options: ShowFileDialogOptions): Promise<string[]>;
+}
+}
+
+declare module 'deft:sqlite' {
+export class SqliteConn {
+    constructor(conn: any);
+    /**
+     *
+     * @param sql {string}
+     * @param params {*[]}
+     * @returns {Promise<number>}
+     */
+    execute(sql: string, params?: any[]): Promise<number>;
+    /**
+     *
+     * @param sql {string}
+     * @param params {*[]}
+     * @returns {Promise<Object[]>}
+     */
+    query(sql: string, params?: any[]): Promise<any[]>;
+    
+}
+export class Sqlite {
+    /**
+     *
+     * @param path {string}
+     * @returns {Promise<SqliteConn>}
+     */
+    static open(path: string): Promise<SqliteConn>;
+}
+}
+
+/**
+ *
+ * @param url {string}
+ * @param options {FetchOptions}
+ * @returns {Promise<FetchResponse>}
+ */
+declare function fetch(url: string, options: FetchOptions): Promise<FetchResponse>;
+declare class FetchResponse {
+    constructor(resp: any, status: any);
+    _resp: any;
+    status: any;
+    ok: boolean;
+    json(): Promise<any>;
 }
 

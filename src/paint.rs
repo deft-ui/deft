@@ -13,6 +13,7 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::mem;
 use yoga::PositionType;
+use crate::style::border_path::BorderPath;
 
 thread_local! {
     pub static NEXT_UNIQUE_RECT_ID: Cell<u64> = Cell::new(1);
@@ -95,7 +96,7 @@ pub struct ElementObjectData {
     pub height: f32,
     pub layer_object_idx: Option<usize>,
     pub element_id: u32,
-    pub element: Element,
+    pub border_path: BorderPath,
 }
 
 #[derive(Clone)]
@@ -237,15 +238,15 @@ impl RenderTree {
 
     pub fn create_node(&mut self, element: &mut Element) {
         let bounds = element.get_bounds();
-        let mut el = element.clone();
+        let mut el = element.clone_element();
         let element_data = ElementObjectData {
-            element: element.clone(),
+            border_path: element.get_border_path_mut(),
             element_id: element.get_eid(),
             coord: (bounds.x, bounds.y),
             children_viewport: element.get_children_viewport(),
             border_color: element.style.border_color,
             renderer: Box::new(move || {
-                RenderFn::merge(vec![el.scrollable.render(), el.get_backend_mut().render()])
+                RenderFn::merge(vec![el.scrollable.render(), el.render()])
             }),
             background_image: element.style.background_image.clone(),
             background_color: element.style.background_color,
@@ -363,7 +364,7 @@ impl RenderTree {
         layer_object_idx: Option<usize>,
     ) -> Vec<RenderObject> {
         let mut children = Vec::new();
-        for mut c in element.get_children() {
+        for c in element.get_children() {
             let child_bounds = c.get_bounds();
             matrix_calculator.save();
             matrix_calculator.translate((child_bounds.x, child_bounds.y));
@@ -372,7 +373,7 @@ impl RenderTree {
             let child_layer_x = layer_x + child_bounds.x;
             let child_layer_y = layer_y + child_bounds.y;
             children.push(self.build_render_object(
-                &mut c,
+                c,
                 child_origin_x,
                 child_origin_y,
                 layer_object_idx,
@@ -389,7 +390,7 @@ impl RenderTree {
 
     pub fn build_render_object_children(
         &mut self,
-        element: &mut Element,
+        element: &Element,
         origin_x: f32,
         origin_y: f32,
         layer_object_idx: Option<usize>,
@@ -458,7 +459,7 @@ impl RenderTree {
 
     pub fn build_render_object(
         &mut self,
-        element: &mut Element,
+        element: &Element,
         origin_x: f32,
         origin_y: f32,
         layer_object_idx: Option<usize>,
@@ -523,7 +524,7 @@ impl RenderTree {
 
     fn create_normal_render_object(
         &mut self,
-        element: &mut Element,
+        element: &Element,
         bounds: &Rect,
         origin_x: f32,
         origin_y: f32,
@@ -570,7 +571,7 @@ impl RenderTree {
         if element.style.transform.is_some() {
             return true;
         }
-        let pos_type = element.style.yoga_node._yn.get_position_type();
+        let pos_type = element.style.yoga_node.position_type;
         pos_type == PositionType::Absolute || pos_type == PositionType::Relative
     }
 
@@ -617,9 +618,8 @@ impl RenderTree {
             eo.width,
             eo.height,
         ));
-        let border_path_mut = eo.element.get_border_path_mut();
-        let border_path = border_path_mut.get_paths().clone();
-        let border_box_path = border_path_mut.get_box_path().clone().unwrap();
+        let border_path = eo.border_path.get_paths().clone();
+        let border_box_path = eo.border_path.get_box_path().clone().unwrap();
         let epo = ElementPO {
             coord: eo.coord,
             children,
@@ -639,7 +639,6 @@ impl RenderTree {
             height: eo.height,
             element_id: eo.element_id,
             need_paint,
-            focused: eo.element.is_focused(),
         };
         epo
     }

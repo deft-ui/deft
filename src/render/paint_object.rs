@@ -24,7 +24,6 @@ pub struct ElementPO {
     pub height: f32,
     pub element_id: u32,
     pub need_paint: bool,
-    pub focused: bool,
 }
 
 impl ElementPO {

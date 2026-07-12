@@ -28,6 +28,8 @@ use winit::platform::android::activity::AndroidApp;
 #[cfg(target_os = "android")]
 use winit::platform::android::ActiveEventLoopExtAndroid;
 use winit::window::WindowId;
+use crate::element::CSS_MANAGER;
+use crate::ext::ext_worker::Worker;
 
 #[derive(Debug)]
 pub struct AppEventPayload {
@@ -104,9 +106,18 @@ impl App {
 
 impl WinitApp {
     pub fn new(app: App, event_loop_proxy: AppEventProxy) -> Self {
+        // init css
+        let default_css = include_str!("../deft.css");
+        CSS_MANAGER.with_borrow_mut(|manager| {
+            if let Err(e) = manager.add(default_css) {
+                println!("Error adding CSS: {:?}", e);
+            }
+        });
+
         JsEngine::init(app.clone());
         let mut js_engine = JsEngine::get();
-        js_engine.init_api();
+        js_engine.register_module::<Worker>("deft:core:worker").unwrap();
+        js_engine.eval_module(include_str!("./js/deft.js"), "deft").unwrap();
         init_event_loop_proxy(event_loop_proxy.clone());
         let _ = js_init_event_loop(move |js_event| {
             let _ = event_loop_proxy
@@ -137,7 +148,7 @@ impl ApplicationHandler<AppEventPayload> for WinitApp {
             } else {
                 WINDOWS.with_borrow_mut(|m| {
                     m.iter_mut().for_each(|(_, f)| {
-                        if let Ok(mut f) = f.upgrade_mut() {
+                        if let Ok(mut f) = f.upgrade() {
                             f.resume();
                         }
                     })

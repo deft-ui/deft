@@ -86,13 +86,13 @@ impl ImageObject {
     pub fn render(&self) -> RenderFn {
         let (width, height) = self.container_size;
         let (img_width, img_height) = self.img.get_size();
-        let img = self.img.clone();
+        let mut img = self.img.clone();
         let color = self.color;
         RenderFn::new(move |painter| {
             let canvas = painter.canvas;
             canvas.save();
             canvas.scale((width / img_width, height / img_height));
-            match img {
+            match &mut img {
                 ImageSrc::Svg(dom) => {
                     dom.set_color(color);
                     dom.render(canvas, painter.context.scale_factor);

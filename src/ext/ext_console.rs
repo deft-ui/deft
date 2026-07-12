@@ -1,7 +1,10 @@
 use crate as deft;
 use deft_macros::js_methods;
+use crate::js_module;
 
 pub struct Console;
+
+js_module!(Console, include_str!("./console.js"));
 
 #[js_methods]
 impl Console {

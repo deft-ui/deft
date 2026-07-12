@@ -1,5 +1,5 @@
 function createLabel(text) {
-    const label = new LabelElement();
+    const label = new LabelWidget();
     label.setText(text);
     return label;
 }
@@ -7,7 +7,7 @@ function createLabel(text) {
 const window = new Window();
 window.setTitle("DeftDemo");
 
-const container = new ScrollElement();
+const container = new ScrollWidget();
 container.setStyle({
     color: '#F9F9F9',
     justifyContent: 'center',

@@ -73,16 +73,6 @@ pub trait BorrowFromJs {
     ) -> Result<R, ValueError>;
 }
 
-impl<T: FromJsValue> BorrowFromJs for T {
-    fn borrow_from_js<R, F: FnOnce(&mut Self) -> R>(
-        value: JsValue,
-        receiver: F,
-    ) -> Result<R, ValueError> {
-        let mut value = Self::from_js_value(value).unwrap();
-        Ok(receiver(&mut value))
-    }
-}
-
 pub trait ToJsValue {
     fn to_js_value(self) -> Result<JsValue, ValueError>;
 }

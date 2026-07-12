@@ -50,7 +50,7 @@ impl<T> State<T> {
             store: StateData::Hosting(MrcWeak::new()),
         }
     }
-    pub fn upgrade_mut(&self) -> Result<StateMutRef<'_, T>, UpgradeError> {
+    pub fn upgrade(&self) -> Result<StateMutRef<'_, T>, UpgradeError> {
         match &self.store {
             StateData::Hosting(d) => {
                 let data = d.upgrade()?;
@@ -150,12 +150,12 @@ pub mod tests {
         let state = sm.new_state(my_state);
 
         {
-            let state_mut_ref = state.upgrade_mut().unwrap();
+            let state_mut_ref = state.upgrade().unwrap();
             assert_eq!(162534, state_mut_ref.num);
         }
 
         sm.remove_state(&state);
-        let upgrade_result = state.upgrade_mut();
+        let upgrade_result = state.upgrade();
         assert!(upgrade_result.is_err());
     }
 }

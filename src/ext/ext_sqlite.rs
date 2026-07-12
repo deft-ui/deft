@@ -1,7 +1,7 @@
 use crate as deft;
 use crate::js::js_engine::JsEngine;
 use crate::js::{JsError, ToJsValue};
-use crate::js_value;
+use crate::{js_module, js_value};
 use crate::task_executor::TaskExecutor;
 use deft_macros::{js_methods, mrc_object};
 use quick_js::JsValue;
@@ -28,6 +28,8 @@ impl Session {
 }
 
 js_value!(SqliteConn);
+
+js_module!(SqliteConn, include_str!("./sqlite.js"));
 
 #[js_methods]
 impl SqliteConn {

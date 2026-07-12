@@ -1,5 +1,3 @@
-pub mod event_emitter;
-
 use crate as deft;
 use crate::base;
 use crate::base::{MouseDetail, Rect, TouchDetail};
@@ -7,6 +5,11 @@ use deft_macros::event;
 use serde::{Deserialize, Serialize};
 use std::any::{Any, TypeId};
 use winit::keyboard::{ModifiersState, NamedKey};
+
+pub use crate::base::EventListener;
+pub use crate::base::JsEvent;
+pub use crate::base::EventContext;
+pub use crate::base::BoxJsEventListenerFactory;
 
 pub struct Event {
     event_type_id: TypeId,

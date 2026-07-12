@@ -1,6 +1,7 @@
 use crate::render::cssborder::{build_border_paths, build_rect_with_radius};
 use tiny_skia::Path;
 
+#[derive(Clone)]
 pub struct BorderPath {
     box_width: f32,
     box_height: f32,

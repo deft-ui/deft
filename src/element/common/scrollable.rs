@@ -4,7 +4,7 @@ use crate::animation::{AnimationInstance, WindowAnimationController};
 use crate::base::{EventContext, Rect};
 use crate::element::common::ScrollBar;
 use crate::element::scroll::Scroll;
-use crate::element::{Element, ElementWeak};
+use crate::element::Element;
 use crate::event::{Event, TouchCancelEvent, TouchEndEvent, TouchMoveEvent, TouchStartEvent};
 use crate::number::DeNan;
 use crate::render::RenderFn;
@@ -92,7 +92,7 @@ impl Scrollable {
     pub fn on_event(
         &mut self,
         event: &Event,
-        ctx: &mut EventContext<ElementWeak>,
+        ctx: &mut EventContext,
         element: &Element,
     ) -> bool {
         let event_id = ctx.get_id();
@@ -315,11 +315,6 @@ impl Scrollable {
         element
             .style
             .calculate_shadow_layout(width, layout_height, LTR);
-
-        for child in &mut element.get_children().clone() {
-            //TODO remove?
-            child.on_layout_update();
-        }
     }
 
     fn get_body_view_size(&self, mut width: f32, mut height: f32) -> (f32, f32) {

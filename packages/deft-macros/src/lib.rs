@@ -1,11 +1,27 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 use syn::{parse_macro_input, Fields, FnArg, Ident, ImplItem, ItemFn, ItemImpl, ItemStruct, Visibility};
-use syn::__private::TokenStream2;
+use syn::__private::{TokenStream2};
 use syn::token::{Async};
 
+fn snake_to_camel(s: &str) -> String {
+    let mut result = String::new();
+    let mut upper_next = false;
+    for c in s.chars() {
+        if c == '_' {
+            upper_next = true;
+        } else if upper_next {
+            result.push(c.to_ascii_uppercase());
+            upper_next = false;
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
 #[proc_macro_attribute]
-pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
+pub fn mrc_object(attr: TokenStream, struct_def: TokenStream) -> TokenStream {
     let struct_def = parse_macro_input!(struct_def as ItemStruct);
     let weak_name = format_ident!("{}Weak", struct_def.ident);
     let struct_name = format_ident!("{}Data", struct_def.ident);
@@ -13,9 +29,18 @@ pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
     let ref_name = struct_def.ident;
     let fields = struct_def.fields;
 
+    let attr_str = attr.to_string();
+    let derive_clone = !attr_str.contains("no_clone");
+
+    let clone_derive = if derive_clone {
+        quote! { #[derive(Clone, PartialEq)] }
+    } else {
+        quote! { #[derive(PartialEq)] }
+    };
+
     let expanded = quote! {
 
-        #[derive(Clone, PartialEq)]
+        #clone_derive
         pub struct #ref_name {
             inner: deft::mrc::Mrc<#struct_name>,
         }
@@ -77,7 +102,7 @@ pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
                 Self {inner: None}
             }
 
-            pub fn upgrade(&self) -> Result<#ref_name, deft::mrc::UpgradeError> {
+            pub fn upgrade_into(&self) -> Result<#ref_name, deft::mrc::UpgradeError> {
                 let inner = if let Some(inner) = &self.inner {
                     inner.upgrade()?
                 } else {
@@ -90,8 +115,8 @@ pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
                 )
             }
 
-            pub fn upgrade_mut(&self) -> Result<#mut_name, deft::mrc::UpgradeError> {
-                let data = self.upgrade()?;
+            pub fn upgrade(&self) -> Result<#mut_name, deft::mrc::UpgradeError> {
+                let data = self.upgrade_into()?;
                 Ok(
                     #mut_name {
                         weak: self,
@@ -118,52 +143,61 @@ pub fn mrc_object(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn element_backend(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
-    let struct_def = parse_macro_input!(struct_def as ItemStruct);
+pub fn widget(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
+    let mut struct_def = parse_macro_input!(struct_def as ItemStruct);
     let struct_name = struct_def.ident.clone();
     let visibility = struct_def.vis.clone();
-    let struct_fields = struct_def.fields;
+    match &mut struct_def.fields {
+        Fields::Named(ref mut named_fields) => {
+            named_fields.named.push(syn::Field {
+                attrs: vec![],
+                vis: syn::Visibility::Inherited,
+                ident: Some(syn::Ident::new("el", proc_macro::Span::call_site().into())),
+                colon_token: Some(Default::default()),
+                mutability: syn::FieldMutability::None,
+                ty: syn::parse_quote!(deft::ui::Element),
+            });
+        }
+        _ => {}
+    }
+    let struct_fields = &struct_def.fields;
     let q = quote! {
-
-        #[deft_macros::mrc_object]
         #visibility struct #struct_name #struct_fields
 
-        impl deft::js::FromJsValue for #struct_name {
-            fn from_js_value(value: deft::js::JsValue) -> Result<Self, deft::js::ValueError> {
-                let element = deft::element::Element::from_js_value(value)?;
-                Ok(element.get_backend_as::<#struct_name>().clone())
+        // impl deft::js::FromJsValue for #struct_name {
+        //     fn from_js_value(value: deft::js::JsValue) -> Result<Self, deft::js::ValueError> {
+        //         let element = deft::ui::Element::from_js_value(value)?;
+        //         Ok(element.get_backend_as::<#struct_name>().clone())
+        //     }
+        // }
+        // deft::js_value!(#struct_name);
+
+        impl std::ops::Deref for #struct_name {
+            type Target = Element;
+
+            fn deref(&self) -> &Self::Target {
+                &self.el
             }
         }
+
+        impl std::ops::DerefMut for #struct_name {
+            fn deref_mut(&mut self) -> &mut Self::Target {
+                &mut self.el
+            }
+        }
+
+        impl deft::ui::ElementHost for #struct_name {}
+
     };
     q.into()
 }
 
 #[proc_macro_attribute]
 pub fn event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
-    create_event(_attr, struct_def, quote! {deft::element::ElementWeak})
+    create_event(_attr, struct_def)
 }
 
-#[proc_macro_attribute]
-pub fn window_event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
-    create_event(_attr, struct_def, quote! {deft::window::WindowHandle})
-}
-
-#[proc_macro_attribute]
-pub fn app_event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
-    create_event(_attr, struct_def, quote! { () })
-}
-
-#[proc_macro_attribute]
-pub fn worker_event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
-    create_event(_attr, struct_def, quote! {deft::ext::ext_worker::WorkerWeak})
-}
-
-#[proc_macro_attribute]
-pub fn worker_context_event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
-    create_event(_attr, struct_def, quote! {deft::ext::ext_worker::WorkerContextWeak})
-}
-
-fn create_event(_attr: TokenStream, struct_def: TokenStream, target_type: TokenStream2) -> TokenStream {
+fn create_event(_attr: TokenStream, struct_def: TokenStream) -> TokenStream {
     let struct_def = parse_macro_input!(struct_def as ItemStruct);
     let listener_name = format_ident!("{}Listener", struct_def.ident);
     let event_name = struct_def.ident;
@@ -177,16 +211,16 @@ fn create_event(_attr: TokenStream, struct_def: TokenStream, target_type: TokenS
 
     let expanded = quote! {
 
-        pub struct #listener_name(Box<dyn FnMut(&mut #event_name, &mut deft::base::EventContext<#target_type>)>);
+        pub struct #listener_name(Box<dyn FnMut(&mut #event_name, &mut deft::event::EventContext)>);
 
         impl #listener_name {
-            pub fn new<F: FnMut(&mut #event_name, &mut deft::base::EventContext<#target_type>) + 'static>(f: F) -> Self {
+            pub fn new<F: FnMut(&mut #event_name, &mut deft::event::EventContext) + 'static>(f: F) -> Self {
                 Self(Box::new(f))
             }
         }
 
-        impl deft::base::EventListener<#event_name, #target_type> for #listener_name {
-            fn handle_event(&mut self, event: &mut #event_name, ctx: &mut deft::base::EventContext<#target_type>) {
+        impl deft::event::EventListener<#event_name> for #listener_name {
+            fn handle_event(&mut self, event: &mut #event_name, ctx: &mut deft::event::EventContext) {
                 (self.0)(event, ctx)
             }
         }
@@ -194,23 +228,18 @@ fn create_event(_attr: TokenStream, struct_def: TokenStream, target_type: TokenS
         impl deft::js::FromJsValue for #listener_name {
             fn from_js_value(value: deft::js::JsValue) -> Result<Self, deft::js::ValueError> {
                 let listener = Self::new(move |e, ctx| {
-                    let target = ctx.target.clone();
                     use deft::js::ToJsValue;
-                    if let Ok(d) = target.to_js_value() {
-                        if let Ok(e) = e.clone().to_js_value() {
-                            let callback_result = value.call_as_function(vec![e, d]);
-                            if let Ok(cb_result) = callback_result {
-                                if let Ok(res) = deft::js::js_value_util::EventResult::from_js_value(cb_result) {
-                                    if res.propagation_cancelled {
-                                        ctx.propagation_cancelled = true;
-                                    }
-                                    if res.prevent_default {
-                                        ctx.prevent_default = true;
-                                    }
+                    if let Ok(e) = e.clone().to_js_value() {
+                        let callback_result = value.call_as_function(vec![e]);
+                        if let Ok(cb_result) = callback_result {
+                            if let Ok(res) = deft::js::js_value_util::EventResult::from_js_value(cb_result) {
+                                if res.propagation_cancelled {
+                                    ctx.propagation_cancelled = true;
+                                }
+                                if res.prevent_default {
+                                    ctx.prevent_default = true;
                                 }
                             }
-                        } else {
-                            println!("invalid event");
                         }
                     } else {
                         println!("invalid event");
@@ -227,15 +256,15 @@ fn create_event(_attr: TokenStream, struct_def: TokenStream, target_type: TokenS
 
         deft::js_serialize!(#event_name);
 
-        impl deft::element::ViewEvent for #event_name {
+        impl deft::ui::ViewEvent for #event_name {
             fn allow_bubbles(&self) -> bool {
                 true
             }
         }
 
-        impl deft::base::JsEvent<#target_type> for #event_name {
-            fn create_listener_factory() -> deft::base::BoxJsEventListenerFactory<#target_type> {
-                use deft::base::EventListener;
+        impl deft::event::JsEvent for #event_name {
+            fn create_listener_factory() -> deft::event::BoxJsEventListenerFactory {
+                use deft::event::EventListener;
                 use deft::js::js_binding::FromJsValue;
                 Box::new(move |listener| {
                     let mut listener = <#listener_name>::from_js_value(listener).ok()?;
@@ -283,6 +312,7 @@ pub fn js_methods(_attr: TokenStream, impl_item: TokenStream) -> TokenStream {
 
     let mut api_bridges = Vec::new();
     let mut api_create_expr_list = Vec::new();
+    let mut register_list = Vec::new();
     let type_name_str = self_ty.clone().into_token_stream().to_string();
     let type_name_ident = format_ident!("{}", type_name_str);
 
@@ -297,7 +327,9 @@ pub fn js_methods(_attr: TokenStream, impl_item: TokenStream) -> TokenStream {
 
                     let vis = item.vis.clone();
 
-                    let api_name_ident = format_ident!("{}_{}", type_name_str, item.sig.ident);
+                    let method_name = snake_to_camel(&item.sig.ident.to_string());
+                    let api_name_ident = format_ident!("{}_{}", type_name_str, method_name);
+                    let api_ident = snake_to_camel(&item.sig.ident.clone().to_string());
 
                     let args_count = item.sig.inputs.len();
                     let args = item.sig.inputs.iter().map(|it| it.clone()).collect::<Vec<_>>();
@@ -320,24 +352,38 @@ pub fn js_methods(_attr: TokenStream, impl_item: TokenStream) -> TokenStream {
                     api_create_expr_list.push(quote! {
                         #api_name_ident::new()
                     });
+                    register_list.push(quote! {
+                        deft::js::js_engine::register_js_function(std::any::TypeId::of::<#self_ty>(), #api_ident, #api_name_ident::new());
+                    });
                     false
                 });
             }
             _ => {}
         }
     }
+
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    use std::hash::Hasher;
+    hasher.write(type_name_str.as_bytes());
+    for it in &register_list {
+        hasher.write(it.to_string().as_bytes());
+    }
+    let hash = hasher.finish();
+    let init_api_name = format_ident!("{}_register_js_api_{:016x}", type_name_str, hash);
+
     let q = quote! {
         #(#attrs)*
         #impl_token #generics #self_ty {
             #(#items)*
-
-            pub fn create_js_apis() -> Vec<Box<dyn deft::js::JsFunc + std::panic::RefUnwindSafe + 'static>> {
-                vec![#(Box::new(#api_create_expr_list), )*]
-            }
-
         }
 
         #(#api_bridges)*
+
+        #[ctor::ctor(unsafe)]
+        fn #init_api_name() {
+            #(#register_list)*
+        }
+
     };
 
     q.into()

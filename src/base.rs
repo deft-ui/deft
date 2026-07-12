@@ -20,6 +20,7 @@ use std::str::FromStr;
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::LocalKey;
 use yoga::Layout;
+use crate::resource_table::ResourceTable;
 
 pub struct IdKey {
     next_id: Cell<usize>,
@@ -313,24 +314,24 @@ thread_local! {
     pub static NEXT_EVENT_ID: Cell<u64> = Cell::new(1);
 }
 
-pub struct EventContext<T> {
+pub struct EventContext {
     id: u64,
-    pub target: T,
     pub propagation_cancelled: bool,
     pub prevent_default: bool,
     pub allow_bubbles: bool,
+    pub resource_table: ResourceTable,
 }
 
-impl<T> EventContext<T> {
-    pub fn new(target: T) -> Self {
+impl EventContext {
+    pub fn new() -> Self {
         let id = NEXT_EVENT_ID.get();
         NEXT_EVENT_ID.set(id + 1);
         Self {
             id,
-            target,
             propagation_cancelled: false,
             prevent_default: false,
             allow_bubbles: true,
+            resource_table: ResourceTable::new(),
         }
     }
 
@@ -340,18 +341,18 @@ impl<T> EventContext<T> {
 }
 
 #[deprecated]
-pub struct Event<T> {
+pub struct Event {
     pub event_type: String,
     pub detail: Box<dyn EventDetail>,
-    pub context: EventContext<T>,
+    pub context: EventContext,
 }
 
-impl<E> Event<E> {
-    pub fn new<T: EventDetail>(event_type: &str, detail: T, target: E) -> Self {
+impl Event {
+    pub fn new<T: EventDetail>(event_type: &str, detail: T) -> Self {
         Self {
             event_type: event_type.to_string(),
             detail: Box::new(detail),
-            context: EventContext::new(target),
+            context: EventContext::new(),
         }
     }
 }
@@ -399,45 +400,75 @@ impl CaretDetail {
     }
 }
 
-pub type EventHandler<E> = dyn FnMut(&mut Event<E>);
+pub type EventHandler = dyn FnMut(&mut Event);
 
-pub type BoxEventListener<E> = Box<dyn FnMut(&mut event::Event, &mut EventContext<E>)>;
+pub type BoxEventListener = Box<dyn FnMut(&mut event::Event, &mut EventContext)>;
 
-pub type BoxJsEventListenerFactory<T> =
-    Box<dyn FnMut(JsValue) -> Option<(TypeId, BoxEventListener<T>)>>;
+pub type BoxJsEventListenerFactory =
+    Box<dyn FnMut(JsValue) -> Option<(TypeId, BoxEventListener)>>;
 
-pub trait JsEvent<T> {
-    fn create_listener_factory() -> BoxJsEventListenerFactory<T>;
+pub trait JsEvent {
+    fn create_listener_factory() -> BoxJsEventListenerFactory;
 }
 
-pub trait EventListener<T, E> {
-    fn handle_event(&mut self, event: &mut T, ctx: &mut EventContext<E>);
+pub trait EventListener<T> {
+    fn handle_event(&mut self, event: &mut T, ctx: &mut EventContext);
 }
 
-pub struct EventRegistration<E> {
-    listeners: HashMap<String, Vec<(u32, Box<EventHandler<E>>)>>,
+pub struct EventRegistration {
+    listeners: HashMap<String, Vec<(u32, Box<EventHandler>)>>,
     next_listener_id: u32,
     typed_listeners:
-        HashMap<TypeId, Vec<(u32, Box<dyn FnMut(&mut event::Event, &mut EventContext<E>)>)>>,
+        HashMap<TypeId, Vec<(u32, Box<dyn FnMut(&mut event::Event, &mut EventContext)>)>>,
     listener_types: HashMap<u32, TypeId>,
+    default_behavior_handlers: HashMap<TypeId, Box<dyn FnMut(&mut event::Event, &mut EventContext)>>,
 }
 
-impl<E> EventRegistration<E> {
+impl EventRegistration {
     pub fn new() -> Self {
         Self {
             next_listener_id: 1,
             listeners: HashMap::new(),
             typed_listeners: HashMap::new(),
             listener_types: HashMap::new(),
+            default_behavior_handlers: HashMap::new(),
         }
     }
 
-    pub fn register_event_listener<T: 'static, H: EventListener<T, E> + 'static>(
+    pub fn set_default_behavior_handler<T: 'static, H: EventListener<T> + 'static>(
+        &mut self,
+        mut listener: H,
+    ) {
+        let event_type_id = TypeId::of::<T>();
+        let wrapper_listener = Box::new(move |d: &mut event::Event, ctx: &mut EventContext| {
+            if let Some(t) = d.downcast_mut::<T>() {
+                listener.handle_event(t, ctx);
+            }
+        });
+        self.default_behavior_handlers.insert(event_type_id, wrapper_listener);
+    }
+
+    pub fn execute_default_behavior(&mut self, event: &mut event::Event, ctx: &mut EventContext) {
+        let event_type_id = event.event_type_id();
+        // let event = &mut ;
+        if let Some(handler) = self.default_behavior_handlers.get_mut(&event_type_id) {
+            if event_type_id != event.event_type_id() {
+                log::error!(
+                    "invalid event detected, expected type id = {:?}, actual type id = {:?}",
+                    event_type_id,
+                    event.event_type_id()
+                );
+            }
+            handler(event, ctx);
+        }
+    }
+
+    pub fn register_event_listener<T: 'static, H: EventListener<T> + 'static>(
         &mut self,
         mut listener: H,
     ) -> u32 {
         let event_type_id = TypeId::of::<T>();
-        let wrapper_listener = Box::new(move |d: &mut event::Event, ctx: &mut EventContext<E>| {
+        let wrapper_listener = Box::new(move |d: &mut event::Event, ctx: &mut EventContext| {
             if let Some(t) = d.downcast_mut::<T>() {
                 listener.handle_event(t, ctx);
             }
@@ -448,7 +479,7 @@ impl<E> EventRegistration<E> {
     pub fn register_raw_event_listener(
         &mut self,
         event_type_id: TypeId,
-        listener: BoxEventListener<E>,
+        listener: BoxEventListener,
     ) -> u32 {
         let id = self.next_listener_id;
         self.next_listener_id += 1;
@@ -468,7 +499,7 @@ impl<E> EventRegistration<E> {
         }
     }
 
-    pub fn emit<T: 'static>(&mut self, event: T, ctx: &mut EventContext<E>) {
+    pub fn emit<T: 'static>(&mut self, event: T, ctx: &mut EventContext) {
         let event_type_id = TypeId::of::<T>();
         self.emit_raw(event_type_id, &mut event::Event::new(event), ctx);
     }
@@ -477,7 +508,7 @@ impl<E> EventRegistration<E> {
         &mut self,
         event_type_id: TypeId,
         event: &mut event::Event,
-        ctx: &mut EventContext<E>,
+        ctx: &mut EventContext,
     ) {
         if let Some(listeners) = self.typed_listeners.get_mut(&event_type_id) {
             if event_type_id != event.event_type_id() {
@@ -493,7 +524,7 @@ impl<E> EventRegistration<E> {
         }
     }
 
-    pub fn add_event_listener(&mut self, event_type: &str, handler: Box<EventHandler<E>>) -> u32 {
+    pub fn add_event_listener(&mut self, event_type: &str, handler: Box<EventHandler>) -> u32 {
         let id = self.next_listener_id;
         self.next_listener_id += 1;
         if !self.listeners.contains_key(event_type) {
@@ -505,7 +536,7 @@ impl<E> EventRegistration<E> {
         id
     }
 
-    pub fn bind_event_listener<T: 'static, F: FnMut(&mut EventContext<E>, &mut T) + 'static>(
+    pub fn bind_event_listener<T: 'static, F: FnMut(&mut EventContext, &mut T) + 'static>(
         &mut self,
         event_type: &str,
         mut handler: F,
@@ -526,7 +557,7 @@ impl<E> EventRegistration<E> {
         }
     }
 
-    pub fn emit_event(&mut self, event: &mut Event<E>) {
+    pub fn emit_event(&mut self, event: &mut Event) {
         if let Some(listeners) = self.listeners.get_mut(&event.event_type) {
             for it in listeners {
                 (it.1)(event);
@@ -535,7 +566,7 @@ impl<E> EventRegistration<E> {
     }
 }
 
-impl<E: ToJsValue + Clone + 'static> EventRegistration<E> {
+impl EventRegistration {
     pub fn add_js_event_listener(&mut self, event_type: &str, callback: JsValue) -> i32 {
         let handler = create_event_handler(event_type, callback);
         let id = self.add_event_listener(
@@ -763,21 +794,21 @@ mod tests {
             value: Rc<RefCell<i32>>,
         }
         struct MyEventListener {}
-        impl EventListener<MyEvent, ()> for MyEventListener {
-            fn handle_event(&mut self, event: &mut MyEvent, _ctx: &mut EventContext<()>) {
+        impl EventListener<MyEvent> for MyEventListener {
+            fn handle_event(&mut self, event: &mut MyEvent, _ctx: &mut EventContext) {
                 debug!("handling {:?}", event);
                 let mut v = event.value.borrow_mut();
                 *v = 1;
             }
         }
         let value = Rc::new(RefCell::new(0));
-        let mut er: EventRegistration<()> = EventRegistration::new();
+        let mut er: EventRegistration = EventRegistration::new();
         er.register_event_listener(MyEventListener {});
         er.emit(
             MyEvent {
                 value: Rc::clone(&value),
             },
-            &mut EventContext::new(()),
+            &mut EventContext::new(),
         );
 
         assert_eq!(1, *value.borrow());

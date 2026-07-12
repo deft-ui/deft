@@ -1,6 +1,6 @@
 {
   "name": "deft-sys",
-  "version": "0.15.0",
+  "version": "1.0.0",
   "description": "Deft typings",
   "typings": "deft.d.ts",
   "scripts": {

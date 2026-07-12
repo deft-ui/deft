@@ -3,7 +3,8 @@ target
 .gradle
 *.so
 *.log
-local*
+local
 dist/
 examples/debug-js
 Cargo.lock
+tsconfig.dts.json

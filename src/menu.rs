@@ -1,7 +1,7 @@
 use crate as deft;
 use crate::element::container::Container;
+use crate::js_module;
 use crate::element::label::Label;
-use crate::element::{Element, ElementBackend, ElementType};
 use crate::event::ClickEventListener;
 use crate::js_value;
 use crate::mrc::Mrc;
@@ -19,7 +19,7 @@ js_value!(Menu);
 #[js_methods]
 impl Menu {
     #[js_func]
-    pub fn new() -> Self {
+    pub fn create() -> Self {
         MenuData { items: Vec::new() }.to_ref()
     }
     pub fn add_item(&mut self, item: MenuItem) {
@@ -88,35 +88,31 @@ pub enum MenuItem {
     Standard(StandardMenuItem),
 }
 
-pub fn build_menu_elements(menu: Menu) -> Element {
-    let mut root = Element::create(Container::create);
-    root.tag = "menu".to_string();
-    root.set_element_type(ElementType::Widget);
+pub fn build_menu_elements(menu: Menu) -> Container {
+    let mut root = Container::new_with_tag("menu".to_string());
     for it in menu.items.clone() {
         match it {
             MenuItem::Separator => {
-                let mut e = Element::create(Container::create);
-                e.tag = "menu-item-separator".to_string();
-                e.set_element_type(ElementType::Widget);
-                root.add_child(e, -1).unwrap();
+                let e = Container::create();
+                root.add_child(&e, None).unwrap();
             }
             MenuItem::Standard(s) => {
-                let mut e = Element::create(Label::create);
-                e.is_form_element = true;
-                e.tag = "menu-item-standard".to_string();
-                e.set_element_type(ElementType::Widget);
-                e.set_disabled(s.disabled);
-                let label = e.get_backend_mut_as::<Label>();
+                let mut label = Label::create();
+                label.is_form_element = true;
+                label.set_disabled(s.disabled);
                 label.set_text(s.label.to_string());
                 let mut onclick = s.onclick.clone();
-                e.register_event_listener(ClickEventListener::new(move |_, _| {
+                label.register_event_listener(ClickEventListener::new(move |_, _| {
                     if let Some(onclick) = &mut *onclick {
                         onclick();
                     }
                 }));
-                root.add_child(e, -1).unwrap();
+                root.add_child(&label, None).unwrap();
             }
         }
     }
     root
 }
+
+js_module!(Menu);
+js_module!(StandardMenuItem);

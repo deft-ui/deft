@@ -90,9 +90,8 @@ impl Service {
                         let ctx = WorkerContext::get();
                         ctx.unwrap().to_js_value().unwrap()
                     });
-                js_engine.add_global_functions(WorkerContext::create_js_apis());
-
-                js_engine.init_api();
+                js_engine.register_module_and_load::<WorkerContext>("deft:workercontext").unwrap();
+                js_engine.eval_module(include_str!("../js/worker_init.js"), "deft").unwrap();
                 {
                     let mut app = app.app_impl.lock().unwrap();
                     app.init_js_engine(&mut js_engine);

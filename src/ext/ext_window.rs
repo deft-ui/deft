@@ -71,7 +71,7 @@ pub fn handle_window_event(window_id: WinitWindowId, event: WindowEvent) {
             let has_modal = MODAL_TO_OWNERS.with_borrow_mut(|m| {
                 m.iter()
                     .find(|(_, o)| {
-                        if let Ok(o) = o.upgrade_mut() {
+                        if let Ok(o) = o.upgrade() {
                             o.get_window_id() == window_id
                         } else {
                             false
@@ -91,11 +91,11 @@ pub fn handle_window_event(window_id: WinitWindowId, event: WindowEvent) {
     });
     if let Some(window) = &mut window {
         if &WindowEvent::CloseRequested == &event {
-            if let Ok(mut f) = window.upgrade_mut() {
+            if let Ok(mut f) = window.upgrade() {
                 let _ = f.close();
             }
         } else {
-            if let Ok(mut window) = window.upgrade_mut() {
+            if let Ok(mut window) = window.upgrade() {
                 window.handle_event(event);
             }
         }

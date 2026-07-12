@@ -1,5 +1,6 @@
 use crate as deft;
 use crate::js::js_event_loop::js_create_event_loop_fn_mut;
+use crate::js_module;
 use crate::js::JsError;
 use crate::js_deserialize;
 use crate::window::WindowHandle;
@@ -35,7 +36,7 @@ impl dialog {
     ) -> Result<(), JsError> {
         let mut owner = None;
         if let Some(window) = window {
-            if let Ok(window) = window.upgrade_mut() {
+            if let Ok(window) = window.upgrade() {
                 owner = Some(DialogHandle(window.window.raw_window_handle()?));
             }
         }
@@ -103,3 +104,5 @@ impl dialog {
         Ok(())
     }
 }
+
+js_module!(dialog, "./dialog.js");

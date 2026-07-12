@@ -1,17 +1,20 @@
 use crate as deft;
-use crate::base::EventContext;
-use crate::element::{Element, ElementBackend, ElementWeak};
-use crate::event::Event;
+use crate::element::{Element, Widget, ElementDelegate, ElementWeak};
+use crate::js_module;
 use crate::ok_or_return;
-use crate::render::RenderFn;
 use crate::style::StylePropKey;
 use crate::text::textbox::{TextBox, TextCoord, TextElement};
-use deft_macros::{element_backend, js_methods};
+use deft_macros::{widget, js_methods};
 use yoga::Size;
+use crate::render::RenderFn;
 
-#[element_backend]
-pub struct RichText {
+struct RichTextState {
     element: ElementWeak,
+    text_box: TextBox,
+}
+
+#[widget]
+pub struct RichText {
     text_box: TextBox,
 }
 
@@ -57,18 +60,9 @@ impl RichText {
         self.text_box.get_selection_text()
     }
 
-    fn layout(&mut self, width: f32) {
-        //TODO twice layout occurs here?
-        self.text_box.set_layout_width(width);
-        self.text_box.layout();
-    }
-}
-
-impl ElementBackend for RichText {
-    fn create(element: &mut Element) -> Self
-    where
-        Self: Sized,
-    {
+    #[js_func]
+    pub fn create() -> Self {
+        let mut element = Element::new("rich-text");
         let mut text_box = TextBox::new();
         {
             let mut el = element.as_weak();
@@ -76,22 +70,28 @@ impl ElementBackend for RichText {
         }
         {
             let mut el = element.as_weak();
-            text_box.set_layout_callback(move || el.mark_dirty(true));
+            text_box.set_layout_callback(move |_has_text| el.mark_dirty(true));
         }
-        let this = RichTextData {
+        text_box.bind_event(&mut element);
+        element.set_delegate(RichTextState {
             element: element.as_weak(),
+            text_box: text_box.clone(),
+        });
+        let mut this = Self {
+            el: element,
             text_box,
-        }
-        .to_ref();
-        element
+        };
+        let textbox_weak = this.text_box.as_weak();
+        this.el
             .style
             .yoga_node
-            .set_measure_func(this.as_weak(), |rich_text_weak, params| {
-                if let Ok(mut rich_text) = rich_text_weak.upgrade() {
-                    rich_text.layout(params.width);
+            .set_measure_func(textbox_weak, |textbox_weak, params| {
+                if let Ok(mut text_box) = textbox_weak.upgrade() {
+                    text_box.set_layout_width(params.width);
+                    text_box.layout();
                     return Size {
-                        width: rich_text.text_box.max_intrinsic_width(),
-                        height: rich_text.text_box.height(),
+                        width: text_box.max_intrinsic_width(),
+                        height: text_box.height(),
                     };
                 }
                 return Size {
@@ -101,11 +101,16 @@ impl ElementBackend for RichText {
             });
         this
     }
+}
 
-    fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend> {
-        None
-    }
+impl Widget for RichText {
 
+    // fn on_event(&mut self, event: &mut Event, ctx: &mut EventContext<ElementWeak>) {
+    //     self.text_box.on_event(&event, ctx, 0.0, 0.0);
+    // }
+}
+
+impl ElementDelegate for RichTextState {
     fn handle_style_changed(&mut self, key: StylePropKey) {
         let element = ok_or_return!(self.element.upgrade());
         match key {
@@ -135,8 +140,6 @@ impl ElementBackend for RichText {
     fn render(&mut self) -> RenderFn {
         self.text_box.render()
     }
-
-    fn on_event(&mut self, event: &mut Event, ctx: &mut EventContext<ElementWeak>) {
-        self.text_box.on_event(&event, ctx, 0.0, 0.0);
-    }
 }
+
+js_module!(RichText);

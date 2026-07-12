@@ -1,8 +1,11 @@
+use std::any::TypeId;
 use quick_js::{Callback, Context, ExecutionError, JsValue, ValueError};
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::future::Future;
 use std::panic::RefUnwindSafe;
 use std::path::PathBuf;
+use anyhow::anyhow;
 use tokio::runtime::Builder;
 use winit::dpi::{PhysicalSize};
 use winit::event::{DeviceEvent, DeviceId, ElementState, WindowEvent};
@@ -14,13 +17,14 @@ use crate::element::button::Button;
 use crate::element::checkbox::Checkbox;
 use crate::element::image::Image;
 use crate::element::label::Label;
-use crate::element::radio::Radio;
+use crate::element::radio::{Radio, RadioGroup};
 use crate::element::richtext::RichText;
-use crate::element::scroll::Scroll;
 use crate::element::select::Select;
 use crate::element::textedit::TextEdit;
 use crate::element::textinput::TextInput;
-use crate::element::{init_base_components, Element, CSS_MANAGER};
+use crate::element::Element;
+use crate::element::body::Body;
+use crate::element::container::Container;
 use crate::ext::ext_animation::animation_create;
 use crate::ext::ext_app::{AppReopenEvent, JsApp};
 #[cfg(fs_enabled)]
@@ -29,17 +33,12 @@ use crate::ext::ext_base64::Base64;
 use crate::ext::ext_console::Console as ExtConsole;
 use crate::ext::ext_env::env;
 #[cfg(fs_enabled)]
-use crate::ext::ext_fs::{
-    fs_create_dir, fs_create_dir_all, fs_delete_file, fs_exists, fs_read_dir, fs_remove_dir,
-    fs_remove_dir_all, fs_rename, fs_stat,
-};
+use crate::ext::ext_fs::FileSystem;
 use crate::ext::ext_localstorage::localstorage;
 use crate::ext::ext_path::path;
 use crate::ext::ext_process::process;
 use crate::ext::ext_shell::shell;
-use crate::ext::ext_timer::{
-    timer_clear_interval, timer_clear_timeout, timer_set_interval, timer_set_timeout,
-};
+use crate::ext::ext_timer::Timer;
 #[cfg(feature = "tray")]
 use crate::ext::ext_tray::SystemTray;
 use crate::ext::ext_window::{handle_window_event, WINDOWS};
@@ -49,24 +48,68 @@ use crate::js::js_runtime::{JsContext, PromiseResolver};
 use crate::js::ToJsCallResult;
 use crate::menu::{Menu, StandardMenuItem};
 use crate::mrc::Mrc;
-use crate::stylesheet::{stylesheet_add, stylesheet_remove, stylesheet_update};
+use crate::stylesheet::{Stylesheet};
 use crate::typeface::typeface_create;
 use crate::window::page::Page;
 use crate::window::popup::Popup;
 use crate::window::{Window, WindowHandle, WindowType};
 
+#[derive(Clone)]
+pub struct Function {
+    name: String,
+    executor: Mrc<Box<dyn JsFunc + RefUnwindSafe>>,
+}
+
+pub trait JsModule {
+    fn get_functions() -> Vec<Function>;
+    fn get_init_scripts() -> Option<String>;
+}
+
+#[derive(Default, Clone)]
+struct JsModuleData {
+    functions: Vec<Function>,
+    init_code: Option<String>,
+}
+
 thread_local! {
+    pub(crate) static JS_MODULES: RefCell<HashMap<TypeId, JsModuleData >> = RefCell::new(HashMap::new());
     static JS_ENGINE: RefCell<Option<Mrc<JsEngine>>> = RefCell::new(None);
 }
+
+pub fn register_js_function<F: JsFunc + RefUnwindSafe + 'static>(type_id: TypeId, name: &str, func: F) {
+    JS_MODULES.with_borrow_mut(|m| {
+        let module = m.entry(type_id).or_default();
+        module.functions.push(Function {
+            name: name.to_string(),
+            executor: Mrc::new(Box::new(func)),
+        });
+    });
+}
+
+pub fn collect_js_functions<T: 'static>() -> Vec<Function> {
+    JS_MODULES.with_borrow(|m| {
+        let type_id = TypeId::of::<T>();
+        m.get(&type_id).cloned().map(|d| d.functions).unwrap_or_default()
+    })
+}
+
+pub fn register_js_init(type_id: TypeId, init_code: &str) {
+    JS_MODULES.with_borrow_mut(|m| {
+        let module = m.entry(type_id).or_default();
+        module.init_code = Some(init_code.to_string());
+    });
+}
+
 
 pub struct JsEngine {
     pub js_context: Mrc<JsContext>,
     pub app: App,
+    module_loader: SharedModuleLoader,
 }
 
 struct JsFuncCallback {
     js_context: Mrc<JsContext>,
-    pub js_func: Box<dyn JsFunc + RefUnwindSafe>,
+    pub js_func: Mrc<Box<dyn JsFunc + RefUnwindSafe>>,
 }
 
 impl Callback<()> for JsFuncCallback {
@@ -118,91 +161,112 @@ impl JsEngine {
             .unwrap();
         let js_context = Mrc::new(JsContext::new(js_context, runtime));
 
-        let engine = Self {
+        let mut engine = Mrc::new(Self {
             js_context,
             app: app.clone(),
-        };
+            module_loader: loader.clone(),
+        });
 
-        init_base_components();
-        engine.add_global_functions(Popup::create_js_apis());
+        JS_ENGINE.with(|e| *e.borrow_mut() = Some(engine.clone()));
 
-        engine.add_global_functions(Menu::create_js_apis());
-        engine.add_global_functions(StandardMenuItem::create_js_apis());
+        // Init core module and console
+        engine.eval_module(include_str!("./core.js"), "deft:core").unwrap();
+        engine.register_module_and_load::<ExtConsole>("deft:core:console").unwrap();
 
-        engine.add_global_functions(Page::create_js_apis());
-        engine.add_global_functions(ExtConsole::create_js_apis());
-        engine.add_global_functions(Element::create_js_apis());
-        engine.add_global_functions(Scroll::create_js_apis());
-        engine.add_global_functions(Button::create_js_apis());
-        engine.add_global_functions(Checkbox::create_js_apis());
-        engine.add_global_functions(Radio::create_js_apis());
-        engine.add_global_functions(TextInput::create_js_apis());
-        engine.add_global_functions(TextEdit::create_js_apis());
-        engine.add_global_functions(RichText::create_js_apis());
-        engine.add_global_functions(Label::create_js_apis());
-        engine.add_global_functions(Image::create_js_apis());
-        engine.add_global_functions(Select::create_js_apis());
+        // Init app module
+        engine.register_module_and_load::<JsApp>("deft:core:jsapp").unwrap();
+
+        // Init env module
+        engine.register_module::<env>("deft:env").unwrap();
+
+        // Init process module
+        engine.register_module_and_load::<process>("deft:process").unwrap();
+
+        // Init menu modules
+        engine.register_module::<Menu>("deft:core:menu").unwrap();
+        engine.register_module::<StandardMenuItem>("deft:core:standardmenuitem").unwrap();
+        engine.eval_module(include_str!("./menu.js"), "deft:menu").unwrap();
+
+        // Init timer module
+        engine.register_module_and_load::<Timer>("deft:core:timer").unwrap();
+
+        // Init window modules
+        engine.register_module::<Page>("deft:core:page").unwrap();
+        engine.register_module::<Popup>("deft:core:popup").unwrap();
+        engine.register_module_and_load::<Window>("deft:core:window").unwrap();
+
+        // Init ui modules
+        engine.register_module::<Element>("deft:core:element").unwrap();
+        engine.register_module::<Body>("deft:core:body").unwrap();
+        engine.register_module::<Checkbox>("deft:core:checkbox").unwrap();
+        engine.register_module::<Container>("deft:core:container").unwrap();
+        engine.register_module::<Button>("deft:core:button").unwrap();
+        engine.register_module::<Checkbox>("deft:core:checkbox").unwrap();
+        engine.register_module::<RadioGroup>("deft:core:radiogroup").unwrap();
+        engine.register_module::<Radio>("deft:core:radio").unwrap();
+        engine.register_module::<TextInput>("deft:core:textinput").unwrap();
+        engine.register_module::<TextEdit>("deft:core:textedit").unwrap();
+        engine.register_module::<RichText>("deft:core:richtext").unwrap();
+        engine.register_module::<Label>("deft:core:label").unwrap();
+        engine.register_module::<Image>("deft:core:image").unwrap();
+        engine.register_module::<Select>("deft:core:select").unwrap();
+        engine.eval_module(include_str!("./ui.js"), "deft:ui").unwrap();
+
+        // Init sqlite module
         #[cfg(feature = "sqlite")]
-        engine.add_global_functions(crate::ext::ext_sqlite::SqliteConn::create_js_apis());
+        engine.register_mod::<crate::ext::ext_sqlite::SqliteConn>("deft:sqlite").unwrap();
+
+        // Init system tray module
         #[cfg(feature = "tray")]
         {
-            engine.add_global_functions(SystemTray::create_js_apis());
+            engine.register_module::<SystemTray>("deft:systemtray").unwrap();
         }
-        engine.add_global_functions(process::create_js_apis());
+
+        // Init dialog module
         #[cfg(feature = "dialog")]
-        engine.add_global_functions(crate::ext::ext_dialog::dialog::create_js_apis());
-        engine.add_global_functions(Base64::create_js_apis());
-        engine.add_global_functions(shell::create_js_apis());
+        engine.register_module::<crate::ext::ext_dialog::dialog>("deft:dialog").unwrap();
+
+        // Init base64 module
+        engine.register_module::<Base64>("deft:core:base64").unwrap();
+
+        // Init shell module
+        engine.register_module::<shell>("deft:core:shell").unwrap();
+
+        // Init audio module
         #[cfg(feature = "audio")]
-        engine.add_global_functions(crate::ext::ext_audio::Audio::create_js_apis());
-        engine.add_global_functions(path::create_js_apis());
-        engine.add_global_functions(env::create_js_apis());
-        #[cfg(feature = "http")]
-        engine.add_global_functions(crate::ext::ext_http::http::create_js_apis());
-        #[cfg(fs_enabled)]
-        engine.add_global_functions(appfs::create_js_apis());
-        engine.add_global_functions(localstorage::create_js_apis());
-        // websocket
-        #[cfg(feature = "websocket")]
-        engine.add_global_functions(crate::ext::ext_websocket::WsConnection::create_js_apis());
-        #[cfg(feature = "http")]
-        engine.add_global_functions(crate::ext::ext_fetch::fetch::create_js_apis());
+        engine.register_module::<crate::ext::ext_audio::Audio>("deft:audio").unwrap();
 
-        engine.add_global_functions(Window::create_js_apis());
-        engine.add_global_func(timer_set_timeout::new());
-        engine.add_global_func(timer_clear_timeout::new());
-        engine.add_global_func(timer_set_interval::new());
-        engine.add_global_func(timer_clear_interval::new());
+        // Init localstorage module
+        engine.register_module_and_load::<localstorage>("deft:core:localstorage").unwrap();
 
+        // Init fs module
+        engine.register_module::<path>("deft:path").unwrap();
         #[cfg(fs_enabled)]
         {
-            engine.add_global_func(fs_read_dir::new());
-            engine.add_global_func(fs_stat::new());
-            engine.add_global_func(fs_exists::new());
-            engine.add_global_func(fs_rename::new());
-            engine.add_global_func(fs_delete_file::new());
-            engine.add_global_func(fs_create_dir::new());
-            engine.add_global_func(fs_create_dir_all::new());
-            engine.add_global_func(fs_remove_dir::new());
-            engine.add_global_func(fs_remove_dir_all::new());
+            engine.register_module::<appfs>("deft:appfs").unwrap();
+            engine.register_module::<FileSystem>("deft:fs").unwrap();
         }
+
+        // Init net modules
+        #[cfg(feature = "http")]
+        {
+            engine.register_module::<crate::ext::ext_http::http>("deft:core:http").unwrap();
+            engine.register_module_and_load::<crate::ext::ext_fetch::fetch>("deft:core:fetch").unwrap();
+        }
+        #[cfg(feature = "websocket")]
+        engine.register_module_and_load::<crate::ext::ext_websocket::WsConnection>("deft:core:wsconnection").unwrap();
 
         engine.add_global_func(animation_create::new());
         engine.add_global_func(typeface_create::new());
 
+        // Init clipboard module
         #[cfg(feature = "clipboard")]
-        engine.add_global_functions(crate::ext::ext_clipboard::Clipboard::create_js_apis());
-        engine.add_global_func(stylesheet_add::new());
-        engine.add_global_func(stylesheet_remove::new());
-        engine.add_global_func(stylesheet_update::new());
+        engine.register_module_and_load::<crate::ext::ext_clipboard::Clipboard>("deft:clipboard").unwrap();
+        engine.register_module_and_load::<Stylesheet>("deft:core:stylesheet").unwrap();
 
+        // Init worker modules
         Worker::init_js_api(WorkerInitParams { app });
-        engine.add_global_functions(Worker::create_js_apis());
-
-
-        engine.add_global_functions(JsApp::create_js_apis());
-
-        JS_ENGINE.with(|e| *e.borrow_mut() = Some(Mrc::new(engine)));
+        engine.register_module_and_load::<Worker>("deft:core:worker").unwrap();
     }
 
     pub fn enable_localstorage(&mut self, p: PathBuf) {
@@ -221,15 +285,26 @@ impl JsEngine {
         self.js_context.create_promise()
     }
 
-    pub fn init_api(&self) {
-        let default_css = include_str!("../../deft.css");
-        CSS_MANAGER.with_borrow_mut(|manager| {
-            if let Err(e) = manager.add(default_css) {
-                println!("Error adding CSS: {:?}", e);
-            }
-        });
-        let libjs = String::from_utf8_lossy(include_bytes!("../../lib.js"));
-        self.js_context.eval_module(&libjs, "lib.js").unwrap();
+    pub fn register_module<M: JsModule>(&mut self, module_name: &str) -> anyhow::Result<()> {
+        let mut module = self.js_context.create_module(&format!("native://{}", module_name));
+        for f in M::get_functions() {
+            let js_context = self.js_context.clone();
+            module = module.add_function(&f.name, JsFuncCallback {
+                js_context,
+                js_func: f.executor,
+            });
+        }
+        module.build().map_err(|e| anyhow!("failed to build js module: {:?}", e))?;
+        let module_init_code = M::get_init_scripts().unwrap_or("export * from 'native'".to_string());
+        self.module_loader.register_memory_module(module_name, &module_init_code);
+        Ok(())
+    }
+
+    pub fn register_module_and_load<M: JsModule>(&mut self, module_name: &str) -> anyhow::Result<()> {
+        self.register_module::<M>(module_name)?;
+        self.js_context.execute_module(module_name)
+            .map_err(|e| anyhow!("Failed to init module: {:?}", e))?;
+        Ok(())
     }
 
     pub fn add_global_functions(&self, functions: Vec<Box<dyn JsFunc + RefUnwindSafe + 'static>>) {
@@ -240,7 +315,7 @@ impl JsEngine {
                 .add_callback(
                     name.as_str(),
                     JsFuncCallback {
-                        js_func: func,
+                        js_func: Mrc::new(func),
                         js_context,
                     },
                 )
@@ -255,7 +330,7 @@ impl JsEngine {
             .add_callback(
                 name.as_str(),
                 JsFuncCallback {
-                    js_func: Box::new(func),
+                    js_func: Mrc::new(Box::new(func)),
                     js_context,
                 },
             )
@@ -285,14 +360,14 @@ impl JsEngine {
                     windows
                         .iter()
                         .filter(|(_, f)| {
-                            f.upgrade_mut()
+                            f.upgrade()
                                 .ok()
                                 .map(|f| f.window_type == WindowType::Menu)
                                 .unwrap_or(false)
                         })
                         .map(|(_, f)| f.clone())
                         .filter(|w| {
-                            if let Ok(window) = w.upgrade_mut() {
+                            if let Ok(window) = w.upgrade() {
                                 let w_size: PhysicalSize<i32> = window.window.outer_size().cast();
                                 if let Some(ptr_pos) = window.window.pointer_position() {
                                     let is_in_window = ptr_pos.x >= 0
@@ -309,7 +384,7 @@ impl JsEngine {
                         .collect()
                 });
                 for f in close_windows {
-                    if let Ok(mut f) = f.upgrade_mut() {
+                    if let Ok(mut f) = f.upgrade() {
                         let _ = f.close();
                     }
                 }

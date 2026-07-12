@@ -3,12 +3,15 @@ use crate::js::JsError;
 use clipboard::{ClipboardContext, ClipboardProvider};
 use deft_macros::js_methods;
 use std::error::Error;
+use crate::js_module;
 
 fn to_js_error(error: Box<dyn Error>) -> JsError {
     JsError::new(error.to_string())
 }
 
 pub struct Clipboard;
+
+js_module!(Clipboard, include_str!("./clipboard.js"));
 
 #[js_methods]
 impl Clipboard {

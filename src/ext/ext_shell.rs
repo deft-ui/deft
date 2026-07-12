@@ -2,10 +2,12 @@ use crate as deft;
 use anyhow::Error;
 use deft_macros::js_methods;
 use std::process::Command;
+use crate::js_module;
 
 #[allow(nonstandard_style)]
 pub struct shell;
 
+js_module!(shell);
 #[js_methods]
 impl shell {
     #[js_func]

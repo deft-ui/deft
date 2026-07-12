@@ -10,6 +10,7 @@ use selectors::parser::{
 };
 use selectors::{self, matching, OpaqueElement};
 use std::fmt;
+use std::ops::Deref;
 
 type LocalName = String;
 type Namespace = String;
@@ -120,7 +121,26 @@ impl selectors::parser::PseudoElement for PseudoElement {
     type Impl = DeftSelectors;
 }
 
-impl selectors::Element for Element {
+#[derive(Debug)]
+pub struct StyleElement {
+    element: Element,
+}
+
+impl Clone for StyleElement {
+    fn clone(&self) -> Self {
+        todo!()
+    }
+}
+
+impl Deref for StyleElement {
+    type Target = Element;
+
+    fn deref(&self) -> &Self::Target {
+        &self.element
+    }
+}
+
+impl selectors::Element for StyleElement {
     type Impl = DeftSelectors;
 
     #[inline]
@@ -130,7 +150,9 @@ impl selectors::Element for Element {
 
     #[inline]
     fn parent_element(&self) -> Option<Self> {
-        self.get_parent()
+        self.get_parent().map(|element| StyleElement {
+            element
+        })
     }
     #[inline]
     fn parent_node_is_shadow_root(&self) -> bool {
@@ -358,6 +380,7 @@ impl Selector {
     }
 
     pub fn matches(&self, element: &Element) -> bool {
+        let element = StyleElement { element: element.clone_element() };
         let mode = if self.pseudo_element().is_some() {
             MatchingMode::ForStatelessPseudoElement
         } else {
@@ -368,7 +391,7 @@ impl Selector {
             &self.selector,
             0,
             None,
-            element,
+            &element,
             &mut context,
             &mut |_, _| {},
         )
@@ -395,16 +418,16 @@ impl Selector {
 pub mod tests {
     use crate::element::button::Button;
     use crate::element::container::Container;
-    use crate::element::{Element, ElementBackend};
+    use crate::element::{Element, Widget};
     use crate::style::select::Selectors;
 
     #[test]
     fn test_select() {
         let btn_selector = Selectors::compile("button").unwrap();
         let container_selector = Selectors::compile("container").unwrap();
-        let mut button = Element::create(Button::create);
+        let mut button = Button::create();
         button.set_tag("button".to_string());
-        let mut container = Element::create(Container::create);
+        let mut container = Container::create();
         container.set_tag("container".to_string());
         assert!(btn_selector.matches(&button));
         assert!(container_selector.matches(&container));

@@ -3,7 +3,7 @@ use crate::border::tiny_path_to_skia_path;
 use crate::canvas_util::CanvasHelper;
 use crate::paint::{DrawLayer, InvalidRects, LayerState, Painter, RenderLayerKey};
 use crate::render::paint_object::{ElementPO, LayerPO};
-use crate::{show_focus_hint, show_layer_hint, show_repaint_area};
+use crate::{show_layer_hint, show_repaint_area};
 use skia_safe::{Canvas, ClipOp, Color, FilterMode, Matrix, Paint, PaintStyle, SamplingOptions};
 use skia_window::context::RenderContext;
 use std::collections::HashMap;
@@ -305,14 +305,11 @@ impl ElementPainter {
                 // draw content box
                 canvas.translate((border_left_width, border_top_width));
                 // let paint_info = some_or_return!(&mut node.paint_info);
-                if let Some(render_fn) = node.render_fn.take() {
+                if let Some(render_fn) = &mut node.render_fn {
                     render_fn.run(painter);
                 }
             }
             canvas.restore();
-            if show_focus_hint() && node.focused {
-                node.draw_hit_rect(canvas);
-            }
         });
     }
 }

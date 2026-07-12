@@ -20,11 +20,10 @@ use crate::animation::ANIMATIONS;
 use crate::animation::{AnimationInstance, WindowAnimationController};
 use crate::base::Rect;
 use crate::element::scroll::ScrollBarStrategy;
-use crate::element::ElementWeak;
+use crate::element::{Element, ElementWeak};
 use crate::event_loop::create_event_loop_callback;
 use crate::font::family::FontFamilies;
-use crate::mrc::{Mrc, MrcWeak};
-use crate::number::DeNan;
+use crate::mrc::{Mrc};
 use crate::style::animation::AnimationParams;
 use crate::style::font::{FontStyle, LineHeightVal};
 use crate::style::length::{Length, LengthContext, LengthOrPercent};
@@ -33,7 +32,6 @@ use crate::style::overflow::Overflow;
 use crate::style::style_vars::StyleVars;
 use crate::style::transform::StyleTransform;
 use crate::style_list::ParsedStyleProp;
-use crate::{ok_or_return, some_or_return};
 use anyhow::{anyhow, Error};
 use deft_macros::mrc_object;
 use quick_js::JsValue;
@@ -46,6 +44,7 @@ use swash::Style;
 use yoga::{
     Align, Direction, Display, FlexDirection, Justify, Node, PositionType, StyleUnit, Wrap,
 };
+use crate::window::{WindowHandle};
 
 //TODO rename
 pub trait PropValueParse: Sized {
@@ -365,10 +364,7 @@ impl DerefMut for YogaNode {
 
 #[mrc_object]
 pub struct StyleNode {
-    element: ElementWeak,
     pub yoga_node: NodeItem,
-
-    parent: Option<MrcWeak<Self>>,
     children: Vec<StyleNode>,
 
     // (inherited, computed)
@@ -393,9 +389,7 @@ impl StyleNode {
     pub fn new() -> Self {
         let transparent = Color::from_argb(0, 0, 0, 0);
         let mut inner = StyleNodeData {
-            element: ElementWeak::invalid(),
             yoga_node: NodeItem::new(),
-            parent: None,
             children: Vec::new(),
             border_radius: [0.0, 0.0, 0.0, 0.0],
             border_color: [transparent, transparent, transparent, transparent],
@@ -418,34 +412,18 @@ impl StyleNode {
     }
 
     pub fn has_shadow(&self) -> bool {
-        self.yoga_node.has_shadow()
-    }
-
-    pub fn bind_element(&mut self, element: ElementWeak) {
-        self.element = element;
+        self.yoga_node.is_layout_boundary()
     }
 
     pub fn get_padding(&self) -> (f32, f32, f32, f32) {
-        let n = &self.yoga_node._yn;
-        (
-            n.get_layout_padding_top().de_nan(0.0),
-            n.get_layout_padding_right().de_nan(0.0),
-            n.get_layout_padding_bottom().de_nan(0.0),
-            n.get_layout_padding_left().de_nan(0.0),
-        )
+        let [t, r, b, l] = self.yoga_node.layout.get_padding().unwrap_or_default();
+        (t, r, b, l)
     }
 
     pub fn get_content_bounds(&self) -> Rect {
-        let l = self.yoga_node._yn.get_layout_padding_left().de_nan(0.0);
-        let r = self.yoga_node._yn.get_layout_padding_right().de_nan(0.0);
-        let t = self.yoga_node._yn.get_layout_padding_top().de_nan(0.0);
-        let b = self.yoga_node._yn.get_layout_padding_bottom().de_nan(0.0);
-        let bl = self.yoga_node._yn.get_layout_border_left().de_nan(0.0);
-        let br = self.yoga_node._yn.get_layout_border_right().de_nan(0.0);
-        let bt = self.yoga_node._yn.get_layout_border_top().de_nan(0.0);
-        let bb = self.yoga_node._yn.get_layout_border_bottom().de_nan(0.0);
-        let width = self.yoga_node._yn.get_layout_width();
-        let height = self.yoga_node._yn.get_layout_height();
+        let [t, r, b, l] = self.yoga_node.layout.get_padding().unwrap_or_default();
+        let [bt, br, bb, bl] = self.yoga_node.layout.get_border().unwrap_or_default();
+        let [width, height] = self.yoga_node.layout.get_size().unwrap_or_default();
         // let (width, height) = self.with_container_node(|n| {
         //     (n.get_layout_width().de_nan(0.0), n.get_layout_height().de_nan(0.0))
         // });
@@ -585,6 +563,7 @@ impl StyleNode {
         &mut self,
         p: ResolvedStyleProp,
         length_ctx: &LengthContext,
+        el: &mut Element,
     ) -> (bool, bool) {
         let prop_key = p.key();
         if self.resolved_style_props.get(&prop_key) == Some(&p) {
@@ -721,7 +700,6 @@ impl StyleNode {
                     Overflow::Scroll => ScrollBarStrategy::Always,
                     Overflow::Auto => ScrollBarStrategy::Auto,
                 };
-                let mut el = ok_or_return!(self.element.upgrade(), (false, false));
                 match scroll_strategy {
                     ScrollBarStrategy::Never => {
                         el.need_snapshot = false;
@@ -753,19 +731,19 @@ impl StyleNode {
                 need_layout = false;
                 let name = value;
                 self.animation_params.name = name;
-                self.update_animation();
+                self.update_animation(length_ctx.window.clone(), el.as_weak());
             }
             ResolvedStyleProp::AnimationDuration(value) => {
                 need_layout = false;
                 let duration = value;
                 self.animation_params.duration = duration;
-                self.update_animation();
+                self.update_animation(length_ctx.window.clone(), el.as_weak());
             }
             ResolvedStyleProp::AnimationIterationCount(value) => {
                 need_layout = false;
                 let ic = value;
                 self.animation_params.iteration_count = ic;
-                self.update_animation();
+                self.update_animation(length_ctx.window.clone(), el.as_weak());
             }
 
             // container node style
@@ -800,7 +778,7 @@ impl StyleNode {
         (repaint, need_layout)
     }
 
-    fn update_animation(&mut self) {
+    fn update_animation(&mut self, window: WindowHandle, element: ElementWeak) {
         let mut me = self.clone();
         let task = create_event_loop_callback(move || {
             let p = &me.animation_params;
@@ -808,14 +786,12 @@ impl StyleNode {
                 if p.name.is_empty() || p.duration <= 0.0 || p.iteration_count <= 0.0 {
                     None
                 } else {
-                    let element = ok_or_return!(me.element.upgrade());
-                    let window = some_or_return!(element.get_window());
                     ANIMATIONS.with_borrow(|m| {
                         let ani = m.get(&p.name)?.preprocess();
                         let frame_controller = WindowAnimationController::new(window);
                         let duration = p.duration * 1000000.0;
                         let iteration_count = p.iteration_count;
-                        let actor = CssAnimationActor::new(ani, element.as_weak());
+                        let actor = CssAnimationActor::new(ani, element);
                         let mut ani_instance = AnimationInstance::new(
                             actor,
                             duration,
@@ -828,15 +804,6 @@ impl StyleNode {
                 };
         });
         task.call();
-    }
-
-    pub fn get_parent(&self) -> Option<StyleNode> {
-        if let Some(p) = &self.parent {
-            if let Ok(sn) = p.upgrade() {
-                return Some(StyleNode { inner: sn });
-            }
-        }
-        return None;
     }
 
     fn set_border_width(
@@ -871,7 +838,6 @@ impl StyleNode {
 
     pub fn insert_child(&mut self, child: &mut StyleNode, index: u32) {
         self.children.insert(index as usize, child.clone());
-        child.parent = Some(self.inner.as_weak());
         self.yoga_node
             .children
             .insert(index as usize, child.yoga_node.clone());
@@ -888,7 +854,6 @@ impl StyleNode {
             return;
         };
         self.yoga_node.children.remove(idx);
-        child.parent = None;
         self.inner.children.remove(idx);
     }
 
@@ -916,6 +881,10 @@ impl StyleNode {
     ) {
         self.yoga_node
             .calculate_shadow_layout(available_width, available_height, parent_direction);
+    }
+
+    pub fn is_shadow_layout_calculated(&self) -> bool {
+        self.yoga_node.layout.is_shadow_layout_calculated().unwrap_or_default()
     }
 }
 

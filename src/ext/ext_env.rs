@@ -1,5 +1,6 @@
 use crate as deft;
 use anyhow::Error;
+use crate::js_module;
 use deft_macros::js_methods;
 use std::env as std_env;
 
@@ -20,3 +21,5 @@ impl env {
         Ok(exe.to_string_lossy().to_string())
     }
 }
+
+js_module!(env);

@@ -66,6 +66,10 @@ mod tooltip;
 mod typeface;
 pub mod winit;
 
+pub mod layout;
+
+pub mod ui;
+
 use crate::base::ResultWaiter;
 use crate::console::init_console;
 use crate::event_loop::AppEventProxy;

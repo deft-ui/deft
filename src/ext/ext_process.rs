@@ -1,7 +1,7 @@
 use std::cell::Cell;
 use crate as deft;
 use crate::app::exit_app;
-use crate::is_mobile_platform;
+use crate::{is_mobile_platform, js_module};
 use crate::js::js_engine::JsEngine;
 use deft_macros::js_methods;
 use log::error;
@@ -27,6 +27,8 @@ impl HostPromiseRejectionTracker for UserPromiseRejectionTracker {
 
 #[allow(nonstandard_style)]
 pub struct process;
+
+js_module!(process, include_str!("./process.js"));
 
 #[js_methods]
 impl process {

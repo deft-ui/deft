@@ -1,7 +1,9 @@
 #![windows_subsystem = "windows"]
+
+use deft_macros::{widget, js_methods};
 use deft::app::{App, IApp};
-use deft::bootstrap;
-use deft::element::{register_component, Element, ElementBackend, ElementWeak};
+use deft::{bootstrap, js_module};
+use deft::element::{Element, Widget, ElementDelegate, ElementWeak};
 use deft::js::js_engine::JsEngine;
 use deft::render::RenderFn;
 use quick_js::loader::{FsJsModuleLoader, JsModuleLoader};
@@ -9,22 +11,39 @@ use skia_safe::{Color, Paint, PaintStyle};
 
 /// Begin Custom Element
 
-struct HelloBackend {
+#[widget]
+struct HelloWidget {
+
+}
+
+impl Widget for HelloWidget {}
+
+js_module!(HelloWidget, include_str!("./custom_widget.js"));
+
+#[js_methods]
+impl HelloWidget {
+
+    #[js_func]
+    pub fn create() -> Self {
+        let mut el = Element::new("hello");
+        el.set_delegate(HelloElementDelegate {
+            element_weak: el.as_weak(),
+        });
+        Self {
+            el,
+        }
+    }
+}
+
+struct HelloElementDelegate {
     element_weak: ElementWeak,
 }
 
-impl ElementBackend for HelloBackend {
-    fn create(element: &mut Element) -> Self
-    where
-        Self: Sized,
-    {
-        Self {
-            element_weak: element.as_weak(),
-        }
-    }
+
+impl ElementDelegate for HelloElementDelegate {
 
     fn render(&mut self) -> RenderFn {
-        let element = self.element_weak.upgrade_mut().unwrap();
+        let element = self.element_weak.upgrade().unwrap();
         let bounds = element.get_bounds();
         let center = (bounds.width / 2.0, bounds.height / 2.0);
         let radius = f32::min(center.0, center.1);
@@ -41,11 +60,11 @@ impl ElementBackend for HelloBackend {
 struct AppImpl {}
 
 impl IApp for AppImpl {
-    fn init_js_engine(&mut self, _js_engine: &mut JsEngine) {
-        register_component::<HelloBackend>("hello");
+    fn init_js_engine(&mut self, js_engine: &mut JsEngine) {
+        js_engine.register_module::<HelloWidget>("custom_widget").unwrap();
     }
     fn create_module_loader(&mut self) -> Box<dyn JsModuleLoader + Send + Sync + 'static> {
-        let ml = FsJsModuleLoader::new("examples/custom-element-js");
+        let ml = FsJsModuleLoader::new("examples/custom-widget-js");
         Box::new(ml)
     }
 }

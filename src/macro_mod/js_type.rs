@@ -18,6 +18,14 @@ macro_rules! js_value {
                 }
             }
         }
+
+        impl deft::js::BorrowFromJs for $ref_type {
+            fn borrow_from_js<R, F: FnOnce(&mut Self) -> R>(value: deft::js::JsValue, receiver: F) -> Result<R, deft::js::ValueError> {
+                use deft::js::js_binding::FromJsValue;
+                let mut el = <$ref_type>::from_js_value(value)?;
+                Ok(receiver(&mut el))
+            }
+        }
     };
 }
 
@@ -37,7 +45,7 @@ macro_rules! js_weak_value {
         impl deft::js::FromJsValue for $ref_type {
             fn from_js_value(value: deft::js::JsValue) -> Result<Self, deft::js::ValueError> {
                 if let Some(r) = value.as_resource(|r: &mut $weak_type| r.clone()) {
-                    if let Ok(r) = r.upgrade() {
+                    if let Ok(r) = r.upgrade_into() {
                         Ok(r)
                     } else {
                         Err(deft::js::ValueError::Internal(
@@ -49,6 +57,14 @@ macro_rules! js_weak_value {
                 }
             }
         }
+
+        impl deft::js::BorrowFromJs for $ref_type {
+            fn borrow_from_js<R, F: FnOnce(&mut Self) -> R>(value: deft::js::JsValue, receiver: F) -> Result<R, deft::js::ValueError> {
+                use deft::js::js_binding::FromJsValue;
+                let mut el = <$ref_type>::from_js_value(value)?;
+                Ok(receiver(&mut el))
+            }
+        }
     };
 }
 
@@ -58,7 +74,7 @@ macro_rules! js_auto_upgrade {
     ($weak_type: ty, $ref_type: ty) => {
         impl deft::js::ToJsValue for $weak_type {
             fn to_js_value(self) -> Result<deft::js::JsValue, deft::js::ValueError> {
-                if let Ok(e) = self.upgrade() {
+                if let Ok(e) = self.upgrade_into() {
                     Ok(deft::js::JsValue::Resource(deft::js::ResourceValue {
                         resource: std::rc::Rc::new(std::cell::RefCell::new(e)),
                     }))
@@ -119,6 +135,32 @@ macro_rules! bind_js_event_listener {
             )*
             _ => {
                 None
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! js_module {
+    ($ty: ty) => {
+        impl deft::js::js_engine::JsModule for $ty {
+            fn get_functions() -> Vec<deft::js::js_engine::Function> {
+                deft::js::js_engine::collect_js_functions::<$ty>()
+            }
+
+            fn get_init_scripts() -> Option<String> {
+                None
+            }
+        }
+    };
+    ($ty: ty, $init_code: expr) => {
+        impl deft::js::js_engine::JsModule for $ty {
+            fn get_functions() -> Vec<deft::js::js_engine::Function> {
+                deft::js::js_engine::collect_js_functions::<$ty>()
+            }
+
+            fn get_init_scripts() -> Option<String> {
+                Some($init_code.to_string())
             }
         }
     };

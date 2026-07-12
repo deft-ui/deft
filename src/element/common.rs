@@ -7,7 +7,6 @@ use crate as deft;
 use crate::base::{EventContext, Rect};
 use crate::canvas_util::CanvasHelper;
 use crate::element::scroll::ScrollBarStrategy;
-use crate::element::ElementWeak;
 use crate::event::{Event, MouseDownEvent, MouseMoveEvent, MouseUpEvent, WheelEvent};
 use crate::render::RenderFn;
 use crate::timer::{set_interval, set_timeout, TimerHandle};
@@ -164,7 +163,7 @@ impl ScrollBar {
         self.track_rect.contains_point(x, y)
     }
 
-    pub fn on_event(&mut self, event: &Event, _ctx: &mut EventContext<ElementWeak>) -> bool {
+    pub fn on_event(&mut self, event: &Event, _ctx: &mut EventContext) -> bool {
         if let Some(e) = MouseDownEvent::cast(event) {
             let d = e.0;
             self.on_mouse_down(d.offset_x, d.offset_y)

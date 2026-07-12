@@ -1,7 +1,8 @@
 use crate as deft;
 use crate::base::EventRegistration;
+use crate::js_module;
 use crate::element::body::Body;
-use crate::element::{Element, ElementBackend, ElementType};
+use crate::element::Element;
 use crate::js_weak_value;
 use crate::window::WindowHandle;
 use deft_macros::{js_methods, mrc_object};
@@ -9,8 +10,8 @@ use deft_macros::{js_methods, mrc_object};
 #[mrc_object]
 pub struct Page {
     window_weak: WindowHandle,
-    event_registration: EventRegistration<PageWeak>,
-    body: Element,
+    event_registration: EventRegistration,
+    body: Body,
 }
 
 js_weak_value!(Page, PageWeak);
@@ -18,10 +19,8 @@ js_weak_value!(Page, PageWeak);
 #[js_methods]
 impl Page {
     pub fn new(window_weak: WindowHandle, content: Element) -> Page {
-        let mut body = Element::create(Body::create);
-        body.set_tag("body".to_owned());
-        body.set_element_type(ElementType::Widget);
-        body.add_child(content, 0).unwrap();
+        let mut body = Body::create();
+        body.add_child(&content, Some(0)).unwrap();
         PageData {
             body,
             window_weak,
@@ -30,14 +29,16 @@ impl Page {
         .to_ref()
     }
 
-    pub fn get_body(&self) -> &Element {
+    pub fn get_body(&self) -> &Body {
         &self.body
     }
 
     #[js_func]
     pub fn close(&self) {
-        if let Ok(mut window) = self.window_weak.upgrade_mut() {
+        if let Ok(mut window) = self.window_weak.upgrade() {
             window.close_page(self.clone());
         }
     }
 }
+
+js_module!(Page);

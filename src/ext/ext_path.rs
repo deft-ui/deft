@@ -2,10 +2,12 @@ use crate as deft;
 use anyhow::Error;
 use deft_macros::js_methods;
 use std::path::PathBuf;
+use crate::js_module;
 
 #[allow(nonstandard_style)]
 pub struct path;
 
+js_module!(path);
 #[js_methods]
 impl path {
     #[js_func]

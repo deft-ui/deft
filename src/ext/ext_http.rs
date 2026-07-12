@@ -1,5 +1,6 @@
 use crate as deft;
 use crate::{js_deserialize, js_serialize};
+use crate::js_module;
 use anyhow::Error;
 use deft_macros::js_methods;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
@@ -70,3 +71,5 @@ impl http {
         Ok(HttpResponse { status, body })
     }
 }
+
+js_module!(http);

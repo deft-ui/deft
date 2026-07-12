@@ -2,13 +2,15 @@ use crate::style::PropValueParse;
 use ordered_float::OrderedFloat;
 use std::str::FromStr;
 use yoga::StyleUnit;
+use crate::window::{WindowHandle};
 
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone)]
 pub struct LengthContext {
     pub root: f32,
     pub font_size: f32,
     pub viewport_width: f32,
     pub viewport_height: f32,
+    pub window: WindowHandle,
 }
 
 #[derive(Clone, Debug, PartialEq, Copy)]

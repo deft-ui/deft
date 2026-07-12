@@ -1,5 +1,6 @@
 use crate as deft;
 use crate::data_dir::get_data_path;
+use crate::js_module;
 use deft_macros::js_methods;
 use std::io;
 use tokio::fs;
@@ -92,3 +93,5 @@ impl appfs {
         fs::remove_dir_all(&path).await
     }
 }
+
+js_module!(appfs);

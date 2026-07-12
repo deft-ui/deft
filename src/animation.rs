@@ -375,7 +375,7 @@ impl WindowAnimationController {
 
 impl FrameController for WindowAnimationController {
     fn request_next_frame(&mut self, callback: Box<dyn FnOnce()>) {
-        if let Ok(mut frame) = self.frame.upgrade_mut() {
+        if let Ok(mut frame) = self.frame.upgrade() {
             frame.request_next_frame_callback(Callback::from_box(callback));
         }
     }

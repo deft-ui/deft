@@ -1,18 +1,15 @@
 mod line;
-mod util;
+pub mod util;
 
+use deft_macros::mrc_object;
 use crate as deft;
-use crate::base::EventContext;
 use crate::color::parse_hex_color;
 use crate::element::paragraph::simple_paragraph_builder::SimpleParagraphBuilder;
 use crate::element::paragraph::ParagraphParams;
 use crate::element::text::intersect_range;
 use crate::element::text::simple_text_paragraph::SimpleTextParagraph;
-use crate::element::{ElementBackend, ElementWeak};
-use crate::event::{
-    ClickEvent, Event, KeyDownEvent, KeyEventDetail, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
-    KEY_MOD_CTRL,
-};
+use crate::element::Element;
+use crate::event::{ClickEventListener, KeyDownEventListener, KeyEventDetail, MouseDownEventListener, MouseMoveEventListener, MouseUpEventListener, KEY_MOD_CTRL};
 use crate::font::family::{FontFamilies, FontFamily};
 use crate::number::DeNan;
 use crate::paint::Painter;
@@ -24,7 +21,7 @@ use crate::style::PropValueParse;
 use crate::text::textbox::line::Line;
 use crate::text::textbox::util::{parse_optional_text_decoration, parse_optional_weight};
 use crate::text::{TextAlign, TextStyle};
-use crate::{base, js_deserialize, js_serialize, some_or_continue};
+use crate::{base, js_deserialize, js_serialize, ok_or_return, some_or_continue};
 use serde::{Deserialize, Serialize};
 use skia_safe::font_style::{Weight, Width};
 use skia_safe::{Color, Paint, PaintStyle};
@@ -140,6 +137,7 @@ impl Selection {
 
 }
 
+#[mrc_object]
 pub struct TextBox {
     params: ParagraphParams,
     lines: Vec<Line>,
@@ -154,7 +152,7 @@ pub struct TextBox {
     caret: TextCoord,
     vertical_caret_moving_coord_x: f32,
     repaint_callback: Box<dyn FnMut()>,
-    layout_callback: Box<dyn FnMut()>,
+    layout_callback: Box<dyn FnMut(bool)>,
     caret_change_callback: Box<dyn FnMut()>,
 }
 
@@ -268,9 +266,10 @@ impl TextBox {
 
     pub fn layout(&mut self) {
         let (_, padding_right, _, padding_left) = self.padding;
+        let my_width = self.width;
         for ln in &mut self.lines {
             if !ln.layout_calculated {
-                ln.force_layout(self.width - padding_left - padding_right);
+                ln.force_layout(my_width - padding_left - padding_right);
                 ln.layout_calculated = true;
             }
         }
@@ -487,46 +486,58 @@ impl TextBox {
         ))
     }
 
-    pub fn on_event(
-        &mut self,
-        event: &Event,
-        _ctx: &mut EventContext<ElementWeak>,
-        scroll_x: f32,
-        scroll_y: f32,
-    ) -> bool {
-        if let Some(d) = KeyDownEvent::cast(event) {
-            return self.on_key_down(&d.0);
-        } else if let Some(e) = MouseDownEvent::cast(event) {
+    pub fn bind_event(&mut self, element: &mut Element) {
+        let scroll_x = 0.0;
+        let scroll_y = 0.0;
+        let me = self.as_weak();
+        element.register_event_listener(KeyDownEventListener::new(move |e, _ctx| {
+            let mut me = ok_or_return!(me.upgrade());
+            me.on_key_down(&e.0);
+        }));
+
+        let me = self.as_weak();
+        element.register_event_listener(MouseDownEventListener::new(move |e, _ctx| {
+            let mut me = ok_or_return!(me.upgrade());
             if e.0.button == 1 {
                 let event = e.0;
-                let begin_coord = self.get_text_coord_by_pixel_coord((
+                let begin_coord = me.get_text_coord_by_pixel_coord((
                     event.offset_x + scroll_x,
                     event.offset_y + scroll_y,
                 ));
-                self.update_caret(begin_coord);
-                self.selection_start(begin_coord);
-                return true;
+                me.update_caret(begin_coord);
+                me.selection_start(begin_coord);
             }
-        } else if let Some(e) = MouseMoveEvent::cast(event) {
-            if self.selecting_begin.is_some() {
+        }));
+
+        let me = self.as_weak();
+        element.register_event_listener(MouseMoveEventListener::new(move |e, _ctx| {
+            let mut me = ok_or_return!(me.upgrade());
+            if me.selecting_begin.is_some() {
                 let event = e.0;
-                let caret = self.get_text_coord_by_pixel_coord((
+                let caret = me.get_text_coord_by_pixel_coord((
                     event.offset_x + scroll_x,
                     event.offset_y + scroll_y,
                 ));
-                self.update_caret(caret);
-                return self.selection_update(caret);
+                me.update_caret(caret);
+                me.selection_update(caret);
             }
-        } else if let Some(e) = MouseUpEvent::cast(event) {
+        }));
+
+        let me = self.as_weak();
+        element.register_event_listener(MouseUpEventListener::new(move |e, _ctx| {
+            let mut me = ok_or_return!(me.upgrade());
             if e.0.button == 1 {
-                return self.selection_end();
+                me.selection_end();
             }
-        } else if let Some(e) = ClickEvent::cast(event) {
-            let caret = self
+        }));
+
+        let me = self.as_weak();
+        element.register_event_listener(ClickEventListener::new(move |e, _ctx| {
+            let mut me = ok_or_return!(me.upgrade());
+            let caret = me
                 .get_text_coord_by_pixel_coord((e.0.offset_x + scroll_x, e.0.offset_y + scroll_y));
-            self.update_caret(caret);
-        }
-        false
+            me.update_caret(caret);
+        }));
     }
 
     pub fn on_key_down(&mut self, event: &KeyEventDetail) -> bool {
@@ -764,7 +775,7 @@ impl TextBox {
         selection_bg.set_color(parse_hex_color("214283").unwrap());
         let mut selection_fg = Paint::default();
         selection_fg.set_color(Color::from_rgb(255, 255, 255));
-        Self {
+        TextBoxData {
             lines: Vec::new(),
             params,
             selection: Selection(TextCoord(0, 0), TextCoord(0, 0)),
@@ -776,19 +787,14 @@ impl TextBox {
             caret: TextCoord(0, 0),
             vertical_caret_moving_coord_x: 0.0,
             repaint_callback: Box::new(|| {}),
-            layout_callback: Box::new(|| {}),
+            layout_callback: Box::new(|_| {}),
             caret_change_callback: Box::new(|| {}),
-        }
-    }
-
-    fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend> {
-        None
+        }.to_ref()
     }
 
     pub fn get_caret(&self) -> TextCoord {
         self.caret
     }
-
     pub fn render(&mut self) -> RenderFn {
         let mut consumed_top = 0.0;
         let mut consumed_rows = 0usize;
@@ -847,7 +853,7 @@ impl TextBox {
         RenderFn::new(move |painter| {
             let canvas = painter.canvas;
             canvas.translate((padding_left, padding_top));
-            for lp in line_painters {
+            for lp in &mut line_painters {
                 if !lp(painter) {
                     break;
                 }
@@ -855,7 +861,7 @@ impl TextBox {
         })
     }
 
-    pub fn set_layout_callback<F: FnMut() + 'static>(&mut self, callback: F) {
+    pub fn set_layout_callback<F: FnMut(bool) + 'static>(&mut self, callback: F) {
         self.layout_callback = Box::new(callback);
     }
 
@@ -879,7 +885,8 @@ impl TextBox {
     }
 
     fn request_layout(&mut self) {
-        (self.layout_callback)();
+        let has_text = !self.get_text().is_empty();
+        (self.layout_callback)(has_text);
     }
 
     fn request_repaint(&mut self) {

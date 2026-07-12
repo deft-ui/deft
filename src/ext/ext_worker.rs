@@ -1,12 +1,12 @@
 use crate as deft;
 use crate::app::{App, IApp};
 use crate::base::{EventContext, EventListener, EventRegistration};
-use crate::bind_js_event_listener;
+use crate::{bind_js_event_listener, js_module};
 use crate::ext::service::Service;
 use crate::js::js_event_loop::{js_create_event_loop_fn_mut, js_is_in_event_loop, JsEvent};
 use crate::js::JsError;
 use crate::js_weak_value;
-use deft_macros::{js_methods, mrc_object, worker_context_event, worker_event};
+use deft_macros::{js_methods, mrc_object, event};
 use quick_js::loader::JsModuleLoader;
 use quick_js::JsValue;
 use std::cell::Cell;
@@ -25,20 +25,22 @@ thread_local! {
 #[mrc_object]
 pub struct Worker {
     id: u32,
-    event_registration: EventRegistration<WorkerWeak>,
+    event_registration: EventRegistration,
     service: Service,
 }
 
+js_module!(Worker, include_str!("./worker.js"));
+
 pub type MessageData = String;
 
-#[worker_event]
+#[event]
 pub struct MessageEvent {
     data: MessageData,
 }
 
 js_weak_value!(Worker, WorkerWeak);
 
-#[worker_context_event]
+#[event]
 pub struct WorkerContextMessageEvent {
     data: MessageData,
 }
@@ -55,18 +57,40 @@ pub struct WorkerParams {
 #[derive(Clone)]
 pub struct SharedModuleLoader {
     module_loader: Arc<Mutex<Box<dyn JsModuleLoader + Send + Sync>>>,
+    memory_modules: Arc<RefCell<HashMap<String, String>>>,
 }
 
 impl SharedModuleLoader {
     pub fn new(module_loader: Box<dyn JsModuleLoader + Send + Sync + 'static>) -> Self {
         Self {
             module_loader: Arc::new(Mutex::new(module_loader)),
+            memory_modules: Arc::new(RefCell::new(HashMap::new())),
         }
+    }
+
+    pub fn register_memory_module(&mut self, module_name: &str, code: &str) {
+        self.memory_modules.borrow_mut().insert(module_name.to_string(), code.to_string());
     }
 }
 
 impl JsModuleLoader for SharedModuleLoader {
+
+    fn resolve_module_path(&mut self, base_module_name: &str, module_name: &str) -> Option<String> {
+        if module_name == "native" {
+            Some(format!("native://{}", base_module_name))
+        } else {
+            let mut loader = self.module_loader.lock().unwrap();
+            loader.resolve_module_path(base_module_name, module_name)
+        }
+    }
+
     fn load(&mut self, module_name: &str) -> Result<String, Error> {
+        {
+            let mm = self.memory_modules.borrow();
+            if let Some(code) = mm.get(&module_name.to_string()) {
+                return Ok(code.to_string());
+            }
+        }
         let mut loader = self.module_loader.lock().unwrap();
         loader.load(module_name)
     }
@@ -132,7 +156,7 @@ impl Worker {
         Ok(js_worker)
     }
 
-    pub fn register_event_listener<T: 'static, H: EventListener<T, WorkerWeak> + 'static>(
+    pub fn register_event_listener<T: 'static, H: EventListener<T> + 'static>(
         &mut self,
         listener: H,
     ) -> u32 {
@@ -175,7 +199,7 @@ impl Worker {
 
     fn receive_message(&mut self, data: MessageData) -> Result<(), JsError> {
         let event = MessageEvent { data };
-        let mut ctx = EventContext::new(self.as_weak());
+        let mut ctx = EventContext::new();
         self.event_registration.emit(event, &mut ctx);
         Ok(())
     }
@@ -184,8 +208,10 @@ impl Worker {
 #[mrc_object]
 pub struct WorkerContext {
     message_emitter: Box<dyn FnMut(MessageData)>,
-    event_registration: EventRegistration<WorkerContextWeak>,
+    event_registration: EventRegistration,
 }
+
+js_module!(WorkerContext, include_str!("./workercontext.js"));
 
 js_weak_value!(WorkerContext, WorkerContextWeak);
 
@@ -203,7 +229,7 @@ impl WorkerContext {
         .to_ref()
     }
 
-    pub fn register_event_listener<T: 'static, H: EventListener<T, WorkerContextWeak> + 'static>(
+    pub fn register_event_listener<T: 'static, H: EventListener<T> + 'static>(
         &mut self,
         listener: H,
     ) -> u32 {
@@ -241,7 +267,7 @@ impl WorkerContext {
 
     fn receive_message(&mut self, data: MessageData) {
         let event = WorkerContextMessageEvent { data };
-        let mut ctx = EventContext::new(self.as_weak());
+        let mut ctx = EventContext::new();
         self.event_registration.emit(event, &mut ctx);
     }
 }

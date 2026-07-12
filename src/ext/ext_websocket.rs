@@ -1,6 +1,6 @@
 use crate as deft;
 use crate::js::{JsError, ToJsValue};
-use crate::js_weak_value;
+use crate::{js_module, js_weak_value};
 use anyhow::Error;
 use deft_macros::{js_methods, mrc_object};
 use futures_util::stream::{SplitSink, SplitStream};
@@ -29,6 +29,8 @@ pub struct WsConnection {
     writer: Arc<Mutex<SplitSink<WsStream, Message>>>,
     reader: Arc<Mutex<SplitStream<WsStream>>>,
 }
+
+js_module!(WsConnection, include_str!("./websocket.js"));
 
 unsafe impl Send for WsConnection {}
 unsafe impl Sync for WsConnection {}

@@ -1,53 +1,51 @@
 use crate as deft;
-use crate::base::EventContext;
 use crate::element::container::Container;
 use crate::element::image::Image;
 use crate::element::label::Label;
-use crate::element::{Element, ElementBackend, ElementWeak};
-use crate::event::{ClickEvent, Event};
+use crate::element::{Element, Widget, ElementDelegate, ElementWeak};
+use crate::event::{ClickEventListener};
 use crate::ok_or_return;
 use crate::style::length::LengthOrPercent;
 use crate::style::{FixedStyleProp, ResolvedStyleProp, StylePropVal};
-use deft_macros::{element_backend, event, js_methods};
+use deft_macros::{widget, event, js_methods, mrc_object};
 use std::collections::HashMap;
 use yoga::{Align, Display, FlexDirection};
+use crate::js_module;
+use crate::mrc::Mrc;
 
 #[event]
 pub struct ChangeEvent {}
 
-#[element_backend]
+struct CheckboxState {
+    label: Label,
+    delegate: CheckboxDelegate,
+}
+
+#[widget]
 pub struct Checkbox {
-    element: ElementWeak,
-    base: Container,
-    img_element: Element,
-    wrapper_element: Element,
-    box_element: Element,
-    label_element: Element,
-    checked: bool,
+    state: Mrc<CheckboxState>,
 }
 
 #[js_methods]
 impl Checkbox {
     #[js_func]
     pub fn set_label(&mut self, label: String) {
-        self.label_element
-            .get_backend_mut_as::<Label>()
-            .set_text(label);
+        self.state.label.set_text(label);
     }
 
     #[js_func]
     pub fn get_label(&mut self) -> String {
-        self.label_element.get_backend_mut_as::<Label>().get_text()
+        self.state.label.get_text()
     }
 
     #[js_func]
     pub fn is_checked(&self) -> bool {
-        self.checked
+        self.state.delegate.checked
     }
 
     #[js_func]
     pub fn set_checked(&mut self, checked: bool) {
-        let mut el = ok_or_return!(self.element.upgrade());
+        let mut el = ok_or_return!(self.state.delegate.element.upgrade());
         if checked {
             el.set_attribute("checked".to_string(), "".to_string());
         } else {
@@ -55,6 +53,83 @@ impl Checkbox {
         }
     }
 
+    #[js_func]
+    pub fn create() -> Self {
+        let mut element = Element::new("checkbox");
+        element.is_form_element = true;
+        element.register_js_event::<ChangeEvent>("change");
+        let mut wrapper = Container::create();
+        let mut box_container = Container::create();
+        let label = Label::create();
+        let mut img = Image::create();
+        img.set_src_svg_raw(include_bytes!("./checked.svg"));
+        img.set_style_props(vec![
+            FixedStyleProp::Width(StylePropVal::Custom(LengthOrPercent::Percent(100.0))),
+            FixedStyleProp::Height(StylePropVal::Custom(LengthOrPercent::Percent(100.0))),
+        ]);
+        box_container.add_child(&img, Some(0)).unwrap();
+
+        wrapper.add_child(&box_container, Some(0)).unwrap();
+        wrapper.add_child(&label, Some(1)).unwrap();
+
+        element.add_child(&wrapper, Some(0)).unwrap();
+        wrapper.set_style_props(vec![
+            FixedStyleProp::AlignItems(StylePropVal::Custom(Align::Center)),
+            FixedStyleProp::FlexDirection(StylePropVal::Custom(FlexDirection::Row)),
+        ]);
+        let delegate = CheckboxDelegateData {
+            box_container,
+            img,
+            checked: false,
+            element: element.as_weak(),
+        }.to_ref();
+        element.set_delegate(delegate.clone());
+        {
+            let mut delegate = delegate.clone();
+            element.register_event_listener(ClickEventListener::new(move |_e, _ctx| {
+                let checked = !delegate.checked;
+                delegate.update_checked(checked);
+            }));
+        }
+        let mut inst = Checkbox {
+            el: element,
+            state: Mrc::new(CheckboxState {
+                label,
+                delegate,
+            })
+        };
+        inst.state.delegate.update_children();
+        inst
+    }
+}
+
+impl Widget for Checkbox {}
+
+impl ElementDelegate for CheckboxDelegate {
+    fn accept_pseudo_element_styles(&mut self, styles: HashMap<String, Vec<ResolvedStyleProp>>) {
+        if let Some(styles) = styles.get("box") {
+            let styles = styles.iter().map(|s| s.to_unresolved()).collect::<Vec<_>>();
+            self.box_container.set_style_props(styles);
+        }
+    }
+
+    fn on_attribute_changed(&mut self, key: &str, value: Option<&str>) {
+        match key {
+            "checked" => self.update_checked(value.is_some()),
+            _ => {},
+        }
+    }
+}
+
+#[mrc_object]
+struct CheckboxDelegate {
+    element: ElementWeak,
+    box_container: Container,
+    checked: bool,
+    img: Image,
+}
+
+impl CheckboxDelegate {
     fn update_checked(&mut self, checked: bool) {
         if self.checked != checked {
             self.checked = checked;
@@ -69,77 +144,8 @@ impl Checkbox {
         } else {
             Display::None
         };
-        self.img_element
-            .set_style_props(vec![FixedStyleProp::Display(StylePropVal::Custom(display))]);
+        self.img.set_style_props(vec![FixedStyleProp::Display(StylePropVal::Custom(display))]);
     }
 }
 
-impl ElementBackend for Checkbox {
-    fn create(element: &mut Element) -> Self
-    where
-        Self: Sized,
-    {
-        element.is_form_element = true;
-        element.register_js_event::<ChangeEvent>("change");
-        let base = Container::create(element);
-        let mut wrapper_element = Element::create(Container::create);
-        let mut box_element = Element::create(Container::create);
-        let label_element = Element::create(Label::create);
-        let mut img_element = Element::create(Image::create);
-        img_element
-            .get_backend_mut_as::<Image>()
-            .set_src_svg_raw(include_bytes!("./checked.svg"));
-        img_element.set_style_props(vec![
-            FixedStyleProp::Width(StylePropVal::Custom(LengthOrPercent::Percent(100.0))),
-            FixedStyleProp::Height(StylePropVal::Custom(LengthOrPercent::Percent(100.0))),
-        ]);
-        box_element.add_child(img_element.clone(), 0).unwrap();
-
-        wrapper_element.add_child(box_element.clone(), 0).unwrap();
-        wrapper_element.add_child(label_element.clone(), 1).unwrap();
-
-        element.add_child(wrapper_element.clone(), 0).unwrap();
-        wrapper_element.set_style_props(vec![
-            FixedStyleProp::AlignItems(StylePropVal::Custom(Align::Center)),
-            FixedStyleProp::FlexDirection(StylePropVal::Custom(FlexDirection::Row)),
-        ]);
-        let mut inst = CheckboxData {
-            element: element.as_weak(),
-            base,
-            img_element,
-            wrapper_element,
-            box_element,
-            label_element,
-            checked: false,
-        }
-        .to_ref();
-        inst.update_children();
-        inst
-    }
-
-    fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend> {
-        Some(&mut self.base)
-    }
-
-    fn on_event(&mut self, event: &mut Event, ctx: &mut EventContext<ElementWeak>) {
-        if ClickEvent::is(event) {
-            self.update_checked(!self.checked);
-        } else {
-            self.base.on_event(event, ctx);
-        }
-    }
-
-    fn accept_pseudo_element_styles(&mut self, styles: HashMap<String, Vec<ResolvedStyleProp>>) {
-        if let Some(styles) = styles.get("box") {
-            let styles = styles.iter().map(|s| s.to_unresolved()).collect::<Vec<_>>();
-            self.box_element.set_style_props(styles);
-        }
-    }
-
-    fn on_attribute_changed(&mut self, key: &str, value: Option<&str>) {
-        match key {
-            "checked" => self.update_checked(value.is_some()),
-            _ => self.base.on_attribute_changed(key, value),
-        }
-    }
-}
+js_module!(Checkbox);

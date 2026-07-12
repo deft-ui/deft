@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
+use crate::js_module;
 
 thread_local! {
     static DB: RefCell<Option<KVStorage>> = RefCell::new(None);
@@ -19,6 +20,8 @@ thread_local! {
 
 #[allow(nonstandard_style)]
 pub struct localstorage {}
+
+js_module!(localstorage, include_str!("./localstorage.js"));
 
 #[js_methods]
 impl localstorage {

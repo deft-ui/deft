@@ -150,7 +150,7 @@ text-input, text-edit {
     border-radius: 3px;
     min-height: 2em;
     padding: 4px;
-    overflow: auto;
+    /*overflow: auto;*/
 }
 
 text-input, entry {

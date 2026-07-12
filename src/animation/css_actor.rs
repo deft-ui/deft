@@ -16,7 +16,8 @@ impl CssAnimationActor {
 
 impl AnimationActor for CssAnimationActor {
     fn apply_animation(&mut self, position: f32, _stop: &mut bool) {
-        let mut el = ok_or_return!(self.element.upgrade());
+        let element = self.element.clone();
+        let mut el = ok_or_return!(element.upgrade());
         el.animation_style_props.clear();
         let styles = self.animation.get_frame(position);
         for st in styles {

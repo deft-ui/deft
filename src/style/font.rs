@@ -1,10 +1,10 @@
-use crate::element::paragraph::parse_weight;
 use crate::font::family::{FontFamilies, FontFamily};
 use crate::style::length::{parse_percent, Length, LengthContext};
 use crate::style::PropValueParse;
 use skia_safe::font_style::{Slant, Weight};
 use std::ops::Deref;
 use std::str::FromStr;
+use crate::text::textbox::util::parse_weight;
 
 #[derive(Clone, Debug, PartialEq, Copy, Hash, Eq)]
 pub enum FontStyle {

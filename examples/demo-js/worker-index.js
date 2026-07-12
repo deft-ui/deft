@@ -1,4 +1,4 @@
-
+console.log("Worker: started");
 workerContext.bindMessage((data) => {
     console.log("Worker: received message from parent", data);
 })

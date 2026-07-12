@@ -1,12 +1,13 @@
 use crate as deft;
-use crate::base::{EventContext, Rect};
+use crate::base::Rect;
+use crate::js_module;
 use crate::canvas_util::CanvasHelper;
 use crate::element::common::editable::Editable;
 use crate::element::common::image_object::ImageObject;
 use crate::element::container::Container;
 use crate::element::label::Label;
-use crate::element::{Element, ElementBackend, ElementWeak};
-use crate::event::{ClickEvent, ClickEventListener, Event};
+use crate::element::{Element, Widget, ElementDelegate, ElementWeak};
+use crate::event::ClickEventListener;
 use crate::mrc::Mrc;
 use crate::render::RenderFn;
 use crate::style::length::{Length, LengthOrPercent};
@@ -14,7 +15,7 @@ use crate::style::{FixedStyleProp, ResolvedStyleProp, StylePropKey, StylePropVal
 use crate::text::textbox::TextBox;
 use crate::window::popup::Popup;
 use crate::{js_deserialize, js_serialize, ok_or_return, some_or_return};
-use deft_macros::{element_backend, event, js_methods};
+use deft_macros::{widget, event, js_methods, mrc_object};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::DerefMut;
@@ -31,22 +32,20 @@ js_deserialize!(SelectOption);
 #[event]
 pub struct ChangeEvent {}
 
-#[element_backend]
-pub struct Select {
+#[mrc_object]
+struct SelectState {
     element_weak: ElementWeak,
-    label: Label,
     placeholder: TextBox,
-    value: String,
-    options: Vec<SelectOption>,
     select_img: ImageObject,
     options_style: Vec<FixedStyleProp>,
     option_style: Vec<FixedStyleProp>,
     option_hover_style: Vec<FixedStyleProp>,
+    label: Label,
+    value: String,
+    options: Vec<SelectOption>,
 }
 
-#[js_methods]
-impl Select {
-    #[js_func]
+impl SelectState {
     pub fn set_value(&mut self, value: String) {
         if self.value != value {
             let label = self
@@ -62,41 +61,14 @@ impl Select {
         }
     }
 
-    #[js_func]
-    pub fn get_value(&self) -> String {
-        self.value.clone()
-    }
-
-    #[js_func]
-    pub fn set_options(&mut self, options: Vec<SelectOption>) {
-        self.options = options;
-    }
-
-    #[js_func]
-    pub fn get_options(&self) -> Vec<SelectOption> {
-        self.options.clone()
-    }
-
-    #[js_func]
-    pub fn set_placeholder(&mut self, value: String) {
-        self.placeholder.clear();
-        self.placeholder.add_line(Editable::build_line(value));
-        self.element_weak.mark_dirty(false);
-    }
-
-    #[js_func]
-    pub fn get_placeholder(&self) -> String {
-        self.placeholder.get_text()
-    }
-
     fn build_options_element<F: FnOnce(String) + Clone + 'static>(
         &self,
         value_setter: F,
-    ) -> Element {
-        let mut wrapper = Element::create(Container::create);
+    ) -> Container {
+        let mut wrapper = Container::create();
         wrapper.set_style_props(self.options_style.clone());
         for option in &self.options {
-            let mut label_el = Element::create(Label::create);
+            let mut label_el = Label::create();
             label_el.set_style_props(self.option_style.clone());
             label_el.set_hover_styles(self.option_hover_style.clone());
             let setter = value_setter.clone();
@@ -104,60 +76,135 @@ impl Select {
             label_el.register_event_listener(ClickEventListener::new(move |_e, _ctx| {
                 (setter.clone())(value.value.clone());
             }));
-            let mut label = label_el.get_backend_as::<Label>().clone();
-            label.set_text(option.label.clone());
+            label_el.set_text(option.label.clone());
             wrapper
-                .add_child(label_el, wrapper.children.len() as i32)
+                .add_child(&label_el, None)
                 .unwrap();
         }
         wrapper
     }
 }
 
-impl ElementBackend for Select {
-    fn create(element: &mut Element) -> Self {
+#[widget]
+pub struct Select {
+    state: SelectState,
+}
+
+#[js_methods]
+impl Select {
+   
+    #[js_func]
+    pub fn set_value(&mut self, value: String) {
+        self.state.set_value(value)
+    }
+
+    #[js_func]
+    pub fn get_value(&self) -> String {
+        self.state.value.clone()
+    }
+
+    #[js_func]
+    pub fn set_options(&mut self, options: Vec<SelectOption>) {
+        self.state.options = options;
+    }
+
+    #[js_func]
+    pub fn get_options(&self) -> Vec<SelectOption> {
+        self.state.options.clone()
+    }
+
+    #[js_func]
+    pub fn set_placeholder(&mut self, value: String) {
+        self.state.placeholder.clear();
+        self.state.placeholder.add_line(Editable::build_line(value));
+        self.state.element_weak.mark_dirty(false);
+    }
+
+    #[js_func]
+    pub fn get_placeholder(&self) -> String {
+        self.state.placeholder.get_text()
+    }
+
+    #[js_func]
+    pub fn create() -> Self {
+        let mut element = Element::new("select");
         element.is_form_element = true;
         element.register_js_event::<ChangeEvent>("change");
-        let label_el = Element::create(Label::create);
-        let label = label_el.get_backend_as::<Label>().clone();
-        element.add_child(label_el.clone(), 0).unwrap();
+        let label = Label::create();
+        element.add_child(&label, Some(0)).unwrap();
 
         let select_img = ImageObject::from_svg_bytes(include_bytes!("./select.svg"));
 
         let placeholder = TextBox::new();
 
-        SelectData {
-            element_weak: element.as_weak(),
+        let state = SelectStateData {
             placeholder,
-            label,
-            value: "".to_string(),
-            options: vec![],
             select_img,
+            element_weak: element.as_weak(),
             options_style: vec![],
             option_style: vec![],
             option_hover_style: vec![],
-        }
-        .to_ref()
-    }
-    fn get_base_mut(&mut self) -> Option<&mut dyn ElementBackend> {
-        None
+            label,
+            value: "".to_string(),
+            options: vec![],
+        }.to_ref();
+
+        element.set_delegate(state.clone());
+        let mut inst = Self {
+            el: element,
+            state,
+        };
+        let el = inst.el.as_weak();
+        let me = inst.state.as_weak();
+        inst.el.register_event_listener(ClickEventListener::new(move |_e, _ctx| {
+            let el = ok_or_return!(el.upgrade());
+            let w = some_or_return!(el.get_window());
+            let bounds = el.get_origin_bounds();
+
+            let mut popup: Mrc<Option<Popup>> = Mrc::new(None);
+            let mut popup_mrc = popup.clone();
+            let me2 = me.clone();
+            let value_setter = move |v| {
+                let mut select = ok_or_return!(me2.upgrade());
+                select.set_value(v);
+                if let Some(p) = popup_mrc.deref_mut() {
+                    let _ = p.clone().close();
+                }
+            };
+            let me = ok_or_return!(me.upgrade());
+            let mut options = me.build_options_element(value_setter);
+            options.set_style_props(vec![FixedStyleProp::MinWidth(StylePropVal::Custom(
+                LengthOrPercent::Length(Length::PX(bounds.width)),
+            ))]);
+            *popup = Some(Popup::new(&options, bounds, &w));
+        }));
+        inst
     }
 
+}
+
+impl Widget for Select {
+
+}
+
+impl ElementDelegate for SelectState {
+
     fn render(&mut self) -> RenderFn {
-        let el = ok_or_return!(self.element_weak.upgrade(), RenderFn::empty());
+        let element_weak = self.element_weak.clone();
+        let el = ok_or_return!(element_weak.upgrade(), RenderFn::empty());
         let bounds = el.get_bounds();
         let (img_width, img_height) = self.select_img.get_container_size();
         let y = (bounds.height - img_height) / 2.0;
         let x = bounds.width - img_width - y;
-        let img = self.select_img.render();
-        let placeholder_renderer = if self.label.get_text().is_empty() {
+        let mut img = self.select_img.render();
+        let mut placeholder_renderer = if self.label.get_text().is_empty() {
             Some(self.placeholder.render())
         } else {
             None
         };
         let (pt, _, _, pl) = el.get_padding();
         RenderFn::new(move |painter| {
-            if let Some(pr) = placeholder_renderer {
+            if let Some(pr) = &mut placeholder_renderer {
                 painter.canvas.session(|c| {
                     c.translate((pl, pt));
                     pr.run(painter);
@@ -168,28 +215,6 @@ impl ElementBackend for Select {
         })
     }
 
-    fn on_event(&mut self, event: &mut Event, _ctx: &mut EventContext<ElementWeak>) {
-        let el = ok_or_return!(self.element_weak.upgrade());
-        let w = some_or_return!(el.get_window());
-        let bounds = el.get_origin_bounds();
-        if let Some(_) = ClickEvent::cast(event) {
-            let mut popup: Mrc<Option<Popup>> = Mrc::new(None);
-            let mut popup_mrc = popup.clone();
-            let weak = self.as_weak();
-            let value_setter = move |v| {
-                let mut select = ok_or_return!(weak.upgrade());
-                select.set_value(v);
-                if let Some(p) = popup_mrc.deref_mut() {
-                    let _ = p.clone().close();
-                }
-            };
-            let mut options_el = self.build_options_element(value_setter);
-            options_el.set_style_props(vec![FixedStyleProp::MinWidth(StylePropVal::Custom(
-                LengthOrPercent::Length(Length::PX(bounds.width)),
-            ))]);
-            *popup = Some(Popup::new(options_el, bounds, &w));
-        }
-    }
     fn accept_pseudo_element_styles(&mut self, styles: HashMap<String, Vec<ResolvedStyleProp>>) {
         if let Some(styles) = styles.get("options") {
             let styles: Vec<FixedStyleProp> = styles.iter().map(|it| it.to_unresolved()).collect();
@@ -226,7 +251,8 @@ impl ElementBackend for Select {
     }
 
     fn handle_style_changed(&mut self, key: StylePropKey) {
-        let mut el = ok_or_return!(self.element_weak.upgrade());
+        let element_weak = self.element_weak.clone();
+        let mut el = ok_or_return!(element_weak.upgrade());
         match key {
             StylePropKey::Color => {
                 if self.select_img.set_color(el.style.color) {
@@ -237,3 +263,5 @@ impl ElementBackend for Select {
         }
     }
 }
+
+js_module!(Select);

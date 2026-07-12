@@ -1,3 +1,15 @@
+import {
+    ButtonWidget,
+    CheckboxWidget, ContainerWidget, ImageWidget,
+    LabelWidget,
+    RadioWidget,
+    RadioGroupWidget, RichTextWidget, SelectWidget,
+    TextEditWidget,
+    TextInputWidget
+} from "deft:ui";
+
+import {Menu, StandardMenuItem} from "deft:menu"
+
 const stylesheet = `
 .main {
     gap: 10px;
@@ -23,27 +35,27 @@ const stylesheet = `
 //TODO support :last selector
 
 function createLabel(text, onClick = null) {
-    const label = new LabelElement();
+    const label = new LabelWidget();
     label.text = text;
     onClick && label.bindClick(onClick);
     return label;
 }
 
 function createTextInput() {
-    const input = new TextInputElement();
+    const input = new TextInputWidget();
     input.placeholder = "You can input text here";
     return input;
 }
 
 function createPassword() {
-    const input = new TextInputElement();
+    const input = new TextInputWidget();
     input.type = "password";
     input.placeholder = "You can input password here"
     return input;
 }
 
 function createMultiLineEntry() {
-    const textEdit = new TextEditElement();
+    const textEdit = new TextEditWidget();
     textEdit.placeholder = "You can input multiline text here";
     textEdit.style = {
         height: '4em',
@@ -56,11 +68,11 @@ function createMultiLineEntry() {
  * @param title
  * @param callback {(e: IMouseEvent) => void}
  * @param tooltip
- * @returns {ButtonElement}
+ * @returns {ButtonWidget}
  */
 function createButton(title, callback, tooltip = "") {
-    const btn = new ButtonElement();
-    const label = new LabelElement();
+    const btn = new ButtonWidget();
+    const label = new LabelWidget();
     label.text = title;
     btn.addChild(label);
     btn.tooltip = tooltip;
@@ -76,20 +88,20 @@ function createButton(title, callback, tooltip = "") {
 }
 
 function createCheckbox(label) {
-    const cb = new CheckboxElement();
+    const cb = new CheckboxWidget();
     // cb.disabled = true;
     cb.label = label;
     return cb;
 }
 
 function createRadio(label) {
-    const radio = new RadioElement();
+    const radio = new RadioWidget();
     radio.label = label;
     return radio;
 }
 
 function createRadioGroup(radioList) {
-    const group = new RadioGroupElement();
+    const group = new RadioGroupWidget();
     group.style = {
         flexDirection: 'row',
         gap: '1em',
@@ -101,7 +113,7 @@ function createRadioGroup(radioList) {
 }
 
 function createImage() {
-    const img = new ImageElement();
+    const img = new ImageWidget();
     img.style = {
         width: 32,
         height: 32,
@@ -111,7 +123,7 @@ function createImage() {
 }
 
 function createRichText() {
-    const richText = new RichTextElement();
+    const richText = new RichTextWidget();
     richText.style = {
         fontSize: 20,
     }
@@ -143,7 +155,7 @@ function createRichText() {
 }
 
 function createSelect() {
-    const el = new SelectElement();
+    const el = new SelectWidget();
     el.options = ["JavaScript", "Rust", "C", "C++", "Java", "Delphi", "C#"].map(it => ({value: it, label: it}));
     el.placeholder = "Select your language...";
     el.bindChange(() => {
@@ -160,11 +172,11 @@ function main() {
         height: 400,
     });
     window.title = "Deft Gallery";
-    const scroll = new ContainerElement();
+    const scroll = new ContainerWidget();
     scroll.className = "main";
     window.body.addChild(scroll);
     if (process.platform === "web") {
-        const tip = new LabelElement();
+        const tip = new LabelWidget();
         tip.text = "No CJK fonts loaded, only English will be displayed";
         tip.style = {
             color: '#F00'
@@ -172,17 +184,17 @@ function main() {
         scroll.addChild(tip);
     }
 
-    function createElementRow(label, element, flexDirection = "column") {
-        const container = new ContainerElement();
+    function createWidgetRow(label, element, flexDirection = "column") {
+        const container = new ContainerWidget();
         container.className = "element-row"
-        const labelElement = new LabelElement();
-        labelElement.text = label;
-        labelElement.className = "element-name";
-        container.addChild(labelElement);
+        const labelWidget = new LabelWidget();
+        labelWidget.text = label;
+        labelWidget.className = "element-name";
+        container.addChild(labelWidget);
         if (typeof element === "function") {
             element = element();
         }
-        const elementWrapper = new ContainerElement();
+        const elementWrapper = new ContainerWidget();
         elementWrapper.style = { flexDirection }
         element = [].concat(element);
         for (const e of element) {
@@ -210,7 +222,7 @@ function main() {
     }, "Show confirm dialog")
 
     const buttonPopup = createButton("Popup", (e) => {
-        const label = new LabelElement();
+        const label = new LabelWidget();
         label.text = "Hello, Deft Gallery!";
         label.style = {
             padding: "4em 2em",
@@ -239,16 +251,16 @@ function main() {
         }
     })
 
-    createElementRow("Label", createLabel("Hello, Deft Gallery!"));
-    createElementRow("TextInput", entry);
-    createElementRow("Password", password);
-    createElementRow("TextEdit", multilineEntry);
-    createElementRow("Button", [button, confirmBtn, buttonPopup, buttonMenu], "row");
-    createElementRow("Radio", radioGroup)
-    createElementRow("Select", select);
-    createElementRow("Checkbox", [checkbox, disabledCheckbox], "row");
-    createElementRow("Image", createImage());
-    createElementRow("RichText", createRichText());
+    createWidgetRow("Label", createLabel("Hello, Deft Gallery!"));
+    createWidgetRow("TextInput", entry);
+    createWidgetRow("Password", password);
+    createWidgetRow("TextEdit", multilineEntry);
+    createWidgetRow("Button", [button, confirmBtn, buttonPopup, buttonMenu], "row");
+    createWidgetRow("Radio", radioGroup)
+    createWidgetRow("Select", select);
+    createWidgetRow("Checkbox", [checkbox, disabledCheckbox], "row");
+    createWidgetRow("Image", createImage());
+    createWidgetRow("RichText", createRichText());
 }
 
 try {

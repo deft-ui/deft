@@ -4,7 +4,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use crate::js::JsPo;
-use crate::{js_serialize, js_value};
+use crate::{js_module, js_serialize, js_value};
 use anyhow::{anyhow, Error};
 use deft_macros::js_methods;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
@@ -37,6 +37,8 @@ pub struct FetchOptions {
 
 #[allow(nonstandard_style)]
 pub struct fetch;
+
+js_module!(fetch, include_str!("./fetch.js"));
 
 js_serialize!(Header);
 
