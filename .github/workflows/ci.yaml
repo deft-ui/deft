@@ -123,21 +123,20 @@ jobs:
 
   ci-wasm:
     name: Wasm
-    runs-on: windows-2022
+    runs-on: ubuntu-latest
+    container: rust:1.89
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
-      - uses: mymindstorm/setup-emsdk@v14
-        with:
-          version: 4.0.9
-          actions-cache-folder: emsdk-cache
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.89
       - name: Install
         run: |
+          apt-get update
+          apt-get install -y build-essential libssl-dev libclang-dev libc++-dev;
           rustup target add wasm32-unknown-emscripten
+          cd / && git clone https://github.com/emscripten-core/emsdk.git && cd emsdk && ./emsdk install 4.0.9 && ./emsdk activate 4.0.9
       - name: Build
-        run: cd examples/gallery && cargo build --target wasm32-unknown-emscripten --release
+        shell: bash
+        run: |
+          . /emsdk/emsdk_env.sh
+          cd examples/gallery && cargo build --target wasm32-unknown-emscripten --release

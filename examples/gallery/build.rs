@@ -1,6 +1,7 @@
 use cfg_aliases::cfg_aliases;
 fn main() {
-    println!("cargo:rustc-env=EMCC_CFLAGS=-s MAX_WEBGL_VERSION=2 -s MODULARIZE=1 -s EXPORT_NAME=loadDeftApp -s EXPORTED_RUNTIME_METHODS=GL,cwrap");
+    // https://emscripten.org/docs/tools_reference/settings_reference.html#error-on-undefined-symbols
+    println!("cargo:rustc-env=EMCC_CFLAGS=-s ERROR_ON_UNDEFINED_SYMBOLS=0 -s MAX_WEBGL_VERSION=2 -s MODULARIZE=1 -s EXPORT_NAME=loadDeftApp -s EXPORTED_RUNTIME_METHODS=GL,cwrap");
     println!("cargo:rerun-if-changed=build.rs");
 
     cfg_aliases! {
