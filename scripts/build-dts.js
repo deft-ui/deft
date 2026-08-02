@@ -15,6 +15,8 @@ const list = [
     item("src/ext", "audio", "deft:audio"),
     item("src/ext", "clipboard", "deft:clipboard"),
     item("src/ext", "dialog", "deft:dialog"),
+    item("src/ext", "stylesheet", "deft:core:stylesheet"),
+    item("src/ext", "jsapp", "deft:core:jsapp"),
     item("src/ext", "sqlite", "deft:sqlite"),
     item("src/ext", "fetch")
 ]

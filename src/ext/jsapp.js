@@ -1,7 +1,7 @@
 import * as jsAppApi from "native";
 import {EventBinder} from "deft:core";
 
-class DeftApp {
+export class DeftApp {
 
     /**
      * @var {EventBinder}
@@ -14,7 +14,7 @@ class DeftApp {
 
     /**
      *
-     * @param callback {(event: IAppReopenEvent) => void}
+     * @param callback {(event: import("deft:ui").IAppReopenEvent) => void}
      */
     bindReopen(callback) {
         this.#eventBinder.bindEvent("reopen", callback);

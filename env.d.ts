@@ -219,7 +219,7 @@ declare module "deft:path" {
     export function join(path: string, other: string): string;
 }
 
-// declare function animation_create(name: string, keyFrames: Record<string, Record<string, any>>)
+declare function animation_create(name: string, keyFrames: Record<string, Record<string, any>>)
 
 declare interface TypefaceParams {
     family: string,
@@ -314,3 +314,12 @@ declare function setInterval(callback: () => void, interval: number): number;
 
 declare function clearInterval(timer: number): void;
 
+declare class DeftNavigator {
+    app: import("deft:core:jsapp").DeftApp;
+    stylesheet: import("deft:core:stylesheet").Stylesheet;
+    clipboard: import("deft:clipboard").Clipboard;
+    fileDialog: import("deft:dialog").FileDialog;
+}
+
+//@ts-ignore
+declare const navigator: DeftNavigator;
