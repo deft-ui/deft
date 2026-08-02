@@ -214,7 +214,7 @@ impl JsEngine {
 
         // Init sqlite module
         #[cfg(feature = "sqlite")]
-        engine.register_mod::<crate::ext::ext_sqlite::SqliteConn>("deft:sqlite").unwrap();
+        engine.register_module::<crate::ext::ext_sqlite::SqliteConn>("deft:sqlite").unwrap();
 
         // Init system tray module
         #[cfg(feature = "tray")]
