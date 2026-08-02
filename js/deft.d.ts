@@ -395,9 +395,9 @@ export class Window {
     get handle(): any;
     /**
      *
-     * @returns {BodyElement}
+     * @returns {BodyWidget}
      */
-    get body(): BodyElement;
+    get body(): BodyWidget;
     /**
      *
      * @returns {{width: number, height: number}}
@@ -408,19 +408,19 @@ export class Window {
     };
     /**
      *
-     * @param content {Element}
+     * @param content {Widget}
      * @param x {number}
      * @param y {number}
      * @return {Page}
      */
-    createPage(content: Element, x: number, y: number): Page;
+    createPage(content: Widget, x: number, y: number): Page;
     /**
      *
-     * @param content {Element}
+     * @param content {Widget}
      * @param target {{x: number, y: number, width?: number, height?: number}}
      * @return {Popup}
      */
-    popup(content: Element, target: {
+    popup(content: Widget, target: {
         x: number;
         y: number;
         width?: number;
@@ -435,24 +435,24 @@ export class Window {
     popupMenu(menu: import("deft:menu").Menu, x: number, y: number): void;
     /**
      *
-     * @param message {string | Element}
+     * @param message {string | Widget}
      * @param options {AlertOptions}
      */
-    showAlert(message: string | Element, options?: AlertOptions): void;
+    showAlert(message: string | Widget, options?: AlertOptions): void;
     /**
      *
-     * @param message {string | Element}
+     * @param message {string | Widget}
      * @param options {ConfirmOptions}
      * @returns {Promise<boolean>}
      */
-    showConfirm(message: string | Element, options?: ConfirmOptions): Promise<boolean>;
+    showConfirm(message: string | Widget, options?: ConfirmOptions): Promise<boolean>;
     /**
      *
-     * @param content {Element}
+     * @param content {Widget}
      * @param title {string}
      * @returns {{close(): void}}
      */
-    showDialog(content: Element, title: string): {
+    showDialog(content: Widget, title: string): {
         close(): void;
     };
     /**
@@ -574,7 +574,7 @@ export class Page {
     handle: any;
     close(): void;
 }
-export class Element {
+export class Widget {
     static fromHandle(elementHandle: any): any;
     /**
      *
@@ -583,9 +583,9 @@ export class Element {
      */
     constructor(el: any, context: object);
     /**
-     * @type {ContainerBasedElement}
+     * @type {ContainerBasedWidget}
      */
-    _parent: ContainerBasedElement;
+    _parent: ContainerBasedWidget;
     /**
      * @type number
      */
@@ -618,9 +618,9 @@ export class Element {
     get className(): string;
     /**
      * Get the parent of element
-     * @returns {Element | null}
+     * @returns {Widget | null}
      */
-    get parent(): Element | null;
+    get parent(): Widget | null;
     /**
      * Make element focusable or not
      * @param focusable {boolean}
@@ -633,9 +633,9 @@ export class Element {
     get focusable(): boolean;
     /**
      * Get the root of current element
-     * @returns {Element}
+     * @returns {Widget}
      */
-    get rootElement(): Element;
+    get rootWidget(): Widget;
     /**
      * Request focus on the current element
      */
@@ -824,7 +824,7 @@ export class Element {
     toString(): string;
     
 }
-export class LabelElement extends Element {
+export class LabelWidget extends Widget {
     constructor();
     /**
      *
@@ -832,7 +832,7 @@ export class LabelElement extends Element {
      */
     set text(text: string);
 }
-export class CheckboxElement extends Element {
+export class CheckboxWidget extends Widget {
     constructor();
     /**
      *
@@ -870,7 +870,7 @@ export class CheckboxElement extends Element {
      */
     bindChange(callback: (e: IVoidEvent) => void): void;
 }
-export class RadioElement extends Element {
+export class RadioWidget extends Widget {
     constructor();
     /**
      *
@@ -908,7 +908,7 @@ export class RadioElement extends Element {
      */
     bindChange(callback: (e: IVoidEvent) => void): void;
 }
-export class SelectElement extends Element {
+export class SelectWidget extends Widget {
     constructor();
     /**
      *
@@ -964,7 +964,7 @@ export class SelectElement extends Element {
  *   backgroundColor ?: string
  * }} TextUnit
  */
-export class RichTextElement extends Element {
+export class RichTextWidget extends Widget {
     constructor();
     /**
      *
@@ -1001,11 +1001,11 @@ export class RichTextElement extends Element {
      */
     get selectionText(): string | undefined;
 }
-export class ImageElement extends Element {
+export class ImageWidget extends Widget {
     constructor();
     set src(src: any);
 }
-export class TextInputElement extends Element {
+export class TextInputWidget extends Widget {
     constructor();
     /**
      *
@@ -1054,7 +1054,7 @@ export class TextInputElement extends Element {
      */
     bindCaretChange(callback: (e: ICaretEvent) => void): void;
 }
-export class TextEditElement extends Element {
+export class TextEditWidget extends Widget {
     constructor();
     /**
      *
@@ -1114,38 +1114,38 @@ export class TextEditElement extends Element {
      */
     bindCaretChange(callback: (e: ICaretEvent) => void): void;
 }
-export class ContainerBasedElement extends Element {
+export class ContainerBasedWidget extends Widget {
     /**
      *
-     * @param child {Element}
+     * @param child {Widget}
      * @param index {number}
      */
-    addChild(child: Element, index?: number): void;
+    addChild(child: Widget, index?: number): void;
     /**
      *
-     * @param newNode {Element}
-     * @param referenceNode {Element}
+     * @param newNode {Widget}
+     * @param referenceNode {Widget}
      */
-    addChildBefore(newNode: Element, referenceNode: Element): void;
+    addChildBefore(newNode: Widget, referenceNode: Widget): void;
     /**
      *
-     * @param newNode {Element}
-     * @param referenceNode {Element}
+     * @param newNode {Widget}
+     * @param referenceNode {Widget}
      */
-    addChildAfter(newNode: Element, referenceNode: Element): void;
+    addChildAfter(newNode: Widget, referenceNode: Widget): void;
     /**
      *
-     * @param child {Element}
+     * @param child {Widget}
      */
-    removeChild(child: Element): void;
+    removeChild(child: Widget): void;
     /**
      *
-     * @returns {Element[]}
+     * @returns {Widget[]}
      */
-    get children(): Element[];
+    get children(): Widget[];
     
 }
-export class ButtonElement extends ContainerBasedElement {
+export class ButtonWidget extends ContainerBasedWidget {
     constructor();
     /**
      *
@@ -1158,19 +1158,19 @@ export class ButtonElement extends ContainerBasedElement {
      */
     get disabled(): boolean;
 }
-export class ContainerElement extends ContainerBasedElement {
+export class ContainerWidget extends ContainerBasedWidget {
     constructor();
 }
-export class DialogElement extends ContainerBasedElement {
+export class DialogWidget extends ContainerBasedWidget {
     constructor();
 }
-export class DialogTitleElement extends ContainerBasedElement {
+export class DialogTitleWidget extends ContainerBasedWidget {
     constructor();
 }
-export class BodyElement extends ContainerBasedElement {
+export class BodyWidget extends ContainerBasedWidget {
     constructor(creator: any);
 }
-export class RadioGroupElement extends ContainerBasedElement {
+export class RadioGroupWidget extends ContainerBasedWidget {
     constructor();
 }
 /**

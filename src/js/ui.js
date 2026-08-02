@@ -747,7 +747,7 @@ export class Widget {
 
     /**
      *
-     * @returns {WidgetRect}
+     * @returns {ElementRect}
      */
     getBoundingClientRect() {
         return elementApi.getBoundingClientRect(this.handle);
