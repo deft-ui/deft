@@ -13,7 +13,6 @@ edition = "2021"
 [dependencies]
 deft-macros = { path = "packages/deft-macros", version = "1.0.0" }
 
-quick-js = { package = "deft-quick-js", version = "0.9.0"}
 yoga = { package = "deft-yoga", version = "0.7.1" }
 winit = { package = "deft-winit", version = "0.36.0", features = ["android-native-activity", "rwh_06"] }
 skia-window = { path = "skia-window", version = "0.11.0"}
@@ -95,8 +94,11 @@ windows = { version = "0.61.1", features = ["Win32_System_Console"] }
 
 [target.'cfg(target_os = "emscripten")'.dependencies]
 skia-window = { path = "skia-window", version = "0.11.0", features = ["webgl"] }
+quick-js = { package = "deft-quick-js", version = "0.10.0"}
+
 [target.'cfg(not(target_os = "emscripten"))'.dependencies]
 tokio = { version = "1.38.0", features = ["rt-multi-thread", "fs", "macros", "io-std", "io-util", "sync"] }
+quick-js = { package = "deft-quick-js", version = "0.10.0", features = ["libc"]}
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = { version = "0.5", features = ["relax-sign-encoding"] }
